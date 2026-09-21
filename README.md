@@ -41,11 +41,21 @@
 | [docs/02-metrics-spec.md](docs/02-metrics-spec.md) | 指標・判定仕様 v1.0（全 10 指標の定義・計算式・入力形式・境界条件） |
 | [docs/03-open-questions.md](docs/03-open-questions.md) | 決定事項の記録（D-1〜D-14）と、Phase 1 と並行して確定する残課題 |
 | [docs/04-tech-stack.md](docs/04-tech-stack.md) | 技術スタック v1.0（構成・OpenAPI 連携・開発環境・採用しなかった選択肢） |
+| [docs/05-architecture.md](docs/05-architecture.md) | 方式設計（状態遷移・ジョブ・正規化・判定・認証認可・エラー処理） |
+| [docs/06-database-design.md](docs/06-database-design.md) | データベース設計（テーブル定義・インデックス・保持期間・Flyway 規約） |
+| [docs/07-api-design.md](docs/07-api-design.md) | API 設計（エンドポイント・認可マトリクス・エラーコード） |
+| [docs/08-screen-design.md](docs/08-screen-design.md) | 画面設計（画面遷移・ステータス表現・各画面・アクセシビリティ） |
 
 ## ステータス
 
-**要件定義 完了（v1.0 確定 / 2026-09-21）。実装は未着手です。**
+**基本設計 完了（2026-09-21）。実装は未着手です。**
 
-次は基本設計（画面設計・API 設計・データベース設計）に進みます。
+| フェーズ | 状態 |
+| --- | --- |
+| 要件定義 | 完了（v1.1 確定） |
+| 技術スタック | 完了（v1.0 確定） |
+| 基本設計（方式・DB・API・画面） | 完了 |
+| 詳細設計・実装 | 未着手 |
+
 残る未決事項は Phase 1 の実装と並行して確定できるものに限られます
 （[docs/03-open-questions.md](docs/03-open-questions.md)）。

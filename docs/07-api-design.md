@@ -1,0 +1,677 @@
+# quality-gate API 設計
+
+| 項目 | 内容 |
+| --- | --- |
+| ドキュメント名 | quality-gate API 設計（基本設計） |
+| バージョン | 1.0 |
+| 最終更新 | 2026-09-21 |
+| 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
+
+本書で定義した API から `api/openapi.yml` が生成され、
+それを入力にフロントエンドの型と呼び出しコードが生成される（[04](04-tech-stack.md) 4 章）。
+**本書と実装がずれた場合、正は実装（springdoc の出力）**である。
+本書は設計意図と全体像を示すものと位置づける。
+
+---
+
+## 1. 共通仕様
+
+### 1.1 基本方針
+
+| 項目 | 仕様 |
+| --- | --- |
+| ベースパス | `/api/v1` |
+| 形式 | JSON（`application/json; charset=utf-8`）。成果物アップロードのみ `multipart/form-data` |
+| 日時 | RFC 3339 / ISO 8601、**UTC 固定**（`2026-09-21T02:10:00Z`）。表示時のタイムゾーン変換はフロントエンドの責務 |
+| ID | UUID（文字列） |
+| 命名 | パスは複数形のケバブケース、プロパティは `camelCase` |
+| 数値 | 割合・時間などの判定対象値は**文字列ではなく数値**で返す。丸めはサーバ側で行い、表示桁数もサーバが決める |
+| バージョニング | パスに `v1` を含む。破壊的変更は `v2` を追加する（[02](02-metrics-spec.md) M-09） |
+
+### 1.2 認証
+
+2 つの独立した認証経路を持つ。
+
+| 経路 | 対象 | 方式 |
+| --- | --- | --- |
+| セッション | `/api/v1/**`（Ingest を除く） | GitHub OAuth ログイン後の `SESSION` Cookie（HttpOnly / SameSite=Lax / Secure） |
+| Ingest Token | `/api/v1/runs`（POST 系） | `Authorization: Bearer qg_<prefix>_<secret>` |
+
+同一オリジン構成のため CORS 設定は行わない。
+**状態変更を伴う操作には CSRF トークンを要求する**（Spring Security の既定）。
+Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で
+免除登録や設定変更が実行できてしまう。
+
+Ingest API は Cookie を用いないため CSRF の対象外とし、当該パスのみ除外する。
+
+### 1.3 エラー応答（RFC 9457）
+
+```json
+{
+  "type": "https://quality-gate.example/problems/artifact-format-invalid",
+  "title": "成果物の形式が不正です",
+  "status": 422,
+  "detail": "jacoco-xml として解釈できませんでした: 行 12 で予期しない要素 <foo> が現れました",
+  "instance": "/api/v1/runs/018f8c.../artifacts",
+  "errorCode": "ARTIFACT_FORMAT_INVALID",
+  "timestamp": "2026-09-21T02:10:05Z",
+  "traceId": "3f8a1c...",
+  "violations": [
+    { "field": "runnerType", "message": "self-hosted / github-hosted のいずれかを指定してください" }
+  ]
+}
+```
+
+- `errorCode` が機械可読な識別子。**クライアントは `title` / `detail` に依存しない**
+- `violations` は入力検証エラーのときのみ含む
+- `traceId` はサーバログの相関 ID と一致する
+
+### 1.4 ページング
+
+カーソル方式を採る。Run は時系列に増え続け、オフセット方式では
+ページ送りの途中で新しい Run が入ると重複・欠落が起きるためである。
+
+```
+GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
+```
+
+```json
+{
+  "items": [ ... ],
+  "nextCursor": "eyJtIjoiMjAy...",
+  "hasMore": true
+}
+```
+
+カーソルは `(measured_at, id)` を Base64 で符号化したもの。
+`limit` の既定は 20、上限は 100。
+
+### 1.5 HTTP ステータスの使い分け
+
+| コード | 用途 |
+| --- | --- |
+| 200 | 取得・更新の成功 |
+| 201 | 生成の成功（`Location` ヘッダを付す） |
+| 202 | 受理したが処理は非同期（`finalize`、再評価） |
+| 204 | 削除・失効の成功 |
+| 400 | リクエスト形式の誤り |
+| 401 | 未認証 |
+| 403 | 権限不足、許可リスト未登録 |
+| 404 | 対象が存在しない、または閲覧権限がない |
+| 409 | 状態の競合（finalize 済みの Run への追加など） |
+| 413 | ファイルサイズ超過 |
+| 422 | 形式は正しいが内容が不正（成果物のパース失敗、設定の検証エラー） |
+| 429 | レート制限超過 |
+| 5xx | サーバ側の問題 |
+
+---
+
+## 2. エンドポイント一覧
+
+凡例: 認可の `—` は認証のみで可（`VIEWER` 以上）。
+
+### 2.1 Ingest API（CI → quality-gate）
+
+| メソッド | パス | 用途 | 認可 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/runs` | Run を作成し `runId` を払い出す | Ingest Token |
+| POST | `/api/v1/runs/{runId}/artifacts` | 成果物をアップロード | Ingest Token |
+| POST | `/api/v1/runs/{runId}/finalize` | 取り込み完了を宣言 | Ingest Token |
+| GET | `/api/v1/runs/{runId}/status` | 処理状態と判定結果（CI のポーリング用の軽量版） | Ingest Token |
+
+### 2.2 参照 API
+
+| メソッド | パス | 用途 | 認可 |
+| --- | --- | --- | --- |
+| GET | `/api/v1/me` | ログイン中の利用者情報とロール | — |
+| GET | `/api/v1/dashboard` | 全リポジトリのサマリ（S-01） | — |
+| GET | `/api/v1/repositories` | リポジトリ一覧 | — |
+| GET | `/api/v1/repositories/{id}` | リポジトリ詳細（S-02） | — |
+| GET | `/api/v1/repositories/{id}/trends` | 指標の時系列（S-05） | — |
+| GET | `/api/v1/runs` | Run 一覧 | — |
+| GET | `/api/v1/runs/{runId}` | Run 詳細（S-03） | — |
+| GET | `/api/v1/runs/{runId}/findings` | Finding 一覧（S-04） | — |
+| GET | `/api/v1/runs/{runId}/artifacts` | 成果物の一覧 | — |
+| GET | `/api/v1/runs/{runId}/artifacts/{artifactId}/content` | 成果物のダウンロード | — |
+| GET | `/api/v1/repositories/{id}/config` | 現在の設定と版履歴（S-06） | — |
+| GET | `/api/v1/waivers` | 免除の一覧（S-07） | — |
+
+### 2.3 操作 API
+
+| メソッド | パス | 用途 | 認可 |
+| --- | --- | --- | --- |
+| POST | `/api/v1/repositories` | リポジトリ登録 | ADMIN |
+| PATCH | `/api/v1/repositories/{id}` | リポジトリ設定の更新 | ADMIN |
+| POST | `/api/v1/repositories/{id}/components` | コンポーネント定義 | ADMIN |
+| POST | `/api/v1/repositories/{id}/ingest-tokens` | トークン発行（平文は応答時のみ） | ADMIN |
+| DELETE | `/api/v1/ingest-tokens/{id}` | トークン失効 | ADMIN |
+| PUT | `/api/v1/repositories/{id}/config` | UI からの設定更新 | ADMIN |
+| POST | `/api/v1/runs/{runId}/reevaluate` | 再評価の実行 | ADMIN |
+| POST | `/api/v1/waivers` | 免除の登録 | ADMIN |
+| DELETE | `/api/v1/waivers/{id}` | 免除の失効 | ADMIN |
+| GET | `/api/v1/users` | 利用者（許可リスト）一覧 | ADMIN |
+| POST | `/api/v1/users` | 許可リストへの追加 | ADMIN |
+| PATCH | `/api/v1/users/{id}` | ロール変更・無効化 | ADMIN |
+| GET | `/api/v1/audit-logs` | 監査ログ | ADMIN |
+
+### 2.4 認証以外の公開エンドポイント
+
+| メソッド | パス | 用途 | 認可 |
+| --- | --- | --- | --- |
+| GET | `/badges/{owner}/{name}.svg` | 最新判定のバッジ（FR-08-5） | 認証不要 |
+| GET | `/actuator/health` | ヘルスチェック | 認証不要 |
+| GET | `/actuator/prometheus` | メトリクス | 内部ネットワークのみ |
+
+バッジを認証不要にするのは、README に埋め込んだ画像を
+ブラウザが Cookie なしで取得するためである。
+バッジが返すのは**合否とリポジトリ名のみ**で、指標値や違反内容は含めない。
+
+---
+
+## 3. Ingest API の詳細
+
+### 3.1 `POST /api/v1/runs`
+
+**リクエスト**
+
+```json
+{
+  "repository": "ymiyamoto63/quality-gate",
+  "commitSha": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
+  "baseCommitSha": "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c",
+  "branch": "feature/order-api",
+  "pullRequestNumber": 1234,
+  "runnerType": "github-hosted",
+  "triggeredBy": "github-actions",
+  "ciRunUrl": "https://github.com/ymiyamoto63/quality-gate/actions/runs/123456",
+  "measuredAt": "2026-09-21T02:10:00Z",
+  "skippedMetrics": [
+    { "metricId": "M-02", "reason": "GitHub ホストランナーのため PIT を実行しない" },
+    { "metricId": "M-03", "reason": "GitHub ホストランナーのため k6 を実行しない" }
+  ]
+}
+```
+
+| 項目 | 必須 | 備考 |
+| --- | --- | --- |
+| `repository` | ○ | `owner/name`。トークンの発行元と一致しない場合 403 |
+| `commitSha` | ○ | 40 桁の 16 進 |
+| `baseCommitSha` | | 省略時は quality-gate が GitHub API で merge-base を解決 |
+| `branch` | ○ | |
+| `pullRequestNumber` | | |
+| `runnerType` | ○ | `self-hosted` / `github-hosted` |
+| `measuredAt` | ○ | |
+| `skippedMetrics` | | 省略時は「全指標を計測した」とみなす |
+
+**応答（201）**
+
+```json
+{
+  "runId": "018f8c1a-...",
+  "attempt": 1,
+  "status": "CREATED",
+  "detailUrl": "https://quality-gate.example/runs/018f8c1a-..."
+}
+```
+
+`detailUrl` を返すのは、CI のログに Run 詳細への直リンクを出せるようにするため。
+不合格を知ったときに、その場から詳細へ飛べる。
+
+### 3.2 `POST /api/v1/runs/{runId}/artifacts`
+
+`multipart/form-data`。
+
+| パート | 内容 |
+| --- | --- |
+| `file` | 成果物ファイル |
+| `type` | `jacoco-xml` など（[02](02-metrics-spec.md) 0.5） |
+| `component` | `backend` / `frontend`（任意） |
+| `scope` | `base` / `head`（M-07 のベース比較用、任意） |
+| `metadata` | JSON 文字列。性能成果物では `environment` が必須 |
+
+**応答（202）**
+
+```json
+{ "artifactId": "018f8c1b-...", "sizeBytes": 245678, "sha256": "e3b0c442..." }
+```
+
+| エラー | コード | 条件 |
+| --- | --- | --- |
+| 409 | `RUN_ALREADY_FINALIZED` | finalize 済みの Run |
+| 413 | `ARTIFACT_TOO_LARGE` | 50MB 超、または Run 合計 200MB 超 |
+| 422 | `ARTIFACT_TYPE_UNKNOWN` | 未知の `type` |
+| 422 | `PERFORMANCE_METADATA_MISSING` | 性能成果物で `environment` が欠落 |
+
+**この時点ではパースしない。** 受領・検証・保存のみを行い、
+パースは判定ジョブで実施する。アップロードごとにパースすると、
+CI の待ち時間がファイル数に比例して延びるためである。
+
+### 3.3 `POST /api/v1/runs/{runId}/finalize`
+
+リクエストボディなし。
+
+**応答（202）**
+
+```json
+{ "runId": "018f8c1a-...", "status": "FINALIZED", "detailUrl": "https://..." }
+```
+
+判定の完了は待たない（[05](05-architecture.md) 3.1）。
+
+### 3.4 `GET /api/v1/runs/{runId}/status`
+
+CI からのポーリング用。Run 詳細より軽量な応答を返す。
+
+```json
+{
+  "runId": "018f8c1a-...",
+  "status": "EVALUATED",
+  "verdict": "FAIL",
+  "completeness": "PARTIAL",
+  "summary": {
+    "pass": 5, "warn": 1, "fail": 1, "skip": 4, "reference": 0, "error": 0
+  },
+  "failedMetrics": [
+    { "metricId": "M-06", "name": "重大・高 脆弱性件数", "value": 2, "threshold": 0 }
+  ],
+  "detailUrl": "https://..."
+}
+```
+
+---
+
+## 4. 参照 API の詳細
+
+### 4.1 `GET /api/v1/dashboard`
+
+`repository_summaries`（[06](06-database-design.md) 3.14）を読むだけで応答する。
+
+```json
+{
+  "repositories": [
+    {
+      "repositoryId": "018f...",
+      "fullName": "ymiyamoto63/quality-gate",
+      "latestRun": {
+        "runId": "018f8c1a-...",
+        "verdict": "FAIL",
+        "completeness": "PARTIAL",
+        "measuredAt": "2026-09-21T02:12:30Z",
+        "branch": "main"
+      },
+      "categories": [
+        { "category": "機能テスト",   "status": "PASS" },
+        { "category": "性能テスト",   "status": "SKIP" },
+        { "category": "セキュリティ", "status": "FAIL" },
+        { "category": "コード構造",   "status": "PASS" },
+        { "category": "契約・互換性", "status": "PASS" },
+        { "category": "使いやすさ",   "status": "WARN" }
+      ],
+      "openCriticalCount": 1,
+      "openHighCount": 1,
+      "activeWaiverCount": 2,
+      "freshness": {
+        "lastMeasuredAt": "2026-09-21T02:12:30Z",
+        "lastFullMeasuredAt": "2026-09-14T02:11:00Z",
+        "staleMeasurement": false,
+        "staleFullMeasurement": true
+      }
+    }
+  ],
+  "alerts": [
+    { "code": "FULL_MEASUREMENT_STALE", "repositoryId": "018f...", "days": 7 }
+  ]
+}
+```
+
+`freshness` を応答に含めるのは、FR-06-2（計測途絶）と FR-06-3（完全計測途絶）を
+**画面側で計算させない**ため。基準日数は設定値であり、
+サーバが判定してブール値で返すほうが、設定変更が画面に確実に反映される。
+
+### 4.2 `GET /api/v1/runs/{runId}`
+
+```json
+{
+  "runId": "018f8c1a-...",
+  "repository": { "repositoryId": "018f...", "fullName": "ymiyamoto63/quality-gate" },
+  "commitSha": "a1b2c3d4...",
+  "commitUrl": "https://github.com/ymiyamoto63/quality-gate/commit/a1b2c3d4...",
+  "baseCommitSha": "9f8e7d6c...",
+  "baselineRunId": "018f8b02-...",
+  "branch": "main",
+  "pullRequestNumber": null,
+  "runnerType": "github-hosted",
+  "status": "EVALUATED",
+  "verdict": "FAIL",
+  "completeness": "PARTIAL",
+  "measuredAt": "2026-09-21T02:10:00Z",
+  "evaluatedAt": "2026-09-21T02:12:30Z",
+  "ciRunUrl": "https://github.com/.../actions/runs/123456",
+  "gateConfig": { "gateConfigId": "018f...", "version": 3, "sourceType": "FILE" },
+  "categories": [
+    {
+      "category": "機能テスト",
+      "status": "PASS",
+      "metrics": [
+        {
+          "metricId": "M-01",
+          "name": "ブランチカバレッジ",
+          "component": "backend",
+          "status": "PASS",
+          "value": 82.4,
+          "unit": "percent",
+          "threshold": { "operator": ">=", "value": 75 },
+          "previousValue": 81.9,
+          "delta": 0.5,
+          "reason": "しきい値 75% を満たしています",
+          "findingCount": 0
+        },
+        {
+          "metricId": "M-02",
+          "name": "ミューテーションスコア",
+          "component": "backend",
+          "status": "SKIP",
+          "value": null,
+          "skipReason": "GitHub ホストランナーのため PIT を実行しない",
+          "skipAccepted": true
+        }
+      ]
+    }
+  ],
+  "findingSummary": {
+    "new": 2, "continuing": 5, "resolved": 3, "waived": 2
+  },
+  "skippedMetrics": [
+    { "metricId": "M-02", "reason": "...", "accepted": true }
+  ]
+}
+```
+
+指標をカテゴリでまとめて返すのは、Run 詳細画面が
+**6 カテゴリの表として描画される**ため（[08](08-screen-design.md) 4.3）。
+平坦な配列を返して画面側で分類すると、カテゴリの定義が
+サーバとクライアントの 2 箇所に存在することになる。
+
+`reason` を**日本語の文として**返すのも同じ理由で、
+「しきい値をどう解釈したか」の表現をサーバに一元化する。
+
+### 4.3 `GET /api/v1/runs/{runId}/findings`
+
+| クエリ | 値 |
+| --- | --- |
+| `metricId` | `M-06` など |
+| `state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL`（複数可） |
+| `severity` | `CRITICAL` / `HIGH` / ...（複数可） |
+| `waived` | `true` / `false` |
+| `limit` / `cursor` | ページング |
+
+```json
+{
+  "items": [
+    {
+      "findingId": "018f...",
+      "metricId": "M-06",
+      "state": "NEW",
+      "severity": "HIGH",
+      "title": "CVE-2026-1234: example-lib の任意コード実行",
+      "filePath": "backend/pom.xml",
+      "line": null,
+      "sourceUrl": "https://github.com/.../blob/a1b2c3d4/backend/pom.xml",
+      "detail": {
+        "package": "com.example:example-lib",
+        "installedVersion": "1.2.3",
+        "fixedVersion": "1.2.5",
+        "cvssScore": 8.1,
+        "advisoryUrl": "https://..."
+      },
+      "waiver": null
+    }
+  ],
+  "nextCursor": null,
+  "hasMore": false
+}
+```
+
+`sourceUrl` はサーバが組み立てて返す。GitHub の URL 形式を
+フロントエンドに持たせると、ホスティング先が変わったときに
+両方を直す必要が生じる。
+
+### 4.4 `GET /api/v1/repositories/{id}/trends`
+
+| クエリ | 値 |
+| --- | --- |
+| `metricId` | 必須。複数指定可 |
+| `component` | 任意 |
+| `from` / `to` | 既定は直近 30 日 |
+| `branch` | 既定は `main` |
+
+```json
+{
+  "metricId": "M-03",
+  "unit": "ms",
+  "threshold": { "operator": "<=", "value": 500 },
+  "series": [
+    {
+      "seriesId": "self-hosted/perf-staging",
+      "label": "専有ランナー（perf-staging）",
+      "judged": true,
+      "points": [
+        { "runId": "018f...", "measuredAt": "2026-09-14T02:11:00Z", "value": 412.5, "status": "PASS" },
+        { "runId": "018f...", "measuredAt": "2026-09-16T02:11:00Z", "value": null,  "status": "SKIP" },
+        { "runId": "018f...", "measuredAt": "2026-09-18T02:11:00Z", "value": 468.1, "status": "WARN" }
+      ]
+    },
+    {
+      "seriesId": "github-hosted",
+      "label": "GitHub ホストランナー（参考値）",
+      "judged": false,
+      "points": [ ... ]
+    }
+  ]
+}
+```
+
+- **計測環境ごとに系列を分ける**（FR-08-2）。系列の分割はサーバが行う
+- `judged: false` の系列は参考値であり、画面では破線で描く（FR-08-6）
+- スキップした点は `value: null` として返す。**0 を返さない**。
+  0 を返すと、グラフ上で「性能が極めて良い」ように見えてしまう
+
+### 4.5 `GET /api/v1/repositories/{id}/config`
+
+```json
+{
+  "current": {
+    "gateConfigId": "018f...",
+    "version": 3,
+    "sourceType": "FILE",
+    "sourceCommitSha": "a1b2c3d4...",
+    "createdAt": "2026-09-20T01:00:00Z",
+    "rawYaml": "version: 1\n...",
+    "parsed": { "metrics": { "branch_coverage": { "threshold": 75 } } }
+  },
+  "history": [
+    { "gateConfigId": "018f...", "version": 3, "sourceType": "FILE", "createdAt": "..." },
+    { "gateConfigId": "018e...", "version": 2, "sourceType": "FILE", "createdAt": "..." }
+  ],
+  "validation": { "valid": true, "errors": [] }
+}
+```
+
+検証エラーがある場合:
+
+```json
+{
+  "validation": {
+    "valid": false,
+    "errors": [
+      { "line": 14, "path": "metrics.branch_coverage.threshold", "message": "0〜100 の数値を指定してください（受信値: \"75%\"）" },
+      { "line": 22, "path": "metrics.mutation_score.targets", "message": "未知のキーです。'components' の誤りではありませんか" }
+    ]
+  }
+}
+```
+
+行番号と、typo の候補提示まで返す。設定ファイルの誤りは
+**書いた人が自力で直せる情報**とセットで返さないと、問い合わせに変わる。
+
+---
+
+## 5. 操作 API の詳細
+
+### 5.1 `POST /api/v1/waivers`
+
+```json
+{
+  "repositoryId": "018f...",
+  "scope": "FINDING",
+  "metricId": "M-06",
+  "fingerprint": "e3b0c44298fc1c14...",
+  "reasonCategory": "NO_FIX_AVAILABLE",
+  "reason": "上流に修正版が未提供。リバースプロキシ側で該当パスを遮断済み（PR #456）",
+  "expiresAt": "2026-10-21T00:00:00Z"
+}
+```
+
+| 検証 | 内容 |
+| --- | --- |
+| `reason` | 必須。20 文字以上（「対応済み」のような実質のない理由を防ぐ） |
+| `expiresAt` | 必須。現在時刻より後、かつ最大 90 日先まで |
+| 重複 | 同一 `(repositoryId, metricId, fingerprint)` に有効な免除が既にある場合 409 |
+
+**応答（201）** で登録された免除を返す。同時に:
+
+1. 監査ログに `WAIVER_CREATED` を記録
+2. 当該リポジトリの最新 Run の再評価ジョブを登録（免除の効果を即座に反映する）
+
+2 を自動で行うのは、免除を登録したのにダッシュボードが
+不合格のままだと、登録が効いたのか分からないためである。
+
+### 5.2 `POST /api/v1/repositories/{id}/ingest-tokens`
+
+**応答（201）**
+
+```json
+{
+  "tokenId": "018f...",
+  "token": "qg_a1b2c3d4_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
+  "tokenPrefix": "a1b2c3d4",
+  "createdAt": "2026-09-21T03:00:00Z"
+}
+```
+
+`token` は**この応答でのみ**返す。以後どの API からも取得できない。
+画面には「この値は二度と表示されません」と明示し、
+コピーするまで閉じられないダイアログで表示する（[08](08-screen-design.md) 4.8）。
+
+### 5.3 `POST /api/v1/runs/{runId}/reevaluate`
+
+**応答（202）**
+
+```json
+{ "runId": "018f...", "status": "PROCESSING", "jobId": "018f..." }
+```
+
+成果物が保持期間を過ぎて削除されている場合は 409 `ARTIFACTS_DELETED` を返す。
+再評価は保存済みの成果物を読み直すため、実体が無いと実行できない。
+
+### 5.4 `POST /api/v1/users`
+
+```json
+{ "githubLogin": "someone", "role": "VIEWER" }
+```
+
+`githubLogin` の実在確認は行わない。GitHub API を呼ぶと、
+存在しないユーザーを登録しようとした時点で外部依存の障害に巻き込まれる。
+実在しない名前を登録しても、そのユーザーはログインできないだけで害がない。
+
+---
+
+## 6. 認可マトリクス
+
+| 操作 | VIEWER | ADMIN | Ingest Token |
+| --- | :---: | :---: | :---: |
+| ダッシュボード・Run・Finding・トレンドの閲覧 | ○ | ○ | — |
+| 設定の閲覧 | ○ | ○ | — |
+| 免除の閲覧 | ○ | ○ | — |
+| 成果物のダウンロード | ○ | ○ | — |
+| Run の作成・成果物の送信・finalize | — | — | ○ |
+| 再評価の実行 | — | ○ | — |
+| 免除の登録・失効 | — | ○ | — |
+| リポジトリ登録・設定変更 | — | ○ | — |
+| トークンの発行・失効 | — | ○ | — |
+| 利用者・ロールの管理 | — | ○ | — |
+| 監査ログの閲覧 | — | ○ | — |
+
+Ingest Token は**書き込み専用**であり、参照 API を一切呼べない。
+CI に置かれる認証情報であるため、漏洩時の影響を
+「偽の計測結果を送れる」に限定し、蓄積データの読み出しには使えないようにする。
+
+---
+
+## 7. エラーコード一覧
+
+| `errorCode` | HTTP | 意味 |
+| --- | --- | --- |
+| `VALIDATION_FAILED` | 400 | リクエストの検証エラー（`violations` に詳細） |
+| `UNAUTHENTICATED` | 401 | 未認証 |
+| `TOKEN_INVALID` | 401 | Ingest Token が不正または失効済み |
+| `USER_NOT_ALLOWLISTED` | 403 | 認証は成功したが許可リストに未登録 |
+| `USER_DISABLED` | 403 | アカウントが無効 |
+| `FORBIDDEN` | 403 | 権限不足 |
+| `REPOSITORY_MISMATCH` | 403 | トークンの発行元と `repository` が不一致 |
+| `RESOURCE_NOT_FOUND` | 404 | 対象が存在しない |
+| `RUN_ALREADY_FINALIZED` | 409 | finalize 済みの Run への操作 |
+| `WAIVER_ALREADY_EXISTS` | 409 | 同一対象に有効な免除が存在する |
+| `ARTIFACTS_DELETED` | 409 | 成果物が保持期間経過で削除済み（再評価不可） |
+| `ARTIFACT_TOO_LARGE` | 413 | ファイルまたは Run 合計のサイズ超過 |
+| `ARTIFACT_TYPE_UNKNOWN` | 422 | 未知の成果物種別 |
+| `ARTIFACT_FORMAT_INVALID` | 422 | パースに失敗 |
+| `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
+| `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
+| `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
+| `RATE_LIMITED` | 429 | レート制限超過 |
+| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害 |
+| `INTERNAL_ERROR` | 500 | 想定外の例外 |
+
+---
+
+## 8. レート制限
+
+内部利用のため厳しい制限は設けないが、**暴走の歯止めとして**設定する。
+
+| 対象 | 制限 |
+| --- | --- |
+| Ingest API（トークン単位） | 60 リクエスト / 分 |
+| 成果物アップロード（トークン単位） | 100 ファイル / 分 |
+| 参照 API（セッション単位） | 600 リクエスト / 分 |
+| バッジ（IP 単位） | 60 リクエスト / 分 |
+
+超過時は 429 と `Retry-After` ヘッダを返す。
+CI の不具合で同じジョブが無限に再実行されるような事故で、
+ストレージと DB が食い潰されることを防ぐのが目的である。
+
+---
+
+## 9. OpenAPI 仕様の生成と検証
+
+| 項目 | 方針 |
+| --- | --- |
+| 生成 | springdoc がコントローラと DTO から生成（[04](04-tech-stack.md) 4.1） |
+| 出力先 | `api/openapi.yml`（リポジトリにコミット） |
+| 同期検証 | CI で再生成し `git diff --exit-code` が通ることを確認（[04](04-tech-stack.md) 4.3） |
+| 互換性検証 | `oasdiff` でベースとの破壊的変更を検出（M-09） |
+| 記述の補強 | `@Schema(description = ...)` を DTO に付与。生成された仕様がフロントエンドの唯一の参照先になるため、説明を実装側に書く |
+
+### DTO 設計の原則
+
+| 原則 | 理由 |
+| --- | --- |
+| エンティティをそのまま返さない | DB のスキーマ変更が API の破壊的変更に直結する |
+| `null` と「値が無い」を区別する | `value: null` は「計測していない」、`0` は「計測して 0 だった」。この 2 つは意味が違う |
+| 列挙値は文字列で返す | 数値だと値の追加で既存の意味が変わる |
+| 表示用の文字列（`reason` / `label`）をサーバが返す | 判定基準の表現を 1 箇所に集約する |
+
+`null` と `0` の区別は本システムの根幹にあたる。
+カバレッジ `0` は「テストが 1 行も通っていない」という深刻な状態、
+`null` は「計測していない」。取り違えると、未計測が
+最悪の値として扱われたり、逆に見過ごされたりする。

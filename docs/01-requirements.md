@@ -7,7 +7,8 @@
 | 作成日 | 2026-09-21 |
 | 最終更新 | 2026-09-21 |
 | ステータス | **確定**（2026-09-21）。以降の変更は改訂履歴に記録する |
-| 関連文書 | [02-metrics-spec.md](02-metrics-spec.md)（指標・判定仕様）、[03-open-questions.md](03-open-questions.md)（決定事項と残課題）、[04-tech-stack.md](04-tech-stack.md)（技術スタック） |
+| 関連文書 | [02](02-metrics-spec.md) 指標・判定仕様 / [03](03-open-questions.md) 決定事項と残課題 / [04](04-tech-stack.md) 技術スタック |
+| 基本設計 | [05](05-architecture.md) 方式設計 / [06](06-database-design.md) DB 設計 / [07](07-api-design.md) API 設計 / [08](08-screen-design.md) 画面設計 |
 
 ### 改訂履歴
 
