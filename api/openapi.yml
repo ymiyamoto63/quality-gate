@@ -1,0 +1,414 @@
+openapi: 3.1.0
+info:
+  description: |
+    リポジトリの品質指標を計測・判定・可視化する API。
+
+    認証は 2 経路ある。
+    - 参照・操作 API: GitHub OAuth ログイン後のセッション Cookie
+    - Ingest API: リポジトリ単位の Ingest Token（書き込み専用）
+  license:
+    name: Proprietary
+  title: quality-gate API
+  version: v1
+servers:
+- description: 同一オリジン
+  url: /
+tags:
+- description: 全リポジトリのサマリ
+  name: Dashboard
+- description: ログイン中の利用者
+  name: Me
+- description: CI からの計測結果の取り込み
+  name: Ingest
+paths:
+  /api/v1/dashboard:
+    get:
+      description: 不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。
+      operationId: dashboard
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DashboardResponse"
+          description: OK
+      summary: ダッシュボードを取得する
+      tags:
+      - Dashboard
+  /api/v1/me:
+    get:
+      operationId: me
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MeResponse"
+          description: OK
+      summary: ログイン中の利用者とロールを返す
+      tags:
+      - Me
+  /api/v1/runs:
+    post:
+      description: 計測開始時に呼ぶ。同一コミットへの再送信は attempt を増やした新しい Run になる。
+      operationId: createRun
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRunRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CreateRunResponse"
+          description: OK
+      summary: Run を作成する
+      tags:
+      - Ingest
+  /api/v1/runs/{runId}/artifacts:
+    post:
+      description: この時点ではパースしない。受領・検証・保存のみを行い、パースは判定ジョブで実施する。
+      operationId: uploadArtifact
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: type
+        required: true
+        schema:
+          type: string
+      - in: query
+        name: component
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: scope
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: metadata
+        required: false
+        schema:
+          type: string
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+              required:
+              - file
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UploadArtifactResponse"
+          description: OK
+      summary: 成果物をアップロードする
+      tags:
+      - Ingest
+  /api/v1/runs/{runId}/finalize:
+    post:
+      description: 判定は非同期で開始される。CI は判定の完了を待たずに次へ進んでよい。
+      operationId: finalizeRun
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/FinalizeResponse"
+          description: OK
+      summary: 取り込み完了を宣言する
+      tags:
+      - Ingest
+  /api/v1/runs/{runId}/status:
+    get:
+      operationId: status
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RunStatusResponse"
+          description: OK
+      summary: 処理状態と判定結果を取得する（CI のポーリング用）
+      tags:
+      - Ingest
+components:
+  schemas:
+    Alert:
+      type: object
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        repositoryId:
+          type: string
+          format: uuid
+    CreateRunRequest:
+      type: object
+      description: Run の作成要求。CI が計測開始時に送信する。
+      properties:
+        baseCommitSha:
+          type: string
+          description: 差分計測の比較基準。省略時は quality-gate が merge-base を解決する
+          pattern: "^[0-9a-f]{40}$"
+        branch:
+          type: string
+          minLength: 1
+        ciRunUrl:
+          type: string
+        commitSha:
+          type: string
+          description: 計測対象のコミット SHA（40 桁）
+          minLength: 1
+          pattern: "^[0-9a-f]{40}$"
+        measuredAt:
+          type: string
+          format: date-time
+        pullRequestNumber:
+          type: integer
+          format: int32
+        repository:
+          type: string
+          description: owner/name 形式。Ingest Token の発行元と一致する必要がある
+          example: ymiyamoto63/quality-gate
+          minLength: 1
+          pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
+        runnerType:
+          type: string
+          description: 計測を実行したランナー種別。性能指標の判定可否がこれで決まる
+          enum:
+          - self-hosted
+          - github-hosted
+        skippedMetrics:
+          type: array
+          description: CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う
+          items:
+            $ref: "#/components/schemas/SkippedMetricRequest"
+        triggeredBy:
+          type: string
+          minLength: 1
+      required:
+      - branch
+      - commitSha
+      - measuredAt
+      - repository
+      - runnerType
+      - triggeredBy
+    CreateRunResponse:
+      type: object
+      properties:
+        attempt:
+          type: integer
+          format: int32
+        detailUrl:
+          type: string
+          description: Run 詳細画面への直リンク。CI のログに出して、不合格時にその場から飛べるようにする
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CREATED
+          - UPLOADING
+          - FINALIZED
+          - PROCESSING
+          - EVALUATED
+          - FAILED
+          - ABANDONED
+    DashboardResponse:
+      type: object
+      description: ダッシュボード。repository_summaries を読むだけで応答する。
+      properties:
+        alerts:
+          type: array
+          description: 計測途絶などの警告。画面側で判定させず、サーバが返す
+          items:
+            $ref: "#/components/schemas/Alert"
+        repositories:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryCard"
+    FinalizeResponse:
+      type: object
+      properties:
+        detailUrl:
+          type: string
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CREATED
+          - UPLOADING
+          - FINALIZED
+          - PROCESSING
+          - EVALUATED
+          - FAILED
+          - ABANDONED
+    Freshness:
+      type: object
+      description: データの鮮度。基準日数は設定値のため、判定結果をサーバが返す。
+      properties:
+        lastFullMeasuredAt:
+          type: string
+          format: date-time
+        lastMeasuredAt:
+          type: string
+          format: date-time
+        staleFullMeasurement:
+          type: boolean
+        staleMeasurement:
+          type: boolean
+    LatestRun:
+      type: object
+      properties:
+        completeness:
+          type: string
+          enum:
+          - FULL
+          - PARTIAL
+        measuredAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        verdict:
+          type: string
+          description: 判定結果。未判定なら null
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
+    MeResponse:
+      type: object
+      description: ログイン中の利用者。フロントエンドはこの role で表示を制御する（防御は API 側）。
+      properties:
+        avatarUrl:
+          type: string
+        displayName:
+          type: string
+        githubLogin:
+          type: string
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - VIEWER
+        userId:
+          type: string
+          format: uuid
+    RepositoryCard:
+      type: object
+      properties:
+        activeWaiverCount:
+          type: integer
+          format: int32
+        freshness:
+          $ref: "#/components/schemas/Freshness"
+        fullName:
+          type: string
+        latestRun:
+          $ref: "#/components/schemas/LatestRun"
+        openCriticalCount:
+          type: integer
+          format: int32
+        openHighCount:
+          type: integer
+          format: int32
+        repositoryId:
+          type: string
+          format: uuid
+    RunStatusResponse:
+      type: object
+      description: CI がポーリングするための軽量な状態応答。
+      properties:
+        completeness:
+          type: string
+          enum:
+          - FULL
+          - PARTIAL
+        detailUrl:
+          type: string
+        errorCode:
+          type: string
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CREATED
+          - UPLOADING
+          - FINALIZED
+          - PROCESSING
+          - EVALUATED
+          - FAILED
+          - ABANDONED
+        verdict:
+          type: string
+          description: 判定結果。未判定の場合は null
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
+    SkippedMetricRequest:
+      type: object
+      description: スキップの申告。申告のない未提出は ERROR として扱われる。
+      properties:
+        metricId:
+          type: string
+          example: M-02
+          minLength: 1
+          pattern: "^M-\\d{2}$"
+        reason:
+          type: string
+          description: なぜ計測しなかったか。Run 詳細にそのまま表示される
+          example: GitHub ホストランナーのため PIT を実行しない
+          minLength: 1
+      required:
+      - metricId
+      - reason
+    UploadArtifactResponse:
+      type: object
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        sha256:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64

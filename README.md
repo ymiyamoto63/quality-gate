@@ -48,14 +48,79 @@
 
 ## ステータス
 
-**基本設計 完了（2026-09-21）。実装は未着手です。**
+**プロジェクト雛形まで完了（2026-09-21）。**
 
 | フェーズ | 状態 |
 | --- | --- |
 | 要件定義 | 完了（v1.1 確定） |
-| 技術スタック | 完了（v1.0 確定） |
+| 技術スタック | 完了（v1.1 確定、雛形で検証済み） |
 | 基本設計（方式・DB・API・画面） | 完了 |
-| 詳細設計・実装 | 未着手 |
+| プロジェクト雛形 | 完了（ビルド・テスト・起動を確認済み） |
+| 正規化・判定エンジン | **未実装**（次のステップ） |
 
-残る未決事項は Phase 1 の実装と並行して確定できるものに限られます
-（[docs/03-open-questions.md](docs/03-open-questions.md)）。
+### 雛形で動くもの
+
+- Flyway による全スキーマ（V001〜V007）の適用
+- Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
+- GitHub OAuth ログインと許可リストによる入口制御
+- ダッシュボード API（`/api/v1/dashboard`）と `/api/v1/me`
+- ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
+- SPA を同梱した同一オリジン配信
+- OpenAPI の生成 → フロントエンドの型生成
+
+### 雛形で未実装のもの
+
+- **正規化アダプタ（`adapter`）と判定エンジン（`evaluate`）** — 判定ジョブは受理するが何もしない
+- 免除・通知・監査ログ・トレンド・再評価の各ユースケース
+- ダッシュボード以外の画面（ルーティングと仮画面のみ）
+
+## 開発の始め方
+
+前提: JDK 25 / Node.js 24 / Docker。
+**WSL2 で作業する場合、リポジトリは Linux ファイルシステム側（`/home/...`）に置いてください。**
+`/mnt/c` 配下はファイル I/O が遅く、ビルドと HMR が体感できるほど遅延します。
+
+```bash
+# 1. データベースを起動する
+docker compose up -d db
+
+# 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します）
+cd backend && ./mvnw verify
+
+# 3. バックエンドを起動する
+./mvnw spring-boot:run
+
+# 4. 別ターミナルでフロントエンドを起動する（/api は 8080 にプロキシされます）
+cd frontend && npm ci && npm run dev
+```
+
+フロントエンドだけを触るときは `-DskipFrontend=true` を付けると Maven の
+フロントエンドビルドを飛ばせます。
+
+### API の型生成
+
+バックエンドが `api/openapi.yml` を生成し、フロントエンドがそこから型を生成します。
+**両方ともリポジトリにコミットします。**
+
+```bash
+cd backend && ./mvnw verify          # api/openapi.yml を再生成
+cd ../frontend && npm run generate:api   # src/api/schema.d.ts を再生成
+git diff --exit-code api/ frontend/src/api/schema.d.ts   # ずれていないか検証
+```
+
+この差分検証は CI でも実行します。生成物がずれている状態は、
+フロントエンドが古い契約に基づいて動いていることを意味します。
+
+## ディレクトリ構成
+
+```
+quality-gate/
+├ backend/          Spring Boot 4（Maven）
+│  └ src/main/resources/db/migration/   Flyway マイグレーション
+├ frontend/         Vue 3 + Vite
+│  └ src/api/schema.d.ts                openapi.yml から生成（コミットする）
+├ api/openapi.yml   バックエンドから生成（コミットする）
+├ docs/             要件定義・設計ドキュメント
+├ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）
+└ .quality-gate.yml 自分自身の品質ゲート設定
+```

@@ -1,0 +1,36 @@
+# Java / Maven
+target/
+!.mvn/wrapper/maven-wrapper.jar
+.mvn/wrapper/maven-wrapper.properties.bak
+
+# Node
+node_modules/
+dist/
+*.tsbuildinfo
+
+# IDE
+.idea/
+*.iml
+.vscode/
+.classpath
+.project
+.settings/
+
+# ローカル実行時のデータ（成果物ストア）
+data/
+
+# 環境変数
+.env
+.env.local
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 計測結果の一時出力
+**/jacoco.xml
+**/mutations.xml
+**/*.sarif
+
+# カバレッジ・スキャン結果の出力先
+reports/

@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<ruleset name="quality-gate"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0 https://pmd.sourceforge.io/ruleset_2_0_0.xsd">
+  <description>
+    M-07（循環的複雑度）の計測用ルールセット。
+    reportLevel を 1 にして「しきい値超過の検出」ではなく「全メソッドの CC 値の出力」を得る。
+    ベースコミットとの比較は quality-gate 側が行うため、ここでは判定しない。
+  </description>
+
+  <rule ref="category/java/design.xml/CyclomaticComplexity">
+    <properties>
+      <property name="classReportLevel" value="1"/>
+      <property name="methodReportLevel" value="1"/>
+    </properties>
+  </rule>
+</ruleset>

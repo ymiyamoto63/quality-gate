@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate 技術スタック |
-| バージョン | **1.0（確定）** |
+| バージョン | **1.1（確定）** |
 | 最終更新 | 2026-09-21 |
-| ステータス | **確定**。[要件定義書](01-requirements.md) v1.0 の付属仕様 |
+| ステータス | **確定**。[要件定義書](01-requirements.md) v1.1 の付属仕様。雛形の実装で検証済み |
 
 ---
 
@@ -69,28 +69,30 @@ quality-gate/
 
 | 分類 | 採用技術 | 版 | 備考 |
 | --- | --- | --- | --- |
-| 言語 | Java | **25 LTS** | |
-| フレームワーク | Spring Boot | 4.x | |
+| 言語 | Java | **25 LTS** | 雛形は Temurin 25.0.4.1 で検証済み |
+| フレームワーク | Spring Boot | 4.1.1 | |
 | ビルドツール | Maven | 3.9 以上 | Maven Wrapper（`mvnw`）をリポジトリに同梱し、開発機と CI でバージョンを揃える |
 | Web 層 | Spring MVC + 仮想スレッド | — | `spring.threads.virtual.enabled=true`。取り込みは I/O 中心のため、リアクティブの複雑さを負わずに並行性を得る |
 | 認証・認可 | Spring Security（OAuth2 Client: GitHub） | — | GitHub App の user-to-server フロー。サーバサイドセッション |
 | 永続化 | Spring Data JPA / Hibernate | — | |
 | データベース | PostgreSQL | 17 | |
 | スキーマ管理 | Flyway | — | すべてのスキーマ変更をマイグレーションで管理 |
-| API 仕様 | springdoc-openapi | 2.x | `openapi.yml` の生成元（4 章） |
+| API 仕様 | springdoc-openapi | 3.1.1 | `openapi.yml` の生成元（4 章）。Spring Boot 4 には 3.x が対応する |
 | 可観測性 | Spring Boot Actuator + Micrometer | — | Prometheus 形式でメトリクス公開 |
 | JSON / XML | Jackson / StAX | — | XML は XXE を無効化して読む（2.2） |
-| スケジューラ | Spring `@Scheduled` | — | 単一プロセス構成のため ShedLock は不要（4.3 参照） |
+| スケジューラ | Spring `@Scheduled` | — | 単一プロセス構成のため ShedLock は不要 |
+| JSON | **Jackson 3**（`tools.jackson`） | 3.1.5 | Spring Boot 4 の既定。パッケージが `com.fasterxml` から変わる（10.1） |
+| マイグレーション実行 | `spring-boot-starter-flyway` | 4.1.1 | `flyway-core` だけでは自動設定が効かない（10.1） |
 
 ### 2.1 テストと品質ツール
 
 | 用途 | 採用技術 | 備考 |
 | --- | --- | --- |
 | 単体・結合テスト | JUnit 5、AssertJ、Mockito、Spring Boot Test | |
-| 外部依存を含む結合テスト | Testcontainers（PostgreSQL） | 実際の PostgreSQL に対してテストする。H2 等の代替 DB は使わない |
-| カバレッジ | JaCoCo | M-01 の計測元 |
-| ミューテーション | PIT（pitest） | M-02 の計測元。backend のみ |
-| 循環的複雑度 | PMD（`CyclomaticComplexity`、`reportLevel: 1`） | M-07 の計測元。全関数の CC 値を出力させる |
+| 外部依存を含む結合テスト | Testcontainers 2.0.5（PostgreSQL） | 実際の PostgreSQL に対してテストする。H2 等の代替 DB は使わない |
+| カバレッジ | JaCoCo 0.8.15 | M-01 の計測元 |
+| ミューテーション | PIT（pitest）1.20.4 | M-02 の計測元。backend のみ。`-P mutation` で有効化 |
+| 循環的複雑度 | maven-pmd-plugin 3.28.0（`CyclomaticComplexity`、`reportLevel: 1`） | M-07 の計測元。全関数の CC 値を出力させる |
 
 ### 2.2 成果物パーサの実装方針
 
@@ -112,16 +114,16 @@ quality-gate/
 
 | 分類 | 採用技術 | 版 | 備考 |
 | --- | --- | --- | --- |
-| フレームワーク | Vue | 3.x | Composition API + `<script setup>` |
-| 言語 | TypeScript | 5.x | `strict: true` |
-| ビルド | Vite | 5.x 以上 | |
-| ランタイム | Node.js | 24 LTS | `.nvmrc` でバージョンを固定 |
-| UI コンポーネント | PrimeVue | 4.x | アクセシビリティ対応が要件（NFR 10.6）のため選定 |
-| 状態管理 | Pinia | 3.x | |
-| ルーティング | Vue Router | 4.x | |
+| フレームワーク | Vue | 3.5 | Composition API + `<script setup>` |
+| 言語 | TypeScript | 5.x | `strict: true` + `noUncheckedIndexedAccess` |
+| ビルド | Vite | 8.x | |
+| ランタイム | Node.js | 24 LTS | `.nvmrc` で固定。Maven ビルドでも同じ版を取得する |
+| UI コンポーネント | PrimeVue + `@primeuix/themes` | 5.x / 3.x | アクセシビリティ対応が要件（NFR 10.6）のため選定 |
+| 状態管理 | Pinia | 4.x | |
+| ルーティング | Vue Router | 5.x | |
 | API 型・呼び出し | openapi-typescript + openapi-fetch | — | 4 章 |
 | グラフ | PrimeVue `Chart`（Chart.js） | — | 3.1 の注意事項あり |
-| 単体テスト | Vitest + @vue/test-utils | — | カバレッジは `@vitest/coverage-v8` |
+| 単体テスト | Vitest 5 + @vue/test-utils | — | カバレッジは `@vitest/coverage-v8`。`coverage.include` を指定し、未テストのファイルも分母に含める |
 | E2E / a11y | Playwright + `@axe-core/playwright` | — | M-10 の計測元 |
 | Lint | ESLint（`eslint-plugin-vue`、`complexity` ルール）+ Prettier | — | `complexity` は M-07 の計測元 |
 
@@ -387,3 +389,71 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 | T-4 | Chart.js のグラフがスクリーンリーダーで読めない | NFR 10.6 未達 | すべてのグラフに表形式の代替表現を併設することを実装要件とする（3.1） |
 | T-5 | WSL2 で `/mnt/c` 配下に配置され、開発が遅い | 開発効率の低下 | README に配置場所を明記し、セットアップ手順の最初に記載する（5.3） |
 | T-6 | Testcontainers が CI 環境で起動できない | 結合テストが動かない | GitHub ホストランナーは Docker を利用できる。セルフホストランナーでは Docker の利用可否を構築時に確認する |
+
+---
+
+## 10. 雛形の実装で判明した点
+
+技術スタックを実際に組み立てた際に、設計時点の想定と違っていた点を記録する。
+同じ調査を繰り返さないため、および次に依存を上げるときの手がかりとして残す。
+
+### 10.1 Spring Boot 4 に固有の差異
+
+| # | 事象 | 対応 |
+| --- | --- | --- |
+| 1 | **JSON の既定が Jackson 3** になっている。DI されるのは `tools.jackson.databind.ObjectMapper` であり、`com.fasterxml.jackson.databind.ObjectMapper` の Bean は存在しない | `tools.jackson` を使う。書き出し・読み取りの例外は非チェック例外（`tools.jackson.core.JacksonException`）に変わっている。アノテーションは `com.fasterxml.jackson.annotation` のまま |
+| 2 | **`flyway-core` を依存に入れてもマイグレーションが実行されない**。Boot 4 は自動設定がモジュール分割されており、Flyway の自動設定は別成果物にある | `org.springframework.boot:spring-boot-starter-flyway` を依存に加える |
+| 3 | `TestRestTemplate` が廃止されている | 結合テストでは JDK の `HttpClient` または `RestClient` を使う |
+| 4 | Testcontainers 2.x で `PostgreSQLContainer` が `org.testcontainers.postgresql` へ移動し、**非ジェネリック**になっている。BOM の成果物名も `testcontainers-postgresql` / `testcontainers-junit-jupiter` に変わっている | 型引数を付けずに使う |
+
+2 は特に気づきにくい。**アプリは正常に起動し、テーブルを参照する処理に到達して初めて失敗する**。
+そのため、全マイグレーションを空の DB に適用する結合テスト（`FlywayMigrationIT`）を
+最初から用意しておくこと。雛形ではこのテストが問題を検出した。
+
+### 10.2 SPA のフォールバック
+
+`ViewControllerRegistry` で `/**/{path}` のようなパターンを登録すると、
+Spring の `PathPattern` が `{*...}` と `**` の位置を制限しているため起動時に失敗する。
+
+`ResourceHandlerRegistry` に `PathResourceResolver` を組み合わせ、
+**静的ファイルとして解決できないパスを index.html に解決し直す**方式を採る
+（`SpaForwardingConfig`）。API・監視・ドキュメントのパスは対象外とし、
+存在しない API に 200 と HTML を返さないようにする。
+
+### 10.3 認可の境界
+
+SPA を同梱する構成では、**保護すべきは API であってシェルではない**。
+SPA のパスまで認証必須にすると、`/runs/xxx` を直接開いたときに画面ではなく 401 が返る。
+
+```
+/api/**          → 認証必須
+/actuator/health → 公開
+/actuator/**     → ADMIN のみ
+それ以外         → 公開（index.html と静的リソース）
+```
+
+未ログインでもシェルは返り、`/api/v1/me` の 401 を受けてフロント側が `/login` へ誘導する。
+
+### 10.4 パッケージ構成の修正
+
+`SecurityConfig` は `auth` と `ingest` の両モジュールを組み立てるため、
+共通基盤である `platform` に置くと「platform が業務モジュールを知らない」という
+依存規則に違反する。**ArchUnit のテストがこれを検出した**ため、
+合成点として `com.qualitygate.config` を新設して移した。
+
+規則をテストにしておくと、こうした置き場所の誤りが設計違反として即座に表面化する。
+
+### 10.5 検証済みの構成
+
+雛形で以下が動作することを確認済み。
+
+| 項目 | 結果 |
+| --- | --- |
+| `mvn verify`（backend） | 単体 22 件・結合 11 件がすべて成功 |
+| Flyway マイグレーション | V001〜V007 が空の PostgreSQL 17 に適用される |
+| OpenAPI 生成 | 結合テストから `api/openapi.yml` を書き出せる |
+| 型生成 | `openapi-typescript` が `schema.d.ts`（409 行）を生成する |
+| フロントビルド | `vue-tsc` + `vite build` が通る |
+| jar への同梱 | `BOOT-INF/classes/static/` に SPA が入る |
+| 起動 | Docker Compose の PostgreSQL に対して 8 秒で起動する |
+| 同一オリジン配信 | `/runs/abc` が index.html を返し、`/api/**` は 401 を返す |

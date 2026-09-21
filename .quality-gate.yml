@@ -1,0 +1,80 @@
+# quality-gate 自身の品質ゲート設定（ドッグフーディング）
+# 仕様: docs/02-metrics-spec.md
+version: 1
+enforcement: report-only          # report-only | check-run | blocking
+on_missing_report: fail           # fail | warn
+
+execution:
+  # CI がスキップを申告できる指標。ここに無い指標のスキップ申告は ERROR とする
+  skippable_metrics: [mutation_score, performance]
+  # 完全計測がこの日数を超えて行われない場合に警告する
+  full_measurement_interval_days: 7
+  # この環境で計測された性能値は参考値（REFERENCE）とし、判定に用いない
+  reference_only_environments: [github-hosted]
+
+components:
+  - name: backend
+    language: java
+    paths: ["backend/**"]
+  - name: frontend
+    language: typescript
+    paths: ["frontend/**"]
+
+exclusions:
+  - "**/generated/**"
+  - "frontend/src/api/schema.d.ts"
+  - "**/*.config.ts"
+  - "backend/**/QualityGateApplication.java"
+
+metrics:
+  branch_coverage:
+    enabled: true
+    threshold: 75
+    scope: overall
+    per_component: true
+    diff_threshold: 80            # 変更行のカバレッジ（WARN 判定）
+  mutation_score:
+    enabled: true
+    threshold: 60
+    scope: changed
+    components: [backend]         # PIT は JVM 専用のため backend のみ
+  performance:
+    enabled: true
+    p95_ms: 500
+    arrival_rate_rps: 50
+    error_rate_pct: 0.1
+    scenarios: ["dashboard", "run-detail", "ingest"]
+  vulnerabilities:
+    enabled: true
+    max_critical: 0
+    max_high: 0
+    max_medium: null
+  cyclomatic_complexity:
+    enabled: true
+    max_complexity: 15
+    scope: new_and_modified
+    warn_from: 11
+  api_contract:
+    enabled: true
+    min_success_rate: 100
+    min_test_count: 1
+    breaking_changes: 0
+  accessibility:
+    enabled: true
+    standard: wcag22aa
+    max_critical: 0
+    pages:
+      - "/login"
+      - "/"
+      - "/repositories/:id"
+      - "/runs/:id"
+      - "/runs/:id/findings"
+      - "/repositories/:id/trends"
+      - "/repositories/:id/config"
+      - "/waivers"
+      - "/admin/users"
+      - "/forbidden"
+
+notifications:
+  on: transition_to_fail
+  slack_channel: "#quality-gate"

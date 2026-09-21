@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: quality-gate
+
+  threads:
+    virtual:
+      enabled: true          # 取り込みは I/O 中心。リアクティブを入れずに並行性を得る
+
+  datasource:
+    url: ${QG_DB_URL:jdbc:postgresql://localhost:5432/qualitygate}
+    username: ${QG_DB_USERNAME:qualitygate}
+    password: ${QG_DB_PASSWORD:qualitygate}
+
+  jpa:
+    hibernate:
+      ddl-auto: none         # スキーマは Flyway のみが変更する
+    open-in-view: false      # 遅延ロードをビュー層まで持ち込まない
+    properties:
+      hibernate:
+        jdbc:
+          batch_size: 100    # 判定結果は一括 INSERT する
+        order_inserts: true
+        order_updates: true
+
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+  session:
+    jdbc:
+      initialize-schema: never   # スキーマは V007 で管理する
+    timeout: 8h
+
+  servlet:
+    multipart:
+      max-file-size: 50MB
+      max-request-size: 60MB
+
+  security:
+    oauth2:
+      client:
+        registration:
+          github:
+            # GitHub App の user-to-server 認可フローを使う（OAuth App は別途用意しない）
+            client-id: ${QG_GITHUB_CLIENT_ID:placeholder-client-id}
+            client-secret: ${QG_GITHUB_CLIENT_SECRET:placeholder-client-secret}
+            scope: read:user
+
+server:
+  port: 8080
+  error:
+    include-message: never   # 例外メッセージの無検閲な露出を防ぐ（応答は ProblemDetail で組む）
+  compression:
+    enabled: true
+
+quality-gate:
+  artifact-root: ${QG_ARTIFACT_ROOT:./data/artifacts}
+  max-artifact-bytes: 52428800      # 50MB
+  max-run-bytes: 209715200          # 200MB
+  base-url: ${QG_BASE_URL:http://localhost:8080}
+  job-poll-interval: 1000
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+  writer-with-order-by-keys: true   # 生成される openapi.yml の差分を安定させる
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+
+logging:
+  level:
+    com.qualitygate: INFO

@@ -1,0 +1,58 @@
+package com.qualitygate.domain.model;
+
+import com.fasterxml.jackson.annotation.JsonCreator;
+import com.fasterxml.jackson.annotation.JsonValue;
+
+import java.util.List;
+
+/**
+ * 取り込む成果物の形式（docs/02-metrics-spec.md 0.5）。
+ *
+ * <p>SARIF を静的解析系の第一形式とし、アダプタ実装を集約する。
+ */
+public enum ArtifactType implements WireValued {
+
+    JACOCO_XML("jacoco-xml", "M-01"),
+    LCOV("lcov", "M-01"),
+    ISTANBUL_JSON("istanbul-json", "M-01"),
+    PIT_XML("pit-xml", "M-02"),
+    K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
+    SARIF("sarif", "M-06", "M-07"),
+    OSV_JSON("osv-json", "M-06"),
+    PMD_XML("pmd-xml", "M-07"),
+    ESLINT_JSON("eslint-json", "M-07"),
+    LIZARD_CSV("lizard-csv", "M-07"),
+    JUNIT_XML("junit-xml", "M-08"),
+    PACT_VERIFICATION("pact-verification", "M-08"),
+    OASDIFF_JSON("oasdiff-json", "M-09"),
+    AXE_JSON("axe-json", "M-10");
+
+    private final String wire;
+    private final List<String> metricIds;
+
+    ArtifactType(String wire, String... metricIds) {
+        this.wire = wire;
+        this.metricIds = List.of(metricIds);
+    }
+
+    @Override
+    @JsonValue
+    public String wire() {
+        return wire;
+    }
+
+    @JsonCreator
+    public static ArtifactType fromWire(String wire) {
+        return WireValued.fromWire(ArtifactType.class, wire);
+    }
+
+    /** この形式が供給しうる指標 ID。 */
+    public List<String> metricIds() {
+        return metricIds;
+    }
+
+    /** 性能計測の成果物か（environment メタデータが必須になる）。 */
+    public boolean requiresEnvironmentMetadata() {
+        return this == K6_SUMMARY;
+    }
+}

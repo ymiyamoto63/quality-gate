@@ -28,7 +28,8 @@ com.qualitygate
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
 ├ job/          ジョブキューとスケジューラ
 ├ github/       GitHub API クライアント（Contents 取得、merge-base 解決、PR コメント）
-└ platform/     認証認可、監査ログ、ArtifactStore、共通例外、設定
+├ config/       合成点。複数モジュールを組み立てる設定（SecurityConfig など）
+└ platform/     認証認可の部品、監査ログ、ArtifactStore、共通例外、設定
 ```
 
 ### 依存規則
@@ -39,6 +40,7 @@ com.qualitygate
 | `evaluate` は `adapter` を知らない | 判定は正規化モデルだけを入力とする。ツールを差し替えても判定ロジックは変わらない |
 | `query` は書き込み系モジュール（`ingest` / `normalize` / `evaluate`）を呼ばない | 参照系は専用の読み取りモデルを持ち、書き込み側の都合に引きずられない |
 | すべてのモジュールが `platform` に依存してよい。逆は不可 | 共通基盤が業務ロジックを知らない状態を保つ |
+| 複数モジュールを組み立てる設定は `config` に置く | `SecurityConfig` は `auth` と `ingest` の両方を参照する。`platform` に置くと上の規則に違反する |
 | `github` への依存は `config` / `notify` / `platform` に限る | 外部 API の障害の影響範囲を閉じ込める |
 
 この依存規則は ArchUnit のテストで機械的に検証する。

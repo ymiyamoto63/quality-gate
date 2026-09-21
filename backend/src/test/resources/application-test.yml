@@ -1,0 +1,16 @@
+# 結合テストの接続先は Testcontainers が動的に差し込む。
+spring:
+  jpa:
+    show-sql: false
+  flyway:
+    clean-disabled: false
+
+quality-gate:
+  artifact-root: ${java.io.tmpdir}/quality-gate-test-artifacts
+  base-url: http://localhost:8080
+  job-poll-interval: 60000   # テスト中にジョブが勝手に走らないよう長くする
+
+logging:
+  level:
+    org.testcontainers: WARN
+    com.github.dockerjava: WARN

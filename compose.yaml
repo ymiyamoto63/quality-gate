@@ -1,0 +1,46 @@
+# 開発時は `docker compose up db` で PostgreSQL のみを起動する。
+# アプリもコンテナで動かす場合は `docker compose --profile full up` とする。
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: qualitygate
+      POSTGRES_USER: qualitygate
+      POSTGRES_PASSWORD: qualitygate
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U qualitygate -d qualitygate"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    profiles: ["full"]
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      QG_DB_URL: jdbc:postgresql://db:5432/qualitygate
+      QG_DB_USERNAME: qualitygate
+      QG_DB_PASSWORD: qualitygate
+      QG_ARTIFACT_ROOT: /var/lib/quality-gate/artifacts
+      QG_GITHUB_CLIENT_ID: ${QG_GITHUB_CLIENT_ID:-}
+      QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-}
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data/artifacts:/var/lib/quality-gate/artifacts
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+volumes:
+  pgdata:

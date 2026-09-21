@@ -1,0 +1,149 @@
+# quality-gate 自身を計測するワークフロー。
+#
+# ランナー種別と重量ジョブ（PIT / k6）の実行可否を切り替えられる。
+#   - 常用の既定値: リポジトリ変数 QG_RUNNER / QG_RUN_HEAVY_ON_GITHUB
+#   - その回限りの上書き: workflow_dispatch の入力
+#
+# GitHub Free のプライベートリポジトリでは Actions の無料枠が月 2,000 分のため、
+# 実行時間の長い PIT と k6 は既定でセルフホストランナーに寄せる
+# （セルフホストランナーの実行時間は無料枠を消費しない）。
+name: quality-gate
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 実行するランナー
+        type: choice
+        options: [self-hosted, ubuntu-latest]
+        default: self-hosted
+      run_heavy_jobs:
+        description: GitHub ホストランナーでも PIT / k6 を実行する
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  setup:
+    runs-on: ubuntu-latest
+    outputs:
+      runner: ${{ steps.resolve.outputs.runner }}
+      runner_type: ${{ steps.resolve.outputs.runner_type }}
+      run_heavy: ${{ steps.resolve.outputs.run_heavy }}
+    steps:
+      - id: resolve
+        run: |
+          RUNNER="${{ inputs.runner || vars.QG_RUNNER || 'self-hosted' }}"
+          HEAVY="${{ inputs.run_heavy_jobs || vars.QG_RUN_HEAVY_ON_GITHUB || 'false' }}"
+          if [ "$RUNNER" = "self-hosted" ]; then
+            RUNNER_TYPE="self-hosted"
+            HEAVY="true"          # 専有ランナーでは常に全量を計測する
+          else
+            RUNNER_TYPE="github-hosted"
+          fi
+          {
+            echo "runner=$RUNNER"
+            echo "runner_type=$RUNNER_TYPE"
+            echo "run_heavy=$HEAVY"
+          } >> "$GITHUB_OUTPUT"
+
+  # 軽量ジョブ: 常に実行する
+  base:
+    needs: setup
+    runs-on: ${{ needs.setup.outputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0          # merge-base の解決に履歴が必要
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: バックエンドのビルドとテスト（JaCoCo / PMD / OpenAPI 生成）
+        run: ./backend/mvnw -f backend/pom.xml -B verify
+
+      - name: 生成物の同期検証
+        run: |
+          cd frontend && npm ci && npm run generate:api && cd ..
+          git diff --exit-code api/ frontend/src/api/schema.d.ts \
+            || { echo '::error::openapi.yml または schema.d.ts が最新ではありません。再生成してコミットしてください'; exit 1; }
+
+      - name: フロントエンドのテスト（Vitest / カバレッジ）
+        run: cd frontend && npm run test:coverage
+
+      - name: 脆弱性スキャン（Trivy）
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: fs
+          format: sarif
+          output: reports/trivy.sarif
+          severity: CRITICAL,HIGH,MEDIUM
+
+      - name: アクセシビリティ検査（Playwright + axe-core）
+        run: cd frontend && npx playwright install --with-deps chromium && npm run test:a11y
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: reports-base
+          path: reports/
+
+  # 重量ジョブ: セルフホストなら常に、GitHub ホストなら設定次第で実行する
+  mutation:
+    needs: setup
+    if: needs.setup.outputs.run_heavy == 'true'
+    runs-on: ${{ needs.setup.outputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: '25', cache: maven }
+      - name: ミューテーションテスト（PIT）
+        run: ./backend/mvnw -f backend/pom.xml -B -P mutation test
+      - uses: actions/upload-artifact@v4
+        with: { name: reports-mutation, path: backend/target/pit-reports/ }
+
+  performance:
+    needs: setup
+    if: needs.setup.outputs.run_heavy == 'true'
+    runs-on: ${{ needs.setup.outputs.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: 負荷試験（k6）
+        run: echo 'TODO: Phase 3 で k6 シナリオを追加する'
+
+  # 取り込み: 重量ジョブが動かなかった場合もスキップを申告するため必ず実行する
+  submit:
+    needs: [setup, base, mutation, performance]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with: { path: reports/, merge-multiple: true }
+      - name: quality-gate へ送信
+        env:
+          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
+          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+        run: |
+          SKIPPED=""
+          if [ "${{ needs.mutation.result }}" = "skipped" ]; then
+            SKIPPED="$SKIPPED M-02"
+          fi
+          if [ "${{ needs.performance.result }}" = "skipped" ]; then
+            SKIPPED="$SKIPPED M-03 M-04 M-05"
+          fi
+          echo "runnerType=${{ needs.setup.outputs.runner_type }} skipped=[$SKIPPED]"
+          echo 'TODO: quality-gate-action の実装後に置き換える'
+        continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）
