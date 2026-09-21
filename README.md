@@ -24,10 +24,14 @@
 
 | ドキュメント | 内容 |
 | --- | --- |
-| [docs/01-requirements.md](docs/01-requirements.md) | 要件定義書（背景・スコープ・機能要件・非機能要件・アーキテクチャ・ロードマップ） |
-| [docs/02-metrics-spec.md](docs/02-metrics-spec.md) | 指標定義・計測方法・判定仕様（全指標の詳細） |
-| [docs/03-open-questions.md](docs/03-open-questions.md) | 未決事項・確認依頼・リスク |
+| [docs/01-requirements.md](docs/01-requirements.md) | 要件定義書 v1.0（背景・スコープ・機能要件・非機能要件・アーキテクチャ・ロードマップ） |
+| [docs/02-metrics-spec.md](docs/02-metrics-spec.md) | 指標・判定仕様 v1.0（全 10 指標の定義・計算式・入力形式・境界条件） |
+| [docs/03-open-questions.md](docs/03-open-questions.md) | 決定事項の記録（D-1〜D-13）と、Phase 1 と並行して確定する残課題 |
 
 ## ステータス
 
-要件定義フェーズ。実装は未着手です。
+**要件定義 完了（v1.0 確定 / 2026-09-21）。実装は未着手です。**
+
+次は基本設計（画面設計・API 設計・データベース設計）に進みます。
+残る未決事項は Phase 1 の実装と並行して確定できるものに限られます
+（[docs/03-open-questions.md](docs/03-open-questions.md)）。
