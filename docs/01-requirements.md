@@ -3,16 +3,17 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate 要件定義書 |
-| バージョン | **1.0（確定）** |
+| バージョン | **1.1（確定）** |
 | 作成日 | 2026-09-21 |
 | 最終更新 | 2026-09-21 |
 | ステータス | **確定**（2026-09-21）。以降の変更は改訂履歴に記録する |
-| 関連文書 | [02-metrics-spec.md](02-metrics-spec.md)（指標・判定仕様）、[03-open-questions.md](03-open-questions.md)（未決事項） |
+| 関連文書 | [02-metrics-spec.md](02-metrics-spec.md)（指標・判定仕様）、[03-open-questions.md](03-open-questions.md)（決定事項と残課題）、[04-tech-stack.md](04-tech-stack.md)（技術スタック） |
 
 ### 改訂履歴
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 1.1 | 2026-09-21 | 技術スタックを確定（Maven / Java 25 LTS / SPA は Spring Boot 同梱の同一オリジン / openapi-typescript + openapi-fetch）。詳細を [04-tech-stack.md](04-tech-stack.md) に分離し、11 章を要約に改める。成果物ストレージを MinIO からローカルファイルシステムへ変更 |
 | 1.0 | 2026-09-21 | **確定版**。未決事項の優先度「高」をすべて解消し、ID の採番を整理。以降の変更は版を上げて改訂履歴に記録する |
 | 0.5 | 2026-09-21 | ランナー種別（セルフホスト / GitHub ホスト）の切り替えと、GitHub ホスト時の PIT・k6 のスキップを設定可能にする。意図的なスキップを ERROR と区別する仕組み（スキップ申告、REFERENCE ステータス、完全計測の鮮度監視）を追加 |
 | 0.4 | 2026-09-21 | ロールを Phase 1 では Admin / Viewer の 2 種に簡素化し、免除は申請即承認（記録のみ）とする。4 ロールと承認フローは利用者増加時の拡張とする |
@@ -815,21 +816,26 @@ quality-gate 自身が WCAG 2.2 Level AA に適合する。具体的には、
 
 ### 11.1 技術スタック
 
+技術スタックは確定済み。選定理由・バージョン方針・採用しなかった選択肢を含む詳細は
+**[04-tech-stack.md](04-tech-stack.md)** に定める。本節は要約のみ示す。
+
 | レイヤ | 採用技術 | 備考 |
 | --- | --- | --- |
-| バックエンド | Java 21（LTS）+ Spring Boot 4 | 計測対象と同一構成。ドッグフーディングが成立する |
+| バックエンド | **Java 25 LTS** + Spring Boot 4 + **Maven** | 計測対象と同一構成。ドッグフーディングが成立する |
 | Web 層 | Spring MVC + 仮想スレッド | 取り込みは I/O 中心。リアクティブ導入の複雑さを避ける |
-| 認証・認可 | Spring Security（OAuth2 Client: GitHub） | GitHub App の user-to-server フローでログイン。許可リストと RBAC は quality-gate 内で管理 |
-| 永続化 | Spring Data JPA + PostgreSQL 16 | 時系列は通常テーブル + 適切なインデックスで足りる規模 |
+| 認証・認可 | Spring Security（OAuth2 Client: GitHub） | GitHub App の user-to-server フローでログイン。セッション Cookie。許可リストと RBAC は quality-gate 内で管理 |
+| 永続化 | Spring Data JPA + **PostgreSQL 17** | 時系列は通常テーブル + 適切なインデックスで足りる規模 |
 | スキーマ管理 | Flyway | |
-| 非同期処理 | DB ベースのジョブキュー（アウトボックス） + `@Scheduled` + ShedLock | 規模的に専用 MQ は過剰 |
-| オブジェクトストレージ | S3 互換（MinIO） | 元成果物の保管 |
-| API 仕様 | springdoc-openapi | 自動生成した OpenAPI を契約テストの基準にする |
-| フロントエンド | Vue 3 + TypeScript + Vite + Pinia + Vue Router | 計測対象と同一構成 |
-| UI コンポーネント | アクセシビリティ対応実績のあるライブラリ（PrimeVue 等）を選定 | 10.6 の達成可否を選定基準に含める |
-| グラフ | ECharts または Chart.js | 代替テキスト表現を実装できることを選定条件とする |
+| 非同期処理 | DB ベースのジョブキュー（アウトボックス） + `@Scheduled` | 単一プロセス構成のため ShedLock は不要 |
+| 成果物ストレージ | **ローカルファイルシステム**（`ArtifactStore` インタフェース経由） | この規模ではオブジェクトストレージは過剰。将来 S3 互換へ差し替え可能な形にする |
+| API 仕様 | springdoc-openapi | 生成した `api/openapi.yml` をリポジトリにコミットし、契約テストと M-09 の基準にする |
+| フロントエンド | Vue 3 + TypeScript + Vite + **PrimeVue** + Pinia + Vue Router | 計測対象と同一構成 |
+| フロント / API 連携 | **openapi-typescript + openapi-fetch** | `openapi.yml` から型を生成。生成物の同期は CI で検証する |
+| SPA の配信 | **Spring Boot に同梱（同一オリジン）** | CORS 不要。認証を HttpOnly セッション Cookie で完結できる |
+| グラフ | PrimeVue `Chart`（Chart.js） | canvas は読み上げできないため、表形式の代替表現の併設を実装要件とする |
 | テスト | JUnit 5 / Testcontainers / Vitest / Playwright（+ axe-core） | |
-| 配布 | Docker イメージ + Docker Compose（初期）／Kubernetes（将来） | 社内単一テナントのため小さく始める |
+| 開発環境 | WSL2 + Docker Compose | リポジトリは WSL2 の Linux ファイルシステム側に置く |
+| 配布 | Docker イメージ + Docker Compose | 社内単一テナントのため小さく始める |
 
 ### 11.2 モジュール構成（バックエンド）
 
@@ -844,7 +850,7 @@ quality-gate/
 │  ├ waiver/        免除の登録・期限管理（承認フローは将来拡張）
 │  ├ notify/        Slack / メール / GitHub コメント
 │  ├ query/         ダッシュボード・トレンド向け参照 API（読み取り最適化）
-│  └ platform/      認証認可、監査ログ、スケジューラ、ストレージ抽象
+│  └ platform/      認証認可、監査ログ、スケジューラ、ArtifactStore（ストレージ抽象）
 └ frontend/         Vue 3 SPA
 ```
 
@@ -875,10 +881,15 @@ quality-gate/
 | C-10 | GitHub ホストランナーでの性能計測は計測条件が統制できないため、値は取得しても**判定には用いない**（`REFERENCE`）。性能指標の合否判定には専有ランナーでの計測が必要 |
 | C-11 | GitHub Free ではプライベートリポジトリの保護ブランチが利用できない。将来マージブロック（Phase 4）へ進む場合は GitHub Pro 以上への変更が必要（[03](03-open-questions.md) Q-14） |
 | C-12 | 本フェーズではマージブロックを行わない。不合格の是正は運用ルールに依存する |
+| C-13 | SPA は Spring Boot に同梱して同一オリジンで配信する。フロントエンドのみを独立してデプロイすることはしない |
 
 ---
 
 ## 13. リスクと対策
+
+本章はプロダクト・運用上のリスクを扱う。
+技術選定に伴うリスク（PIT の Java 25 対応、生成物の同期漏れ など）は
+[04-tech-stack.md](04-tech-stack.md) 9 章に分けて記載する。
 
 | # | リスク | 影響 | 対策 |
 | --- | --- | --- | --- |

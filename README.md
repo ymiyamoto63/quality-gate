@@ -20,13 +20,27 @@
 
 計測対象リポジトリの想定構成は **Java Spring Boot 4（バックエンド）+ Vue 3 SPA（フロントエンド）** です。
 
+## 技術スタック
+
+| レイヤ | 採用技術 |
+| --- | --- |
+| バックエンド | Java 25 LTS / Spring Boot 4 / Maven / Spring Data JPA / Flyway / PostgreSQL 17 |
+| フロントエンド | Vue 3 / TypeScript / Vite / PrimeVue / Pinia / Vue Router |
+| 連携 | バックエンドが `api/openapi.yml` を生成し、フロントが openapi-typescript + openapi-fetch で型と呼び出しを生成 |
+| 配信 | SPA を Spring Boot に同梱し、同一オリジンで配信（CORS 不要 / セッション Cookie 認証） |
+| テスト | JUnit 5 / Testcontainers / JaCoCo / PIT / Vitest / Playwright + axe-core |
+| 実行環境 | WSL2 + Docker Compose |
+
+詳細と選定理由は [docs/04-tech-stack.md](docs/04-tech-stack.md) を参照してください。
+
 ## ドキュメント
 
 | ドキュメント | 内容 |
 | --- | --- |
-| [docs/01-requirements.md](docs/01-requirements.md) | 要件定義書 v1.0（背景・スコープ・機能要件・非機能要件・アーキテクチャ・ロードマップ） |
+| [docs/01-requirements.md](docs/01-requirements.md) | 要件定義書 v1.1（背景・スコープ・機能要件・非機能要件・アーキテクチャ・ロードマップ） |
 | [docs/02-metrics-spec.md](docs/02-metrics-spec.md) | 指標・判定仕様 v1.0（全 10 指標の定義・計算式・入力形式・境界条件） |
-| [docs/03-open-questions.md](docs/03-open-questions.md) | 決定事項の記録（D-1〜D-13）と、Phase 1 と並行して確定する残課題 |
+| [docs/03-open-questions.md](docs/03-open-questions.md) | 決定事項の記録（D-1〜D-14）と、Phase 1 と並行して確定する残課題 |
+| [docs/04-tech-stack.md](docs/04-tech-stack.md) | 技術スタック v1.0（構成・OpenAPI 連携・開発環境・採用しなかった選択肢） |
 
 ## ステータス
 
