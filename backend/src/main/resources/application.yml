@@ -2,6 +2,14 @@ spring:
   application:
     name: quality-gate
 
+  config:
+    # ローカル開発用に .env を読む。backend/ からもリポジトリ直下からも起動できるよう両方を探す。
+    # optional なので .env が無い環境（CI / コンテナ）では何もしない。
+    # 実際の環境変数のほうが優先される。
+    import:
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+
   threads:
     virtual:
       enabled: true          # 取り込みは I/O 中心。リアクティブを入れずに並行性を得る
