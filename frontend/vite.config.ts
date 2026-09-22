@@ -16,7 +16,10 @@ export default defineConfig({
     proxy: {
       '/api': backend,
       '/oauth2': backend,
-      '/login': backend,
+      // OAuth の折り返し先だけをバックエンドへ送る。'/login' 全体を送ると、
+      // SPA のログイン画面（/login）が開発時だけバックエンドに吸われて表示できない。
+      // 本番は SPA フォールバックの除外が 'login/' のため /login は SPA に届く。
+      '/login/oauth2': backend,
       '/logout': backend,
       '/badges': backend,
       '/actuator': backend,

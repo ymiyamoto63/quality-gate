@@ -23,6 +23,21 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
 
     List<Run> findByRepositoryIdOrderByMeasuredAtDesc(UUID repositoryId, Pageable pageable);
 
+    /**
+     * カーソル以降の 1 ページ。
+     *
+     * <p>{@code measuredAt} は同時刻が起こりうる（同じコミットの再計測など）ため、
+     * id を第 2 の鍵にして境界をまたいだ重複・欠落を防ぐ。
+     */
+    @Query("select r from Run r where r.repositoryId = :repositoryId "
+            + "and (r.measuredAt < :measuredAt "
+            + "     or (r.measuredAt = :measuredAt and r.id < :id)) "
+            + "order by r.measuredAt desc, r.id desc")
+    List<Run> findPageAfter(@Param("repositoryId") UUID repositoryId,
+                            @Param("measuredAt") Instant measuredAt,
+                            @Param("id") UUID id,
+                            Pageable pageable);
+
     /** finalize されないまま滞留した Run（ABANDONED の対象）。 */
     @Query("select r from Run r where r.status in ('CREATED','UPLOADING') and r.createdAt < :before")
     List<Run> findStaleRuns(@Param("before") Instant before);

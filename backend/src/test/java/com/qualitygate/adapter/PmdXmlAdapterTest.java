@@ -54,19 +54,25 @@ class PmdXmlAdapterTest {
                 .containsEntry("member", "evaluate(EvaluationContext)");
     }
 
+    /**
+     * 表示用のパスと名寄せ用のパスは別物である。
+     *
+     * <p>リンクが辿れるのはリポジトリ相対、base / head で一致するのはモジュール相対。
+     * 片方に寄せると、リンクが 404 になるか、同じ関数が別物と見なされるかのどちらかになる。
+     */
     @Test
-    void 絶対パスをリポジトリ相対に寄せる() {
+    void 表示用のパスはリポジトリ相対にする() {
         NormalizedReport report = adapter.parse(stream(PMD), context(List.of()));
 
-        // ベース側と head 側で作業ディレクトリが違うと、同じ関数が別物と見なされる
         assertThat(report.findings().getFirst().filePath())
-                .isEqualTo("src/main/java/com/qualitygate/evaluate/Big.java");
+                .isEqualTo("backend/src/main/java/com/qualitygate/evaluate/Big.java");
     }
 
     @Test
-    void 名寄せのキーに行番号を含めない() {
+    void 名寄せのキーはモジュール相対にし行番号を含めない() {
         NormalizedReport report = adapter.parse(stream(PMD), context(List.of()));
 
+        // ベース側と head 側で作業ディレクトリが違うと、同じ関数が別物と見なされる
         RawFinding finding = report.findings().getFirst();
         assertThat(finding.identity())
                 .isEqualTo("src/main/java/com/qualitygate/evaluate/Big.java#evaluate(EvaluationContext)")
@@ -99,5 +105,35 @@ class PmdXmlAdapterTest {
 
     private static InputStream stream(String xml) {
         return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
+    }
+
+    /**
+     * モノレポでは、モジュール相対パスのままだと GitHub のリンクが 404 になる。
+     * 絶対パスに実際にコンポーネント名が含まれているときだけ接頭辞を付ける。
+     */
+    @Test
+    void コンポーネント名が絶対パスに現れればリポジトリ相対に直す() {
+        String module = "src/main/java/com/qualitygate/Good.java";
+
+        assertThat(PmdXmlAdapter.repoRelative(
+                "/build/backend/" + module, module, "backend"))
+                .isEqualTo("backend/" + module);
+    }
+
+    @Test
+    void 絶対パスと合わないコンポーネント名では接頭辞を付けない() {
+        String module = "src/main/java/com/qualitygate/Good.java";
+
+        // 推測で付けると、逆に壊れたリンクを作る
+        assertThat(PmdXmlAdapter.repoRelative("/build/api/" + module, module, "backend"))
+                .isEqualTo(module);
+    }
+
+    @Test
+    void コンポーネント宣言が無ければモジュール相対のまま返す() {
+        String module = "src/main/java/com/qualitygate/Good.java";
+
+        assertThat(PmdXmlAdapter.repoRelative("/build/" + module, module, null))
+                .isEqualTo(module);
     }
 }

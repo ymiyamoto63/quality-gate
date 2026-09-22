@@ -248,9 +248,9 @@ git diff --exit-code api/ frontend/src/api/schema.d.ts
 export default defineConfig({
   server: {
     proxy: {
-      "/api":   { target: "http://localhost:8080", changeOrigin: false },
-      "/oauth2": { target: "http://localhost:8080", changeOrigin: false },
-      "/login":  { target: "http://localhost:8080", changeOrigin: false },
+      "/api":          { target: "http://localhost:8080", changeOrigin: false },
+      "/oauth2":       { target: "http://localhost:8080", changeOrigin: false },
+      "/login/oauth2": { target: "http://localhost:8080", changeOrigin: false },
     },
   },
 });
@@ -258,6 +258,12 @@ export default defineConfig({
 
 `changeOrigin: false` とするのは、Cookie の `Domain` 属性と OAuth のリダイレクト先を
 本番同様に扱うため。ここを本番と変えると、認証まわりだけ開発で再現できない不具合が生まれる。
+
+**プロキシ対象は `/login` 全体ではなく `/login/oauth2` に限る。**
+`/login` は SPA のログイン画面のパスでもあるため、全体をバックエンドへ送ると
+開発時だけログイン画面が表示できなくなる（本番では SPA フォールバックの除外が
+`login/` のため `/login` は SPA に届き、開発と本番で挙動が食い違う）。
+バックエンドが必要とするのは OAuth の折り返し先 `/login/oauth2/code/github` だけである。
 
 ### 4.5 本番ビルドでの同梱
 
@@ -457,3 +463,39 @@ SPA のパスまで認証必須にすると、`/runs/xxx` を直接開いたと�
 | jar への同梱 | `BOOT-INF/classes/static/` に SPA が入る |
 | 起動 | Docker Compose の PostgreSQL に対して 8 秒で起動する |
 | 同一オリジン配信 | `/runs/abc` が index.html を返し、`/api/**` は 401 を返す |
+
+### 10.6 参照 API の実装で判明した点
+
+#### springdoc は入れ子レコードのスキーマ名を単純名で付ける
+
+別の応答に同じ名前の入れ子レコードがあると、**片方の定義がもう片方を静かに上書きする**。
+`RunListResponse.Item` と `FindingListResponse.Item` で実際に発生し、生成された
+TypeScript の型では違反一覧の要素が Run 一覧の要素になっていた。仕様は生成でき、
+型も生成でき、中身だけが別物になるため、コンパイルエラーにもならない。
+
+対処として入れ子レコードには応答をまたいで一意な名前を付け
+（`RunSummary` / `FindingItem` など）、`OpenApiExportIT` で
+**一覧応答がそれぞれ別の要素スキーマを指していること**を検証している。
+
+#### 必須と null は宣言しないと伝わらない
+
+springdoc の既定では `required` も `nullable` も出力されず、生成される
+クライアント型は**全項目が省略可能**になる。この状態では、常に埋まっている項目にも
+存在確認が要り、本当に null になりうる項目（未計測の値など）と区別がつかない。
+本プロジェクトは「null は未計測 / 0 は計測して 0」を厳密に分けているため、
+この区別が仕様に出ないのは致命的である。
+
+応答 DTO には必ず返す項目に `@NotNull` を、null を返しうる項目に
+`@Schema(nullable = true)` を付ける。両方付いた項目は「常に存在し、値は null でありうる」
+という意味になり、生成される型も `value: number | null` となる。
+
+#### Spring Boot 4 には `@AutoConfigureMockMvc` が同梱されていない
+
+`spring-boot-starter-test` の依存には MockMvc の自動設定が含まれない。
+`MockMvcBuilders.webAppContextSetup(context).apply(springSecurity())` で
+組み立てる。JSON の直列化まで通すテストはこの方法で書いている。
+
+#### Playwright のブラウザは環境側のものを使えるようにする
+
+同梱ブラウザを取得できない環境（プロキシ配下など）でも動かせるよう、
+`QG_E2E_CHROMIUM` に実行ファイルのパスを渡せば `executablePath` として使う。

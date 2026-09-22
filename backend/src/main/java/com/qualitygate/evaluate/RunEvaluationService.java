@@ -5,6 +5,8 @@ import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.RunSkippedMetric;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.MetricCategory;
 import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
@@ -27,6 +29,7 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
@@ -46,15 +49,6 @@ import java.util.UUID;
 public class RunEvaluationService {
 
     private static final Logger log = LoggerFactory.getLogger(RunEvaluationService.class);
-
-    /** 指標 ID からカテゴリ名への対応（ダッシュボードのカテゴリ別表示に使う）。 */
-    private static final Map<String, String> CATEGORY_OF_METRIC = Map.of(
-            "M-01", "機能テスト", "M-02", "機能テスト",
-            "M-03", "性能テスト", "M-04", "性能テスト", "M-05", "性能テスト",
-            "M-06", "セキュリティ",
-            "M-07", "コード構造",
-            "M-08", "契約・互換性", "M-09", "契約・互換性",
-            "M-10", "使いやすさ");
 
     private final RunRepository runs;
     private final RunSkippedMetricRepository skippedMetrics;
@@ -88,6 +82,7 @@ public class RunEvaluationService {
         run.applyGateConfig(gateConfigId);
 
         Optional<Run> baseline = findBaseline(run);
+        run.applyBaseline(baseline.map(Run::getId).orElse(null));
         EvaluationContext context = new EvaluationContext(run, thresholds, input,
                 previousValuesOf(baseline), baseline.isPresent());
 
@@ -99,7 +94,7 @@ public class RunEvaluationService {
         measurements.flush();
         findings.flush();
 
-        persistMeasurements(run, results);
+        persistMeasurements(run, results, context);
         persistFindings(run, results, baseline);
 
         Verdict verdict = aggregate(results);
@@ -173,13 +168,23 @@ public class RunEvaluationService {
                 : results;
     }
 
-    private void persistMeasurements(Run run, List<MetricResult> results) {
+    /**
+     * 判定結果を保存する。
+     *
+     * <p>比較対象 Run の値を {@code previousValue} として複製する。参照時に
+     * 比較対象を引き直すのではなく Run に焼き付けるのは、比較対象が保持期間を
+     * 過ぎて削除されても「前回比 +0.5」の表示が壊れないようにするためである。
+     */
+    private void persistMeasurements(Run run, List<MetricResult> results,
+                                     EvaluationContext context) {
         for (MetricResult result : results) {
+            BigDecimal previous = context
+                    .previousValue(result.metricId(), result.componentName()).orElse(null);
             measurements.save(new Measurement(Uuid7.generate(), run.getId(),
                     run.getRepositoryId(), result.metricId(), result.componentName(),
                     result.status(), result.value(), result.unit(),
                     toJson(result.threshold()),
-                    null, result.reason(), toJson(result.detail()), run.getMeasuredAt()));
+                    previous, result.reason(), toJson(result.detail()), run.getMeasuredAt()));
         }
     }
 
@@ -301,14 +306,15 @@ public class RunEvaluationService {
      * 存在する状態を避けるため。
      */
     static Map<String, String> categoryStatusOf(List<MetricResult> results) {
-        Map<String, MeasurementStatus> worst = new LinkedHashMap<>();
+        Map<MetricCategory, MeasurementStatus> worst = new EnumMap<>(MetricCategory.class);
         for (MetricResult result : results) {
-            String category = CATEGORY_OF_METRIC.getOrDefault(result.metricId(), "その他");
+            MetricCategory category = MetricCatalog.of(result.metricId()).category();
             worst.merge(category, result.status(),
                     (a, b) -> severityRank(a) >= severityRank(b) ? a : b);
         }
+        // EnumMap の反復順は宣言順、つまり要件定義の指標表と同じ並びになる。
         Map<String, String> asString = new LinkedHashMap<>();
-        worst.forEach((category, status) -> asString.put(category, status.name()));
+        worst.forEach((category, status) -> asString.put(category.displayName(), status.name()));
         return asString;
     }
 

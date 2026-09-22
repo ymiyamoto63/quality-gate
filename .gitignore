@@ -34,3 +34,7 @@ Thumbs.db
 
 # カバレッジ・スキャン結果の出力先
 reports/
+
+# Playwright の失敗時トレース（e2e/fixtures は結合テストが生成する成果物なので追跡する）
+test-results/
+playwright-report/

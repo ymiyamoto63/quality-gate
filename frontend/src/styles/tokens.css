@@ -10,10 +10,20 @@
   --surface-page: #f9f9f7;
   --text-primary: #0b0b0b;
   --text-secondary: #52514e;
-  --text-muted: #898781;
+  /*
+   * 控えめな文字。以前の #898781 はライト面で 3.5:1 しかなく、
+   * 通常文字に必要な 4.5:1 を満たしていなかった（axe の color-contrast で検出）。
+   * ライト 4.9:1 / ダーク 6.2:1。
+   */
+  --text-muted: #706f6a;
   --gridline: #e1e0d9;
   --axis: #c3c2b7;
   --border: rgba(11, 11, 11, 0.1);
+  /*
+   * リンク色。ブラウザ既定の #0000EE はダーク面で 1.9:1 しかなく読めない。
+   * 系列色（--series-1）と同系で、両面とも 6:1 以上を確保する。
+   */
+  --link: #1f5fae;
 
   /* ステータス色はライト/ダークで同じ。判定の意味は環境で変わらないため。 */
   --status-pass: #0ca30c;
@@ -37,6 +47,8 @@
     --surface-page: #0d0d0d;
     --text-primary: #ffffff;
     --text-secondary: #c3c2b7;
+    --text-muted: #9b9a92;
+    --link: #7ab5f5;
     --gridline: #2c2c2a;
     --axis: #383835;
     --border: rgba(255, 255, 255, 0.1);
@@ -51,6 +63,8 @@
   --surface-page: #0d0d0d;
   --text-primary: #ffffff;
   --text-secondary: #c3c2b7;
+  --text-muted: #9b9a92;
+  --link: #7ab5f5;
   --gridline: #2c2c2a;
   --axis: #383835;
   --border: rgba(255, 255, 255, 0.1);
@@ -67,6 +81,16 @@ body {
   font-family: var(--font-sans);
   background: var(--surface-page);
   color: var(--text-primary);
+}
+
+/*
+ * リンクは色だけで区別しない（WCAG 1.4.1）。下線を常に引き、
+ * 色覚特性や強制カラーモードでも本文と見分けられるようにする。
+ */
+a {
+  color: var(--link);
+  text-decoration: underline;
+  text-underline-offset: 0.15em;
 }
 
 /* フォーカスリングを消さない（WCAG 2.2 AA / docs/08 A-2） */

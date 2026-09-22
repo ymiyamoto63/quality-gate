@@ -126,6 +126,22 @@ public class Run {
         return gateConfigId;
     }
 
+    /**
+     * 差分（新規 / 継続 / 解消）の算出に使った比較対象 Run を記録する。
+     *
+     * <p>「前回」が同一ブランチの直前の Run とは限らない（失敗した Run は
+     * 比較対象にならない）ため、どの Run と比べた結果なのかを残さないと
+     * 「新規 2 件」の根拠を後から辿れない。
+     */
+    public void applyBaseline(UUID baselineRunId) {
+        this.baselineRunId = baselineRunId;
+    }
+
+    /** 比較対象 Run。初回 Run では null。 */
+    public UUID getBaselineRunId() {
+        return baselineRunId;
+    }
+
     /** 処理そのものが失敗した場合。判定結果 FAIL とは区別する。 */
     public void markFailed(String errorCode, String errorDetail) {
         this.status = RunStatus.FAILED;

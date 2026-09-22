@@ -66,7 +66,19 @@ function formatDateTime(value: string | null): string {
     <ul v-else class="qg-cards">
       <li v-for="card in cards" :key="card.repositoryId" class="qg-card">
         <div class="qg-card__head">
-          <h2>{{ card.fullName }}</h2>
+          <h2>
+            <!--
+              判定を見たあと次に知りたいのは「なぜその判定か」なので、
+              カードの見出しから直接 Run 詳細へ入れるようにする。
+            -->
+            <RouterLink
+              v-if="card.latestRun"
+              :to="{ name: 'run', params: { runId: card.latestRun.runId } }"
+            >
+              {{ card.fullName }}
+            </RouterLink>
+            <span v-else>{{ card.fullName }}</span>
+          </h2>
           <StatusChip :status="verdictToStatus(card.latestRun?.verdict)" />
         </div>
 

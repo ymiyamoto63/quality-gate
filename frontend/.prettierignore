@@ -1,0 +1,6 @@
+# 生成物。結合テスト（RunQueryApiIT）が実物の API から書き出すため、
+# 整形するとテスト実行のたびに差分が出る。
+e2e/fixtures/
+
+# openapi-typescript の出力は生成直後に prettier をかけて整形済み
+dist/

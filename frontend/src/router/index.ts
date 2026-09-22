@@ -5,6 +5,8 @@ import LoginView from '@/views/LoginView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
+import RunDetailView from '@/views/RunDetailView.vue'
+import FindingListView from '@/views/FindingListView.vue'
 
 /** 画面一覧は docs/08-screen-design.md 1 章と対応する。 */
 const routes: RouteRecordRaw[] = [
@@ -44,18 +46,11 @@ const routes: RouteRecordRaw[] = [
     props: { title: '設定' },
     meta: { title: '設定' },
   },
-  {
-    path: '/runs/:runId',
-    name: 'run',
-    component: PlaceholderView,
-    props: { title: 'Run 詳細' },
-    meta: { title: 'Run 詳細' },
-  },
+  { path: '/runs/:runId', name: 'run', component: RunDetailView, meta: { title: 'Run 詳細' } },
   {
     path: '/runs/:runId/findings',
     name: 'findings',
-    component: PlaceholderView,
-    props: { title: '違反一覧' },
+    component: FindingListView,
     meta: { title: '違反一覧' },
   },
   {

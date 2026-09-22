@@ -87,10 +87,11 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         if (!RULE.equals(rule)) {
             return null;
         }
-        String relativePath = relativize(filePath);
-        if (context.isExcluded(relativePath)) {
+        String modulePath = relativize(filePath);
+        if (context.isExcluded(modulePath)) {
             return null;
         }
+        String repoPath = repoRelative(filePath, modulePath, context.componentName());
 
         // 属性は getElementText() より前にすべて読む。本文を読むとカーソルが
         // END_ELEMENT まで進み、以降は属性を取得できない。
@@ -104,12 +105,14 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         }
         String memberName = memberNameOf(message, methodAttribute);
 
-        // fingerprint の材料は「ファイルパス + 関数の同定子」。行番号を含めない。
-        String identity = relativePath + "#" + memberName;
+        // fingerprint の材料は「モジュール相対パス + 関数の同定子」。行番号を含めない。
+        // リポジトリ相対ではなくモジュール相対を使うのは、base 側と head 側で
+        // チェックアウト先が違っても同じ関数が同じ identity になるようにするため。
+        String identity = modulePath + "#" + memberName;
 
         return new RawFinding("M-07", RULE, Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(memberName, complexity),
-                relativePath, beginLine, context.componentName(), identity,
+                repoPath, beginLine, context.componentName(), identity,
                 Map.of("complexity", complexity,
                         "member", memberName,
                         "scope", context.scope() == null ? "head" : context.scope()));
@@ -117,7 +120,8 @@ public class PmdXmlAdapter implements ArtifactAdapter {
 
     /**
      * PMD は絶対パスを出す。ベース側と head 側で作業ディレクトリが違うと
-     * 同じ関数が別物と見なされるため、リポジトリ相対に寄せる。
+     * 同じ関数が別物と見なされるため、モジュール相対（{@code src/...} 以下）に寄せる。
+     * fingerprint の安定性はこの形に依存する。
      */
     static String relativize(String filePath) {
         if (filePath == null) {
@@ -131,6 +135,27 @@ public class PmdXmlAdapter implements ArtifactAdapter {
             }
         }
         return normalized;
+    }
+
+    /**
+     * 表示・リンク用のリポジトリ相対パスを決める。
+     *
+     * <p>モジュール相対パス（{@code src/main/java/...}）のままでは、モノレポで
+     * GitHub のリンクが 404 になる。コンポーネント名が宣言されていて、かつ
+     * PMD が出した絶対パスが実際に {@code /<component>/<モジュール相対>} で
+     * 終わっている場合にだけ接頭辞を付ける。推測で付けると、逆に壊れたリンクを作る。
+     *
+     * <p>コンポーネント宣言のない単一モジュール構成では、モジュール相対パスが
+     * そのままリポジトリ相対パスである。
+     */
+    static String repoRelative(String absolutePath, String modulePath, String componentName) {
+        if (modulePath == null || componentName == null || componentName.isBlank()) {
+            return modulePath;
+        }
+        String normalized = absolutePath.replace('\\', '/');
+        return normalized.endsWith("/" + componentName + "/" + modulePath)
+                ? componentName + "/" + modulePath
+                : modulePath;
     }
 
     static Integer complexityOf(String message) {
