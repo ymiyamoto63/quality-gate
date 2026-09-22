@@ -111,9 +111,7 @@ docker compose up -d db
 # 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します）
 cd backend && ./mvnw verify
 
-# 3. バックエンドを起動する（GitHub App の設定が必要。次節を参照）
-export QG_GITHUB_CLIENT_ID=...
-export QG_GITHUB_CLIENT_SECRET=...
+# 3. バックエンドを起動する（GitHub App の設定と .env が必要。次節を参照）
 ./mvnw spring-boot:run
 
 # 4. 別ターミナルでフロントエンドを起動する（/api は 8080 にプロキシされます）
@@ -146,17 +144,23 @@ cd frontend && npm ci && npm run dev
 2. 作成後の画面で **Client ID** を控え、**Generate a new client secret** でシークレットを発行する
    （シークレットは発行時にしか表示されません）
 
-3. バックエンドの起動時に環境変数で渡す
+3. リポジトリ直下の `.env` に書く
 
    ```bash
-   export QG_GITHUB_CLIENT_ID=Iv23li...
-   export QG_GITHUB_CLIENT_SECRET=...
+   cp .env.example .env
+   # .env を編集する
+   QG_GITHUB_CLIENT_ID=Iv23li...
+   QG_GITHUB_CLIENT_SECRET=...
    ```
 
-   IDE からデバッグ実行する場合は、実行構成の環境変数に同じ値を設定します。
-   **Spring Boot は `.env` を自動では読み込みません。** `.env.example` を `.env` に
-   コピーしただけでは反映されないため注意してください（`.env` は compose の `full` プロファイル用です）。
-   認証情報はコミットしないでください。
+   バックエンドは起動時に `.env` を設定ファイルとして読み込みます（`application.yml` の
+   `spring.config.import`）。`backend/` から起動しても、リポジトリ直下から起動しても見つかります。
+   `.env` は `.gitignore` 済みです。認証情報はコミットしないでください。
+
+   - 値は `KEY=value` の形で書き、引用符で囲まないでください（引用符も値の一部として読まれます）
+   - 同じ名前の環境変数が設定されている場合は、環境変数のほうが優先されます
+   - Windows 側のエディタで編集した場合は改行コードを LF にしてください
+     （CRLF だと値の末尾に `\r` が付きます）
 
 利用者が 1 件も存在しない初期状態では、**最初にログインしたユーザーが自動的に ADMIN として登録されます**。
 2 人目以降は、ADMIN が許可リストに追加するまでログインできません（`/forbidden` に遷移します）。
@@ -166,7 +170,8 @@ cd frontend && npm ci && npm run dev
 | 症状 | 原因と対処 |
 | --- | --- |
 | ヘッダーだけ表示され本文が空のまま。dev server に `http proxy error: /api/v1/me` / `connect ETIMEDOUT 127.0.0.1:8080` | バックエンドに到達できていない。バックエンドが起動しているか確認する。WSL2 では Vite とバックエンドを**同じ環境**（両方 WSL 内、または両方 Windows 側）で動かす。Windows 側の IDE でバックエンドを動かす場合は `.wslconfig` に `networkingMode=mirrored` を設定する |
-| 「GitHub でログイン」を押すと GitHub の 404 になり、URL に `client_id=placeholder-client-id` が含まれる | `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` が未設定。上記の GitHub App を作成し、環境変数を設定してバックエンドを再起動する |
+| 「GitHub でログイン」を押すと GitHub の 404 になり、URL に `client_id=placeholder-client-id` が含まれる | `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` が読み込まれていない。上記の GitHub App を作成し、リポジトリ直下の `.env` に書いてバックエンドを再起動する |
+| バックエンドの起動時に `Client id of registration 'github' must not be empty` で失敗する | `.env` に `QG_GITHUB_CLIENT_ID=` のように空の値が残っている。空の値は既定値より優先されるため、値を入れるか行ごと削除する |
 | GitHub で `redirect_uri is not associated with this application` と表示される | GitHub App の Callback URL が、URL 中の `redirect_uri` と一致していない。表示された `redirect_uri` をそのまま Callback URL に追加する |
 
 疎通は Vite を動かしているのと同じ端末から `curl http://127.0.0.1:8080/actuator/health` で確認できます。
