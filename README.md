@@ -56,7 +56,7 @@
 | 技術スタック | 完了（v1.1 確定、雛形で検証済み） |
 | 基本設計（方式・DB・API・画面） | 完了 |
 | プロジェクト雛形 | 完了（ビルド・テスト・起動を確認済み） |
-| 正規化・判定エンジン | 完了（M-01 / M-02 / M-06 / M-07 の 4 指標） |
+| 正規化・判定エンジン | 完了（M-01 / M-02 / M-06 / M-07 / M-10 の 5 指標） |
 | 設定解決（`.quality-gate.yml`） | 完了（検証・版管理・Run への紐づけ） |
 | 参照 API と画面（S-03 Run 詳細 / S-04 違反一覧 / S-05 トレンド） | 完了 |
 | 残りの指標・ユースケース・画面 | **未実装** |
@@ -74,6 +74,9 @@
     frontend は「未計測」ではなく「対象外」と表示する
   - M-06 重大・高 脆弱性件数（SARIF）
   - M-07 循環的複雑度 15 超の新規関数数（PMD XML）
+  - M-10 アクセシビリティ違反（axe-core の結果 JSON）— WCAG 2.2 AA の基準に含まれるルールの
+    critical + serious を数え、設定の `pages` の画面がすべて検査されているかを確かめる。
+    Run 詳細には「重大 0 件は適合の十分条件ではない」と常に注記する
   - 差分算出（新規 / 継続 / 解消 / 初回）、スキップ申告、fail-closed
 - **設定解決** — CI が送る `.quality-gate.yml` を行番号つきで検証し、
   内容ハッシュで版管理して Run に紐づける
@@ -90,11 +93,11 @@
 - ダッシュボード API（`/api/v1/dashboard`）と `/api/v1/me`
 - SPA を同梱した同一オリジン配信
 - OpenAPI の生成 → フロントエンドの型生成（必須項目と null 許容まで宣言）
-- アクセシビリティの自動検査（axe-core、ライト / ダーク両モード）
+- アクセシビリティの自動検査（axe-core、ライト / ダーク両モード）。結果は M-10 の成果物として書き出す
 
 ### 未実装のもの
 
-- **残る指標** — M-03〜05 性能 / M-08・M-09 契約 / M-10 アクセシビリティ
+- **残る指標** — M-03〜05 性能 / M-08・M-09 契約
 - 免除・通知・監査ログ・再評価の各ユースケース
 - 残る画面 — リポジトリ詳細 / 設定 / 免除管理 / 利用者管理（ルーティングと仮画面のみ）
 
@@ -141,7 +144,7 @@ cd frontend && npm ci && npm run dev
 | `npm run build` | `frontend/` | 型検査（`vue-tsc`）のあと `frontend/dist/` に本番ビルドを出力する |
 | `npm run typecheck` / `npm run lint` / `npm run format` | `frontend/` | 型検査 / ESLint（警告 0 件が条件）/ Prettier による整形 |
 | `npm test` / `npm run test:coverage` | `frontend/` | Vitest による単体テスト / カバレッジつき（`reports/frontend-coverage/` に出力） |
-| `npm run test:a11y` | `frontend/` | Playwright + axe-core によるアクセシビリティ検査（dev server の起動が前提） |
+| `npm run test:a11y` | `frontend/` | Playwright + axe-core によるアクセシビリティ検査（dev server は未起動なら自動で立ち上がる）。結果を `reports/axe-results.json`（M-10 の成果物）に書き出す |
 | `docker compose --profile full up --build` | リポジトリ直下 | DB とアプリの両方をコンテナで起動する（後述の「起動の仕組み」を参照） |
 
 ### ログイン用の GitHub App
@@ -224,12 +227,17 @@ git diff --exit-code api/ frontend/src/api/schema.d.ts   # ずれていないか
 ### アクセシビリティ検査（M-10）
 
 ```bash
-cd frontend && npm run dev              # 別ターミナルで dev server を起動
-npx playwright test                     # ライト / ダークの両モードで検査
+cd frontend && npx playwright test      # ライト / ダークの両モードで検査
 ```
 
-同梱ブラウザを取得できない環境では、`QG_E2E_CHROMIUM` に
-Chromium の実行ファイルのパスを渡してください。
+dev server は起動していなければ自動で立ち上がります（起動済みならそれを使います）。
+検査先を変える場合は `QG_E2E_BASE_URL` を、同梱ブラウザを取得できない環境では
+`QG_E2E_CHROMIUM` に Chromium の実行ファイルのパスを渡してください。
+
+axe-core の結果は `reports/axe-results.json` に書き出され、これを `axe-json` として
+quality-gate に送ります。同じ場所の `playwright-results.json` はテストレポートで、
+axe の結果ではありません。検査する画面を足したら `.quality-gate.yml` の
+`accessibility.pages` にも足してください。
 
 ## 起動の仕組み
 

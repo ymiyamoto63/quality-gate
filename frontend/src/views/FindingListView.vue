@@ -85,6 +85,10 @@ function detailLine(item: FindingItem): string | null {
   }
   if (typeof item.detail.cvssScore === 'number') parts.push(`CVSS ${item.detail.cvssScore}`)
   if (typeof item.detail.complexity === 'number') parts.push(`複雑度 ${item.detail.complexity}`)
+  // アクセシビリティ違反はファイルではなく画面の要素で位置を示す
+  if (typeof item.detail.page === 'string') parts.push(`画面 ${item.detail.page}`)
+  if (typeof item.detail.selector === 'string') parts.push(`要素 ${item.detail.selector}`)
+  if (typeof item.detail.impact === 'string') parts.push(`axe impact: ${item.detail.impact}`)
   return parts.length > 0 ? parts.join(' · ') : null
 }
 </script>
@@ -175,6 +179,15 @@ function detailLine(item: FindingItem): string | null {
               アドバイザリ <span class="qg-visually-hidden">（外部サイト）</span>
               <i class="pi pi-external-link" aria-hidden="true" />
             </a>
+            <a
+              v-if="typeof item.detail.helpUrl === 'string'"
+              :href="String(item.detail.helpUrl)"
+              target="_blank"
+              rel="noopener"
+            >
+              ルールの解説 <span class="qg-visually-hidden">（外部サイト）</span>
+              <i class="pi pi-external-link" aria-hidden="true" />
+            </a>
           </p>
 
           <!--
@@ -229,6 +242,8 @@ function detailLine(item: FindingItem): string | null {
 }
 
 .qg-finding {
+  /* CSS セレクタや長いパスで横にはみ出さない */
+  overflow-wrap: anywhere;
   background: var(--surface-1);
   border: 1px solid var(--border);
   border-radius: var(--radius);

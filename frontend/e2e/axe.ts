@@ -1,5 +1,6 @@
-import { expect, type Page } from '@playwright/test'
+import { expect, test, type Page } from '@playwright/test'
 import AxeBuilder from '@axe-core/playwright'
+import { writeAxeResult } from './axe-report'
 
 /**
  * 検査するテーマ。
@@ -18,11 +19,15 @@ export const COLOR_SCHEMES = ['light', 'dark'] as const
  *
  * 自動検査で検出できる WCAG 違反は一部にとどまるため、
  * 「重大 0 件」は AA 適合の必要条件であって十分条件ではない。
+ *
+ * 結果は判定の前に書き出す。違反があって検査が落ちたときこそ、
+ * その違反を quality-gate に届ける必要がある。
  */
 export async function expectNoBlockingViolations(page: Page): Promise<void> {
   const results = await new AxeBuilder({ page })
     .withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa'])
     .analyze()
+  writeAxeResult(test.info().testId, results)
 
   const blocking = results.violations.filter(
     (v) => v.impact === 'critical' || v.impact === 'serious',

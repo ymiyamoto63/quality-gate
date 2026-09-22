@@ -4,6 +4,7 @@ import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.gate.GateConfigDocument;
 import com.qualitygate.domain.model.MutationScope;
+import com.qualitygate.domain.model.WcagStandard;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -179,6 +180,9 @@ public class GateConfigParser {
             if ("mutation_score".equals(entry.getKey())) {
                 validateMutation(values, path, lines, errors);
             }
+            if ("accessibility".equals(entry.getKey())) {
+                validateAccessibility(values, path, lines, errors);
+            }
 
             boolean enabled = !Boolean.FALSE.equals(values.get("enabled"));
             result.put(entry.getKey(), new GateConfigDocument.MetricConfig(enabled, values));
@@ -208,6 +212,31 @@ public class GateConfigParser {
             errors.add(error(lines, path + ".components",
                     "コンポーネント名の配列で指定してください（例: [backend]。受信値: %s）"
                             .formatted(quote(components))));
+        }
+    }
+
+    /**
+     * M-10 の判定基準と検査対象ページ。
+     *
+     * <p>未知の基準を既定値で読み流すと、書いた基準とは違う基準で合否が出る。
+     * ページは画面のパス（{@code /runs/:id}）で書く。URL で書くと検査結果と照合できない。
+     */
+    private void validateAccessibility(Map<String, Object> values, String path,
+                                       YamlLineIndex lines, List<ConfigValidationError> errors) {
+        Object standard = values.get("standard");
+        Set<String> standards = Arrays.stream(WcagStandard.values()).map(WcagStandard::wire)
+                .collect(Collectors.toSet());
+        if (standard != null && !standards.contains(String.valueOf(standard))) {
+            errors.add(error(lines, path + ".standard", "指定できるのは %s のいずれかです（受信値: %s）"
+                    .formatted(String.join(" / ", sorted(standards)), quote(standard))));
+        }
+        Object pages = values.get("pages");
+        boolean listOfPaths = pages instanceof List<?> list
+                && list.stream().allMatch(p -> p instanceof String s && s.startsWith("/"));
+        if (pages != null && !listOfPaths) {
+            errors.add(error(lines, path + ".pages",
+                    "/ で始まる画面のパスの配列で指定してください（例: [\"/login\", \"/runs/:id\"]。受信値: %s）"
+                            .formatted(quote(pages))));
         }
     }
 

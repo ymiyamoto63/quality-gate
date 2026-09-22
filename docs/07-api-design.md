@@ -617,6 +617,18 @@ Run 詳細の指標行は、計測条件の生の値（`variant`: `changed` / `a
 `SKIP`（今回は測らなかった）とは別物であり、画面も「未計測」ではなく「対象外」と表示する。
 `value` は常に `null`。合否・部分計測・カテゴリの状態のいずれにも影響しない。
 
+### アクセシビリティ（M-10）の指標行と違反
+
+M-10 の `threshold` は他の指標と同じ `operator` / `value`（critical + serious の許容件数）に加え、
+判定基準の `standard`（`wcag22aa` など）を持つ。`detail` は基準内の `critical` / `serious` /
+`moderate` / `minor` の件数、基準外の `outOfStandard`、判断を保留した要素数 `needsReview`、
+検査した画面 `pages`、読み込みに失敗した画面 `failedPages` を返す。
+
+M-10 の違反は `filePath` / `line` / `sourceUrl` が `null` である。リポジトリ上のファイルではなく
+画面の要素を指すため、GitHub へのリンクを組み立てると壊れたリンクになる。位置は `detail` の
+`page`（`/runs/:id`）と `selector`（CSS セレクタ）で示し、`impact`・`tags`・`helpUrl`・
+`html`（先頭 512 文字）・`failureSummary` を添える。
+
 ---
 
 ## 5. 操作 API の詳細

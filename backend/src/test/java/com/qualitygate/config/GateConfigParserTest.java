@@ -140,6 +140,31 @@ class GateConfigParserTest {
     }
 
     @Test
+    void アクセシビリティの基準の誤りは選択肢を示して拒否する() {
+        // 既定値で読み流すと、書いた基準とは違う基準で合否が出る
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  accessibility:
+                    standard: wcag22-aa
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("wcag21aa / wcag22aa");
+    }
+
+    @Test
+    void 検査対象ページは画面のパスでなければ拒否する() {
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  accessibility:
+                    pages: ["https://app.example.com/login"]
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("/ で始まる画面のパス");
+    }
+
+    @Test
     void 重複したキーは拒否する() {
         // 後勝ちで黙らせると、消したはずの設定が効き続ける
         assertThatThrownBy(() -> parser.parse("""

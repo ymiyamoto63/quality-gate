@@ -340,8 +340,14 @@ public class RunEvaluationService {
         };
     }
 
+    /**
+     * ダッシュボードの「重大 N 件・高 N 件」は脆弱性（M-06）の件数に限る。
+     * アクセシビリティ違反（M-10）も同じ深刻度で保存するため、混ぜると
+     * 未解決の脆弱性が増えたように見える。
+     */
     private static long countBySeverity(List<MetricResult> results, Severity severity) {
         return results.stream()
+                .filter(r -> GateThresholds.M_VULNERABILITIES.equals(r.metricId()))
                 .flatMap(r -> r.findingsToPersist().stream())
                 .filter(f -> f.finding().severity() == severity)
                 .count();

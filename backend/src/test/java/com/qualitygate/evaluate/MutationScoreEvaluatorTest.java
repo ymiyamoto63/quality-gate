@@ -15,6 +15,7 @@ import java.util.Set;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.coverage;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.input;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.run;
+import static com.qualitygate.evaluate.EvaluatorTestSupport.thresholdsWith;
 import static org.assertj.core.api.Assertions.assertThat;
 
 class MutationScoreEvaluatorTest {
@@ -216,11 +217,8 @@ class MutationScoreEvaluatorTest {
     private static EvaluationContext context(Set<String> components,
                                              Map<String, BigDecimal> previous,
                                              List<RawMeasurement> measurements) {
-        GateThresholds d = GateThresholds.defaults();
-        GateThresholds thresholds = new GateThresholds(d.enabledMetrics(), d.skippableMetrics(),
-                d.exclusions(), d.branchCoverageThreshold(), d.branchCoverageWarnBelow(),
-                d.maxCritical(), d.maxHigh(), d.maxComplexity(), d.complexityWarnFrom(),
-                d.mutationThreshold(), components);
+        GateThresholds thresholds = thresholdsWith("mutation_score",
+                Map.of("threshold", 60, "components", List.copyOf(components)));
         NormalizedInput input = input(measurements, List.of(), List.of(), Set.of("M-02"));
         return new EvaluationContext(run(), thresholds, input, previous, !previous.isEmpty());
     }

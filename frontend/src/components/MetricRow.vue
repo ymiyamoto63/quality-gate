@@ -26,6 +26,15 @@ const value = computed(() =>
     ? '—'
     : formatValue(props.metric.value, props.metric.unit),
 )
+/**
+ * 指標そのものの限界。判定結果によらず常に添える（docs/02-metrics-spec.md M-10）。
+ * 「重大 0 件」を適合の証明と受け取られると、手動での確認が省かれる。
+ */
+const NOTES: Record<string, string> = {
+  'M-10':
+    '自動検査で検出できる WCAG 違反は一部です。重大 0 件は適合の必要条件であって十分条件ではありません。キーボード操作とスクリーンリーダーでの確認は別に必要です。',
+}
+const note = computed(() => NOTES[props.metric.metricId] ?? null)
 const threshold = computed(() => formatThreshold(props.metric.threshold, props.metric.unit))
 const delta = computed(() => formatDelta(props.metric.delta, props.metric.unit))
 </script>
@@ -61,6 +70,10 @@ const delta = computed(() => formatDelta(props.metric.delta, props.metric.unit))
     </div>
 
     <p v-if="metric.reason" class="qg-metric__reason">{{ metric.reason }}</p>
+    <p v-if="note" class="qg-metric__note">
+      <i class="pi pi-info-circle" aria-hidden="true" />
+      {{ note }}
+    </p>
 
     <RouterLink
       v-if="metric.findingCount > 0"
@@ -109,6 +122,12 @@ const delta = computed(() => formatDelta(props.metric.delta, props.metric.unit))
 .qg-metric__reason {
   margin: 0.25rem 0 0;
   font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+
+.qg-metric__note {
+  margin: 0.25rem 0 0;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 

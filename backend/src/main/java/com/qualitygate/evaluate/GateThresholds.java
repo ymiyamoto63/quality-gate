@@ -1,6 +1,7 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.gate.GateConfigDocument;
+import com.qualitygate.domain.model.WcagStandard;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
@@ -15,6 +16,9 @@ import java.util.Set;
  * @param skippableMetrics  スキップ申告を受理してよい指標（指標 ID）
  * @param exclusions        計測除外の glob パターン
  * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
+ * @param maxAccessibilityViolations M-10 の合格ライン（critical + serious の件数）
+ * @param accessibilityStandard      M-10 の判定基準
+ * @param accessibilityPages         M-10 で検査されているべきページ。空なら限定しない
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -27,7 +31,10 @@ public record GateThresholds(
         int maxComplexity,
         int complexityWarnFrom,
         BigDecimal mutationThreshold,
-        Set<String> mutationComponents) {
+        Set<String> mutationComponents,
+        int maxAccessibilityViolations,
+        WcagStandard accessibilityStandard,
+        List<String> accessibilityPages) {
 
     public static final String M_BRANCH_COVERAGE = "M-01";
     public static final String M_MUTATION = "M-02";
@@ -47,7 +54,8 @@ public record GateThresholds(
      * 未実装の指標まで判定対象に含めると、すべての Run が ERROR で不合格になる。
      */
     public static final Set<String> IMPLEMENTED_METRICS =
-            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_VULNERABILITIES, M_COMPLEXITY);
+            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_VULNERABILITIES, M_COMPLEXITY,
+                    M_ACCESSIBILITY);
 
     /** YAML の指標名と指標 ID の対応。 */
     private static final Map<String, List<String>> METRIC_IDS_OF = Map.of(
@@ -81,6 +89,7 @@ public record GateThresholds(
         GateConfigDocument.MetricConfig vulnerabilities = document.metric("vulnerabilities");
         GateConfigDocument.MetricConfig complexity = document.metric("cyclomatic_complexity");
         GateConfigDocument.MetricConfig mutation = document.metric("mutation_score");
+        GateConfigDocument.MetricConfig accessibility = document.metric("accessibility");
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
         return new GateThresholds(
@@ -94,7 +103,11 @@ public record GateThresholds(
                 complexity.number("max_complexity").orElse(BigDecimal.valueOf(15)).intValue(),
                 complexity.number("warn_from").orElse(BigDecimal.valueOf(11)).intValue(),
                 mutation.number("threshold").orElse(BigDecimal.valueOf(60)),
-                Set.copyOf(mutation.list("components")));
+                Set.copyOf(mutation.list("components")),
+                accessibility.number("max_critical").orElse(BigDecimal.ZERO).intValue(),
+                accessibility.text("standard").flatMap(WcagStandard::find)
+                        .orElse(WcagStandard.DEFAULT),
+                List.copyOf(accessibility.list("pages")));
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */

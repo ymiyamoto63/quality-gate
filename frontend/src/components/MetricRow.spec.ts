@@ -111,4 +111,24 @@ describe('MetricRow', () => {
     expect(text).toContain('対象外')
     expect(text).not.toContain('未計測')
   })
+
+  it('アクセシビリティは自動検査の限界を判定結果によらず添える', () => {
+    // 合格でも出す。「重大 0 件」を適合の証明と受け取らせない
+    const text = render(
+      metric({
+        metricId: 'M-10',
+        name: 'アクセシビリティ違反',
+        componentName: null,
+        unit: 'count',
+        value: 0,
+        threshold: { operator: '<=', value: 0 },
+      }),
+    ).text()
+
+    expect(text).toContain('必要条件であって十分条件ではありません')
+  })
+
+  it('他の指標には注記を出さない', () => {
+    expect(render(metric()).find('.qg-metric__note').exists()).toBe(false)
+  })
 })

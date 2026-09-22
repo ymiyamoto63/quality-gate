@@ -1,6 +1,7 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.gate.GateConfigDocument;
 import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -11,6 +12,7 @@ import com.qualitygate.platform.id.Uuid7;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +38,17 @@ final class EvaluatorTestSupport {
                                      boolean hasBaseline) {
         return new EvaluationContext(run(), GateThresholds.defaults(), input,
                 previousValues, hasBaseline);
+    }
+
+    /** 既定の設定のうち、1 つの指標の設定だけを差し替えた合格ライン。 */
+    static GateThresholds thresholdsWith(String metric, Map<String, Object> values) {
+        GateConfigDocument defaults = GateConfigDocument.defaults();
+        Map<String, GateConfigDocument.MetricConfig> metrics =
+                new LinkedHashMap<>(defaults.metrics());
+        metrics.put(metric, new GateConfigDocument.MetricConfig(true, values));
+        return GateThresholds.from(new GateConfigDocument(defaults.version(),
+                defaults.enforcement(), defaults.onMissingReport(), defaults.execution(),
+                defaults.exclusions(), metrics));
     }
 
     static NormalizedInput input(List<RawMeasurement> measurements,

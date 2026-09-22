@@ -113,6 +113,26 @@ class RunQueryApiIT {
             </pmd>
             """;
 
+    /** 違反の無い axe-core の結果。 */
+    private static final String AXE_CLEAN = """
+            [{ "url": "http://localhost:5173/login", "violations": [] }]
+            """;
+
+    /** Run 詳細の画面にコントラスト不足が 1 件ある axe-core の結果。 */
+    private static final String AXE_CONTRAST = """
+            [{ "url": "http://localhost:5173/runs/0190f5a2-7c1e-7a3b-9e4d-2f6a8b1c3d5e",
+               "testEngine": { "name": "axe-core", "version": "4.13.0" },
+               "toolOptions": { "runOnly": { "type": "tag",
+                 "values": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } },
+               "violations": [{
+                 "id": "color-contrast", "impact": "serious", "tags": ["cat.color", "wcag2aa", "wcag143"],
+                 "help": "Elements must meet minimum color contrast ratio thresholds",
+                 "helpUrl": "https://dequeuniversity.com/rules/axe/4.13/color-contrast",
+                 "nodes": [{ "target": [".qg-metric__threshold"], "impact": "serious",
+                   "html": "<span class='qg-metric__threshold'>≥ 75%</span>",
+                   "failureSummary": "Fix any of the following:\\n  Element has insufficient color contrast of 3.2" }] }] }]
+            """;
+
     /** 変更範囲の PIT 結果。検出 8 / 対象 10 = 80% で合格。 */
     private static final String PIT = "<mutations partial='true'>"
             + mutation("KILLED").repeat(8)
@@ -184,7 +204,7 @@ class RunQueryApiIT {
 
         // カテゴリは要件定義の指標表と同じ並び
         assertThat(detail.categories()).extracting(RunDetailResponse.RunCategory::category)
-                .containsExactly("機能テスト", "セキュリティ", "コード構造");
+                .containsExactly("機能テスト", "セキュリティ", "コード構造", "使いやすさ");
 
         RunDetailResponse.RunCategory security = detail.categories().stream()
                 .filter(c -> c.category().equals("セキュリティ")).findFirst().orElseThrow();
@@ -213,7 +233,7 @@ class RunQueryApiIT {
 
         assertThat(detail.findingSummary().initial()).isEqualTo(3);
         assertThat(detail.findingSummary().newCount()).isZero();
-        assertThat(detail.artifactCount()).isEqualTo(4);
+        assertThat(detail.artifactCount()).isEqualTo(5);
     }
 
     /**
@@ -491,10 +511,15 @@ class RunQueryApiIT {
                 .bodyJson()
                 .satisfies(content -> {
                     var json = content.assertThat();
-                    json.extractingPath("$.totalCount").asNumber().isEqualTo(3);
+                    json.extractingPath("$.totalCount").asNumber().isEqualTo(4);
                     json.extractingPath("$.items[0].severity").isEqualTo("CRITICAL");
                     json.extractingPath("$.items[0].sourceUrl").asString()
                             .startsWith("https://github.com/ymiyamoto63/quality-gate/blob/");
+                    // 画面の違反にはリポジトリ上のファイルが無い。GitHub への壊れたリンクを作らない
+                    json.extractingPath("$.items[?(@.metricId == 'M-10')].sourceUrl")
+                            .asArray().containsExactly((Object) null);
+                    json.extractingPath("$.items[?(@.metricId == 'M-10')].detail.page")
+                            .asArray().containsExactly("/runs/:id");
                 });
 
         storeFixtures(tester, run);
@@ -555,12 +580,14 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", pmd);
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
+        attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CLEAN);
         return evaluate(run);
     }
 
     /**
      * 画面の検査用に、backend と frontend の両方を計測した Run を作る。
      * M-02 は設定で backend に限るため、frontend は対象外として並ぶ。
+     * 違反一覧の画面がアクセシビリティ違反も描けるよう、M-10 の違反を 1 件含める。
      */
     private Run evaluatedWithFrontend(Instant measuredAt) {
         Run run = createRun(measuredAt);
@@ -577,6 +604,7 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
+        attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CONTRAST);
         return evaluate(run);
     }
 

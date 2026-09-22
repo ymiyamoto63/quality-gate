@@ -94,7 +94,9 @@ jobs:
       - name: アクセシビリティ検査（Playwright + axe-core）
         run: cd frontend && npx playwright install --with-deps chromium && npm run test:a11y
 
+      # テストが落ちても成果物は送る。違反で落ちたときこそ、その違反を判定に届ける必要がある
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: reports-base
           path: reports/
@@ -152,4 +154,6 @@ jobs:
           #   type=quality-gate-config で .quality-gate.yml を送信する
           #   type=pit-xml は metadata={"mutationScope":"all"} を付けて送信する
           #   （mutation プロファイルは全クラスを対象にするため。無いと 422 で拒否される）
+          #   type=axe-json で reports/axe-results.json を送信する（component=frontend）。
+          #   reports/playwright-results.json はテストレポートであり axe の結果ではない
         continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）

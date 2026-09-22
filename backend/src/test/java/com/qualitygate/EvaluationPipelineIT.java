@@ -13,6 +13,7 @@ import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.RunnerType;
+import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
@@ -87,6 +88,15 @@ class EvaluationPipelineIT {
             }]}
             """;
 
+    /** 違反の無い axe-core の結果（ログイン画面を WCAG 2.2 AA のタグで検査）。 */
+    private static final String AXE_CLEAN = """
+            [{ "url": "http://localhost:5173/login",
+               "testEngine": { "name": "axe-core", "version": "4.13.0" },
+               "toolOptions": { "runOnly": { "type": "tag",
+                 "values": ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"] } },
+               "violations": [] }]
+            """;
+
     private static final String PMD = """
             <?xml version="1.0" encoding="UTF-8"?>
             <pmd version="7.0.0">
@@ -145,6 +155,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_HIGH);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
+        attachAxe(run, AXE_CLEAN);
 
         Run evaluated = evaluate(run);
 
@@ -162,7 +173,9 @@ class EvaluationPipelineIT {
                         // High 1 件で不合格
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
                         // ベース比較ができないため新規関数数は 0 で合格
-                        org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
+                        // 重大なアクセシビリティ違反は無い
+                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS));
 
         // 初回 Run なので違反はすべて INITIAL。NEW にすると
         // 「この変更が問題を持ち込んだ」という誤った表示になる
@@ -190,7 +203,7 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-02", "M-06", "M-07");
+                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-10");
     }
 
     @Test
@@ -208,6 +221,7 @@ class EvaluationPipelineIT {
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07",
                 "GitHub ホストランナーのため実行しない"));
         attachPit(run, "changed");
+        attachAxe(run, AXE_CLEAN);
 
         Run evaluated = evaluate(run);
 
@@ -304,6 +318,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   cyclomatic_complexity:
                     enabled: false
+                  accessibility:
+                    enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.LCOV, "lcov.info", "frontend", null,
@@ -354,6 +370,73 @@ class EvaluationPipelineIT {
         assertThat(all.getPreviousValue()).isNull();
     }
 
+    @Test
+    void アクセシビリティ違反は不合格にするがダッシュボードの脆弱性件数には数えない() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachPit(run, "changed");
+        // 別の成果物で同じ画面を検査した結果（ライト / ダークなど）は、同じ違反として 1 件に数える
+        String violation = """
+                [{ "url": "http://localhost:5173/runs/0190f5a2-7c1e-7a3b-9e4d-2f6a8b1c3d5e",
+                   "violations": [{ "id": "image-alt", "impact": "critical", "tags": ["wcag2a"],
+                     "help": "Images must have alternate text",
+                     "nodes": [{ "target": ["img.logo"] }] }] }]
+                """;
+        attachAxe(run, "axe-light.json", violation);
+        attachAxe(run, "axe-dark.json",
+                violation.replace("9e4d-2f6a8b1c3d5e", "9e4d-000000000000"));
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-10"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL);
+                    assertThat(m.getValue()).isEqualByComparingTo("1");
+                });
+        assertThat(findings.findByRunId(run.getId()))
+                .filteredOn(f -> f.getMetricId().equals("M-10"))
+                .singleElement()
+                .satisfies(f -> {
+                    assertThat(f.getSeverity()).isEqualTo(Severity.CRITICAL);
+                    assertThat(f.getFilePath()).isNull();
+                });
+        // ダッシュボードの「重大 N 件」は脆弱性の件数。アクセシビリティ違反を混ぜない
+        var summary = summaries.findById(repositoryId).orElseThrow();
+        assertThat(summary.getOpenCriticalCount()).isZero();
+        assertThat(summary.getCategoryStatus()).contains("使いやすさ");
+    }
+
+    @Test
+    void 設定したページが検査されていなければアクセシビリティは計測エラー() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  accessibility:
+                    pages: ["/login", "/runs/:id"]
+                """);
+        attachAllMetrics(run);
+        attachPit(run, "changed");
+
+        Run evaluated = evaluate(run);
+
+        // AXE_CLEAN は /login しか検査していない。/runs/:id を合格にすると、
+        // 検査していない画面まで「違反 0 件」と表示される
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-10"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
+                    assertThat(m.getReason()).contains("/runs/:id");
+                });
+    }
+
     /** ジョブハンドラと同じ手順（設定解決 → 正規化 → 判定）を踏む。 */
     @Test
     void 設定ファイルのしきい値が判定に使われる() {
@@ -369,6 +452,8 @@ class EvaluationPipelineIT {
                   vulnerabilities:
                     enabled: false
                   cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -444,6 +529,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
+        attachAxe(run, AXE_CLEAN);
 
         Run evaluated = evaluate(run);
 
@@ -463,6 +549,8 @@ class EvaluationPipelineIT {
                   vulnerabilities:
                     enabled: false
                   cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -507,6 +595,15 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachAxe(run, AXE_CLEAN);
+    }
+
+    private void attachAxe(Run run, String json) {
+        attachAxe(run, "axe-results.json", json);
+    }
+
+    private void attachAxe(Run run, String filename, String json) {
+        attach(run, ArtifactType.AXE_JSON, filename, "frontend", null, json);
     }
 
     private void attachPit(Run run, String mutationScope) {
