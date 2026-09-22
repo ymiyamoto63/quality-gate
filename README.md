@@ -108,7 +108,9 @@ docker compose up -d db
 # 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します）
 cd backend && ./mvnw verify
 
-# 3. バックエンドを起動する
+# 3. バックエンドを起動する（GitHub App の設定が必要。次節を参照）
+export QG_GITHUB_CLIENT_ID=...
+export QG_GITHUB_CLIENT_SECRET=...
 ./mvnw spring-boot:run
 
 # 4. 別ターミナルでフロントエンドを起動する（/api は 8080 にプロキシされます）
@@ -117,6 +119,54 @@ cd frontend && npm ci && npm run dev
 
 フロントエンドだけを触るときは `-DskipFrontend=true` を付けると Maven の
 フロントエンドビルドを飛ばせます。
+
+### ログイン用の GitHub App
+
+ログインは GitHub App の user-to-server 認可フローで行います（D-11）。
+ローカルで動かすには、開発者ごとに GitHub App を 1 つ作成し、その認証情報を
+バックエンドに渡す必要があります。
+
+1. GitHub の **Settings → Developer settings → GitHub Apps → New GitHub App** で作成する
+
+   | 項目 | 値 |
+   | --- | --- |
+   | GitHub App name | 任意（GitHub 全体で一意。例: `quality-gate-local-<GitHub ログイン名>`） |
+   | Homepage URL | `http://localhost:5173` |
+   | Callback URL | `http://localhost:8080/login/oauth2/code/github` と `http://localhost:5173/login/oauth2/code/github` の両方 |
+   | Webhook の Active | チェックを外す |
+   | Repository permissions | Contents: Read-only（リポジトリ読み取り用。ログインだけなら不要） |
+   | Where can this GitHub App be installed? | Only on this account |
+
+   Callback URL は、ブラウザで開いたオリジン（8080 で直接開くか、5173 の dev server 経由か）
+   によって決まる `redirect_uri` と完全一致している必要があるため、両方を登録します。
+
+2. 作成後の画面で **Client ID** を控え、**Generate a new client secret** でシークレットを発行する
+   （シークレットは発行時にしか表示されません）
+
+3. バックエンドの起動時に環境変数で渡す
+
+   ```bash
+   export QG_GITHUB_CLIENT_ID=Iv23li...
+   export QG_GITHUB_CLIENT_SECRET=...
+   ```
+
+   IDE からデバッグ実行する場合は、実行構成の環境変数に同じ値を設定します。
+   **Spring Boot は `.env` を自動では読み込みません。** `.env.example` を `.env` に
+   コピーしただけでは反映されないため注意してください（`.env` は compose の `full` プロファイル用です）。
+   認証情報はコミットしないでください。
+
+利用者が 1 件も存在しない初期状態では、**最初にログインしたユーザーが自動的に ADMIN として登録されます**。
+2 人目以降は、ADMIN が許可リストに追加するまでログインできません（`/forbidden` に遷移します）。
+
+### 起動時のよくある症状
+
+| 症状 | 原因と対処 |
+| --- | --- |
+| ヘッダーだけ表示され本文が空のまま。dev server に `http proxy error: /api/v1/me` / `connect ETIMEDOUT 127.0.0.1:8080` | バックエンドに到達できていない。バックエンドが起動しているか確認する。WSL2 では Vite とバックエンドを**同じ環境**（両方 WSL 内、または両方 Windows 側）で動かす。Windows 側の IDE でバックエンドを動かす場合は `.wslconfig` に `networkingMode=mirrored` を設定する |
+| 「GitHub でログイン」を押すと GitHub の 404 になり、URL に `client_id=placeholder-client-id` が含まれる | `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` が未設定。上記の GitHub App を作成し、環境変数を設定してバックエンドを再起動する |
+| GitHub で `redirect_uri is not associated with this application` と表示される | GitHub App の Callback URL が、URL 中の `redirect_uri` と一致していない。表示された `redirect_uri` をそのまま Callback URL に追加する |
+
+疎通は Vite を動かしているのと同じ端末から `curl http://127.0.0.1:8080/actuator/health` で確認できます。
 
 ### API の型生成
 
