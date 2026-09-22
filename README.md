@@ -104,22 +104,36 @@
 **WSL2 で作業する場合、リポジトリは Linux ファイルシステム側（`/home/...`）に置いてください。**
 `/mnt/c` 配下はファイル I/O が遅く、ビルドと HMR が体感できるほど遅延します。
 
+**アプリを動かすだけなら、手順 1〜3 で足ります。** ブラウザで `http://localhost:8080` を開いてください。
+`spring-boot:run` がフロントエンドのビルドと同梱まで自動で行うため（Node.js も Maven が
+`backend/target/` に取得します）、`npm run dev` は不要です。
+
 ```bash
 # 1. データベースを起動する
 docker compose up -d db
 
-# 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します）
+# 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します。動かすだけなら省略可）
 cd backend && ./mvnw verify
 
-# 3. バックエンドを起動する（GitHub App の設定と .env が必要。次節を参照）
+# 3. アプリを起動する（GitHub App の設定と .env が必要。次節を参照）
+#    画面も API も http://localhost:8080 で配信されます
 ./mvnw spring-boot:run
+```
 
-# 4. 別ターミナルでフロントエンドを起動する（/api は 8080 にプロキシされます）
+**画面（`frontend/`）を開発するときは**、手順 3 の代わりに次の 2 つを別々のターミナルで起動し、
+`http://localhost:5173` を開きます。コードを保存するとブラウザに即時反映（HMR）されます。
+8080 だけで開発すると、画面を直すたびに `spring-boot:run` を止めて再実行する必要があります。
+
+```bash
+# 3'. バックエンドを起動する（フロントエンドのビルドを飛ばして起動を速くする）
+cd backend && ./mvnw spring-boot:run -DskipFrontend=true
+
+# 4. 別ターミナルでフロントエンドの dev server を起動する（/api などは 8080 にプロキシされます）
 cd frontend && npm ci && npm run dev
 ```
 
-フロントエンドだけを触るときは `-DskipFrontend=true` を付けると Maven の
-フロントエンドビルドを飛ばせます。
+`-DskipFrontend=true` で起動したバックエンドは画面を同梱しないため、
+この場合 `http://localhost:8080` を開いても画面は表示されません（API のみ）。
 
 ### 各コマンドの説明
 
@@ -156,7 +170,7 @@ cd frontend && npm ci && npm run dev
    | --- | --- |
    | GitHub App name | 任意（GitHub 全体で一意。例: `quality-gate-local-<GitHub ログイン名>`） |
    | Homepage URL | `http://localhost:5173` |
-   | Callback URL | `http://localhost:8080/login/oauth2/code/github` と `http://localhost:5173/login/oauth2/code/github` の両方 |
+   | Callback URL | `http://localhost:8080/login/oauth2/code/github` と `http://localhost:5173/login/oauth2/code/github` の両方（8080 だけで動かすなら前者のみでよい） |
    | Webhook の Active | チェックを外す |
    | Repository permissions | Contents: Read-only（リポジトリ読み取り用。ログインだけなら不要） |
    | Where can this GitHub App be installed? | Only on this account |
