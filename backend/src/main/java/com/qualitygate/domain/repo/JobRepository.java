@@ -27,4 +27,8 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     List<Job> lockNextPending(@Param("now") Instant now, Pageable pageable);
 
     long countByStatus(com.qualitygate.domain.model.JobStatus status);
+
+    /** RUNNING のまま滞留したジョブ。プロセスの異常終了で取り残されたもの。 */
+    @Query("select j from Job j where j.status = 'RUNNING' and j.lockedAt < :before")
+    List<Job> findStale(@Param("before") Instant before);
 }

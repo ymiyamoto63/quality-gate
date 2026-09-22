@@ -145,5 +145,9 @@ jobs:
             SKIPPED="$SKIPPED M-03 M-04 M-05"
           fi
           echo "runnerType=${{ needs.setup.outputs.runner_type }} skipped=[$SKIPPED]"
+          # 判定に使う合格ラインも成果物として送る。quality-gate は
+          # チェックアウトしたそのコミットの .quality-gate.yml で判定する。
+          ls -l .quality-gate.yml
           echo 'TODO: quality-gate-action の実装後に置き換える'
+          #   type=quality-gate-config で .quality-gate.yml を送信する
         continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）

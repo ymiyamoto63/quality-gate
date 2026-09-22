@@ -30,7 +30,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /** 取り込み（Run 作成・成果物受領・確定）のユースケース。 */
@@ -38,15 +37,6 @@ import java.util.UUID;
 public class IngestService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestService.class);
-
-    /**
-     * スキップ申告を受理してよい指標。
-     *
-     * <p>本来はリポジトリの {@code .quality-gate.yml} の
-     * {@code execution.skippable_metrics} から読む。設定解決の実装が入るまでの既定値。
-     */
-    private static final Set<String> DEFAULT_SKIPPABLE_METRICS =
-            Set.of("M-02", "M-03", "M-04", "M-05");
 
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
@@ -103,13 +93,13 @@ public class IngestService {
     /**
      * スキップ申告を記録する。
      *
-     * <p>{@code skippable_metrics} に含まれない指標の申告は受理せず、
-     * {@code accepted=false} として残す。判定時に SKIP ではなく ERROR になる。
+     * <p>受理するかどうかは<strong>判定時に決める</strong>。取り込み時点では
+     * 設定（{@code execution.skippable_metrics}）が未解決であり、設定は成果物として
+     * 後から届くためである。ここで暫定値を入れると、設定と食い違ったまま記録が残る。
      */
     private void recordSkippedMetrics(UUID runId, List<SkippedMetricRequest> requested) {
         requested.stream()
-                .map(s -> new RunSkippedMetric(runId, s.metricId(), s.reason(),
-                        DEFAULT_SKIPPABLE_METRICS.contains(s.metricId())))
+                .map(s -> new RunSkippedMetric(runId, s.metricId(), s.reason()))
                 .forEach(skippedMetrics::save);
     }
 

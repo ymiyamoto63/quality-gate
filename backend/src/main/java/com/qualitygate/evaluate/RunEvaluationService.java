@@ -78,10 +78,14 @@ public class RunEvaluationService {
     }
 
     @Transactional
-    public Run evaluate(UUID runId, NormalizedInput input, GateThresholds thresholds) {
+    public Run evaluate(UUID runId, NormalizedInput input, GateThresholds thresholds,
+                        UUID gateConfigId) {
         Run run = runs.findById(runId).orElseThrow(
                 () -> new IllegalStateException("Run が見つかりません: " + runId));
         run.markProcessing();
+        // どの設定版で判定したかを残す。後からしきい値を変えても、
+        // 過去の Run は当時の判定のまま保たれる。
+        run.applyGateConfig(gateConfigId);
 
         Optional<Run> baseline = findBaseline(run);
         EvaluationContext context = new EvaluationContext(run, thresholds, input,
@@ -113,9 +117,13 @@ public class RunEvaluationService {
         Map<String, MetricEvaluator> byMetric = new HashMap<>();
         evaluators.forEach(e -> byMetric.put(e.metricId(), e));
 
+        // 受理の可否はここで確定する。取り込み時点では設定が未解決だった。
         Map<String, RunSkippedMetric> declared = new HashMap<>();
-        skippedMetrics.findByKeyRunId(context.run().getId())
-                .forEach(s -> declared.put(s.getMetricId(), s));
+        for (RunSkippedMetric skip : skippedMetrics.findByKeyRunId(context.run().getId())) {
+            skip.decideAcceptance(
+                    context.thresholds().skippableMetrics().contains(skip.getMetricId()));
+            declared.put(skip.getMetricId(), skip);
+        }
 
         List<MetricResult> results = new ArrayList<>();
         for (String metricId : context.thresholds().enabledMetrics().stream().sorted().toList()) {

@@ -107,11 +107,12 @@ class IngestApiIT {
         assertThat(created.getBody()).containsEntry("attempt", 1);
         assertThat(String.valueOf(created.getBody().get("detailUrl"))).endsWith(runId.toString());
 
-        // 許容されない指標のスキップ申告は accepted=false として残る（判定時に ERROR になる）
+        // 申告は受け取るが、受理するかは判定時に決める。
+        // 取り込み時点では設定（execution.skippable_metrics）が未解決である。
         assertThat(skippedMetrics.findByKeyRunId(runId))
                 .extracting("metricId", "accepted")
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-02", true),
+                        org.assertj.core.groups.Tuple.tuple("M-02", false),
                         org.assertj.core.groups.Tuple.tuple("M-06", false));
 
         // 成果物をアップロードする

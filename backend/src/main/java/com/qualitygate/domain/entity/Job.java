@@ -81,6 +81,15 @@ public class Job {
         this.updatedAt = at;
     }
 
+    /** 取り残されたジョブを実行待ちに戻す。試行回数は増やさない。 */
+    public void requeue(Instant at) {
+        this.status = JobStatus.PENDING;
+        this.lockedBy = null;
+        this.lockedAt = null;
+        this.runAfter = at;
+        this.updatedAt = at;
+    }
+
     public void markSucceeded(Instant at) {
         this.status = JobStatus.SUCCEEDED;
         this.lockedBy = null;

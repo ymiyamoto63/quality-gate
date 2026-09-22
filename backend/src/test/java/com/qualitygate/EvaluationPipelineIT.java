@@ -27,6 +27,9 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.domain.report.NormalizedInput;
+import com.qualitygate.config.GateConfigService;
+import com.qualitygate.domain.gate.ConfigValidationException;
+import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
 import com.qualitygate.normalize.ReportNormalizer;
@@ -45,6 +48,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /**
  * 取り込んだ成果物が正規化され、判定され、読み取りモデルに反映されるまでを検証する。
@@ -107,6 +111,8 @@ class EvaluationPipelineIT {
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
+    @Autowired GateConfigService gateConfigService;
+    @Autowired GateConfigRepository gateConfigs;
 
     private UUID repositoryId;
 
@@ -119,6 +125,7 @@ class EvaluationPipelineIT {
         skippedMetrics.deleteAll();
         summaries.deleteAll();
         runs.deleteAll();
+        gateConfigs.deleteAll();
         tokens.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
@@ -188,8 +195,15 @@ class EvaluationPipelineIT {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        // 既定の skippable_metrics は mutation_score / performance のみ。
+        // 複雑度のスキップを受理させるには設定でそう書く必要がある。
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                execution:
+                  skippable_metrics: [cyclomatic_complexity]
+                """);
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07",
-                "GitHub ホストランナーのため実行しない", true));
+                "GitHub ホストランナーのため実行しない"));
 
         Run evaluated = evaluate(run);
 
@@ -206,8 +220,8 @@ class EvaluationPipelineIT {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        // accepted=false は「申告したが設定で許容されていない」
-        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07", "理由なく省略", false));
+        // 既定の設定は複雑度のスキップを許容していない
+        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07", "理由なく省略"));
 
         Run evaluated = evaluate(run);
 
@@ -274,10 +288,130 @@ class EvaluationPipelineIT {
                 .allSatisfy(f -> assertThat(f.getState()).isEqualTo(FindingState.CONTINUING));
     }
 
+    /** ジョブハンドラと同じ手順（設定解決 → 正規化 → 判定）を踏む。 */
+    @Test
+    void 設定ファイルのしきい値が判定に使われる() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        // カバレッジ 90% を不合格にするしきい値を設定で与える
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  branch_coverage:
+                    threshold: 95
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getMetricId()).isEqualTo("M-01");
+                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL);
+                    assertThat(m.getReason()).contains("95% を下回っています");
+                });
+        // どの設定版で判定したかが Run に残る
+        assertThat(evaluated.getGateConfigId()).isNotNull();
+    }
+
+    @Test
+    void 同じ内容の設定は版を増やさない() {
+        String yaml = "version: 1\nmetrics:\n  branch_coverage:\n    threshold: 80\n";
+
+        Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
+        attach(first, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, yaml);
+        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        Run firstEvaluated = evaluate(first);
+
+        Run second = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(second, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, yaml);
+        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        Run secondEvaluated = evaluate(second);
+
+        // 毎回新しい版を作ると、変更履歴がノイズで埋まる
+        assertThat(gateConfigs.count()).isEqualTo(1);
+        assertThat(secondEvaluated.getGateConfigId()).isEqualTo(firstEvaluated.getGateConfigId());
+    }
+
+    @Test
+    void 設定が不正なら行番号つきで拒否する() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  branch_coverage:
+                    threshold: "75%"
+                  mutation_scores:
+                    threshold: 60
+                """);
+
+        List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
+
+        assertThatThrownBy(() -> gateConfigService.resolve(run, records))
+                .isInstanceOf(ConfigValidationException.class)
+                .satisfies(e -> {
+                    var errors = ((ConfigValidationException) e).errors();
+                    assertThat(errors).anySatisfy(error -> {
+                        assertThat(error.path()).isEqualTo("metrics.branch_coverage.threshold");
+                        assertThat(error.line()).isEqualTo(4);
+                        assertThat(error.message()).contains("数値を指定してください");
+                    });
+                    // typo には候補を添える
+                    assertThat(errors).anySatisfy(error -> {
+                        assertThat(error.path()).isEqualTo("metrics.mutation_scores");
+                        assertThat(error.message()).contains("mutation_score");
+                    });
+                });
+    }
+
+    @Test
+    void 設定ファイルが無ければ既定値で判定する() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(evaluated.getGateConfigId()).isNull();
+        assertThat(gateConfigs.count()).isZero();
+    }
+
+    @Test
+    void 設定で無効にした指標は判定対象から外れる() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+
+        Run evaluated = evaluate(run);
+
+        // 無効化した指標は成果物が無くても ERROR にならない
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(measurements.findByRunId(run.getId()))
+                .extracting(Measurement::getMetricId)
+                .containsExactly("M-01");
+    }
+
     private Run evaluate(Run run) {
-        NormalizedInput input = normalizer.normalize(
-                artifacts.findByRunId(run.getId()), List.of("**/generated/**"));
-        evaluationService.evaluate(run.getId(), input, GateThresholds.defaults());
+        List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
+        GateConfigService.Resolved config = gateConfigService.resolve(run, records);
+        GateThresholds thresholds = GateThresholds.from(config.document());
+        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
+        evaluationService.evaluate(run.getId(), input, thresholds,
+                config.isDefault() ? null : config.gateConfig().getId());
         return runs.findById(run.getId()).orElseThrow();
     }
 

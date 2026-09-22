@@ -107,6 +107,7 @@ Finding を Run をまたいで同一と見なすキー。
 | M-08 | Pact | verification result JSON | `pact-verification` |
 | M-09 | oasdiff | breaking changes JSON | `oasdiff-json` |
 | M-10 | axe-core (@axe-core/playwright) | axe results JSON | `axe-json` |
+| — | （設定ファイル） | `.quality-gate.yml` | `quality-gate-config` |
 
 SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツールは SARIF で提出する。
 これによりアダプタ実装が 1 本に集約でき、ツールの差し替えコストが下がる。

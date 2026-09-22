@@ -117,6 +117,15 @@ public class Run {
         this.status = RunStatus.PROCESSING;
     }
 
+    /** 判定に使った設定版を記録する。判定の再現性の根拠になる。 */
+    public void applyGateConfig(UUID gateConfigId) {
+        this.gateConfigId = gateConfigId;
+    }
+
+    public UUID getGateConfigId() {
+        return gateConfigId;
+    }
+
     /** 処理そのものが失敗した場合。判定結果 FAIL とは区別する。 */
     public void markFailed(String errorCode, String errorDetail) {
         this.status = RunStatus.FAILED;

@@ -27,15 +27,25 @@ public class RunSkippedMetric {
     @Column(nullable = false)
     private String reason;
 
-    @Column(nullable = false)
-    private boolean accepted;
+    /**
+     * 申告を受理したか。
+     *
+     * <p>取り込み時点では設定（{@code execution.skippable_metrics}）が未解決のため
+     * {@code null}。判定時に確定する。
+     */
+    @Column
+    private Boolean accepted;
 
     protected RunSkippedMetric() {
     }
 
-    public RunSkippedMetric(UUID runId, String metricId, String reason, boolean accepted) {
+    public RunSkippedMetric(UUID runId, String metricId, String reason) {
         this.key = new Key(runId, metricId);
         this.reason = reason;
+    }
+
+    /** 判定時に、解決済みの設定に照らして受理の可否を確定する。 */
+    public void decideAcceptance(boolean accepted) {
         this.accepted = accepted;
     }
 
@@ -51,8 +61,9 @@ public class RunSkippedMetric {
         return reason;
     }
 
+    /** 未判定（null）は受理していないものとして扱う。 */
     public boolean isAccepted() {
-        return accepted;
+        return Boolean.TRUE.equals(accepted);
     }
 
     @Embeddable

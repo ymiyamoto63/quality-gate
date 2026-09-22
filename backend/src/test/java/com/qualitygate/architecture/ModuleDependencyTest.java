@@ -50,6 +50,20 @@ class ModuleDependencyTest {
             .because("共通基盤が業務ロジックを知らない状態を保つ");
 
     @ArchTest
+    static final ArchRule 判定は設定の取得方法を知らない = noClasses()
+            .that().resideInAPackage("..evaluate..")
+            .should().dependOnClassesThat().resideInAPackage("..config..")
+            .because("判定は解決済みの設定（domain.gate）だけを入力とする。"
+                    + "取得元がファイルか API かで判定ロジックが変わらないようにする");
+
+    @ArchTest
+    static final ArchRule アダプタは設定の解決を知らない = noClasses()
+            .that().resideInAPackage("..adapter..")
+            .should().dependOnClassesThat().resideInAPackage("..config..")
+            .because("アダプタは ParseContext で渡された情報だけを使う")
+            .allowEmptyShould(true);
+
+    @ArchTest
     static final ArchRule 外部API呼び出しは限られたモジュールからのみ = noClasses()
             .that().resideInAnyPackage("..adapter..", "..evaluate..", "..query..", "..ingest..")
             .should().dependOnClassesThat().resideInAPackage("..github..")
