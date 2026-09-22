@@ -41,6 +41,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/repositories/{repositoryId}/trends': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 指標の時系列を取得する
+     * @description 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
+     */
+    get: operations['trends']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/runs': {
     parameters: {
       query?: never
@@ -485,6 +505,44 @@ export interface components {
       name: string
       reason: string
     }
+    TrendPoint: {
+      commitSha: string
+      /** Format: date-time */
+      measuredAt: string
+      /** Format: uuid */
+      runId: string
+      /** @enum {string} */
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR'
+      /** @description 実測値。未計測は null。0 を返さない。0 を返すと、グラフ上で「極めて良い値」に見えてしまう */
+      value: number | null
+    }
+    /** @description 指標の時系列。計測環境ごとに系列を分ける */
+    TrendResponse: {
+      branch: string
+      /** Format: date-time */
+      from: string
+      metricId: string
+      name: string
+      series: components['schemas']['TrendSeries'][]
+      /** @description 重畳表示する合格ライン。期間内で最後に適用された値。期間中にしきい値が変わった場合は thresholdChanged が true になる */
+      threshold: {
+        [key: string]: unknown
+      } | null
+      /** @description 期間内でしきい値が変わったか。true のとき、1 本の線では過去の判定を説明できない */
+      thresholdChanged: boolean
+      /** Format: date-time */
+      to: string
+      unit: string | null
+    }
+    TrendSeries: {
+      /** Format: int32 */
+      colorIndex: number
+      componentName: string | null
+      judged: boolean
+      label: string
+      points: components['schemas']['TrendPoint'][]
+      seriesId: string
+    }
     UploadArtifactResponse: {
       /** Format: uuid */
       artifactId?: string
@@ -544,6 +602,37 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['MeResponse']
+        }
+      }
+    }
+  }
+  trends: {
+    parameters: {
+      query: {
+        /** @description 指標 ID（M-01 など） */
+        metricId: string
+        /** @description 省略時はリポジトリの既定ブランチ */
+        branch?: string
+        /** @description 省略時は to の 30 日前 */
+        from?: string
+        /** @description 省略時は現在時刻 */
+        to?: string
+      }
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['TrendResponse']
         }
       }
     }

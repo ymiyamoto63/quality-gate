@@ -17,16 +17,18 @@ import java.util.Map;
 public final class MetricCatalog {
 
     private static final List<MetricDefinition> ALL = List.of(
-            new MetricDefinition("M-01", "ブランチカバレッジ", MetricCategory.FUNCTIONAL, true),
-            new MetricDefinition("M-02", "ミューテーションスコア", MetricCategory.FUNCTIONAL, true),
-            new MetricDefinition("M-03", "応答時間 p95", MetricCategory.PERFORMANCE, false),
-            new MetricDefinition("M-04", "スループット", MetricCategory.PERFORMANCE, true),
-            new MetricDefinition("M-05", "エラー率", MetricCategory.PERFORMANCE, false),
-            new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false),
-            new MetricDefinition("M-07", "循環的複雑度 15 超の新規関数数", MetricCategory.STRUCTURE, false),
-            new MetricDefinition("M-08", "API 契約テスト成功率", MetricCategory.CONTRACT, true),
-            new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false),
-            new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false));
+            new MetricDefinition("M-01", "ブランチカバレッジ", MetricCategory.FUNCTIONAL, true, false),
+            new MetricDefinition("M-02", "ミューテーションスコア", MetricCategory.FUNCTIONAL, true, false),
+            // 性能はランナーの性能に左右されるため、計測環境ごとに別系列にする（FR-08-2）
+            new MetricDefinition("M-03", "応答時間 p95", MetricCategory.PERFORMANCE, false, true),
+            new MetricDefinition("M-04", "スループット", MetricCategory.PERFORMANCE, true, true),
+            new MetricDefinition("M-05", "エラー率", MetricCategory.PERFORMANCE, false, true),
+            new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false, false),
+            new MetricDefinition("M-07", "循環的複雑度 15 超の新規関数数",
+                    MetricCategory.STRUCTURE, false, false),
+            new MetricDefinition("M-08", "API 契約テスト成功率", MetricCategory.CONTRACT, true, false),
+            new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false, false),
+            new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false, false));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 
@@ -49,7 +51,7 @@ public final class MetricCatalog {
      */
     public static MetricDefinition of(String metricId) {
         return BY_ID.getOrDefault(metricId,
-                new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true));
+                new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true, false));
     }
 
     /** 指標 ID を要件定義の並び（M-01, M-02, …）で比較する。 */

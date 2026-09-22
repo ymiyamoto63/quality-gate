@@ -69,4 +69,18 @@ class MetricCatalogTest {
                 .containsExactly("機能テスト", "性能テスト", "セキュリティ",
                         "コード構造", "契約・互換性", "使いやすさ");
     }
+
+    /**
+     * トレンドで系列を分ける基準（FR-08-2）。性能はランナーの性能に左右されるが、
+     * カバレッジや脆弱性件数は計測環境で変わらない。環境で割ると系列が無意味に増える。
+     */
+    @Test
+    void 計測環境に左右される指標を区別する() {
+        assertThat(MetricCatalog.of("M-03").environmentSensitive()).isTrue();
+        assertThat(MetricCatalog.of("M-04").environmentSensitive()).isTrue();
+        assertThat(MetricCatalog.of("M-05").environmentSensitive()).isTrue();
+
+        assertThat(MetricCatalog.of("M-01").environmentSensitive()).isFalse();
+        assertThat(MetricCatalog.of("M-06").environmentSensitive()).isFalse();
+    }
 }

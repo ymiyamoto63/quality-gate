@@ -99,6 +99,12 @@ function formatDateTime(value: string | null): string {
         <p class="qg-muted">
           最後の完全計測: {{ formatDateTime(card.freshness.lastFullMeasuredAt) }}
         </p>
+
+        <p class="qg-card__links">
+          <RouterLink :to="{ name: 'trends', params: { repositoryId: card.repositoryId } }">
+            トレンドを見る →
+          </RouterLink>
+        </p>
       </li>
     </ul>
   </section>
@@ -134,6 +140,11 @@ function formatDateTime(value: string | null): string {
 
 .qg-muted {
   color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.qg-card__links {
+  margin-bottom: 0;
   font-size: 0.875rem;
 }
 

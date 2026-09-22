@@ -477,25 +477,15 @@ class RunQueryApiIT {
         storeFixtures(tester, run);
     }
 
-    /**
-     * 画面のアクセシビリティ検査（M-10）で使う応答例を書き出す。
-     *
-     * <p>手で書いた例を置くと、API が変わっても検査は通り続け、実際の画面だけが
-     * 壊れる。{@code api/openapi.yml} と同じく、<strong>実物から生成する</strong>。
-     */
+    /** 画面のアクセシビリティ検査（M-10）で使う応答例を書き出す（{@link FixtureWriter}）。 */
     private static void storeFixtures(MockMvcTester tester, Run run) throws Exception {
-        java.nio.file.Path directory = java.nio.file.Path.of("..", "frontend", "e2e", "fixtures");
-        java.nio.file.Files.createDirectories(directory);
-
-        java.nio.file.Files.writeString(directory.resolve("run-detail.json"),
+        FixtureWriter.write("run-detail.json",
                 tester.get().uri("/api/v1/runs/{id}", run.getId())
-                        .exchange().getResponse().getContentAsString(),
-                java.nio.charset.StandardCharsets.UTF_8);
-        java.nio.file.Files.writeString(directory.resolve("findings.json"),
+                        .exchange().getResponse().getContentAsString());
+        FixtureWriter.write("findings.json",
                 tester.get().uri("/api/v1/runs/{id}/findings?state=NEW&state=CONTINUING"
                                 + "&state=INITIAL", run.getId())
-                        .exchange().getResponse().getContentAsString(),
-                java.nio.charset.StandardCharsets.UTF_8);
+                        .exchange().getResponse().getContentAsString());
     }
 
     @Test

@@ -74,12 +74,15 @@ class OpenApiExportIT {
     void 一覧応答が別々の要素スキーマを指している() throws Exception {
         Map<String, Object> schemas = schemasOf(exportedSpec());
 
-        assertThat(itemRefOf(schemas, "RunListResponse")).isEqualTo("RunSummary");
-        assertThat(itemRefOf(schemas, "FindingListResponse")).isEqualTo("FindingItem");
+        assertThat(itemRefOf(schemas, "RunListResponse", "items")).isEqualTo("RunSummary");
+        assertThat(itemRefOf(schemas, "FindingListResponse", "items")).isEqualTo("FindingItem");
+        assertThat(itemRefOf(schemas, "TrendResponse", "series")).isEqualTo("TrendSeries");
+        assertThat(itemRefOf(schemas, "TrendSeries", "points")).isEqualTo("TrendPoint");
 
         // 名前だけ分かれていても中身が入れ替わっていれば同じ事故になる
         assertThat(propertiesOf(schemas, "FindingItem")).containsKeys("severity", "sourceUrl");
         assertThat(propertiesOf(schemas, "RunSummary")).containsKeys("commitSha", "measuredAt");
+        assertThat(propertiesOf(schemas, "TrendPoint")).containsKeys("measuredAt", "value");
     }
 
     private String exportedSpec() throws Exception {
@@ -96,13 +99,14 @@ class OpenApiExportIT {
         return (Map<String, Object>) components.get("schemas");
     }
 
-    /** {@code items} が指しているスキーマ名。 */
+    /** 配列の要素が指しているスキーマ名。 */
     @SuppressWarnings("unchecked")
-    private static String itemRefOf(Map<String, Object> schemas, String schemaName) {
-        Map<String, Object> items =
-                (Map<String, Object>) propertiesOf(schemas, schemaName).get("items");
-        assertThat(items).as("%s に items がありません", schemaName).isNotNull();
-        String ref = String.valueOf(((Map<String, Object>) items.get("items")).get("$ref"));
+    private static String itemRefOf(Map<String, Object> schemas, String schemaName,
+                                    String property) {
+        Map<String, Object> array =
+                (Map<String, Object>) propertiesOf(schemas, schemaName).get(property);
+        assertThat(array).as("%s に %s がありません", schemaName, property).isNotNull();
+        String ref = String.valueOf(((Map<String, Object>) array.get("items")).get("$ref"));
         return ref.substring(ref.lastIndexOf('/') + 1);
     }
 

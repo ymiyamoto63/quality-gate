@@ -7,6 +7,7 @@ import NotFoundView from '@/views/NotFoundView.vue'
 import PlaceholderView from '@/views/PlaceholderView.vue'
 import RunDetailView from '@/views/RunDetailView.vue'
 import FindingListView from '@/views/FindingListView.vue'
+import TrendView from '@/views/TrendView.vue'
 
 /** 画面一覧は docs/08-screen-design.md 1 章と対応する。 */
 const routes: RouteRecordRaw[] = [
@@ -35,8 +36,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/repositories/:repositoryId/trends',
     name: 'trends',
-    component: PlaceholderView,
-    props: { title: 'トレンド' },
+    component: TrendView,
     meta: { title: 'トレンド' },
   },
   {

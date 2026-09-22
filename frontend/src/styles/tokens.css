@@ -32,9 +32,15 @@
   --status-fail: #d03b3b;
   --status-neutral: #898781;
 
-  /* グラフの系列色（ライト/ダークとも検証済み: CVD ΔE 24.7/26.8） */
+  /*
+   * グラフの系列色。dataviz の検証器で 6 項目すべて PASS
+   * （ライト: CVD ΔE 24.7 / ダーク: 26.8）。
+   * 色を増やして系列を増やさない。生成した 4 色目は色覚特性下で
+   * 既存の色と見分けがつかなくなり、検証の意味が失われる。
+   */
   --series-1: #2a78d6;
   --series-2: #eb6834;
+  --series-3: #8a5cd6;
 
   --radius: 8px;
   --font-sans: system-ui, -apple-system, 'Segoe UI', 'Hiragino Sans', 'Noto Sans JP', sans-serif;
@@ -54,6 +60,7 @@
     --border: rgba(255, 255, 255, 0.1);
     --series-1: #3987e5;
     --series-2: #d95926;
+    --series-3: #9a72f0;
   }
 }
 
@@ -70,6 +77,7 @@
   --border: rgba(255, 255, 255, 0.1);
   --series-1: #3987e5;
   --series-2: #d95926;
+  --series-3: #9a72f0;
 }
 
 * {

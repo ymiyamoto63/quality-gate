@@ -22,6 +22,8 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: リポジトリ単位の参照
+  name: Repositories
 paths:
   /api/v1/dashboard:
     get:
@@ -50,6 +52,53 @@ paths:
       summary: ログイン中の利用者とロールを返す
       tags:
       - Me
+  /api/v1/repositories/{repositoryId}/trends:
+    get:
+      description: 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
+      operationId: trends
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: 指標 ID（M-01 など）
+        in: query
+        name: metricId
+        required: true
+        schema:
+          type: string
+      - description: 省略時はリポジトリの既定ブランチ
+        in: query
+        name: branch
+        required: false
+        schema:
+          type: string
+      - description: 省略時は to の 30 日前
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: 省略時は現在時刻
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TrendResponse"
+          description: OK
+      summary: 指標の時系列を取得する
+      tags:
+      - Repositories
   /api/v1/runs:
     get:
       operationId: list
@@ -1027,6 +1076,108 @@ components:
       - metricId
       - name
       - reason
+    TrendPoint:
+      type: object
+      properties:
+        commitSha:
+          type: string
+        measuredAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - PASS
+          - WARN
+          - FAIL
+          - SKIP
+          - REFERENCE
+          - ERROR
+        value:
+          type:
+          - number
+          - "null"
+          description: 実測値。未計測は null。0 を返さない。0 を返すと、グラフ上で「極めて良い値」に見えてしまう
+      required:
+      - commitSha
+      - measuredAt
+      - runId
+      - status
+      - value
+    TrendResponse:
+      type: object
+      description: 指標の時系列。計測環境ごとに系列を分ける
+      properties:
+        branch:
+          type: string
+        from:
+          type: string
+          format: date-time
+        metricId:
+          type: string
+        name:
+          type: string
+        series:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendSeries"
+        threshold:
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
+          description: 重畳表示する合格ライン。期間内で最後に適用された値。期間中にしきい値が変わった場合は thresholdChanged
+            が true になる
+        thresholdChanged:
+          type: boolean
+          description: 期間内でしきい値が変わったか。true のとき、1 本の線では過去の判定を説明できない
+        to:
+          type: string
+          format: date-time
+        unit:
+          type:
+          - string
+          - "null"
+      required:
+      - branch
+      - from
+      - metricId
+      - name
+      - series
+      - threshold
+      - thresholdChanged
+      - to
+      - unit
+    TrendSeries:
+      type: object
+      properties:
+        colorIndex:
+          type: integer
+          format: int32
+        componentName:
+          type:
+          - string
+          - "null"
+        judged:
+          type: boolean
+        label:
+          type: string
+        points:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        seriesId:
+          type: string
+      required:
+      - colorIndex
+      - componentName
+      - judged
+      - label
+      - points
+      - seriesId
     UploadArtifactResponse:
       type: object
       properties:
