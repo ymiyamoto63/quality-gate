@@ -190,7 +190,8 @@ public class RunQueryService {
         List<Measurement> rows = new ArrayList<>(measurements.findByRunId(runId));
         rows.sort(Comparator
                 .comparing(Measurement::getMetricId, MetricCatalog::compareByCatalogOrder)
-                .thenComparing(m -> m.getComponentName() == null ? "" : m.getComponentName()));
+                .thenComparing(m -> m.getComponentName() == null ? "" : m.getComponentName())
+                .thenComparing(m -> m.getVariant() == null ? "" : m.getVariant()));
 
         for (Measurement measurement : rows) {
             MetricDefinition definition = MetricCatalog.of(measurement.getMetricId());
@@ -230,6 +231,8 @@ public class RunQueryService {
                 measurement.getMetricId(),
                 definition.name(),
                 measurement.getComponentName(),
+                measurement.getVariant(),
+                MetricCatalog.variantLabel(measurement.getMetricId(), measurement.getVariant()),
                 measurement.getStatus(),
                 measurement.getValue(),
                 measurement.getUnit(),
@@ -271,6 +274,7 @@ public class RunQueryService {
             case REFERENCE -> 2;
             case SKIP -> 1;
             case PASS -> 0;
+            case NOT_APPLICABLE -> -1;
         };
     }
 

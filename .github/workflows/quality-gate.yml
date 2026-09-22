@@ -150,4 +150,6 @@ jobs:
           ls -l .quality-gate.yml
           echo 'TODO: quality-gate-action の実装後に置き換える'
           #   type=quality-gate-config で .quality-gate.yml を送信する
+          #   type=pit-xml は metadata={"mutationScope":"all"} を付けて送信する
+          #   （mutation プロファイルは全クラスを対象にするため。無いと 422 で拒否される）
         continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）

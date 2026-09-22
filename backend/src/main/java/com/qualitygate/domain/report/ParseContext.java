@@ -3,6 +3,8 @@ package com.qualitygate.domain.report;
 import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 
 /**
  * パースに必要な周辺情報。
@@ -12,10 +14,27 @@ import java.util.List;
  * @param componentName アップロード時に宣言されたコンポーネント名
  * @param scope         base / head（M-07 のベース比較用）
  * @param exclusions    計測除外の glob パターン
+ * @param metadata      アップロード時に添えられた計測メタデータ（JSON オブジェクト）
  */
-public record ParseContext(String componentName, String scope, List<String> exclusions) {
+public record ParseContext(String componentName, String scope, List<String> exclusions,
+                           Map<String, Object> metadata) {
 
     public static final String SCOPE_BASE = "base";
+
+    public ParseContext(String componentName, String scope, List<String> exclusions) {
+        this(componentName, scope, exclusions, Map.of());
+    }
+
+    public ParseContext {
+        metadata = metadata == null ? Map.of() : metadata;
+    }
+
+    /** 文字列のメタデータ。無い・文字列でない場合は空。 */
+    public Optional<String> metadataText(String key) {
+        return metadata.get(key) instanceof String text && !text.isBlank()
+                ? Optional.of(text)
+                : Optional.empty();
+    }
 
     public boolean isBaseScope() {
         return SCOPE_BASE.equals(scope);

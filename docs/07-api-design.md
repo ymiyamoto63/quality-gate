@@ -227,7 +227,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `type` | `jacoco-xml` など（[02](02-metrics-spec.md) 0.5） |
 | `component` | `backend` / `frontend`（任意） |
 | `scope` | `base` / `head`（M-07 のベース比較用、任意） |
-| `metadata` | JSON 文字列。性能成果物では `environment` が必須 |
+| `metadata` | JSON オブジェクトの文字列。性能成果物では `environment`、PIT（`pit-xml`）では `mutationScope`（`changed` / `all`）が必須 |
 
 **応答（202）**
 
@@ -241,6 +241,8 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | 413 | `ARTIFACT_TOO_LARGE` | 50MB 超、または Run 合計 200MB 超 |
 | 422 | `ARTIFACT_TYPE_UNKNOWN` | 未知の `type` |
 | 422 | `PERFORMANCE_METADATA_MISSING` | 性能成果物で `environment` が欠落 |
+| 422 | `MUTATION_SCOPE_MISSING` | PIT の成果物で `mutationScope` が欠落 |
+| 400 | `VALIDATION_FAILED` | `metadata` が JSON オブジェクトでない、`mutationScope` が選択肢に無い |
 
 **この時点ではパースしない。** 受領・検証・保存のみを行い、
 パースは判定ジョブで実施する。アップロードごとにパースすると、
@@ -484,8 +486,17 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
 | --- | --- |
 | コンポーネント | 常に分ける。backend と frontend のカバレッジを 1 本の線にしても意味がない |
 | 計測環境（ランナー種別） | 値が環境に左右される指標（性能）でのみ分ける。カバレッジまで割ると、同じ条件の計測が無意味に 2 本になる |
+| 計測条件（`variant`） | 値に計測条件が添えられている場合に分ける。M-02 の実行範囲（変更範囲 / 全量）。範囲が切り替わるたびに品質が乱高下して見えるのを防ぐ |
 
-どちらに該当するかは指標の性質であり、`MetricCatalog` に持たせている。
+計測環境で分けるかどうかは指標の性質であり、`MetricCatalog` に持たせている。
+系列名は「backend（変更範囲）」「backend（全量・専有ランナー）」のように条件を括弧内に並べる。
+
+**計測条件を持たない点は、同じコンポーネントの条件つき系列に配る。** 成果物の未提出などに
+よる計測エラーは実行範囲が分からない。これを別系列にすると、下のコンポーネントを持たない点と
+同じく欠測が 1 本の線として現れる。
+
+**対象外（`NOT_APPLICABLE`）の点は返さない。** 測りようのないものは欠測ですらなく、
+系列を作ると値の無い線が 1 本増えるだけになる。
 
 **コンポーネントを持たない点は、各コンポーネントの系列に配る。**
 スキップと計測エラーは指標ごと Run ごとに起きるため、判定結果にコンポーネント名が
@@ -588,6 +599,23 @@ springdoc はスキーマ名に Java の単純名を使うため、別の応答�
 `state` / `severity` に未知の値を渡した場合は 400 を返し、黙って無視しない。
 無視すると、綴りを間違えたフィルタが「絞り込まない」として通り、
 利用者には「絞り込んだのに全件出た」ように見える。
+
+### 計測条件（`variant` / `variantLabel`）
+
+Run 詳細の指標行は、計測条件の生の値（`variant`: `changed` / `all`）と表示名
+（`variantLabel`: `変更範囲` / `全量`）の両方を返す。条件の区別が無い指標ではどちらも `null`。
+表示名をサーバが持つのは、トレンドの系列名と同じ語を使うためである。画面側に対応表を持つと、
+条件を足したときに片方だけ生の値を出す。
+
+`previousValue` / `delta` は条件の一致する比較対象からだけ算出する。
+条件の違う値との差は、改善や悪化ではなく条件の違いを表すだけだからである。
+
+### 判定ステータス `NOT_APPLICABLE`
+
+`status` に `NOT_APPLICABLE`（対象外）が加わった。ツールの制約でそのコンポーネントでは
+測りようがないことを表す（M-02 の frontend。[02](02-metrics-spec.md) M-02）。
+`SKIP`（今回は測らなかった）とは別物であり、画面も「未計測」ではなく「対象外」と表示する。
+`value` は常に `null`。合否・部分計測・カテゴリの状態のいずれにも影響しない。
 
 ---
 
@@ -702,6 +730,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `ARTIFACT_TYPE_UNKNOWN` | 422 | 未知の成果物種別 |
 | `ARTIFACT_FORMAT_INVALID` | 422 | パースに失敗 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
+| `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
 | `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
 | `RATE_LIMITED` | 429 | レート制限超過 |

@@ -19,6 +19,8 @@ function metric(overrides: Partial<RunMetric> = {}): RunMetric {
     reason: 'しきい値 75% を満たしています',
     detail: {},
     findingCount: 0,
+    variant: null,
+    variantLabel: null,
     ...overrides,
   }
 }
@@ -76,5 +78,37 @@ describe('MetricRow', () => {
       params: { runId: 'run-1' },
       query: { metricId: 'M-01' },
     })
+  })
+
+  it('計測条件をコンポーネント名と並べて名前に添える', () => {
+    const text = render(
+      metric({
+        metricId: 'M-02',
+        name: 'ミューテーションスコア',
+        variant: 'changed',
+        variantLabel: '変更範囲',
+      }),
+    ).text()
+
+    expect(text).toContain('ミューテーションスコア（backend・変更範囲）')
+  })
+
+  it('対象外は未計測と出さない', () => {
+    const text = render(
+      metric({
+        metricId: 'M-02',
+        componentName: 'frontend',
+        status: 'NOT_APPLICABLE',
+        value: null,
+        unit: null,
+        threshold: {},
+        delta: null,
+        deltaImproved: null,
+        reason: 'PIT は JVM 言語専用のため、このコンポーネントは計測の対象外です',
+      }),
+    ).text()
+
+    expect(text).toContain('対象外')
+    expect(text).not.toContain('未計測')
   })
 })

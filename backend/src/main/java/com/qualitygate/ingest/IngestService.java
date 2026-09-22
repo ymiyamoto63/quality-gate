@@ -7,6 +7,7 @@ import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.RunSkippedMetric;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.JobType;
+import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
@@ -25,12 +26,15 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 /** 取り込み（Run 作成・成果物受領・確定）のユースケース。 */
 @Service
@@ -121,11 +125,7 @@ public class IngestService {
                             .formatted(properties.maxArtifactBytes() / 1024 / 1024,
                                     declaredSize / 1024 / 1024));
         }
-        if (type.requiresEnvironmentMetadata() && !hasEnvironment(metadata)) {
-            throw new ApiException(ErrorCode.PERFORMANCE_METADATA_MISSING,
-                    "性能計測の成果物には environment メタデータが必要です"
-                            + "（name / runner / cpu / memory / datasetProfile など）");
-        }
+        validateMetadata(type, metadata);
 
         // ファイルを先に保存し、成功後に DB へ記録する。逆順にすると、
         // 参照先ファイルの無いレコードという扱いにくい壊れ方をする。
@@ -177,17 +177,57 @@ public class IngestService {
         return "%s/runs/%s".formatted(properties.baseUrl(), runId);
     }
 
-    private boolean hasEnvironment(String metadata) {
-        if (metadata == null || metadata.isBlank()) {
-            return false;
+    /**
+     * 成果物の種類ごとに必須のメタデータを検証する。
+     *
+     * <p>取り込み時に拒否するのは、判定時に気づいても CI のログには残らないため。
+     * 計測条件の欠けた値は、後から正しい系列に振り分けられない。
+     */
+    private void validateMetadata(ArtifactType type, String metadata) {
+        JsonNode node = parseMetadata(metadata);
+
+        if (type.requiresEnvironmentMetadata() && !node.hasNonNull("environment")) {
+            throw new ApiException(ErrorCode.PERFORMANCE_METADATA_MISSING,
+                    "性能計測の成果物には environment メタデータが必要です"
+                            + "（name / runner / cpu / memory / datasetProfile など）");
         }
+        if (type == ArtifactType.PIT_XML) {
+            JsonNode scope = node.get(MutationScope.METADATA_KEY);
+            String allowed = Arrays.stream(MutationScope.values()).map(MutationScope::wire)
+                    .collect(Collectors.joining(" / "));
+            if (scope == null || scope.isNull()) {
+                // 変更範囲だけの値と全量の値は比較できない。どちらか分からない値は
+                // 前回比にもトレンドにも置き場所がない（docs/02-metrics-spec.md M-02）
+                throw new ApiException(ErrorCode.MUTATION_SCOPE_MISSING,
+                        "PIT の成果物には metadata の %s（%s）が必要です"
+                                .formatted(MutationScope.METADATA_KEY, allowed));
+            }
+            if (!scope.isString() || MutationScope.find(scope.asString()).isEmpty()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                        "metadata の %s は %s のいずれかを指定してください（受信値: %s）"
+                                .formatted(MutationScope.METADATA_KEY, allowed, scope));
+            }
+        }
+    }
+
+    /** 未指定は空のオブジェクトとして扱う。指定されたなら JSON オブジェクトでなければならない。 */
+    private JsonNode parseMetadata(String metadata) {
+        if (metadata == null || metadata.isBlank()) {
+            return objectMapper.createObjectNode();
+        }
+        JsonNode node;
         try {
-            return objectMapper.readTree(metadata).hasNonNull("environment");
+            node = objectMapper.readTree(metadata);
         } catch (JacksonException e) {
             // 入力の誤りであり、再送すれば直るものではない。そのまま業務例外にする。
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "metadata が JSON として解釈できません: " + e.getMessage());
         }
+        if (!node.isObject()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "metadata は JSON オブジェクト（{...}）で指定してください");
+        }
+        return node;
     }
 
     private String toJson(Map<String, ?> value) {

@@ -4,7 +4,8 @@
  * ラベル・記号・アイコン・色の 4 つを常に同時に使う。
  * 色覚特性、モノクロ印刷、強制カラーモードのいずれでも意味が失われないようにするため。
  */
-export type MeasurementStatus = 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR'
+export type MeasurementStatus =
+  'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
 export type Verdict = 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
 
 export interface StatusPresentation {
@@ -23,6 +24,9 @@ const PRESENTATIONS: Record<MeasurementStatus, StatusPresentation> = {
   // 表さないため。未計測を黄色にすると「注意すべき悪い状態」に見えてしまう。
   SKIP: { label: '未計測', mark: '○', icon: 'pi-minus-circle', colorVar: '--status-neutral' },
   REFERENCE: { label: '参考値', mark: '◇', icon: 'pi-info-circle', colorVar: '--status-neutral' },
+  // 対象外は「ツールの制約で測りようがない」（M-02 の frontend など）。未計測と同じ見た目に
+  // すると、測り忘れの積み残しと誤読される（docs/02-metrics-spec.md M-02）
+  NOT_APPLICABLE: { label: '対象外', mark: '—', icon: 'pi-ban', colorVar: '--status-neutral' },
 }
 
 export function presentationOf(status: MeasurementStatus): StatusPresentation {

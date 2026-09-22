@@ -345,7 +345,7 @@ export interface components {
        * @description カテゴリ内で最も重いステータス
        * @enum {string}
        */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR'
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
     }
     /** @description Run 1 件の判定結果 */
     RunDetailResponse: {
@@ -440,7 +440,7 @@ export interface components {
       /** @description 判定理由。文言はサーバが持ち、画面はそのまま表示する */
       reason: string | null
       /** @enum {string} */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR'
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
       /** @description 合格ライン。例: {"operator": ">=", "value": 75} */
       threshold: {
         [key: string]: unknown
@@ -448,6 +448,10 @@ export interface components {
       unit: string | null
       /** @description 実測値。未計測は null。0 は「計測して 0 だった」を意味し別物 */
       value: number | null
+      /** @description 計測条件（M-02 の実行範囲 changed / all など）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null */
+      variant: string | null
+      /** @description 計測条件の表示名（変更範囲 / 全量 など） */
+      variantLabel: string | null
     }
     /** @description CI がポーリングするための軽量な状態応答。 */
     RunStatusResponse: {
@@ -512,7 +516,7 @@ export interface components {
       /** Format: uuid */
       runId: string
       /** @enum {string} */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR'
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
       /** @description 実測値。未計測は null。0 を返さない。0 を返すと、グラフ上で「極めて良い値」に見えてしまう */
       value: number | null
     }

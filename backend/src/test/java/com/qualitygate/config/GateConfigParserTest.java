@@ -115,6 +115,31 @@ class GateConfigParserTest {
     }
 
     @Test
+    void ミューテーションの実行範囲の誤りは選択肢を示して拒否する() {
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  mutation_score:
+                    scope: diff
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("all / changed");
+    }
+
+    @Test
+    void ミューテーションの対象コンポーネントは配列でなければ拒否する() {
+        // 文字列のまま読み流すと「限定なし」になり、書いた意図と逆に効く
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  mutation_score:
+                    components: backend
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("配列");
+    }
+
+    @Test
     void 重複したキーは拒否する() {
         // 後勝ちで黙らせると、消したはずの設定が効き続ける
         assertThatThrownBy(() -> parser.parse("""

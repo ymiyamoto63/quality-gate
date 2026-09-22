@@ -13,6 +13,9 @@ import com.qualitygate.platform.storage.ArtifactStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
 import java.util.ArrayList;
@@ -34,12 +37,18 @@ public class ReportNormalizer {
 
     private static final Logger log = LoggerFactory.getLogger(ReportNormalizer.class);
 
+    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
+    };
+
     private final List<ArtifactAdapter> adapters;
     private final ArtifactStore artifactStore;
+    private final ObjectMapper objectMapper;
 
-    public ReportNormalizer(List<ArtifactAdapter> adapters, ArtifactStore artifactStore) {
+    public ReportNormalizer(List<ArtifactAdapter> adapters, ArtifactStore artifactStore,
+                            ObjectMapper objectMapper) {
         this.adapters = adapters;
         this.artifactStore = artifactStore;
+        this.objectMapper = objectMapper;
     }
 
     public NormalizedInput normalize(List<ArtifactRecord> artifacts, List<String> exclusions) {
@@ -50,8 +59,8 @@ public class ReportNormalizer {
         Map<String, String> parseErrors = new HashMap<>();
 
         for (ArtifactRecord artifact : artifacts) {
-            ParseContext context = new ParseContext(
-                    artifact.getComponentName(), artifact.getScope(), exclusions);
+            ParseContext context = new ParseContext(artifact.getComponentName(),
+                    artifact.getScope(), exclusions, metadataOf(artifact));
             try {
                 NormalizedReport report = parse(artifact, context);
                 measurements.addAll(report.measurements());
@@ -93,6 +102,23 @@ public class ReportNormalizer {
         } catch (java.io.IOException e) {
             throw new ArtifactFormatException(
                     "成果物を読み出せませんでした: " + artifact.getFilename(), e);
+        }
+    }
+
+    /**
+     * 取り込み時に JSON オブジェクトであることを検証済みのため、通常は失敗しない。
+     * 検証の導入前に取り込まれた成果物に備え、読めなければメタデータ無しとして扱う。
+     */
+    private Map<String, Object> metadataOf(ArtifactRecord artifact) {
+        String metadata = artifact.getMetadata();
+        if (metadata == null || metadata.isBlank()) {
+            return Map.of();
+        }
+        try {
+            return objectMapper.readValue(metadata, JSON_OBJECT);
+        } catch (JacksonException e) {
+            log.warn("成果物のメタデータを読めませんでした artifactId={}", artifact.getId());
+            return Map.of();
         }
     }
 

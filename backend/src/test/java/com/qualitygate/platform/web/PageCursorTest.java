@@ -52,6 +52,15 @@ class PageCursorTest {
                 .isEqualTo(ErrorCode.VALIDATION_FAILED);
     }
 
+    /**
+     * 境界の 0 は受け付ける。PIT が「{@code offset < 0} を {@code offset <= 0} に
+     * 変えても落ちるテストがない」と指摘した箇所（先頭ページを拒否する誤りを検出できない）。
+     */
+    @Test
+    void 先頭の位置0は受け付ける() {
+        assertThat(PageCursor.toOffset(PageCursor.ofOffset(0))).isZero();
+    }
+
     @Test
     void 負の位置は受け付けない() {
         String forged = java.util.Base64.getUrlEncoder().withoutPadding()

@@ -23,10 +23,13 @@ public interface MeasurementRepository extends JpaRepository<Measurement, UUID> 
      *
      * <p>{@code measurements} は {@code repositoryId} と {@code measuredAt} を
      * {@code runs} から複製して持つが、ブランチとランナー種別は持たないため結合する。
+     *
+     * <p>対象外（{@code NOT_APPLICABLE}）は除く。測りようのないものは欠測ですらなく、
+     * 系列を作ると値の無い線が 1 本増えるだけになる。
      */
     @Query("""
             select new com.qualitygate.domain.repo.TrendRow(
-                m.runId, m.measuredAt, m.componentName, r.runnerType, m.status,
+                m.runId, m.measuredAt, m.componentName, m.variant, r.runnerType, m.status,
                 m.value, m.unit, m.threshold, r.commitSha)
             from Measurement m, Run r
             where r.id = m.runId
@@ -34,6 +37,7 @@ public interface MeasurementRepository extends JpaRepository<Measurement, UUID> 
               and m.metricId = :metricId
               and r.branch = :branch
               and r.status = com.qualitygate.domain.model.RunStatus.EVALUATED
+              and m.status <> com.qualitygate.domain.model.MeasurementStatus.NOT_APPLICABLE
               and m.measuredAt >= :from
               and m.measuredAt < :to
             order by m.measuredAt asc, m.componentName asc

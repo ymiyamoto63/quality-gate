@@ -227,6 +227,45 @@ class TrendApiIT {
         assertThat(trendOf("M-01", "feature/x").series().getFirst().points()).hasSize(1);
     }
 
+    /**
+     * 変更範囲だけの値と全量の値を 1 本の線で結ぶと、範囲が切り替わるたびに
+     * 品質が乱高下して見える。範囲ごとに別の系列にする。
+     */
+    @Test
+    void ミューテーションスコアは実行範囲ごとに系列を分け対象外は系列にしない() {
+        mutation(Instant.parse("2026-09-20T00:00:00Z"), 8, "changed");
+        mutation(Instant.parse("2026-09-21T00:00:00Z"), 9, "all");
+        mutation(Instant.parse("2026-09-22T00:00:00Z"), 7, "changed");
+
+        TrendResponse trend = trend("M-02");
+
+        // frontend は対象外（NOT_APPLICABLE）。値の無い線を 1 本増やさない
+        assertThat(trend.series())
+                .extracting(TrendResponse.TrendSeries::label)
+                .containsExactly("backend（全量）", "backend（変更範囲）");
+        assertThat(trend.series().get(1).points())
+                .extracting(TrendResponse.TrendPoint::value)
+                .usingElementComparator(java.math.BigDecimal::compareTo)
+                .containsExactly(new java.math.BigDecimal("80"), new java.math.BigDecimal("70"));
+    }
+
+    /** 実行範囲の分からない計測エラーは、新しい系列ではなく既存の系列の欠測にする。 */
+    @Test
+    void 実行範囲の分からない計測エラーは既存の系列の欠測になる() {
+        mutation(Instant.parse("2026-09-20T00:00:00Z"), 8, "changed");
+        mutation(Instant.parse("2026-09-21T00:00:00Z"), 8, "changed", "all");
+        mutation(Instant.parse("2026-09-22T00:00:00Z"), 8, "changed");
+
+        TrendResponse trend = trend("M-02");
+
+        assertThat(trend.series()).singleElement().satisfies(series -> {
+            assertThat(series.label()).isEqualTo("backend（変更範囲）");
+            assertThat(series.points()).extracting(TrendResponse.TrendPoint::status)
+                    .containsExactly(MeasurementStatus.PASS, MeasurementStatus.ERROR,
+                            MeasurementStatus.PASS);
+        });
+    }
+
     /** 既定ブランチはリポジトリの設定に従う。画面が "main" を決め打ちしない。 */
     @Test
     void ブランチ省略時はリポジトリの既定ブランチを使う() {
@@ -417,6 +456,41 @@ class TrendApiIT {
         evaluate(run);
     }
 
+    /**
+     * backend の PIT と frontend の lcov を計測した Run。
+     * 実行範囲を複数渡すと、範囲の違う成果物が混在した Run になる。
+     */
+    private void mutation(Instant measuredAt, int killed, String... scopes) {
+        Run run = createRun(measuredAt, "main", RunnerType.SELF_HOSTED);
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
+                version: 1
+                metrics:
+                  mutation_score:
+                    components: [backend]
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco(17));
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
+                "SF:src/api/client.ts\nBRF:20\nBRH:18\nend_of_record\n");
+        for (String scope : scopes) {
+            String xml = "<mutations>"
+                    + mutant("KILLED").repeat(killed)
+                    + mutant("SURVIVED").repeat(10 - killed)
+                    + "</mutations>";
+            attach(run, ArtifactType.PIT_XML, "mutations-" + scope + ".xml", "backend", xml,
+                    "{\"mutationScope\":\"%s\"}".formatted(scope));
+        }
+        evaluate(run);
+    }
+
+    private static String mutant(String status) {
+        return "<mutation status='%s'><sourceFile>Good.java</sourceFile>".formatted(status)
+                + "<mutatedClass>com.qualitygate.Good</mutatedClass></mutation>";
+    }
+
     private void skipped(Instant measuredAt) {
         Run run = createRun(measuredAt, "main", RunnerType.GITHUB_HOSTED);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
@@ -455,10 +529,15 @@ class TrendApiIT {
 
     private void attach(Run run, ArtifactType type, String filename, String component,
                         String content) {
+        attach(run, type, filename, component, content, null);
+    }
+
+    private void attach(Run run, ArtifactType type, String filename, String component,
+                        String content, String metadata) {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, null, null));
+                component, null, metadata));
     }
 }

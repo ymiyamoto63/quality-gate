@@ -12,12 +12,20 @@ import type { RunMetric } from '@/stores/run'
  */
 const props = defineProps<{ metric: RunMetric; runId: string }>()
 
-const label = computed(() =>
-  props.metric.componentName
-    ? `${props.metric.name}（${props.metric.componentName}）`
-    : props.metric.name,
+// 計測条件（M-02 の実行範囲など）は名前に添える。変更範囲だけの値を
+// 全量の値と読み違えると、スコアの高低を取り違える
+const label = computed(() => {
+  const qualifiers = [props.metric.componentName, props.metric.variantLabel].filter(Boolean)
+  return qualifiers.length > 0
+    ? `${props.metric.name}（${qualifiers.join('・')}）`
+    : props.metric.name
+})
+// 対象外は「未計測」と出さない。測りようがないものを測り忘れに見せないため
+const value = computed(() =>
+  props.metric.status === 'NOT_APPLICABLE'
+    ? '—'
+    : formatValue(props.metric.value, props.metric.unit),
 )
-const value = computed(() => formatValue(props.metric.value, props.metric.unit))
 const threshold = computed(() => formatThreshold(props.metric.threshold, props.metric.unit))
 const delta = computed(() => formatDelta(props.metric.delta, props.metric.unit))
 </script>

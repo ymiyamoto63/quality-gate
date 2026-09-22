@@ -47,6 +47,13 @@ public class Measurement {
     @Column(name = "component_name")
     private String componentName;
 
+    /**
+     * 計測条件（M-02 の実行範囲 changed / all など）。条件の違う値は比較できないため、
+     * 前回比とトレンドの系列はこの値ごとに分ける。条件の区別が無い指標では null。
+     */
+    @Column
+    private String variant;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
     private MeasurementStatus status;
@@ -81,14 +88,16 @@ public class Measurement {
 
     @SuppressWarnings("java:S107")
     public Measurement(UUID id, UUID runId, UUID repositoryId, String metricId,
-                       String componentName, MeasurementStatus status, BigDecimal value,
-                       String unit, String threshold, BigDecimal previousValue,
-                       String reason, String detail, Instant measuredAt) {
+                       String componentName, String variant, MeasurementStatus status,
+                       BigDecimal value, String unit, String threshold,
+                       BigDecimal previousValue, String reason, String detail,
+                       Instant measuredAt) {
         this.id = id;
         this.runId = runId;
         this.repositoryId = repositoryId;
         this.metricId = metricId;
         this.componentName = componentName;
+        this.variant = variant;
         this.status = status;
         this.value = value;
         this.unit = unit;
@@ -114,6 +123,10 @@ public class Measurement {
     /** コンポーネント名（backend / frontend）。全体値の指標では null。 */
     public String getComponentName() {
         return componentName;
+    }
+
+    public String getVariant() {
+        return variant;
     }
 
     public String getScenario() {

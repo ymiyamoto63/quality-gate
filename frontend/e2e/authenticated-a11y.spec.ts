@@ -51,6 +51,13 @@ for (const target of PAGES) {
       // 検査前に中身が描かれていることを確かめる。空のページは必ず「違反 0 件」になる
       await expect(page.getByText(target.expected).first()).toBeVisible()
 
+      // 折りたたまれた中身も検査する。合格だけのカテゴリは初期状態で閉じるため、
+      // 開かないと「対象外」などの行が一度も検査されない
+      const collapsed = page.locator('[aria-expanded="false"]')
+      while ((await collapsed.count()) > 0) {
+        await collapsed.first().click()
+      }
+
       await expectNoBlockingViolations(page)
     })
   }

@@ -674,6 +674,7 @@ components:
           - SKIP
           - REFERENCE
           - ERROR
+          - NOT_APPLICABLE
       required:
       - category
       - expandByDefault
@@ -915,6 +916,7 @@ components:
           - SKIP
           - REFERENCE
           - ERROR
+          - NOT_APPLICABLE
         threshold:
           type:
           - object
@@ -930,6 +932,17 @@ components:
           - number
           - "null"
           description: 実測値。未計測は null。0 は「計測して 0 だった」を意味し別物
+        variant:
+          type:
+          - string
+          - "null"
+          description: 計測条件（M-02 の実行範囲 changed / all など）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では
+            null
+        variantLabel:
+          type:
+          - string
+          - "null"
+          description: 計測条件の表示名（変更範囲 / 全量 など）
       required:
       - componentName
       - delta
@@ -944,6 +957,8 @@ components:
       - threshold
       - unit
       - value
+      - variant
+      - variantLabel
     RunStatusResponse:
       type: object
       description: CI がポーリングするための軽量な状態応答。
@@ -1096,6 +1111,7 @@ components:
           - SKIP
           - REFERENCE
           - ERROR
+          - NOT_APPLICABLE
         value:
           type:
           - number

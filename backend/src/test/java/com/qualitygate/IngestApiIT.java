@@ -239,6 +239,64 @@ class IngestApiIT {
         assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
     }
 
+    /**
+     * 変更範囲と全量の値は比較できない。どちらか分からない値は前回比にもトレンドにも
+     * 置き場所がないため、取り込みの時点で拒否して CI のログに残す。
+     */
+    @Test
+    void PITの成果物に実行範囲が無ければ拒否される() {
+        ResponseEntity<Map> response = uploadPit(createRun(), null);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody()).containsEntry("errorCode", "MUTATION_SCOPE_MISSING");
+        assertThat(String.valueOf(response.getBody().get("detail")))
+                .contains("mutationScope").contains("changed / all");
+    }
+
+    @Test
+    void PITの実行範囲が選択肢に無ければ拒否される() {
+        ResponseEntity<Map> response = uploadPit(createRun(), "{\"mutationScope\":\"diff\"}");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(response.getBody()).containsEntry("errorCode", "VALIDATION_FAILED");
+    }
+
+    @Test
+    void metadataがJSONオブジェクトでなければ拒否される() {
+        ResponseEntity<Map> response = uploadPit(createRun(), "[\"changed\"]");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(String.valueOf(response.getBody().get("detail"))).contains("JSON オブジェクト");
+    }
+
+    @Test
+    void 実行範囲つきのPITの成果物は受理される() {
+        ResponseEntity<Map> response = uploadPit(createRun(), "{\"mutationScope\":\"changed\"}");
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+    }
+
+    private ResponseEntity<Map> uploadPit(UUID runId, String metadata) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("file", new ByteArrayResource("<mutations/>".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "mutations.xml";
+            }
+        });
+        form.add("type", "pit-xml");
+        form.add("component", "backend");
+        if (metadata != null) {
+            form.add("metadata", metadata);
+        }
+        return client.post()
+                .uri("/api/v1/runs/{runId}/artifacts", runId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().toEntity(Map.class);
+    }
+
     @Test
     void 同一コミットへの再送信は新しいattemptになる() {
         assertThat(attemptOf(createRun())).isEqualTo(1);

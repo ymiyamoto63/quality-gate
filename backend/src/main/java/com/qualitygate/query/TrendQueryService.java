@@ -87,6 +87,8 @@ public class TrendQueryService {
      * （backend と frontend のカバレッジを 1 本の線にしても意味がない）。
      * 計測環境は、値が環境に左右される指標でのみ軸になる。性能以外の指標まで
      * ランナー種別で割ると、同じ値の系列が無意味に 2 本に割れる。
+     * 計測条件（M-02 の実行範囲など）も軸になる。変更範囲だけの値と全量の値を
+     * 1 本の線で結ぶと、範囲が切り替わるたびに品質が乱高下して見える。
      */
     private List<TrendResponse.TrendSeries> seriesOf(List<TrendRow> rows,
                                                 MetricDefinition definition) {
@@ -99,10 +101,11 @@ public class TrendQueryService {
                 componentLess.add(row);
                 continue;
             }
-            grouped.computeIfAbsent(new Key(row.componentName(), environment),
+            grouped.computeIfAbsent(new Key(row.componentName(), environment, row.variant()),
                     k -> new ArrayList<>()).add(row);
         }
 
+        mergeConditionLess(grouped);
         mergeComponentLess(grouped, componentLess, definition);
 
         // 色は系列の同一性に従って固定する。並び順で振ると、絞り込みで
@@ -116,10 +119,36 @@ public class TrendQueryService {
                     .sorted(java.util.Comparator.comparing(TrendRow::measuredAt))
                     .map(TrendQueryService::pointOf)
                     .toList();
-            series.add(new TrendResponse.TrendSeries(key.id(), key.label(), key.componentName(),
+            series.add(new TrendResponse.TrendSeries(key.id(), key.label(definition),
+                    key.componentName(),
                     judged(points), i % MAX_COLORED_SERIES, points));
         }
         return series;
+    }
+
+    /**
+     * 計測条件を持たない点を、同じコンポーネントの条件つき系列に配る。
+     *
+     * <p>成果物の未提出などによる ERROR は値が無く、計測条件も分からない。
+     * これを独立した系列にすると、コンポーネントを持たない点と同じく
+     * 欠測が「もう 1 本の線」として現れる。条件つきの系列が無ければそのまま残す。
+     */
+    private static void mergeConditionLess(Map<Key, List<TrendRow>> grouped) {
+        for (Key key : List.copyOf(grouped.keySet())) {
+            if (key.variant() != null) {
+                continue;
+            }
+            List<Key> siblings = grouped.keySet().stream()
+                    .filter(other -> other.variant() != null
+                            && Objects.equals(other.componentName(), key.componentName())
+                            && other.runnerType() == key.runnerType())
+                    .toList();
+            if (siblings.isEmpty()) {
+                continue;
+            }
+            List<TrendRow> rows = grouped.remove(key);
+            siblings.forEach(sibling -> grouped.get(sibling).addAll(rows));
+        }
     }
 
     /**
@@ -143,8 +172,8 @@ public class TrendQueryService {
             for (TrendRow row : componentLess) {
                 RunnerType environment =
                         definition.environmentSensitive() ? row.runnerType() : null;
-                grouped.computeIfAbsent(new Key(null, environment), k -> new ArrayList<>())
-                        .add(row);
+                grouped.computeIfAbsent(new Key(null, environment, row.variant()),
+                        k -> new ArrayList<>()).add(row);
             }
             return;
         }
@@ -202,21 +231,31 @@ public class TrendQueryService {
     }
 
     /** 系列の同一性。 */
-    private record Key(String componentName, RunnerType runnerType) implements Comparable<Key> {
+    private record Key(String componentName, RunnerType runnerType, String variant)
+            implements Comparable<Key> {
 
         String id() {
             return (componentName == null ? "all" : componentName)
+                    + (variant == null ? "" : "/" + variant)
                     + (runnerType == null ? "" : "/" + runnerType.wire());
         }
 
-        String label() {
-            String base = componentName == null ? "全体" : componentName;
-            if (runnerType == null) {
-                return base;
+        /** 例: 「backend」「backend（変更範囲）」「専有ランナー」「backend（全量・専有ランナー）」 */
+        String label(MetricDefinition definition) {
+            List<String> conditions = new ArrayList<>();
+            if (variant != null) {
+                conditions.add(MetricCatalog.variantLabel(definition.metricId(), variant));
             }
-            String environment = runnerType == RunnerType.SELF_HOSTED
-                    ? "専有ランナー" : "GitHub ホストランナー";
-            return componentName == null ? environment : base + "（" + environment + "）";
+            if (runnerType != null) {
+                conditions.add(runnerType == RunnerType.SELF_HOSTED
+                        ? "専有ランナー" : "GitHub ホストランナー");
+            }
+            String conditionText = String.join("・", conditions);
+            if (componentName == null) {
+                return conditionText.isEmpty() ? "全体" : conditionText;
+            }
+            return conditionText.isEmpty()
+                    ? componentName : componentName + "（" + conditionText + "）";
         }
 
         @Override

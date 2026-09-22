@@ -10,7 +10,7 @@
     "dev": "vite",
     "build": "vue-tsc --build && vite build",
     "preview": "vite preview",
-    "generate:api": "openapi-typescript ../api/openapi.yml -o src/api/schema.d.ts",
+    "generate:api": "openapi-typescript ../api/openapi.yml -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts",
     "typecheck": "vue-tsc --build --force",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write src e2e",

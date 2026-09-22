@@ -249,7 +249,8 @@ CREATE TABLE measurements (
     metric_id       varchar(8)  NOT NULL,
     component_name  varchar(64),                -- 'backend' / 'frontend'（V008 で追加）
     scenario        varchar(64),                -- M-03 のシナリオ単位判定用
-    status          varchar(12) NOT NULL,
+    variant         varchar(16),                -- 計測条件。M-02 の実行範囲 changed / all（V010 で追加）
+    status          varchar(16) NOT NULL,       -- NOT_APPLICABLE を入れるため V010 で 12 → 16
     value           numeric(12,4),
     unit            varchar(16),
     threshold       jsonb,                      -- {"operator":">=","value":75}
@@ -258,14 +259,21 @@ CREATE TABLE measurements (
     detail          jsonb,                      -- 分母分子などの内訳
     measured_at     timestamptz NOT NULL,       -- runs.measured_at の複製（トレンド検索用）
     CONSTRAINT measurements_status_check CHECK (status IN
-        ('PASS','WARN','FAIL','SKIP','REFERENCE','ERROR'))
+        ('PASS','WARN','FAIL','SKIP','REFERENCE','ERROR','NOT_APPLICABLE'))
 );
 
--- component_name / scenario は NULL を取りうる。UNIQUE 制約では NULL 同士が
+-- component_name / scenario / variant は NULL を取りうる。UNIQUE 制約では NULL 同士が
 -- 重複と見なされないため、COALESCE を挟んだ一意インデックスで担保する。
 CREATE UNIQUE INDEX ux_measurements_key ON measurements
-    (run_id, metric_id, COALESCE(component_name, ''), COALESCE(scenario, ''));
+    (run_id, metric_id, COALESCE(component_name, ''), COALESCE(scenario, ''),
+     COALESCE(variant, ''));
 ```
+
+`variant` は**値どうしを比較できるかを分ける計測条件**である。M-02 は実行範囲
+（変更クラスのみ / 全量）で値の意味が変わり、両者を比べた差は品質の変化ではなく
+範囲の違いを表すだけになる。そのため前回値（`previous_value`）は `variant` の
+一致する行からだけ引き、トレンドの系列も `variant` ごとに分ける。
+`detail`（jsonb）に入れず列にするのは、トレンド検索で系列の軸として使うためである。
 
 `component_name` を持たせるのは、表示とトレンドの絞り込みで常に必要になるためである。
 `findings` が既に `component_name` を非正規化して持っており、
@@ -475,7 +483,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | `runs.status` | `CREATED` / `UPLOADING` / `FINALIZED` / `PROCESSING` / `EVALUATED` / `FAILED` / `ABANDONED` |
 | `runs.verdict` | `PASS` / `PASS_WITH_WARNINGS` / `FAIL` |
 | `runs.completeness` | `FULL` / `PARTIAL` |
-| `measurements.status` | `PASS` / `WARN` / `FAIL` / `SKIP` / `REFERENCE` / `ERROR` |
+| `measurements.status` | `PASS` / `WARN` / `FAIL` / `SKIP` / `REFERENCE` / `ERROR` / `NOT_APPLICABLE` |
 | `findings.state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL` |
 | `findings.severity` | `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO` |
 | `waivers.status` | `ACTIVE` / `EXPIRED` / `REVOKED` |
@@ -596,6 +604,8 @@ DELETE FROM runs
 | `V006__create_summaries_and_audit.sql` | `repository_summaries` / `audit_logs` と権限設定 |
 | `V007__create_spring_session.sql` | Spring Session JDBC のテーブル |
 | `V008__add_measurement_component_name.sql` | `measurements.component_name` の追加と一意インデックスの置き換え |
+| `V009__skipped_metric_acceptance_at_evaluation.sql` | `run_skipped_metrics.accepted` を NULL 許容にし、受理の可否を判定時に決める |
+| `V010__measurement_variant_and_not_applicable.sql` | `measurements.variant` の追加、一意インデックスの置き換え、`NOT_APPLICABLE` の追加と `status` の拡幅 |
 
 `waivers` と `findings` は相互に参照するため、
 `findings.waiver_id` の外部キーは `V004` の末尾で `ALTER TABLE` により追加する。

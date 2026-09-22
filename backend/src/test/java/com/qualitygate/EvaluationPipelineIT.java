@@ -144,6 +144,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_HIGH);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachPit(run, "changed");
 
         Run evaluated = evaluate(run);
 
@@ -156,6 +157,8 @@ class EvaluationPipelineIT {
                 .containsExactlyInAnyOrder(
                         // カバレッジ 90% は合格
                         org.assertj.core.groups.Tuple.tuple("M-01", MeasurementStatus.PASS),
+                        // ミューテーションスコア 80% は合格
+                        org.assertj.core.groups.Tuple.tuple("M-02", MeasurementStatus.PASS),
                         // High 1 件で不合格
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
                         // ベース比較ができないため新規関数数は 0 で合格
@@ -187,7 +190,7 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-06", "M-07");
+                .containsExactlyInAnyOrder("M-02", "M-06", "M-07");
     }
 
     @Test
@@ -204,6 +207,7 @@ class EvaluationPipelineIT {
                 """);
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07",
                 "GitHub ホストランナーのため実行しない"));
+        attachPit(run, "changed");
 
         Run evaluated = evaluate(run);
 
@@ -288,6 +292,68 @@ class EvaluationPipelineIT {
                 .allSatisfy(f -> assertThat(f.getState()).isEqualTo(FindingState.CONTINUING));
     }
 
+    @Test
+    void ミューテーションスコアは対象のbackendだけを判定しfrontendは対象外と示す() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  mutation_score:
+                    components: [backend]
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend", null,
+                "SF:src/api/format.ts\nBRF:10\nBRH:9\nend_of_record\n");
+        attachPit(run, "changed");
+
+        Run evaluated = evaluate(run);
+
+        // 対象外は不合格にも部分計測にもしない。測りようのないものを積み残し扱いにしない
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.FULL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-02"))
+                .extracting(Measurement::getComponentName, Measurement::getStatus,
+                        Measurement::getVariant)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("backend", MeasurementStatus.PASS,
+                                "changed"),
+                        org.assertj.core.groups.Tuple.tuple("frontend",
+                                MeasurementStatus.NOT_APPLICABLE, null));
+    }
+
+    @Test
+    void ミューテーションスコアの前回値は実行範囲が同じRunからだけ引く() {
+        Run first = createRun(Instant.parse("2026-09-20T00:00:00Z"));
+        attachAllMetrics(first);
+        attachPit(first, "changed", 8);
+        evaluate(first);
+
+        Run second = createRun(Instant.parse("2026-09-21T00:00:00Z"));
+        attachAllMetrics(second);
+        attachPit(second, "changed", 7);
+        evaluate(second);
+
+        // 全量の値を変更範囲の値と比べた差は、品質の変化ではなく範囲の違い
+        Run third = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attachAllMetrics(third);
+        attachPit(third, "all", 9);
+        evaluate(third);
+
+        Measurement changed = mutationOf(second);
+        assertThat(changed.getPreviousValue()).isEqualByComparingTo("80");
+        // 70% は合格ラインを満たすが、前回から 10 ポイント落ちている
+        assertThat(changed.getStatus()).isEqualTo(MeasurementStatus.WARN);
+
+        Measurement all = mutationOf(third);
+        assertThat(all.getVariant()).isEqualTo("all");
+        assertThat(all.getPreviousValue()).isNull();
+    }
+
     /** ジョブハンドラと同じ手順（設定解決 → 正規化 → 判定）を踏む。 */
     @Test
     void 設定ファイルのしきい値が判定に使われる() {
@@ -298,6 +364,8 @@ class EvaluationPipelineIT {
                 metrics:
                   branch_coverage:
                     threshold: 95
+                  mutation_score:
+                    enabled: false
                   vulnerabilities:
                     enabled: false
                   cyclomatic_complexity:
@@ -375,6 +443,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachPit(run, "changed");
 
         Run evaluated = evaluate(run);
 
@@ -389,6 +458,8 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
                 version: 1
                 metrics:
+                  mutation_score:
+                    enabled: false
                   vulnerabilities:
                     enabled: false
                   cyclomatic_complexity:
@@ -427,12 +498,47 @@ class EvaluationPipelineIT {
         return String.format("%040x", Math.abs(measuredAt.hashCode()));
     }
 
+    private Measurement mutationOf(Run run) {
+        return measurements.findByRunId(run.getId()).stream()
+                .filter(m -> m.getMetricId().equals("M-02")).findFirst().orElseThrow();
+    }
+
+    private void attachAllMetrics(Run run) {
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+    }
+
+    private void attachPit(Run run, String mutationScope) {
+        attachPit(run, mutationScope, 8);
+    }
+
+    /** 10 個の mutation のうち {@code killed} 個を検出した PIT の結果。 */
+    private void attachPit(Run run, String mutationScope, int killed) {
+        String xml = "<mutations>"
+                + mutation("KILLED").repeat(killed)
+                + mutation("SURVIVED").repeat(10 - killed)
+                + "</mutations>";
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", null, xml,
+                "{\"mutationScope\":\"%s\"}".formatted(mutationScope));
+    }
+
+    private static String mutation(String status) {
+        return "<mutation status='%s'><sourceFile>Good.java</sourceFile>".formatted(status)
+                + "<mutatedClass>com.qualitygate.Good</mutatedClass></mutation>";
+    }
+
     private void attach(Run run, ArtifactType type, String filename, String component,
                         String scope, String content) {
+        attach(run, type, filename, component, scope, content, null);
+    }
+
+    private void attach(Run run, ArtifactType type, String filename, String component,
+                        String scope, String content, String metadata) {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, scope, null));
+                component, scope, metadata));
     }
 }

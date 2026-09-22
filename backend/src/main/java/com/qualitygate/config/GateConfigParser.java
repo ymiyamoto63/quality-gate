@@ -3,6 +3,7 @@ package com.qualitygate.config;
 import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.gate.GateConfigDocument;
+import com.qualitygate.domain.model.MutationScope;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -11,6 +12,7 @@ import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -18,6 +20,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 /**
  * {@code .quality-gate.yml} を検証して {@link GateConfigDocument} にする。
@@ -173,11 +176,39 @@ public class GateConfigParser {
             Map<String, Object> values = mapOf(entry.getValue());
             checkUnknownKeys(values, allowed, path, lines, errors);
             validateNumbers(values, path, lines, errors);
+            if ("mutation_score".equals(entry.getKey())) {
+                validateMutation(values, path, lines, errors);
+            }
 
             boolean enabled = !Boolean.FALSE.equals(values.get("enabled"));
             result.put(entry.getKey(), new GateConfigDocument.MetricConfig(enabled, values));
         }
         return result;
+    }
+
+    /**
+     * M-02 の実行範囲と対象コンポーネント。
+     *
+     * <p>{@code components} を文字列 1 つで書かれたまま読み流すと「限定なし」になり、
+     * frontend まで判定対象に入って ERROR が並ぶ。書いた意図と逆に効くため拒否する。
+     */
+    private void validateMutation(Map<String, Object> values, String path, YamlLineIndex lines,
+                                  List<ConfigValidationError> errors) {
+        Object scope = values.get("scope");
+        Set<String> scopes = Arrays.stream(MutationScope.values()).map(MutationScope::wire)
+                .collect(Collectors.toSet());
+        if (scope != null && !scopes.contains(String.valueOf(scope))) {
+            errors.add(error(lines, path + ".scope", "指定できるのは %s のいずれかです（受信値: %s）"
+                    .formatted(String.join(" / ", sorted(scopes)), quote(scope))));
+        }
+        Object components = values.get("components");
+        boolean listOfNames = components instanceof List<?> list
+                && list.stream().allMatch(c -> c instanceof String s && !s.isBlank());
+        if (components != null && !listOfNames) {
+            errors.add(error(lines, path + ".components",
+                    "コンポーネント名の配列で指定してください（例: [backend]。受信値: %s）"
+                            .formatted(quote(components))));
+        }
     }
 
     /** 割合は 0〜100、件数は 0 以上。範囲外を通すと、判定が意図せず緩くなる。 */

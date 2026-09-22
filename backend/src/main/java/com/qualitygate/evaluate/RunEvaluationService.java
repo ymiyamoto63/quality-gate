@@ -174,15 +174,18 @@ public class RunEvaluationService {
      * <p>比較対象 Run の値を {@code previousValue} として複製する。参照時に
      * 比較対象を引き直すのではなく Run に焼き付けるのは、比較対象が保持期間を
      * 過ぎて削除されても「前回比 +0.5」の表示が壊れないようにするためである。
+     *
+     * <p>前回値は計測条件（{@code variant}）の一致するものに限る。条件の違う値との
+     * 差は、改善や悪化ではなく条件の違いを表すだけだからである。
      */
     private void persistMeasurements(Run run, List<MetricResult> results,
                                      EvaluationContext context) {
         for (MetricResult result : results) {
-            BigDecimal previous = context
-                    .previousValue(result.metricId(), result.componentName()).orElse(null);
+            BigDecimal previous = context.previousValue(result.metricId(),
+                    result.componentName(), result.variant()).orElse(null);
             measurements.save(new Measurement(Uuid7.generate(), run.getId(),
                     run.getRepositoryId(), result.metricId(), result.componentName(),
-                    result.status(), result.value(), result.unit(),
+                    result.variant(), result.status(), result.value(), result.unit(),
                     toJson(result.threshold()),
                     previous, result.reason(), toJson(result.detail()), run.getMeasuredAt()));
         }
@@ -249,7 +252,7 @@ public class RunEvaluationService {
                 finding.componentName(), toJson(finding.detail()));
     }
 
-    /** FAIL・ERROR があれば不合格。SKIP と REFERENCE は集約に影響しない。 */
+    /** FAIL・ERROR があれば不合格。SKIP・REFERENCE・NOT_APPLICABLE は集約に影響しない。 */
     static Verdict aggregate(List<MetricResult> results) {
         boolean failed = results.stream().anyMatch(r ->
                 r.status() == MeasurementStatus.FAIL || r.status() == MeasurementStatus.ERROR);
@@ -261,7 +264,12 @@ public class RunEvaluationService {
                 : Verdict.PASS;
     }
 
-    /** SKIP / REFERENCE を 1 つでも含めば部分計測とする。 */
+    /**
+     * SKIP / REFERENCE を 1 つでも含めば部分計測とする。
+     *
+     * <p>NOT_APPLICABLE は含めない。ツールの制約で測りようのないものを部分計測に
+     * 数えると、どの Run も永遠に完全計測にならず、部分計測の警告が意味を失う。
+     */
     static Completeness completenessOf(List<MetricResult> results) {
         boolean partial = results.stream().anyMatch(r ->
                 r.status() == MeasurementStatus.SKIP || r.status() == MeasurementStatus.REFERENCE);
@@ -282,7 +290,8 @@ public class RunEvaluationService {
         Map<String, BigDecimal> values = new HashMap<>();
         for (Measurement measurement : measurements.findByRunId(baseline.get().getId())) {
             values.put(EvaluationContext.key(measurement.getMetricId(),
-                    measurement.getComponentName()), measurement.getValue());
+                    measurement.getComponentName(), measurement.getVariant()),
+                    measurement.getValue());
         }
         return values;
     }
@@ -326,6 +335,8 @@ public class RunEvaluationService {
             case REFERENCE -> 2;
             case SKIP -> 1;
             case PASS -> 0;
+            // 対象外はカテゴリの状態を左右しない。合格の指標と並んでいれば合格のまま
+            case NOT_APPLICABLE -> -1;
         };
     }
 

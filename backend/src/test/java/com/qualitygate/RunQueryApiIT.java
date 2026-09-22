@@ -113,6 +113,18 @@ class RunQueryApiIT {
             </pmd>
             """;
 
+    /** 変更範囲の PIT 結果。検出 8 / 対象 10 = 80% で合格。 */
+    private static final String PIT = "<mutations partial='true'>"
+            + mutation("KILLED").repeat(8)
+            + mutation("SURVIVED")
+            + mutation("NO_COVERAGE")
+            + "</mutations>";
+
+    private static String mutation(String status) {
+        return "<mutation status='%s'><sourceFile>Good.java</sourceFile>".formatted(status)
+                + "<mutatedClass>com.qualitygate.Good</mutatedClass></mutation>";
+    }
+
     @Value("${local.server.port}")
     int port;
 
@@ -191,10 +203,17 @@ class RunQueryApiIT {
         assertThat(functional.status()).isEqualTo(MeasurementStatus.PASS);
         // 合格だけのカテゴリは初期状態で折りたたむ
         assertThat(functional.expandByDefault()).isFalse();
+        // 計測条件（実行範囲）は生の値と表示名の両方を返す
+        assertThat(functional.metrics()).filteredOn(m -> m.metricId().equals("M-02"))
+                .singleElement().satisfies(metric -> {
+                    assertThat(metric.value()).isEqualByComparingTo("80");
+                    assertThat(metric.variant()).isEqualTo("changed");
+                    assertThat(metric.variantLabel()).isEqualTo("変更範囲");
+                });
 
         assertThat(detail.findingSummary().initial()).isEqualTo(3);
         assertThat(detail.findingSummary().newCount()).isZero();
-        assertThat(detail.artifactCount()).isEqualTo(3);
+        assertThat(detail.artifactCount()).isEqualTo(4);
     }
 
     /**
@@ -439,7 +458,7 @@ class RunQueryApiIT {
      */
     @Test
     void 応答のJSONが画面の読む形になっている() throws Exception {
-        Run run = evaluated(Instant.parse("2026-09-22T02:10:00Z"));
+        Run run = evaluatedWithFrontend(Instant.parse("2026-09-22T02:10:00Z"));
         MockMvcTester tester = authenticatedTester();
 
         assertThat(tester.get().uri("/api/v1/runs/{id}", run.getId()).exchange())
@@ -461,6 +480,10 @@ class RunQueryApiIT {
                             .isEqualTo(">=");
                     // 前回値が無ければ差分は 0 ではなく null
                     json.extractingPath("$.categories[0].metrics[0].delta").isNull();
+                    // PIT で測りようのない frontend は、未計測ではなく対象外として返す
+                    json.extractingPath("$.categories[0].metrics[?(@.metricId == 'M-02' "
+                                    + "&& @.componentName == 'frontend')].status")
+                            .asArray().containsExactly("NOT_APPLICABLE");
                 });
 
         assertThat(tester.get().uri("/api/v1/runs/{id}/findings", run.getId()).exchange())
@@ -530,6 +553,30 @@ class RunQueryApiIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, sarif);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", pmd);
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
+                "{\"mutationScope\":\"changed\"}");
+        return evaluate(run);
+    }
+
+    /**
+     * 画面の検査用に、backend と frontend の両方を計測した Run を作る。
+     * M-02 は設定で backend に限るため、frontend は対象外として並ぶ。
+     */
+    private Run evaluatedWithFrontend(Instant measuredAt) {
+        Run run = createRun(measuredAt);
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
+                version: 1
+                metrics:
+                  mutation_score:
+                    components: [backend]
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
+                "SF:src/api/format.ts\nBRF:20\nBRH:17\nend_of_record\n");
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
+                "{\"mutationScope\":\"changed\"}");
         return evaluate(run);
     }
 
@@ -554,10 +601,15 @@ class RunQueryApiIT {
 
     private void attach(Run run, ArtifactType type, String filename, String component,
                         String content) {
+        attach(run, type, filename, component, content, null);
+    }
+
+    private void attach(Run run, ArtifactType type, String filename, String component,
+                        String content, String metadata) {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, null, null));
+                component, null, metadata));
     }
 }
