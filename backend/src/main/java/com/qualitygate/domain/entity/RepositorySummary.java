@@ -78,6 +78,31 @@ public class RepositorySummary {
         this.repositoryId = repositoryId;
     }
 
+    /**
+     * 判定完了時に読み取りモデルを更新する。
+     *
+     * <p>完全計測（FULL）のときだけ {@code lastFull*} を進める。部分計測で上書きすると、
+     * 「最後に全指標を測ったのはいつか」が失われ、鮮度監視が機能しなくなる。
+     */
+    @SuppressWarnings("java:S107")
+    public void update(UUID runId, Verdict verdict, Completeness completeness, Instant measuredAt,
+                       String categoryStatus, int openCriticalCount, int openHighCount,
+                       int activeWaiverCount) {
+        this.latestRunId = runId;
+        this.latestVerdict = verdict;
+        this.latestCompleteness = completeness;
+        this.latestMeasuredAt = measuredAt;
+        this.categoryStatus = categoryStatus;
+        this.openCriticalCount = openCriticalCount;
+        this.openHighCount = openHighCount;
+        this.activeWaiverCount = activeWaiverCount;
+        this.updatedAt = Instant.now();
+        if (completeness == Completeness.FULL) {
+            this.lastFullRunId = runId;
+            this.lastFullMeasuredAt = measuredAt;
+        }
+    }
+
     public UUID getRepositoryId() {
         return repositoryId;
     }

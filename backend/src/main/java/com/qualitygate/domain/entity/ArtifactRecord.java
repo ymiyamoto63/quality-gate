@@ -110,6 +110,30 @@ public class ArtifactRecord {
         return storageKey;
     }
 
+    /** アップロード時に宣言されたコンポーネント名（backend / frontend）。 */
+    public String getComponentName() {
+        return componentName;
+    }
+
+    /** base / head。M-07 のベース比較に使う。 */
+    public String getScope() {
+        return scope;
+    }
+
+    public String getParseStatus() {
+        return parseStatus;
+    }
+
+    public void markParsed() {
+        this.parseStatus = "OK";
+        this.parseError = null;
+    }
+
+    public void markParseFailed(String error) {
+        this.parseStatus = "FAILED";
+        this.parseError = error;
+    }
+
     public String getMetadata() {
         return metadata;
     }

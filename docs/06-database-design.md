@@ -247,6 +247,7 @@ CREATE TABLE measurements (
     repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
     component_id    uuid        REFERENCES components(id) ON DELETE SET NULL,
     metric_id       varchar(8)  NOT NULL,
+    component_name  varchar(64),                -- 'backend' / 'frontend'（V008 で追加）
     scenario        varchar(64),                -- M-03 のシナリオ単位判定用
     status          varchar(12) NOT NULL,
     value           numeric(12,4),
@@ -257,10 +258,24 @@ CREATE TABLE measurements (
     detail          jsonb,                      -- 分母分子などの内訳
     measured_at     timestamptz NOT NULL,       -- runs.measured_at の複製（トレンド検索用）
     CONSTRAINT measurements_status_check CHECK (status IN
-        ('PASS','WARN','FAIL','SKIP','REFERENCE','ERROR')),
-    CONSTRAINT measurements_unique_key UNIQUE (run_id, metric_id, component_id, scenario)
+        ('PASS','WARN','FAIL','SKIP','REFERENCE','ERROR'))
 );
+
+-- component_name / scenario は NULL を取りうる。UNIQUE 制約では NULL 同士が
+-- 重複と見なされないため、COALESCE を挟んだ一意インデックスで担保する。
+CREATE UNIQUE INDEX ux_measurements_key ON measurements
+    (run_id, metric_id, COALESCE(component_name, ''), COALESCE(scenario, ''));
 ```
+
+`component_name` を持たせるのは、表示とトレンドの絞り込みで常に必要になるためである。
+`findings` が既に `component_name` を非正規化して持っており、
+片方は FK を辿り片方は文字列という不整合な扱いを避ける。
+`component_id` は将来のコンポーネント管理機能のために残す。
+
+一意性を UNIQUE 制約ではなく式インデックスで担保するのは、
+**SQL の UNIQUE 制約が NULL 同士を重複と見なさない**ためである。
+`component_name` が NULL のまま UNIQUE 制約に任せると、
+同一 Run・同一指標の行が何行でも入ってしまう。
 
 `repository_id` と `measured_at` を `runs` から**意図的に複製**している。
 トレンド API（NFR 10.1 で p95 800ms）は期間とリポジトリと指標で絞り込むため、
@@ -580,6 +595,7 @@ DELETE FROM runs
 | `V005__create_jobs_and_notifications.sql` | `jobs` / `notifications` |
 | `V006__create_summaries_and_audit.sql` | `repository_summaries` / `audit_logs` と権限設定 |
 | `V007__create_spring_session.sql` | Spring Session JDBC のテーブル |
+| `V008__add_measurement_component_name.sql` | `measurements.component_name` の追加と一意インデックスの置き換え |
 
 `waivers` と `findings` は相互に参照するため、
 `findings.waiver_id` の外部キーは `V004` の末尾で `ALTER TABLE` により追加する。

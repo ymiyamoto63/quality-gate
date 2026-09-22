@@ -20,11 +20,15 @@ components:
     language: typescript
     paths: ["frontend/**"]
 
+# 除外パターンは「各ツールが報告するパスの形」に合わせて書く。
+# JaCoCo はパッケージ相対（com/qualitygate/...）、lcov はコンポーネント相対
+# （src/api/...）のパスを出すため、リポジトリ相対（backend/...）では一致しない。
+# 迷う場合は **/ を先頭に付けた接尾一致で書く。
 exclusions:
   - "**/generated/**"
-  - "frontend/src/api/schema.d.ts"
+  - "**/api/schema.d.ts"
   - "**/*.config.ts"
-  - "backend/**/QualityGateApplication.java"
+  - "**/QualityGateApplication.java"
 
 metrics:
   branch_coverage:
