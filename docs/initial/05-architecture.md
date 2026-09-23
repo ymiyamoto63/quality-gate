@@ -650,8 +650,8 @@ CI 側のスクリプトがこれらに依存しないようにする。
 
 | 項目 | 方針 |
 | --- | --- |
-| 形式 | JSON 構造化ログ（未実装。現状は Spring Boot 既定のテキスト形式） |
-| 相関 ID | `requestId`（全リクエスト）、`runId`（取り込み・判定）を MDC に載せる（未実装） |
+| 形式 | JSON 構造化ログ（Spring Boot の structured logging）。`QG_LOG_FORMAT` に `ecs` / `logstash` / `gelf` を指定する。`compose.yaml`（`full`）の既定は `ecs`。未指定なら開発向けのテキスト形式 |
+| 相関 ID | `requestId`（全リクエスト。`X-Request-Id` ヘッダがあればそれを使い、応答にも返す）、`runId`（パスに runId を含む API と、判定・通知などのジョブ）、`jobId`（ジョブ）を MDC に載せる。JSON 形式では項目として、テキスト形式では `req=` / `run=` / `job=` として出る。エラー応答の `traceId` は `requestId` と同じ値 |
 | 秘匿情報 | Ingest Token、SMTP のパスワード、セッション ID、GitHub のアクセストークンはログに出さない。マスク処理をログ出力の共通層に実装する |
 | レベル | 判定結果は INFO。成果物の形式不正は WARN（システム異常ではないため）。ジョブの恒久的失敗は ERROR |
 
@@ -660,16 +660,16 @@ ERROR を「対応が必要な異常」に限定しておかないと、アラ�
 
 ### 10.2 メトリクス（Micrometer）
 
-`/actuator/prometheus`（ADMIN のみ）で公開する。下表のうち実装済みは `qg.notifications` と `qg.rate_limit.rejected` で、
-ほかは未実装である。
+`/actuator/prometheus`（ADMIN のみ）で公開する。
 
 | メトリクス | 用途 |
 | --- | --- |
-| `qg.ingest.runs`（counter、`result` タグ） | 取り込みの成功・失敗率 |
-| `qg.evaluation.duration`（timer、`metric_id` タグ） | 判定の所要時間。NFR 10.1 の 60 秒 / 5 分を監視する |
-| `qg.jobs.pending`（gauge、`type` タグ） | ジョブの滞留検知 |
+| `qg.ingest.runs`（counter、`result` = created / rejected / finalized） | 取り込みの成功・失敗率 |
+| `qg.ingest.artifacts`（counter、`result` = accepted / rejected、`type`） | 成果物の受領。拒否が増えたら CI 側の設定の誤りを疑う |
+| `qg.evaluation.duration`（timer、`metric_id` タグ） | 判定の所要時間。指標ごとと、設定解決・正規化・判定を合わせた `metric_id=total`。NFR 10.1 の 60 秒 / 5 分を監視する |
+| `qg.jobs.pending`（gauge、`type` タグ） | ジョブの滞留検知（30 秒ごとに DB から読み直す） |
 | `qg.jobs.dead`（gauge） | 恒久的失敗の蓄積 |
-| `qg.artifacts.bytes`（gauge） | ストレージ使用量 |
+| `qg.artifacts.bytes`（gauge） | ストレージ使用量（実体が残っている成果物の合計） |
 | `qg.notifications`（counter、`channel` / `result` タグ） | 通知の到達状況 |
 | `qg.rate_limit.rejected`（counter、`category` タグ） | レート制限で拒否した回数（API 設計 8 章）。CI の暴走の検知 |
 

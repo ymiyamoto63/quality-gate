@@ -14,6 +14,7 @@
 | `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents / Pull requests: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
 | `QG_GITHUB_API_URL` | `https://api.github.com` | GitHub Enterprise Server なら `https://<host>/api/v3` |
 | `QG_RATE_LIMIT_ENABLED` | `true` | API のレート制限（Ingest Token ごとに 60 回 / 分、成果物のアップロードは 100 回 / 分、参照 API は利用者ごとに 600 回 / 分）。上限は `quality-gate.rate-limit.*` で変えられる。超過すると 429 と `Retry-After` を返す |
+| `QG_LOG_FORMAT` | なし（テキスト） | `ecs` / `logstash` / `gelf` で JSON 構造化ログにする。相関 ID（`requestId` / `runId` / `jobId`）が項目として載る。`compose.yaml` の `full` では `ecs` |
 | `QG_SCHEDULE_ZONE` | `Asia/Tokyo` | 日次バッチ（02:00 再評価・02:10 免除の期限切れ・03:00 保持期間・03:10 滞留 Run・09:00 鮮度確認）のタイムゾーン。各時刻は `quality-gate.schedule.*` の cron 式で変えられる |
 
 優先順位は **環境変数 > `.env` > `application.yml` の既定値**です。

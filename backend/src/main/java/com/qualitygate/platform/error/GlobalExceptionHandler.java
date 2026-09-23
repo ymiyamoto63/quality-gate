@@ -1,5 +1,6 @@
 package com.qualitygate.platform.error;
 
+import com.qualitygate.platform.observability.CorrelationIds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
@@ -69,6 +70,8 @@ public class GlobalExceptionHandler {
         problem.setTitle(code.title());
         problem.setProperty("errorCode", code.name());
         problem.setProperty("timestamp", Instant.now().toString());
+        // サーバログの相関 ID と同じ値。利用者が問い合わせるときに、ログを辿る手がかりになる
+        CorrelationIds.currentRequestId().ifPresent(id -> problem.setProperty("traceId", id));
         return problem;
     }
 }

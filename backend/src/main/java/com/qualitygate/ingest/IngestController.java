@@ -43,9 +43,11 @@ import java.util.UUID;
 public class IngestController {
 
     private final IngestService ingestService;
+    private final IngestMetrics metrics;
 
-    public IngestController(IngestService ingestService) {
+    public IngestController(IngestService ingestService, IngestMetrics metrics) {
         this.ingestService = ingestService;
+        this.metrics = metrics;
     }
 
     @PostMapping
@@ -53,7 +55,14 @@ public class IngestController {
             description = "計測開始時に呼ぶ。同一コミットへの再送信は attempt を増やした新しい Run になる。")
     public ResponseEntity<CreateRunResponse> createRun(
             IngestAuthentication auth, @Valid @RequestBody CreateRunRequest request) {
-        Run run = ingestService.createRun(auth.repositoryId(), request);
+        Run run;
+        try {
+            run = ingestService.createRun(auth.repositoryId(), request);
+        } catch (ApiException e) {
+            metrics.run("rejected");
+            throw e;
+        }
+        metrics.run("created");
         CreateRunResponse body = new CreateRunResponse(
                 run.getId(), run.getAttempt(), run.getStatus(), ingestService.detailUrl(run.getId()));
         return ResponseEntity.created(URI.create("/api/v1/runs/" + run.getId())).body(body);
@@ -71,14 +80,25 @@ public class IngestController {
             @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "metadata", required = false) String metadata) {
 
-        ArtifactType artifactType = parseType(type);
+        ArtifactType artifactType;
+        try {
+            artifactType = parseType(type);
+        } catch (ApiException e) {
+            metrics.artifact("rejected", "unknown");
+            throw e;
+        }
         try (InputStream content = file.getInputStream()) {
             ArtifactRecord record = ingestService.storeArtifact(auth.repositoryId(), runId,
                     artifactType, originalName(file), component, scope, metadata,
                     content, file.getSize());
+            metrics.artifact("accepted", artifactType.wire());
             return ResponseEntity.accepted().body(new UploadArtifactResponse(
                     record.getId(), record.getSizeBytes(), record.getSha256()));
+        } catch (ApiException e) {
+            metrics.artifact("rejected", artifactType.wire());
+            throw e;
         } catch (IOException e) {
+            metrics.artifact("rejected", artifactType.wire());
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "アップロードされたファイルを読み取れませんでした: " + e.getMessage());
         }
@@ -90,6 +110,7 @@ public class IngestController {
     public ResponseEntity<FinalizeResponse> finalizeRun(IngestAuthentication auth,
                                                         @PathVariable UUID runId) {
         Run run = ingestService.finalizeRun(auth.repositoryId(), runId);
+        metrics.run("finalized");
         return ResponseEntity.accepted().body(new FinalizeResponse(
                 run.getId(), run.getStatus(), ingestService.detailUrl(run.getId())));
     }

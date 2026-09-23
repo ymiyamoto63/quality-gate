@@ -1,13 +1,17 @@
 package com.qualitygate.job;
 
 import com.qualitygate.domain.entity.Job;
+import com.qualitygate.platform.observability.CorrelationIds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.slf4j.MDC;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
  * ジョブキューのポーラ。
@@ -23,6 +27,9 @@ public class JobWorker {
 
     private static final Logger log = LoggerFactory.getLogger(JobWorker.class);
     private static final int BATCH_SIZE = 4;
+
+    /** ペイロードの runId。ログの相関 ID に使うだけなので、JSON として読まずに拾う。 */
+    private static final Pattern RUN_ID = Pattern.compile("\"runId\"\\s*:\\s*\"([0-9a-fA-F-]{36})\"");
 
     private final JobQueue queue;
     private final List<JobHandler> handlers;
@@ -41,6 +48,11 @@ public class JobWorker {
 
     private void execute(UUID jobId) {
         Job job = queue.load(jobId);
+        MDC.put(CorrelationIds.JOB_ID, jobId.toString());
+        Matcher runId = RUN_ID.matcher(job.getPayload() == null ? "" : job.getPayload());
+        if (runId.find()) {
+            MDC.put(CorrelationIds.RUN_ID, runId.group(1));
+        }
         try {
             handlerFor(job).handle(job);
             queue.markSucceeded(jobId);
@@ -58,6 +70,9 @@ public class JobWorker {
             // そうしないと、原因が試行回数分のログに埋もれて見えなくなる。
             log.error("ジョブが恒久的に失敗しました id={} type={}", jobId, job.getType(), e);
             queue.markFailed(jobId, e.getMessage(), false);
+        } finally {
+            MDC.remove(CorrelationIds.JOB_ID);
+            MDC.remove(CorrelationIds.RUN_ID);
         }
     }
 
