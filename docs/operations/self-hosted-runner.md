@@ -5,7 +5,10 @@ quality-gate リポジトリの次のワークフローが、**セルフホス�
 | ワークフロー | ジョブ | 用途 |
 | --- | --- | --- |
 | `collect.yml` / `collect-target.yml` | `plan` / `fetch` / `measure` / `submit` のすべて | 収集ランナー。対象リポジトリの計測（15 分ごとの定期実行と手動実行。[収集ランナーで計測する](collector.md)） |
-| `quality-gate.yml` | `base` / `mutation` / `performance`（既定） | quality-gate 自身の CI と計測 |
+| `quality-gate.yml` | `base` / `mutation` / `performance`（既定） | quality-gate 自身の計測（main への push と手動実行のみ） |
+
+Pull Request の CI（`ci.yml`）はユニットテストだけを GitHub ホストランナー（`ubuntu-latest`）で実行し、
+セルフホストランナーを使いません。ランナーが止まっていても PR の CI は止まりません。
 
 収集ランナーは常にセルフホストランナーで動きます（D-13 の切り替えの対象外）。
 `quality-gate.yml` の計測ジョブをセルフホストランナーで動かす理由は 2 つです。
