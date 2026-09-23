@@ -36,6 +36,8 @@ tags:
   name: Config
 - description: リポジトリ単位の参照
   name: Repositories
+- description: README 用のバッジ
+  name: Badge
 - description: 許可リストとロールの管理（管理者のみ）
   name: Users
 - description: 免除の一覧・登録・失効
@@ -900,6 +902,30 @@ paths:
       summary: 免除を失効させる
       tags:
       - Waivers
+  /badges/{owner}/{name}.svg:
+    get:
+      operationId: badge
+      parameters:
+      - in: path
+        name: owner
+        required: true
+        schema:
+          type: string
+      - in: path
+        name: name
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            image/svg+xml:
+              schema:
+                type: string
+          description: OK
+      summary: 既定ブランチの最新の合否のバッジ（認証不要）
+      tags:
+      - Badge
 components:
   schemas:
     Alert:

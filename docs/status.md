@@ -23,6 +23,7 @@
 - Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
+- README 用のバッジ（`/badges/{owner}/{name}.svg`。認証不要で、既定ブランチの最新の合否だけを返す。FR-08-5）
 - API のレート制限（トークンバケット。Ingest Token・利用者・IP ごと。超過は 429 と `Retry-After`）
 - 可観測性 — JSON 構造化ログ（`QG_LOG_FORMAT`）、相関 ID（`requestId` / `runId` / `jobId` を MDC に載せ、エラー応答の `traceId` と一致）、
   メトリクス `qg.ingest.*` / `qg.evaluation.duration` / `qg.jobs.*` / `qg.artifacts.bytes` / `qg.notifications` / `qg.rate_limit.rejected`
@@ -79,5 +80,5 @@
 ## 未実装のもの
 
 - 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、
-  Check Run の出力、README 用のバッジ（FR-08-5）
+  Check Run の出力
 - 通知は**メールのみ**とした（Slack・PR コメントは運用上不要と判断し削除。D-15 / V014）
