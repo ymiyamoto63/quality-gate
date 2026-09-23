@@ -19,6 +19,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | --- | --- |
 | Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`）、k6（`docker run grafana/k6`） |
 | git | チェックアウトと merge-base の解決 |
+| curl / unzip / jq | 収集ランナー（`collect.yml`）の PMD の取得と送信（[収集ランナーで計測する](collector.md)） |
 | パスワードなしの `sudo`、または Playwright の依存パッケージの事前導入 | `npx playwright install --with-deps chromium` が apt で OS パッケージを入れる |
 | github.com / Maven Central / npm レジストリへの外向き通信 | ランナーの接続、JDK・Node.js・依存関係の取得 |
 | 十分なディスク（目安 20GB 以上） | Maven / npm のキャッシュ、Docker イメージ、Playwright のブラウザ |

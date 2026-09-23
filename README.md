@@ -18,6 +18,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | ドキュメント | 内容 |
 | --- | --- |
 | [概要](docs/overview.md) | 目的・対象とする品質指標・技術スタック・ディレクトリ構成 |
+| [はじめての人向け: quality-gate のしくみ](docs/architecture/overview-for-beginners.md) | リポジトリ間の関係、ランナー、認証認可、計測の中身をやさしく解説 |
 | [実装状況](docs/status.md) | フェーズごとの進捗・動くもの・未実装のもの |
 
 ### 開発
