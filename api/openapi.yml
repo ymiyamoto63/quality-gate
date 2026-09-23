@@ -22,20 +22,26 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: 保持期間などのシステム設定（管理者のみ）
+  name: Settings
 - description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
   name: RepositoryAdmin
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
+- description: 再評価とジョブの運用（管理者のみ）
+  name: Operations
 - description: .quality-gate.yml の表示・検証結果・版履歴
   name: Config
 - description: リポジトリ単位の参照
   name: Repositories
 - description: 許可リストとロールの管理（管理者のみ）
   name: Users
+- description: 免除の一覧・登録・失効
+  name: Waivers
 paths:
   /api/v1/audit-logs:
     get:
-      operationId: list_4
+      operationId: list_5
       parameters:
       - description: 省略時は to の 30 日前
         in: query
@@ -95,7 +101,7 @@ paths:
       - Dashboard
   /api/v1/ingest-tokens/{tokenId}:
     delete:
-      operationId: revoke
+      operationId: revoke_1
       parameters:
       - in: path
         name: tokenId
@@ -109,6 +115,35 @@ paths:
       summary: Ingest Token を失効させる（即座に無効になる）
       tags:
       - RepositoryAdmin
+  /api/v1/jobs/dead:
+    get:
+      operationId: deadJobs
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/DeadJobList"
+          description: OK
+      summary: 恒久的に失敗したジョブを一覧する（新しい順に最大 100 件）
+      tags:
+      - Operations
+  /api/v1/jobs/{jobId}/retry:
+    post:
+      operationId: retry
+      parameters:
+      - in: path
+        name: jobId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: 恒久的に失敗したジョブを再実行する
+      tags:
+      - Operations
   /api/v1/me:
     get:
       operationId: me
@@ -124,7 +159,7 @@ paths:
       - Me
   /api/v1/repositories:
     get:
-      operationId: list_3
+      operationId: list_4
       responses:
         "200":
           content:
@@ -136,7 +171,7 @@ paths:
       tags:
       - Repositories
     post:
-      operationId: create
+      operationId: create_1
       requestBody:
         content:
           application/json:
@@ -364,7 +399,7 @@ paths:
       - Repositories
   /api/v1/runs:
     get:
-      operationId: list_1
+      operationId: list_2
       parameters:
       - in: query
         name: repositoryId
@@ -436,7 +471,7 @@ paths:
       - Runs
   /api/v1/runs/{runId}/artifacts:
     get:
-      operationId: list_2
+      operationId: list_3
       parameters:
       - in: path
         name: runId
@@ -616,6 +651,27 @@ paths:
       summary: Run に紐づく違反を一覧する
       tags:
       - Runs
+  /api/v1/runs/{runId}/reevaluate:
+    post:
+      description: 保存済みの成果物を読み直し、最新の設定・免除・脆弱性情報で判定し直す。成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。
+      operationId: reevaluate
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReevaluateResponse"
+          description: OK
+      summary: Run を再評価する
+      tags:
+      - Operations
   /api/v1/runs/{runId}/status:
     get:
       operationId: status
@@ -636,9 +692,41 @@ paths:
       summary: 処理状態と判定結果を取得する（CI のポーリング用）
       tags:
       - Ingest
+  /api/v1/settings/retention:
+    get:
+      operationId: retention
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RetentionSettings"
+          description: OK
+      summary: データ保持期間を取得する
+      tags:
+      - Settings
+    put:
+      description: 翌日の保持期間バッチから効く。短くすると古いデータが削除される。
+      operationId: updateRetention
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RetentionSettings"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RetentionSettings"
+          description: OK
+      summary: データ保持期間を変更する
+      tags:
+      - Settings
   /api/v1/users:
     get:
-      operationId: list
+      operationId: list_1
       responses:
         "200":
           content:
@@ -695,6 +783,75 @@ paths:
       summary: ロールの変更・無効化
       tags:
       - Users
+  /api/v1/waivers:
+    get:
+      description: 有効なものを期限の近い順に先頭へ並べる。
+      operationId: list
+      parameters:
+      - description: 省略時は全リポジトリ
+        in: query
+        name: repositoryId
+        required: false
+        schema:
+          type: string
+          format: uuid
+      - description: 省略時はすべての状態
+        in: query
+        name: status
+        required: false
+        schema:
+          type: string
+          enum:
+          - ACTIVE
+          - EXPIRED
+          - REVOKED
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WaiverList"
+          description: OK
+      summary: 免除を一覧する
+      tags:
+      - Waivers
+    post:
+      description: 理由は 20 文字以上、期限は最長 90 日。登録と同時に最新 Run の再評価を積む。同じ対象に有効な免除があれば 409
+        WAIVER_ALREADY_EXISTS。
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateWaiverRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/WaiverItem"
+          description: OK
+      summary: 免除を登録する
+      tags:
+      - Waivers
+  /api/v1/waivers/{waiverId}:
+    delete:
+      description: 失効と同時に最新 Run の再評価を積む。
+      operationId: revoke
+      parameters:
+      - in: path
+        name: waiverId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: 免除を失効させる
+      tags:
+      - Waivers
 components:
   schemas:
     Alert:
@@ -1024,6 +1181,49 @@ components:
           - VIEWER
       required:
       - githubLogin
+    CreateWaiverRequest:
+      type: object
+      properties:
+        expiresAt:
+          type: string
+          format: date-time
+          description: 期限。現在より後、最大 90 日先まで
+        fingerprint:
+          type:
+          - string
+          - "null"
+          description: scope=FINDING のとき必須。違反一覧の fingerprint
+          pattern: "^[0-9a-f]{64}$"
+        metricId:
+          type: string
+          minLength: 1
+          pattern: "^M-\\d{2}$"
+        reason:
+          type: string
+          maxLength: 4000
+          minLength: 20
+        reasonCategory:
+          type: string
+          enum:
+          - UNREACHABLE
+          - FALSE_POSITIVE
+          - NO_FIX_AVAILABLE
+          - PLANNED
+        repositoryId:
+          type: string
+          format: uuid
+        scope:
+          type: string
+          enum:
+          - FINDING
+          - METRIC
+      required:
+      - expiresAt
+      - metricId
+      - reason
+      - reasonCategory
+      - repositoryId
+      - scope
     DashboardResponse:
       type: object
       description: ダッシュボード。repository_summaries を読むだけで応答する。
@@ -1037,6 +1237,48 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RepositoryCard"
+    DeadJobItem:
+      type: object
+      properties:
+        attempts:
+          type: integer
+          format: int32
+        createdAt:
+          type: string
+          format: date-time
+        dedupKey:
+          type:
+          - string
+          - "null"
+        jobId:
+          type: string
+          format: uuid
+        lastError:
+          type:
+          - string
+          - "null"
+        type:
+          type: string
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+      - attempts
+      - createdAt
+      - dedupKey
+      - jobId
+      - lastError
+      - type
+      - updatedAt
+    DeadJobList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/DeadJobItem"
+      required:
+      - items
     DefineComponentRequest:
       type: object
       properties:
@@ -1133,8 +1375,7 @@ components:
         waiver:
           type: "null"
           $ref: "#/components/schemas/Waiver"
-          description: 免除中の場合のみ。免除は解決ではないため画面では薄く表示しない。免除機能（FR-09）は未実装のため、現時点では常に
-            null
+          description: 判定時に免除されていた場合のみ。免除は解決ではないため画面では薄く表示しない
       required:
       - componentName
       - detail
@@ -1327,6 +1568,31 @@ components:
         userId:
           type: string
           format: uuid
+    ReevaluateResponse:
+      type: object
+      description: 再評価を受け付けた。判定は非同期で行う
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          description: 受付時点の Run の状態
+          enum:
+          - CREATED
+          - UPLOADING
+          - FINALIZED
+          - PROCESSING
+          - EVALUATED
+          - FAILED
+          - ABANDONED
+      required:
+      - jobId
+      - runId
+      - status
     RepositoryAdminResponse:
       type: object
       description: 登録・更新したリポジトリ
@@ -1513,6 +1779,39 @@ components:
       required:
       - fullName
       - repositoryId
+    RetentionSettings:
+      type: object
+      description: データ保持期間（日）
+      properties:
+        artifactDays:
+          type: integer
+          format: int32
+          description: 成果物のファイル実体。既定 90 日
+          maximum: 3650
+          minimum: 1
+        auditLogDays:
+          type: integer
+          format: int32
+          description: 監査ログ。既定 730 日。削除は管理ロールのバッチが行う
+          maximum: 3650
+          minimum: 365
+        notificationDays:
+          type: integer
+          format: int32
+          description: 通知の送信履歴。既定 365 日
+          maximum: 3650
+          minimum: 30
+        runDays:
+          type: integer
+          format: int32
+          description: Run・指標値・違反。既定 730 日（2 年）
+          maximum: 3650
+          minimum: 30
+      required:
+      - artifactDays
+      - auditLogDays
+      - notificationDays
+      - runDays
     RunCategory:
       type: object
       properties:
@@ -2235,10 +2534,133 @@ components:
           format: date
         reason:
           type: string
+        reasonCategory:
+          type: string
+          enum:
+          - UNREACHABLE
+          - FALSE_POSITIVE
+          - NO_FIX_AVAILABLE
+          - PLANNED
+        status:
+          type: string
+          description: 現在の状態。判定後に失効・期限切れになっていれば ACTIVE 以外
+          enum:
+          - ACTIVE
+          - EXPIRED
+          - REVOKED
         waiverId:
           type: string
           format: uuid
       required:
       - expiresOn
       - reason
+      - reasonCategory
+      - status
       - waiverId
+    WaiverItem:
+      type: object
+      description: 免除。理由の全文を返す（折りたたむと判断の妥当性を検証できない）
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        createdByLogin:
+          type:
+          - string
+          - "null"
+        expiresAt:
+          type: string
+          format: date-time
+        expiringSoon:
+          type: boolean
+          description: 期限まで 7 日以内の有効な免除
+        fingerprint:
+          type:
+          - string
+          - "null"
+        metricId:
+          type: string
+        metricName:
+          type: string
+        reason:
+          type: string
+        reasonCategory:
+          type: string
+          enum:
+          - UNREACHABLE
+          - FALSE_POSITIVE
+          - NO_FIX_AVAILABLE
+          - PLANNED
+        reasonCategoryLabel:
+          type: string
+        repositoryFullName:
+          type: string
+        repositoryId:
+          type: string
+          format: uuid
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        revokedByLogin:
+          type:
+          - string
+          - "null"
+        scope:
+          type: string
+          enum:
+          - FINDING
+          - METRIC
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - EXPIRED
+          - REVOKED
+        title:
+          type:
+          - string
+          - "null"
+          description: 登録時点の違反の見出し
+        waiverId:
+          type: string
+          format: uuid
+      required:
+      - createdAt
+      - createdByLogin
+      - expiresAt
+      - expiringSoon
+      - fingerprint
+      - metricId
+      - metricName
+      - reason
+      - reasonCategory
+      - reasonCategoryLabel
+      - repositoryFullName
+      - repositoryId
+      - revokedAt
+      - revokedByLogin
+      - scope
+      - status
+      - title
+      - waiverId
+    WaiverList:
+      type: object
+      properties:
+        activeCount:
+          type: integer
+          format: int64
+          description: 有効な免除の件数
+        expiringSoonCount:
+          type: integer
+          format: int64
+          description: 7 日以内に期限切れになる有効な免除の件数
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/WaiverItem"
+      required:
+      - activeCount
+      - expiringSoonCount
+      - items

@@ -53,6 +53,10 @@ public class SecurityConfig {
         if (!uri.startsWith("/api/v1/runs")) {
             return false;
         }
+        // 再評価は同じ /api/v1/runs 配下の POST だが、管理者がセッションで行う操作である
+        if (uri.endsWith("/reevaluate")) {
+            return false;
+        }
         return "POST".equals(request.getMethod()) || uri.endsWith("/status");
     }
 

@@ -24,6 +24,7 @@ public enum ErrorCode {
     REPOSITORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じリポジトリが既に登録されています"),
     CONFIG_MANAGED_BY_FILE(HttpStatus.CONFLICT, "設定はリポジトリ内のファイルで管理されています"),
     WAIVER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ対象に有効な免除が既に存在します"),
+    RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
     ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),
     ARTIFACT_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "成果物のサイズが上限を超えています"),
     ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_ENTITY, "未知の成果物種別です"),

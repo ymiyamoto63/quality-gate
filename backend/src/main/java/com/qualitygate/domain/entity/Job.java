@@ -146,6 +146,26 @@ public class Job {
         return runAfter;
     }
 
+    public String getDedupKey() {
+        return dedupKey;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    /** 恒久的失敗（DEAD）を手動で実行待ちに戻す。試行回数は数え直す。 */
+    public void retry(Instant at) {
+        this.status = JobStatus.PENDING;
+        this.attempts = 0;
+        this.runAfter = at;
+        this.updatedAt = at;
+    }
+
     public String getLastError() {
         return lastError;
     }

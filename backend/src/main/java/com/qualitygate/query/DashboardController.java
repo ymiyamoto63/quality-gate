@@ -3,7 +3,10 @@ package com.qualitygate.query;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.model.WaiverScope;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
+import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.query.dto.DashboardResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -27,12 +30,15 @@ public class DashboardController {
     private final MonitoredRepositoryRepository repositories;
     private final RepositorySummaryRepository summaries;
     private final FreshnessPolicy freshness;
+    private final WaiverRepository waivers;
 
     public DashboardController(MonitoredRepositoryRepository repositories,
-                               RepositorySummaryRepository summaries, FreshnessPolicy freshness) {
+                               RepositorySummaryRepository summaries, FreshnessPolicy freshness,
+                               WaiverRepository waivers) {
         this.repositories = repositories;
         this.summaries = summaries;
         this.freshness = freshness;
+        this.waivers = waivers;
     }
 
     @GetMapping
@@ -69,6 +75,15 @@ public class DashboardController {
                     "%s の計測が %d 時間以上届いていません".formatted(repo.fullName(),
                             FreshnessPolicy.STALE_MEASUREMENT.toHours())));
         }
+        // 指標そのものの免除は、設定している間ずっと警告する（FR-10-6）。
+        // 指標全体を見ないことにしている状態を、日常の画面から消さない
+        waivers.findEffective(repo.getId(), now).stream()
+                .filter(w -> w.getScope() == WaiverScope.METRIC)
+                .forEach(w -> alerts.add(new DashboardResponse.Alert("METRIC_WAIVED", repo.getId(),
+                        "%s の %s（%s）は指標全体が免除されています（%s まで）".formatted(
+                                repo.fullName(), w.getMetricId(),
+                                MetricCatalog.of(w.getMetricId()).name(),
+                                w.getExpiresAt().atOffset(java.time.ZoneOffset.UTC).toLocalDate()))));
         if (staleFull) {
             alerts.add(new DashboardResponse.Alert("FULL_MEASUREMENT_STALE", repo.getId(),
                     "%s の完全計測が %d 日以上行われていません".formatted(repo.fullName(), intervalDays)));
