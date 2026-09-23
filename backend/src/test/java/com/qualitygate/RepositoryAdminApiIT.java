@@ -36,6 +36,9 @@ class RepositoryAdminApiIT {
     @Autowired GateConfigRepository configs;
     @Autowired AuditLogRepository auditLogs;
     @Autowired JdbcTemplate jdbc;
+    @Autowired com.qualitygate.domain.repo.RunRepository runs;
+    @Autowired com.qualitygate.domain.repo.ArtifactRecordRepository artifacts;
+    @Autowired com.qualitygate.platform.storage.ArtifactStore artifactStore;
 
     private MockMvcTester mvc;
 
@@ -212,6 +215,46 @@ class RepositoryAdminApiIT {
                 .content("{\"rawYaml\":\"version: 1\\n\"}"))
                 .hasStatus(409)
                 .bodyJson().extractingPath("$.errorCode").isEqualTo("CONFIG_MANAGED_BY_FILE");
+    }
+
+    /**
+     * 直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを行番号付きで返す。
+     * 画面は誤りを該当行の直下に出すため、行番号とパスを構造で持つ必要がある。
+     */
+    @Test
+    void 設定の検証エラーは失敗したRunの設定ファイルと行番号で返る() throws Exception {
+        String repositoryId = createRepository();
+        String yaml = "version: 1\nmetrics:\n  branch_coverage:\n    threshold: \"75%\"\n"
+                + "  mutation_scor:\n    threshold: 60\n";
+        var run = new com.qualitygate.domain.entity.Run(Uuid7.generate(),
+                java.util.UUID.fromString(repositoryId), "c".repeat(40), "develop",
+                com.qualitygate.domain.model.RunnerType.SELF_HOSTED, "ci",
+                java.time.Instant.parse("2026-09-22T00:00:00Z"), 1);
+        run.markFailed("CONFIG_VALIDATION_FAILED", "設定の検証に失敗しました");
+        runs.save(run);
+        var stored = artifactStore.store(run.getId().toString(), ".quality-gate.yml",
+                new java.io.ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
+        artifacts.save(new com.qualitygate.domain.entity.ArtifactRecord(Uuid7.generate(),
+                run.getId(), com.qualitygate.domain.model.ArtifactType.QUALITY_GATE_CONFIG,
+                ".quality-gate.yml", stored.sizeBytes(), stored.sha256(), stored.storageKey(),
+                null, null, null));
+
+        MvcTestResult config = mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
+                .with(as("viewer-user", "VIEWER")).exchange();
+        assertThat(config).hasStatusOk()
+                .bodyJson()
+                .satisfies(json -> {
+                    json.assertThat().extractingPath("$.validation.valid").isEqualTo(false);
+                    json.assertThat().extractingPath("$.validation.errors[*].line").asArray()
+                            .containsExactlyInAnyOrder(4, 5);
+                    json.assertThat().extractingPath("$.validation.rawYaml").asString()
+                            .contains("mutation_scor");
+                });
+
+        // 画面のアクセシビリティ検査（M-10）で使う応答例（FixtureWriter）
+        FixtureWriter.write("config-invalid.json", body(config));
+        FixtureWriter.write("repositories.json", body(mvc.get().uri("/api/v1/repositories")
+                .with(as("admin-user", "ADMIN")).exchange()));
     }
 
     private String createRepository() {

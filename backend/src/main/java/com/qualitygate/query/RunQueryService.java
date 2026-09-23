@@ -146,7 +146,8 @@ public class RunQueryService {
                         waiverById.get(f.getWaiverId()))).toList(),
                 hasMore ? PageCursor.ofOffset(offset + pageSize) : null,
                 hasMore,
-                findings.count(criteria));
+                findings.count(criteria),
+                run.getRepositoryId());
     }
 
     @Transactional(readOnly = true)
@@ -381,6 +382,7 @@ public class RunQueryService {
                 finding.getId(),
                 finding.getMetricId(),
                 MetricCatalog.of(finding.getMetricId()).name(),
+                finding.getFingerprint(),
                 finding.getState(),
                 finding.getSeverity(),
                 finding.getRuleId(),

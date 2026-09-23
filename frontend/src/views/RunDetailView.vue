@@ -4,11 +4,15 @@ import { useRoute } from 'vue-router'
 import StatusChip from '@/components/StatusChip.vue'
 import MetricRow from '@/components/MetricRow.vue'
 import { useRunStore } from '@/stores/run'
+import { useAuthStore } from '@/stores/auth'
+import { api, messageOf } from '@/api/client'
+import type { components } from '@/api/schema'
 import { verdictToStatus } from '@/api/status'
 import { formatDateTime, shortSha } from '@/api/format'
 
 const route = useRoute()
 const store = useRunStore()
+const auth = useAuthStore()
 
 const runId = computed(() => String(route.params.runId))
 const detail = computed(() => store.detail)
@@ -37,6 +41,39 @@ function toggle(category: string): void {
   expanded.value = { ...expanded.value, [category]: !expanded.value[category] }
 }
 
+const reevaluateMessage = ref('')
+const reevaluating = ref(false)
+
+/**
+ * 再評価は非同期に行われる。受け付けたことだけを伝え、結果は再読み込みで見る。
+ * 権限の無い利用者にもボタンは見せ、無効化して理由を示す（docs/08 5 章）。
+ */
+async function reevaluate(): Promise<void> {
+  reevaluating.value = true
+  const { error } = await api.POST('/api/v1/runs/{runId}/reevaluate', {
+    params: { path: { runId: runId.value } },
+  })
+  reevaluating.value = false
+  reevaluateMessage.value = error
+    ? messageOf(error, '再評価を依頼できませんでした')
+    : '再評価を受け付けました。数十秒後に再読み込みすると結果が反映されます。'
+}
+
+const artifacts = ref<components['schemas']['ArtifactItem'][] | null>(null)
+
+async function loadArtifacts(): Promise<void> {
+  const { data } = await api.GET('/api/v1/runs/{runId}/artifacts', {
+    params: { path: { runId: runId.value } },
+  })
+  artifacts.value = data?.items ?? []
+}
+
+function formatBytes(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
+}
+
 const runnerLabel = computed(() =>
   detail.value?.runnerType === 'self-hosted' ? '専有ランナー' : 'GitHub ホストランナー',
 )
@@ -63,7 +100,21 @@ const runnerLabel = computed(() =>
           <span v-if="detail.completeness === 'PARTIAL'" class="qg-badge">
             部分計測（未計測 {{ detail.skippedMetrics.length }} 件）
           </span>
+          <button
+            v-if="detail.status === 'EVALUATED' || detail.status === 'FAILED'"
+            type="button"
+            class="qg-button qg-reevaluate"
+            :disabled="!auth.isAdmin || reevaluating"
+            :aria-describedby="auth.isAdmin ? undefined : 'reevaluate-note'"
+            @click="reevaluate"
+          >
+            再評価
+          </button>
         </div>
+        <p v-if="!auth.isAdmin" id="reevaluate-note" class="qg-visually-hidden">
+          再評価には管理者権限が必要です
+        </p>
+        <p class="qg-muted" aria-live="polite">{{ reevaluateMessage }}</p>
 
         <p class="qg-muted">
           {{ detail.branch }} · {{ formatDateTime(detail.measuredAt) }} · {{ runnerLabel }}
@@ -168,6 +219,30 @@ const runnerLabel = computed(() =>
         {{ detail.findingSummary.initial }} ・ 免除中 {{ detail.findingSummary.waived }}
         <br />
         取り込んだ成果物: {{ detail.artifactCount }} 件
+        <button
+          v-if="artifacts === null"
+          type="button"
+          class="qg-link-button"
+          @click="loadArtifacts"
+        >
+          一覧
+        </button>
+        <ul v-if="artifacts" class="qg-artifacts">
+          <li v-for="artifact in artifacts" :key="artifact.artifactId">
+            <a
+              v-if="!artifact.deleted"
+              :href="`/api/v1/runs/${detail.runId}/artifacts/${artifact.artifactId}/content`"
+              download
+            >
+              {{ artifact.filename }}
+            </a>
+            <span v-else>{{ artifact.filename }}（保持期間を過ぎて削除済み）</span>
+            <span>
+              · {{ artifact.type }}{{ artifact.component ? ` · ${artifact.component}` : '' }} ·
+              {{ formatBytes(artifact.sizeBytes) }}</span
+            >
+          </li>
+        </ul>
         <br />
         <RouterLink :to="{ name: 'findings', params: { runId: detail.runId } }">
           違反一覧を見る →
@@ -178,6 +253,21 @@ const runnerLabel = computed(() =>
 </template>
 
 <style scoped>
+.qg-reevaluate {
+  margin-left: auto;
+}
+.qg-link-button {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--link);
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.qg-artifacts {
+  margin: 0.25rem 0;
+}
 .qg-run-head__title {
   display: flex;
   align-items: center;

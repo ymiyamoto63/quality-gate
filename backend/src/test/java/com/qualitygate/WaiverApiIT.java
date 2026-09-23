@@ -168,7 +168,7 @@ class WaiverApiIT {
     }
 
     @Test
-    void 免除の登録には理由と期限の制約がある() {
+    void 免除の登録には理由と期限の制約がある() throws Exception {
         Run run = evaluatedRun(Instant.now().minus(Duration.ofHours(1)));
         String fingerprint = findings.findByRunId(run.getId()).getFirst().getFingerprint();
 
@@ -195,6 +195,9 @@ class WaiverApiIT {
         assertThat(mvc.get().uri("/api/v1/waivers").with(as("viewer-user", "VIEWER")))
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.activeCount").isEqualTo(1);
+        // 画面のアクセシビリティ検査（M-10）で使う応答例（FixtureWriter）
+        FixtureWriter.write("waivers.json", mvc.get().uri("/api/v1/waivers")
+                .with(as("viewer-user", "VIEWER")).exchange().getResponse().getContentAsString());
         assertThat(mvc.post().uri("/api/v1/waivers").with(as("viewer-user", "VIEWER"))
                 .contentType(MediaType.APPLICATION_JSON).content("""
                         {"repositoryId": "%s", "scope": "METRIC", "metricId": "M-06",

@@ -27,12 +27,15 @@ public record FindingListResponse(
         @NotNull boolean hasMore,
         @NotNull
         @Schema(description = "絞り込み後の総件数。件数表示と「全部見た」の判断に使う")
-        long totalCount) {
+        long totalCount,
+        @NotNull @Schema(description = "Run の属するリポジトリ。免除の登録に使う") UUID repositoryId) {
 
     public record FindingItem(
             @NotNull UUID findingId,
             @NotNull String metricId,
             @NotNull String metricName,
+            @NotNull @Schema(description = "Run をまたいで違反を同定するキー。免除はこの値で違反を指す")
+            String fingerprint,
             @NotNull FindingState state,
             @NotNull Severity severity,
             @NotNull @Schema(nullable = true) String ruleId,

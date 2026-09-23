@@ -45,7 +45,12 @@ function formatDateTime(value: string | null): string {
     <h1>ダッシュボード</h1>
 
     <!-- 計測途絶の警告。判定はサーバが行い、画面は表示するだけ。 -->
-    <div v-for="alert in alerts" :key="alert.code" class="qg-alert" role="status">
+    <div
+      v-for="alert in alerts"
+      :key="`${alert.code}/${alert.message}`"
+      class="qg-alert"
+      role="status"
+    >
       <i class="pi pi-exclamation-triangle" aria-hidden="true" />
       {{ alert.message }}
     </div>
@@ -101,6 +106,9 @@ function formatDateTime(value: string | null): string {
         </p>
 
         <p class="qg-card__links">
+          <RouterLink :to="{ name: 'repository', params: { repositoryId: card.repositoryId } }">
+            詳細 →
+          </RouterLink>
           <RouterLink :to="{ name: 'trends', params: { repositoryId: card.repositoryId } }">
             トレンドを見る →
           </RouterLink>
@@ -146,6 +154,8 @@ function formatDateTime(value: string | null): string {
 .qg-card__links {
   margin-bottom: 0;
   font-size: 0.875rem;
+  display: flex;
+  gap: 1rem;
 }
 
 .qg-alert {

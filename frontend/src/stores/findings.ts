@@ -29,6 +29,8 @@ export const useFindingsStore = defineStore('findings', () => {
   const nextCursor = ref<string | null>(null)
   const errorMessage = ref<string | null>(null)
   const filter = ref<FindingFilter>(defaultFilter())
+  /** Run の属するリポジトリ。違反から免除を登録するときに使う。 */
+  const repositoryId = ref<string | null>(null)
 
   async function load(runId: string): Promise<void> {
     state.value = 'loading'
@@ -71,6 +73,7 @@ export const useFindingsStore = defineStore('findings', () => {
     items.value = items.value.concat(data.items ?? [])
     nextCursor.value = data.nextCursor ?? null
     totalCount.value = data.totalCount ?? 0
+    repositoryId.value = data.repositoryId
     errorMessage.value = null
     state.value = 'ready'
   }
@@ -82,6 +85,7 @@ export const useFindingsStore = defineStore('findings', () => {
     nextCursor,
     errorMessage,
     filter,
+    repositoryId,
     load,
     loadMore,
     setFilter,

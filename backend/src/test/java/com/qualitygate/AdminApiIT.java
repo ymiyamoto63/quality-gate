@@ -143,7 +143,7 @@ class AdminApiIT {
     }
 
     @Test
-    void 監査ログを新しい順に読める() {
+    void 監査ログを新しい順に読める() throws Exception {
         for (String login : new String[] {"a-user", "b-user", "c-user"}) {
             assertThat(mvc.post().uri("/api/v1/users").with(as("admin-user", "ADMIN"))
                     .contentType(MediaType.APPLICATION_JSON)
@@ -162,5 +162,9 @@ class AdminApiIT {
                 });
         assertThat(mvc.get().uri("/api/v1/audit-logs").with(as("viewer-user", "VIEWER")))
                 .hasStatus(403);
+
+        // 画面のアクセシビリティ検査（M-10）で使う応答例（FixtureWriter）
+        FixtureWriter.write("users.json", mvc.get().uri("/api/v1/users")
+                .with(as("admin-user", "ADMIN")).exchange().getResponse().getContentAsString());
     }
 }

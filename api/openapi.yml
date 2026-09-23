@@ -1384,6 +1384,9 @@ components:
         findingId:
           type: string
           format: uuid
+        fingerprint:
+          type: string
+          description: Run をまたいで違反を同定するキー。免除はこの値で違反を指す
         line:
           type:
           - integer
@@ -1429,6 +1432,7 @@ components:
       - detail
       - filePath
       - findingId
+      - fingerprint
       - line
       - metricId
       - metricName
@@ -1453,6 +1457,10 @@ components:
           - string
           - "null"
           description: 次ページのカーソル。最終ページでは null
+        repositoryId:
+          type: string
+          format: uuid
+          description: Run の属するリポジトリ。免除の登録に使う
         totalCount:
           type: integer
           format: int64
@@ -1461,6 +1469,7 @@ components:
       - hasMore
       - items
       - nextCursor
+      - repositoryId
       - totalCount
     Freshness:
       type: object

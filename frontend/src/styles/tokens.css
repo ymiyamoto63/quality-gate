@@ -127,3 +127,153 @@ a {
   white-space: nowrap;
   border: 0;
 }
+
+/*
+ * 画面をまたいで使う部品の見た目。個々の画面に同じ定義を書き写すと、
+ * 片方だけ直してコントラストが崩れる。
+ */
+.qg-muted {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+}
+
+.qg-empty {
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.qg-panel {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.25rem;
+  margin-bottom: 1rem;
+}
+
+.qg-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+.qg-table th,
+.qg-table td {
+  text-align: left;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+}
+.qg-table th {
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
+.qg-button {
+  background: var(--surface-1);
+  border: 1px solid var(--axis);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.8rem;
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+}
+/* 反転色にする。系列色（--series-1）の上に白文字はダーク面で 4.5:1 に届かない */
+.qg-button--primary {
+  background: var(--text-primary);
+  border-color: var(--text-primary);
+  color: var(--surface-1);
+  font-weight: 600;
+}
+.qg-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.qg-form {
+  display: grid;
+  gap: 0.9rem;
+}
+.qg-form label {
+  display: grid;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+.qg-form input,
+.qg-form select,
+.qg-form textarea {
+  font: inherit;
+  font-weight: 400;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--axis);
+  border-radius: var(--radius);
+  background: var(--surface-page);
+  color: var(--text-primary);
+}
+.qg-form__hint {
+  font-weight: 400;
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+}
+.qg-form__error {
+  font-weight: 400;
+  color: var(--text-primary);
+  border-left: 3px solid var(--status-fail);
+  padding-left: 0.5rem;
+  font-size: 0.875rem;
+}
+.qg-form__actions {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: flex-end;
+}
+
+.qg-tabs {
+  display: flex;
+  gap: 0.25rem;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+.qg-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  padding: 0.5rem 0.9rem;
+  color: var(--text-secondary);
+  font: inherit;
+  cursor: pointer;
+}
+.qg-tabs a {
+  padding: 0.5rem 0.9rem;
+  border-bottom: 3px solid transparent;
+  color: var(--text-secondary);
+  text-decoration: none;
+}
+.qg-tabs a[aria-current='page'],
+.qg-tabs button[aria-selected='true'] {
+  color: var(--text-primary);
+  border-bottom-color: var(--series-1);
+  font-weight: 600;
+}
+
+/* 表はモバイル幅でカード形式に変形する（docs/08-screen-design.md 6 章） */
+@media (max-width: 767px) {
+  .qg-table--stack thead {
+    position: absolute;
+    left: -9999px;
+  }
+  .qg-table--stack tr {
+    display: block;
+    border-bottom: 1px solid var(--border);
+    padding: 0.5rem 0;
+  }
+  .qg-table--stack td {
+    display: block;
+    border: none;
+    padding: 0.2rem 0;
+  }
+  .qg-table--stack td::before {
+    content: attr(data-label) '：';
+    color: var(--text-secondary);
+    font-size: 0.8125rem;
+  }
+}

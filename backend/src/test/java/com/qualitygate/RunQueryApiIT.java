@@ -548,6 +548,12 @@ class RunQueryApiIT {
         FixtureWriter.write("run-detail.json",
                 tester.get().uri("/api/v1/runs/{id}", run.getId())
                         .exchange().getResponse().getContentAsString());
+        FixtureWriter.write("repository-detail.json",
+                tester.get().uri("/api/v1/repositories/{id}", run.getRepositoryId())
+                        .exchange().getResponse().getContentAsString());
+        FixtureWriter.write("runs.json",
+                tester.get().uri("/api/v1/runs?repositoryId={id}&limit=10", run.getRepositoryId())
+                        .exchange().getResponse().getContentAsString());
         FixtureWriter.write("findings.json",
                 tester.get().uri("/api/v1/runs/{id}/findings?state=NEW&state=CONTINUING"
                                 + "&state=INITIAL", run.getId())
