@@ -699,7 +699,7 @@ jobs:
 
 実際のワークフローは `.github/workflows/quality-gate.yml` にある。上の例との差は次のとおり
 （2026-09-23 時点）。`base` ジョブの静的解析は Trivy のみで、Semgrep・gitleaks・ESLint は未導入。
-`submit` ジョブは成果物の収集とスキップ対象の算出までで、送信処理（FR-03-4 の `quality-gate-action`）は未実装。
+`submit` ジョブは成果物とスキップ対象を決め、`quality-gate-action`（FR-03-4）で送信する（[CI から送る](../operations/ci-submit.md)）。
 また quality-gate 自身の Pull Request では計測を行わず、`.github/workflows/ci.yml` がユニットテスト（JUnit / Vitest）だけを
 GitHub ホストランナーで実行する。計測は main への push と手動実行のときだけ行う。
 

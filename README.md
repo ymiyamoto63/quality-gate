@@ -47,6 +47,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | [収集ランナーで計測する](docs/operations/collector.md) | **標準の計測方法。** 対象リポジトリに何も置かずに、quality-gate 側で取得・計測・送信する（手動実行と 15 分ごとの定期実行） |
 | [対象リポジトリの前提と、CI から直接送る方式](docs/operations/target-repository.md) | 対象リポジトリの前提・CI から直接送る場合の `.quality-gate.yml` の最小例と M-01 だけを取り込む手順 |
 | [取り込み（Ingest API）](docs/operations/ingest.md) | Ingest API の流れと、ローカルでの取り込みの試し方 |
+| [CI から送る: quality-gate-action と CLI](docs/operations/ci-submit.md) | 対象の CI から送るための GitHub Actions の composite action と、他の CI 向けの CLI（`qg-submit`） |
 | [セルフホストランナー](docs/operations/self-hosted-runner.md) | 収集ランナーと計測ジョブ用ランナーの準備・登録・リポジトリ変数 |
 | [設定値](docs/operations/configuration.md) | 環境変数 / `.env` の一覧と優先順位 |
 

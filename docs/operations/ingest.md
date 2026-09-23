@@ -17,9 +17,9 @@
    正規化 → 判定 → 読み取りモデル更新を行う
 5. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 
-> 対象の CI 向けの送信アクション（`quality-gate-action`）は未実装です。quality-gate 自身の `.github/workflows/quality-gate.yml` の
-> `submit` ジョブは送信の手前で止まっているため、quality-gate 自身の計測は現状、下の手順のように API を直接呼んで取り込みます。
-> 収集ランナーは `collector/bin/submit.sh` で送信まで行います。
+> 対象の CI から送るときは、GitHub Actions なら `quality-gate-action`、それ以外なら CLI（`cli/qg-submit`）で
+> 上の 1〜3 を 1 回で行えます（[CI から送る](ci-submit.md)）。quality-gate 自身の計測も `quality-gate-action` で送ります。
+> 収集ランナーは `collector/bin/submit.sh` で送ります。
 
 認証の経路（Ingest Token とセッション Cookie の使い分け）は [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。
 

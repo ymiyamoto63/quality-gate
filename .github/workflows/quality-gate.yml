@@ -80,6 +80,14 @@ jobs:
           git diff --exit-code api/ frontend/src/api/schema.d.ts \
             || { echo '::error::openapi.yml または schema.d.ts が最新ではありません。再生成してコミットしてください'; exit 1; }
 
+      # M-01（Java）と M-07 の成果物。submit ジョブへは reports/ だけを受け渡す
+      - name: JaCoCo と PMD の結果の収集（M-01 / M-07）
+        if: always()
+        run: |
+          mkdir -p reports/backend
+          cp backend/target/site/jacoco/jacoco.xml reports/backend/ || true
+          cp backend/target/pmd.xml reports/backend/ || true
+
       # M-08 の契約テストは、API の応答を検証する結合テスト（*ApiIT）とする。
       # 単体テストまで送ると、M-08 が単体テスト全体の成功率になってしまう
       - name: 契約テストの結果の収集（M-08）
@@ -179,32 +187,58 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with: { path: reports/, merge-multiple: true }
-      - name: quality-gate へ送信
+      # 送る成果物とスキップの申告を決める。動かなかった重量ジョブの指標はスキップとして申告する
+      - name: 送信内容の決定
+        id: plan
         env:
-          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
-          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+          MUTATION_RESULT: ${{ needs.mutation.result }}
+          PERFORMANCE_RESULT: ${{ needs.performance.result }}
+          RUNNER_TYPE: ${{ needs.setup.outputs.runner_type }}
+          PERF_ENVIRONMENT: ${{ vars.QG_PERF_ENVIRONMENT }}
         run: |
           SKIPPED=""
-          if [ "${{ needs.mutation.result }}" = "skipped" ]; then
-            SKIPPED="$SKIPPED M-02"
+          if [ "$MUTATION_RESULT" = "skipped" ]; then
+            SKIPPED+=$'M-02 ミューテーションテストを実行しない設定のため\n'
           fi
-          if [ "${{ needs.performance.result }}" = "skipped" ] || ! ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
-            SKIPPED="$SKIPPED M-03 M-04 M-05"
+          if [ "$PERFORMANCE_RESULT" = "skipped" ] || ! ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
+            for id in M-03 M-04 M-05; do SKIPPED+="$id 負荷試験を実行しない設定、または性能検証環境が未設定のため"$'\n'; done
           fi
-          echo "runnerType=${{ needs.setup.outputs.runner_type }} skipped=[$SKIPPED]"
-          # 判定に使う合格ラインも成果物として送る。quality-gate は
-          # チェックアウトしたそのコミットの .quality-gate.yml で判定する。
-          ls -l .quality-gate.yml
-          echo 'TODO: quality-gate-action の実装後に置き換える'
-          #   type=quality-gate-config で .quality-gate.yml を送信する
-          #   type=pit-xml は metadata={"mutationScope":"all"} を付けて送信する
-          #   （mutation プロファイルは全クラスを対象にするため。無いと 422 で拒否される）
-          #   type=axe-json で reports/axe-results.json を送信する（component=frontend）。
-          #   reports/playwright-results.json はテストレポートであり axe の結果ではない
-          #   type=junit-xml で reports/contract/TEST-*ApiIT.xml を送信する（component=backend）
-          #   type=oasdiff-json で reports/oasdiff.json を送信する。
-          #   reports/oasdiff-base-spec-missing があれば metadata={"baseSpecMissing":true} を付ける
-          #   type=k6-summary で reports/perf/k6-summary-*.json を 1 ファイルずつ送信する。
-          #   metadata={"environment":{"name":"perf-staging","runner":"<runner_type>",
-          #   "cpu":..,"memory":..,"datasetProfile":..}} が必須（無いと 422 で拒否される）
-        continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）
+          # 比較元に OpenAPI 定義が無ければ、M-09 は新規 API として申告する
+          OASDIFF_META=""
+          [ ! -e reports/oasdiff-base-spec-missing ] || OASDIFF_META=' metadata={"baseSpecMissing":true}'
+          # 性能の計測環境（必須のメタデータ）。リポジトリ変数 QG_PERF_ENVIRONMENT（JSON）で詳細を指定できる
+          ENVIRONMENT=${PERF_ENVIRONMENT:-'{"name":"perf-staging"}'}
+          PERF_META=$(jq -c --arg runner "$RUNNER_TYPE" '{environment: ({runner: $runner} + .)}' <<< "$ENVIRONMENT")
+          {
+            echo "skipped<<EOF"
+            printf '%s' "$SKIPPED"
+            echo "EOF"
+            echo "artifacts<<EOF"
+            echo "jacoco-xml reports/backend/jacoco.xml component=backend"
+            echo "pmd-xml reports/backend/pmd.xml component=backend"
+            echo "junit-xml reports/contract/TEST-*ApiIT.xml component=backend"
+            echo "lcov reports/frontend-coverage/lcov.info component=frontend"
+            echo "axe-json reports/axe-results.json component=frontend"
+            echo "sarif reports/trivy.sarif"
+            echo "oasdiff-json reports/oasdiff.json${OASDIFF_META}"
+            [ "$MUTATION_RESULT" = "skipped" ] || echo 'pit-xml reports/mutations.xml component=backend metadata={"mutationScope":"all"}'
+            if ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
+              echo "k6-summary reports/perf/k6-summary-*.json metadata=${PERF_META}"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+          echo "runnerType=$RUNNER_TYPE"
+          printf 'skipped:\n%s' "$SKIPPED"
+
+      # 判定に使う合格ラインも送る。quality-gate はチェックアウトしたそのコミットの .quality-gate.yml で判定する。
+      # 失敗しても CI は止めない（quality-gate-action の fail-on-error の既定。NFR 10.3）
+      - name: quality-gate へ送信
+        if: vars.QG_BASE_URL != ''
+        uses: ./quality-gate-action
+        with:
+          base-url: ${{ vars.QG_BASE_URL }}
+          token: ${{ secrets.QG_INGEST_TOKEN }}
+          runner-type: ${{ needs.setup.outputs.runner_type }}
+          config: .quality-gate.yml
+          artifacts: ${{ steps.plan.outputs.artifacts }}
+          skipped-metrics: ${{ steps.plan.outputs.skipped }}

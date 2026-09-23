@@ -15,7 +15,7 @@
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
 | API と画面（S-01〜S-09） | 完了 |
 | 収集ランナー（対象リポジトリに何も置かない計測。D-16） | 段階 1〜4 を実装（M-01 / M-02 / M-06〜M-10。手動実行と 15 分ごとの定期実行、PR の先頭も計測。M-02 は既定ブランチのみ。M-10 は対象アプリを起動して検査。対象のコードは計測用のコンテナの中で動かす。[収集ランナーで計測する](operations/collector.md)） |
-| 対象の CI からの送信（`quality-gate-action`） | 未着手（D-16 により推奨に変更） |
+| 対象の CI からの送信（`quality-gate-action` / CLI） | 完了（GitHub Actions の composite action と、他の CI 向けの CLI `qg-submit`。quality-gate 自身の計測もこれで送る。[CI から送る](operations/ci-submit.md)） |
 
 ## 動くもの
 
@@ -74,9 +74,6 @@
 
 ## 未実装のもの
 
-- **対象の CI からの送信** — GitHub Actions 用の composite action `quality-gate-action`（FR-03-4。D-16 により推奨）と CLI（FR-03-5）。
-  quality-gate 自身の `.github/workflows/quality-gate.yml` の `submit` ジョブは成果物を集めてスキップ対象を算出するところまでで、
-  送信部分は TODO のまま
 - `pact-verification` / `gatling-log` / `istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` 形式のアダプタ
   （Pact は JUnit XML、それ以外は SARIF など実装済みの形式で送れる。ただし M-07 は `pmd-xml` のみ）
 - `baseCommitSha` 省略時の merge-base の自動解決（バックエンドの GitHub API 連携は未実装。収集ランナーや CI 側で算出して渡す）

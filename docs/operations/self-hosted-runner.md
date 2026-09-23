@@ -82,8 +82,8 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | quality-gate 自身の Ingest Token（[取り込み](ingest.md)を参照）。負荷試験の状態取得にも使う |
 | Secrets | `QG_PERF_SESSION` | `SESSION` Cookie の値 | 負荷試験で参照 API を呼ぶためのセッション |
 
-`QG_BASE_URL` と `QG_INGEST_TOKEN` は `submit` ジョブが送信に使う想定ですが、送信処理（`quality-gate-action`）は
-まだ実装されていません（[実装状況](../status.md)）。
+`QG_BASE_URL` と `QG_INGEST_TOKEN` は `submit` ジョブが `quality-gate-action` で送信に使います（[CI から送る](ci-submit.md)）。
+`QG_BASE_URL` が未設定なら送信のステップを飛ばします。
 
 ## 4. 動作確認
 
