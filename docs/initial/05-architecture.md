@@ -660,7 +660,7 @@ ERROR を「対応が必要な異常」に限定しておかないと、アラ�
 
 ### 10.2 メトリクス（Micrometer）
 
-`/actuator/prometheus`（ADMIN のみ）で公開する。下表のうち実装済みは `qg.notifications` のみで、
+`/actuator/prometheus`（ADMIN のみ）で公開する。下表のうち実装済みは `qg.notifications` と `qg.rate_limit.rejected` で、
 ほかは未実装である。
 
 | メトリクス | 用途 |
@@ -671,6 +671,7 @@ ERROR を「対応が必要な異常」に限定しておかないと、アラ�
 | `qg.jobs.dead`（gauge） | 恒久的失敗の蓄積 |
 | `qg.artifacts.bytes`（gauge） | ストレージ使用量 |
 | `qg.notifications`（counter、`channel` / `result` タグ） | 通知の到達状況 |
+| `qg.rate_limit.rejected`（counter、`category` タグ） | レート制限で拒否した回数（API 設計 8 章）。CI の暴走の検知 |
 
 ### 10.3 アラート
 

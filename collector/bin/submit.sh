@@ -27,6 +27,7 @@ load_profile "$QG_REPOSITORY"
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
+# curl の --retry は、レート制限（429）と一時的な障害（5xx）を Retry-After に従って再試行する
 
 # スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
 skipped_json() {
@@ -64,7 +65,7 @@ REQUEST=$(jq -n \
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
-RUN_ID=$(curl -sS --fail-with-body -X POST "$API" "${AUTH[@]}" \
+RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
   -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
 echo "Run を作成しました: $RUN_ID"
 
@@ -81,7 +82,7 @@ upload() {
   local query="type=${type}"
   [ -n "$component" ] && query="${query}&component=${component}"
   [ -n "$scope" ] && query="${query}&scope=${scope}"
-  curl -sS --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
+  curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
   echo "送信しました: type=$type ${component:+component=$component }${scope:+scope=$scope }${file#"$REPORTS"/}"
 }
 
@@ -119,4 +120,4 @@ if [ -n "${OPENAPI_PATH:-}" ]; then
 fi
 upload sarif "$REPORTS/trivy.sarif"
 
-curl -sS --fail-with-body -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .
+curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .
