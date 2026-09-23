@@ -14,11 +14,11 @@
 
 | コマンド | 実行場所 | 何をするか |
 | --- | --- | --- |
-| `./mvnw test` | `backend/` | 単体テストのみ（Docker 不要） |
+| `./mvnw test` | `backend/` | 単体テストのみ（Docker 不要）。Pull Request の CI（`.github/workflows/ci.yml`）は `-DskipFrontend=true -Djacoco.skip=true` を付けてこれを実行する |
 | `./mvnw -P mutation test` | `backend/` | PIT によるミューテーションテスト（M-02 の計測元）。時間がかかる |
 | `./mvnw package -DskipTests` | `backend/` | フロントエンドを同梱した実行可能 jar（`target/quality-gate.jar`）を作る。`java -jar target/quality-gate.jar` で起動できる |
 | `npm run build` | `frontend/` | 型検査（`vue-tsc`）のあと `frontend/dist/` に本番ビルドを出力する |
 | `npm run typecheck` / `npm run lint` / `npm run format` | `frontend/` | 型検査 / ESLint（警告 0 件が条件）/ Prettier による整形 |
-| `npm test` / `npm run test:coverage` | `frontend/` | Vitest による単体テスト / カバレッジつき（リポジトリ直下の `reports/frontend-coverage/` に出力） |
+| `npm test` / `npm run test:coverage` | `frontend/` | Vitest による単体テスト（Pull Request の CI でも実行する）/ カバレッジつき（リポジトリ直下の `reports/frontend-coverage/` に出力） |
 | `npm run test:a11y` | `frontend/` | Playwright + axe-core によるアクセシビリティ検査。詳細は [アクセシビリティ検査](accessibility-check.md) |
 | `docker compose --profile full up --build` | リポジトリ直下 | DB とアプリの両方をコンテナで起動する（[起動の仕組み](../architecture/runtime.md#起動方法の-3-パターン)を参照） |
