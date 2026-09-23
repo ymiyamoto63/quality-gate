@@ -87,6 +87,22 @@ public class IngestToken {
         return tokenHash;
     }
 
+    public String getDescription() {
+        return description;
+    }
+
+    public UUID getCreatedBy() {
+        return createdBy;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getRevokedAt() {
+        return revokedAt;
+    }
+
     public Instant getLastUsedAt() {
         return lastUsedAt;
     }

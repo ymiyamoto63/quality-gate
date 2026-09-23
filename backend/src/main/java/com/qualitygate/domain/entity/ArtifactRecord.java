@@ -138,6 +138,15 @@ public class ArtifactRecord {
         return metadata;
     }
 
+    public Instant getUploadedAt() {
+        return uploadedAt;
+    }
+
+    /** 保持期間を過ぎてファイル実体を消したことを記録する。メタデータは残す。 */
+    public void markDeleted(Instant at) {
+        this.deletedAt = at;
+    }
+
     public Instant getDeletedAt() {
         return deletedAt;
     }

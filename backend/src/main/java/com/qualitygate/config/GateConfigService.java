@@ -69,6 +69,14 @@ public class GateConfigService {
                 .findFirst();
 
         if (configArtifact.isEmpty()) {
+            // ファイルが無ければ UI で保存した設定、それも無ければシステム既定値（FR-02-3）
+            Optional<GateConfig> ui = configs.findFirstByRepositoryIdAndSourceTypeOrderByVersionDesc(
+                    run.getRepositoryId(), GateConfig.SOURCE_UI);
+            if (ui.isPresent()) {
+                log.info("設定ファイルが提出されていないため UI の設定 v{} を使います runId={}",
+                        ui.get().getVersion(), run.getId());
+                return new Resolved(parser.parse(ui.get().getRawYaml()), ui.get());
+            }
             log.info("設定ファイルが提出されていないため既定値を使います runId={}", run.getId());
             return new Resolved(GateConfigDocument.defaults(), null);
         }

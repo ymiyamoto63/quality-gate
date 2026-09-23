@@ -22,8 +22,12 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
+  name: RepositoryAdmin
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
+- description: .quality-gate.yml の表示・検証結果・版履歴
+  name: Config
 - description: リポジトリ単位の参照
   name: Repositories
 - description: 許可リストとロールの管理（管理者のみ）
@@ -31,7 +35,7 @@ tags:
 paths:
   /api/v1/audit-logs:
     get:
-      operationId: list_2
+      operationId: list_4
       parameters:
       - description: 省略時は to の 30 日前
         in: query
@@ -89,6 +93,22 @@ paths:
       summary: ダッシュボードを取得する
       tags:
       - Dashboard
+  /api/v1/ingest-tokens/{tokenId}:
+    delete:
+      operationId: revoke
+      parameters:
+      - in: path
+        name: tokenId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          description: OK
+      summary: Ingest Token を失効させる（即座に無効になる）
+      tags:
+      - RepositoryAdmin
   /api/v1/me:
     get:
       operationId: me
@@ -102,6 +122,199 @@ paths:
       summary: ログイン中の利用者とロールを返す
       tags:
       - Me
+  /api/v1/repositories:
+    get:
+      operationId: list_3
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryList"
+          description: OK
+      summary: 登録済みのリポジトリを一覧する
+      tags:
+      - Repositories
+    post:
+      operationId: create
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryAdminResponse"
+          description: OK
+      summary: リポジトリを登録する
+      tags:
+      - RepositoryAdmin
+  /api/v1/repositories/{repositoryId}:
+    get:
+      description: "指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立\
+        てを 2 箇所に持たないため。"
+      operationId: detail
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryDetail"
+          description: OK
+      summary: リポジトリ詳細を取得する
+      tags:
+      - Repositories
+    patch:
+      operationId: update_2
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateRepositoryRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryAdminResponse"
+          description: OK
+      summary: リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効）
+      tags:
+      - RepositoryAdmin
+  /api/v1/repositories/{repositoryId}/components:
+    post:
+      operationId: defineComponent
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DefineComponentRequest"
+        required: true
+      responses:
+        "200":
+          description: OK
+      summary: コンポーネントを定義する（同名があれば置き換える）
+      tags:
+      - RepositoryAdmin
+  /api/v1/repositories/{repositoryId}/config:
+    get:
+      description: 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
+      operationId: get
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryConfig"
+          description: OK
+      summary: 現在の設定と版の履歴、直近の検証結果を取得する
+      tags:
+      - Config
+    put:
+      description: リポジトリ内のファイルが優先される。ファイルで管理されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは
+        422 CONFIG_VALIDATION_FAILED（行番号付き）。
+      operationId: update
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateConfigRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/RepositoryConfig"
+          description: OK
+      summary: UI から設定を更新する
+      tags:
+      - Config
+  /api/v1/repositories/{repositoryId}/ingest-tokens:
+    get:
+      operationId: tokens
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/TokenList"
+          description: OK
+      summary: 発行済みの Ingest Token を一覧する（平文は返さない）
+      tags:
+      - RepositoryAdmin
+    post:
+      description: token（平文）はこの応答でのみ返す。以後どの API からも取得できない。
+      operationId: issue
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/IssueTokenRequest"
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/IssuedToken"
+          description: OK
+      summary: Ingest Token を発行する
+      tags:
+      - RepositoryAdmin
   /api/v1/repositories/{repositoryId}/trends:
     get:
       description: 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
@@ -203,7 +416,7 @@ paths:
   /api/v1/runs/{runId}:
     get:
       description: 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
-      operationId: detail
+      operationId: detail_1
       parameters:
       - in: path
         name: runId
@@ -222,6 +435,25 @@ paths:
       tags:
       - Runs
   /api/v1/runs/{runId}/artifacts:
+    get:
+      operationId: list_2
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ArtifactListResponse"
+          description: OK
+      summary: Run に取り込んだ成果物を一覧する
+      tags:
+      - Runs
     post:
       description: この時点ではパースしない。受領・検証・保存のみを行い、パースは判定ジョブで実施する。
       operationId: uploadArtifact
@@ -273,6 +505,34 @@ paths:
       summary: 成果物をアップロードする
       tags:
       - Ingest
+  /api/v1/runs/{runId}/artifacts/{artifactId}/content:
+    get:
+      description: 保持期間を過ぎて実体を削除済みなら 409 ARTIFACTS_DELETED。
+      operationId: content
+      parameters:
+      - in: path
+        name: runId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: path
+        name: artifactId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+          description: OK
+      summary: 成果物をダウンロードする
+      tags:
+      - Runs
   /api/v1/runs/{runId}/finalize:
     post:
       description: 判定は非同期で開始される。CI は判定の完了を待たずに次へ進んでよい。
@@ -411,7 +671,7 @@ paths:
   /api/v1/users/{userId}:
     patch:
       description: 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
-      operationId: update
+      operationId: update_1
       parameters:
       - in: path
         name: userId
@@ -447,6 +707,50 @@ components:
         repositoryId:
           type: string
           format: uuid
+    ArtifactItem:
+      type: object
+      properties:
+        artifactId:
+          type: string
+          format: uuid
+        component:
+          type:
+          - string
+          - "null"
+        deleted:
+          type: boolean
+          description: 保持期間を過ぎて実体を削除済みなら true。ダウンロードできない
+        filename:
+          type: string
+        sha256:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        type:
+          type: string
+        uploadedAt:
+          type: string
+          format: date-time
+      required:
+      - artifactId
+      - component
+      - deleted
+      - filename
+      - sha256
+      - sizeBytes
+      - type
+      - uploadedAt
+    ArtifactListResponse:
+      type: object
+      description: Run に取り込んだ成果物の一覧（FR-07-5）
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ArtifactItem"
+      required:
+      - items
     AuditLogItem:
       type: object
       properties:
@@ -508,6 +812,128 @@ components:
       - hasMore
       - items
       - nextCursor
+    ComponentItem:
+      type: object
+      properties:
+        language:
+          type: string
+        name:
+          type: string
+        pathPatterns:
+          type: array
+          items:
+            type: string
+      required:
+      - language
+      - name
+      - pathPatterns
+    ConfigHistoryItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        gateConfigId:
+          type: string
+          format: uuid
+        sourceCommitSha:
+          type:
+          - string
+          - "null"
+        sourceType:
+          type: string
+        version:
+          type: integer
+          format: int32
+      required:
+      - createdAt
+      - gateConfigId
+      - sourceCommitSha
+      - sourceType
+      - version
+    ConfigValidation:
+      type: object
+      description: 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる
+      properties:
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/ValidationErrorItem"
+        rawYaml:
+          type:
+          - string
+          - "null"
+          description: 検証に失敗した設定ファイルの内容
+        runId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: 検証に失敗した Run
+        valid:
+          type: boolean
+      required:
+      - errors
+      - rawYaml
+      - runId
+      - valid
+    ConfigVersion:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        gateConfigId:
+          type: string
+          format: uuid
+        parsed:
+          type: object
+          additionalProperties: {}
+        rawYaml:
+          type: string
+        sourceCommitSha:
+          type:
+          - string
+          - "null"
+        sourceType:
+          type: string
+        version:
+          type: integer
+          format: int32
+      required:
+      - createdAt
+      - gateConfigId
+      - parsed
+      - rawYaml
+      - sourceCommitSha
+      - sourceType
+      - version
+    CreateRepositoryRequest:
+      type: object
+      properties:
+        defaultBranch:
+          type:
+          - string
+          - "null"
+          description: 省略時は main
+          maxLength: 255
+          minLength: 0
+        measurePullRequests:
+          type:
+          - boolean
+          - "null"
+          description: 省略時は true
+        name:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9._-]{1,100}$"
+        owner:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
+      required:
+      - name
+      - owner
     CreateRunRequest:
       type: object
       description: Run の作成要求。CI が計測開始時に送信する。
@@ -611,6 +1037,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RepositoryCard"
+    DefineComponentRequest:
+      type: object
+      properties:
+        language:
+          type: string
+          maxLength: 32
+          minLength: 0
+        name:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9._-]{1,64}$"
+        pathPatterns:
+          type: array
+          items:
+            type: string
+            minLength: 1
+          minItems: 1
+      required:
+      - language
+      - name
+      - pathPatterns
     FinalizeResponse:
       type: object
       properties:
@@ -765,6 +1212,36 @@ components:
       - sourceCommitSha
       - sourceType
       - version
+    IssueTokenRequest:
+      type: object
+      properties:
+        description:
+          type:
+          - string
+          - "null"
+          description: "用途のメモ（例: GitHub Actions）"
+          maxLength: 255
+          minLength: 0
+    IssuedToken:
+      type: object
+      description: 発行した Ingest Token。token は<strong>この応答でのみ</strong>返す
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        token:
+          type: string
+          description: 平文のトークン。以後どの API からも取得できない
+        tokenId:
+          type: string
+          format: uuid
+        tokenPrefix:
+          type: string
+      required:
+      - createdAt
+      - token
+      - tokenId
+      - tokenPrefix
     LatestRun:
       type: object
       properties:
@@ -786,6 +1263,52 @@ components:
           - PASS
           - PASS_WITH_WARNINGS
           - FAIL
+    LatestRunSummary:
+      type: object
+      properties:
+        branch:
+          type: string
+        commitSha:
+          type: string
+        completeness:
+          type:
+          - string
+          - "null"
+          enum:
+          - FULL
+          - PARTIAL
+        measuredAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        status:
+          type: string
+          enum:
+          - CREATED
+          - UPLOADING
+          - FINALIZED
+          - PROCESSING
+          - EVALUATED
+          - FAILED
+          - ABANDONED
+        verdict:
+          type:
+          - string
+          - "null"
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
+      required:
+      - branch
+      - commitSha
+      - completeness
+      - measuredAt
+      - runId
+      - status
+      - verdict
     MeResponse:
       type: object
       description: ログイン中の利用者。フロントエンドはこの role で表示を制御する（防御は API 側）。
@@ -804,6 +1327,27 @@ components:
         userId:
           type: string
           format: uuid
+    RepositoryAdminResponse:
+      type: object
+      description: 登録・更新したリポジトリ
+      properties:
+        defaultBranch:
+          type: string
+        enabled:
+          type: boolean
+        fullName:
+          type: string
+        measurePullRequests:
+          type: boolean
+        repositoryId:
+          type: string
+          format: uuid
+      required:
+      - defaultBranch
+      - enabled
+      - fullName
+      - measurePullRequests
+      - repositoryId
     RepositoryCard:
       type: object
       properties:
@@ -825,6 +1369,137 @@ components:
         repositoryId:
           type: string
           format: uuid
+    RepositoryConfig:
+      type: object
+      description: 現在の設定と版の履歴。validation は直近に届いた設定ファイルの検証結果
+      properties:
+        current:
+          type: "null"
+          $ref: "#/components/schemas/ConfigVersion"
+          description: 設定版が 1 つも無ければ null（既定値で判定）
+        defaultYaml:
+          type: string
+          description: 既定値の YAML。設定版が無いときの表示と UI 編集の初期値
+        editable:
+          type: boolean
+          description: UI から編集できるか。ファイルで管理されていれば false
+        history:
+          type: array
+          items:
+            $ref: "#/components/schemas/ConfigHistoryItem"
+        validation:
+          $ref: "#/components/schemas/ConfigValidation"
+      required:
+      - current
+      - defaultYaml
+      - editable
+      - history
+      - validation
+    RepositoryDetail:
+      type: object
+      description: リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く
+      properties:
+        activeWaiverCount:
+          type: integer
+          format: int32
+        components:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentItem"
+        configVersion:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 判定に使われている設定の版。既定値なら null
+        freshness:
+          $ref: "#/components/schemas/RepositoryFreshness"
+        lastFullRunId:
+          type:
+          - string
+          - "null"
+          format: uuid
+        latestRun:
+          type: "null"
+          $ref: "#/components/schemas/LatestRunSummary"
+          description: 判定済みの最新 Run。まだ無ければ null
+        repository:
+          $ref: "#/components/schemas/RepositoryItem"
+      required:
+      - activeWaiverCount
+      - components
+      - configVersion
+      - freshness
+      - lastFullRunId
+      - latestRun
+      - repository
+    RepositoryFreshness:
+      type: object
+      description: データの鮮度（FR-06-2 / FR-06-3）。基準日数はサーバが持つ
+      properties:
+        fullMeasurementIntervalDays:
+          type: integer
+          format: int32
+        lastFullMeasuredAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        lastMeasuredAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        staleFullMeasurement:
+          type: boolean
+        staleMeasurement:
+          type: boolean
+      required:
+      - fullMeasurementIntervalDays
+      - lastFullMeasuredAt
+      - lastMeasuredAt
+      - staleFullMeasurement
+      - staleMeasurement
+    RepositoryItem:
+      type: object
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        defaultBranch:
+          type: string
+        enabled:
+          type: boolean
+        fullName:
+          type: string
+        measurePullRequests:
+          type: boolean
+        name:
+          type: string
+        owner:
+          type: string
+        repositoryId:
+          type: string
+          format: uuid
+      required:
+      - createdAt
+      - defaultBranch
+      - enabled
+      - fullName
+      - measurePullRequests
+      - name
+      - owner
+      - repositoryId
+    RepositoryList:
+      type: object
+      description: 登録済みのリポジトリ。無効化したものも含む
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/RepositoryItem"
+      required:
+      - items
     RepositoryRef:
       type: object
       properties:
@@ -1278,6 +1953,49 @@ components:
       - metricId
       - name
       - reason
+    TokenList:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TokenSummary"
+      required:
+      - items
+    TokenSummary:
+      type: object
+      description: 発行済みのトークン。平文もハッシュも返さない
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        description:
+          type:
+          - string
+          - "null"
+        lastUsedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 一度も使われていなければ null
+        revokedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        tokenId:
+          type: string
+          format: uuid
+        tokenPrefix:
+          type: string
+      required:
+      - createdAt
+      - description
+      - lastUsedAt
+      - revokedAt
+      - tokenId
+      - tokenPrefix
     TrendPoint:
       type: object
       properties:
@@ -1381,6 +2099,33 @@ components:
       - label
       - points
       - seriesId
+    UpdateConfigRequest:
+      type: object
+      properties:
+        rawYaml:
+          type: string
+          maxLength: 262144
+          minLength: 0
+      required:
+      - rawYaml
+    UpdateRepositoryRequest:
+      type: object
+      properties:
+        defaultBranch:
+          type:
+          - string
+          - "null"
+          maxLength: 255
+          minLength: 1
+        enabled:
+          type:
+          - boolean
+          - "null"
+          description: false で無効化（ダッシュボードから外れ、取り込みも拒否される）
+        measurePullRequests:
+          type:
+          - boolean
+          - "null"
     UpdateUserRequest:
       type: object
       properties:
@@ -1465,6 +2210,23 @@ components:
       - role
       - status
       - userId
+    ValidationErrorItem:
+      type: object
+      properties:
+        line:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: 1 始まりの行番号
+        message:
+          type: string
+        path:
+          type: string
+      required:
+      - line
+      - message
+      - path
     Waiver:
       type: object
       properties:

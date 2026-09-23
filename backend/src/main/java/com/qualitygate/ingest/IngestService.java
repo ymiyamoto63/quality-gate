@@ -80,6 +80,12 @@ public class IngestService {
             throw new ApiException(ErrorCode.REPOSITORY_MISMATCH,
                     "この Ingest Token は %s に対して発行されていません".formatted(request.repository()));
         }
+        if (!repository.isEnabled()) {
+            // 無効化したリポジトリの計測がダッシュボードの外で積み上がり続けないようにする
+            throw new ApiException(ErrorCode.FORBIDDEN,
+                    "%s は quality-gate で無効化されています。管理者に確認してください"
+                            .formatted(request.repository()));
+        }
 
         // 同一コミットへの再送信は上書きせず、attempt を増やした新しい Run とする。
         int attempt = runs.findMaxAttempt(repository.getId(), request.commitSha()) + 1;

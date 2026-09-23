@@ -24,18 +24,15 @@ import java.util.Optional;
 @Tag(name = "Dashboard", description = "全リポジトリのサマリ")
 public class DashboardController {
 
-    /** 計測途絶とみなす閾値（FR-06-2）。 */
-    private static final Duration STALE_MEASUREMENT = Duration.ofHours(48);
-    /** 完全計測途絶とみなす閾値（FR-06-3）。設定値になるまでの既定。 */
-    private static final Duration STALE_FULL_MEASUREMENT = Duration.ofDays(7);
-
     private final MonitoredRepositoryRepository repositories;
     private final RepositorySummaryRepository summaries;
+    private final FreshnessPolicy freshness;
 
     public DashboardController(MonitoredRepositoryRepository repositories,
-                               RepositorySummaryRepository summaries) {
+                               RepositorySummaryRepository summaries, FreshnessPolicy freshness) {
         this.repositories = repositories;
         this.summaries = summaries;
+        this.freshness = freshness;
     }
 
     @GetMapping
@@ -62,12 +59,19 @@ public class DashboardController {
         Instant lastMeasured = summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null);
         Instant lastFull = summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null);
 
-        boolean staleMeasurement = isStale(lastMeasured, now, STALE_MEASUREMENT);
-        boolean staleFull = isStale(lastFull, now, STALE_FULL_MEASUREMENT);
+        int intervalDays = freshness.fullIntervalDays(repo.getId());
+        boolean staleMeasurement = FreshnessPolicy.isStale(lastMeasured, now,
+                FreshnessPolicy.STALE_MEASUREMENT);
+        boolean staleFull = FreshnessPolicy.isStale(lastFull, now, Duration.ofDays(intervalDays));
 
+        if (staleMeasurement) {
+            alerts.add(new DashboardResponse.Alert("MEASUREMENT_STALE", repo.getId(),
+                    "%s の計測が %d 時間以上届いていません".formatted(repo.fullName(),
+                            FreshnessPolicy.STALE_MEASUREMENT.toHours())));
+        }
         if (staleFull) {
             alerts.add(new DashboardResponse.Alert("FULL_MEASUREMENT_STALE", repo.getId(),
-                    "完全計測が %d 日以上行われていません".formatted(STALE_FULL_MEASUREMENT.toDays())));
+                    "%s の完全計測が %d 日以上行われていません".formatted(repo.fullName(), intervalDays)));
         }
 
         DashboardResponse.LatestRun latestRun = summary
@@ -82,14 +86,6 @@ public class DashboardController {
                 summary.map(RepositorySummary::getOpenHighCount).orElse(0),
                 summary.map(RepositorySummary::getActiveWaiverCount).orElse(0),
                 new DashboardResponse.Freshness(lastMeasured, lastFull, staleMeasurement, staleFull));
-    }
-
-    /**
-     * 未計測（null）は「古い」とはみなさない。
-     * 一度も測っていないリポジトリと、測っていたのに途絶えたリポジトリは別の状態である。
-     */
-    private static boolean isStale(Instant last, Instant now, Duration threshold) {
-        return last != null && last.isBefore(now.minus(threshold));
     }
 
     /** 不合格 → 注意 → 合格 → 未判定 の順に並べる。 */
