@@ -48,6 +48,7 @@ class IngestApiIT {
     @Value("${local.server.port}")
     int port;
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired IngestTokenRepository tokens;
@@ -61,6 +62,7 @@ class IngestApiIT {
 
     @BeforeEach
     void setUp() {
+        IntegrationCleanup.deleteAll(jdbc);
         jobs.deleteAll();
         artifacts.deleteAll();
         skippedMetrics.deleteAll();

@@ -1,6 +1,8 @@
 package com.qualitygate.config;
 
 import com.qualitygate.auth.AllowlistOAuth2UserService;
+import com.qualitygate.auth.SessionUserRefreshFilter;
+import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.domain.repo.IngestTokenRepository;
 import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -16,7 +18,9 @@ import org.springframework.security.config.annotation.method.configuration.Enabl
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.access.intercept.AuthorizationFilter;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
 
 /**
@@ -71,8 +75,16 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain appFilterChain(HttpSecurity http,
-                                       AllowlistOAuth2UserService userService) throws Exception {
+                                       AllowlistOAuth2UserService userService,
+                                       UserAccountRepository users) throws Exception {
         return http
+                // Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で免除登録や
+                // 設定変更が実行できてしまう。SPA は XSRF-TOKEN Cookie の値を
+                // X-XSRF-TOKEN ヘッダで送り返す（frontend/src/api/client.ts）
+                .csrf(csrf -> csrf.spa())
+                .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
+                // ロールの変更・無効化を次のリクエストから反映する（ログアウトを待たない）
+                .addFilterBefore(new SessionUserRefreshFilter(users), AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         // データを返すのは API だけ。保護すべきはここ。
                         .requestMatchers("/api/**").authenticated()

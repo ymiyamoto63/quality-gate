@@ -3,6 +3,8 @@ package com.qualitygate.platform.error;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -36,6 +38,23 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = problemOf(ErrorCode.VALIDATION_FAILED, "入力値を確認してください");
         problem.setProperty("violations", violations);
         return problem;
+    }
+
+    /**
+     * メソッドセキュリティ（{@code @PreAuthorize}）の拒否。既定の 500 にせず 403 で返す。
+     * 画面は無効化したボタンで権限の無さを示すが、防御はこの応答が担う。
+     */
+    @ExceptionHandler(AccessDeniedException.class)
+    public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
+        log.warn("権限不足: {}", ex.getMessage());
+        return problemOf(ErrorCode.FORBIDDEN, "この操作には管理者権限が必要です");
+    }
+
+    /** 本文が JSON として読めない・型が合わない。サーバの異常ではない。 */
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ProblemDetail handleUnreadable(HttpMessageNotReadableException ex) {
+        return problemOf(ErrorCode.VALIDATION_FAILED,
+                "リクエストの本文を解釈できません。JSON の形式と値の型を確認してください");
     }
 
     @ExceptionHandler(Exception.class)

@@ -163,6 +163,7 @@ class RunQueryApiIT {
     @Value("${local.server.port}")
     int port;
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired IngestTokenRepository tokens;
@@ -185,6 +186,7 @@ class RunQueryApiIT {
 
     @BeforeEach
     void setUp() {
+        IntegrationCleanup.deleteAll(jdbc);
         jobs.deleteAll();
         findings.deleteAll();
         measurements.deleteAll();

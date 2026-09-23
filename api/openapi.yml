@@ -22,9 +22,59 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: 監査ログの閲覧（管理者のみ）
+  name: AuditLogs
 - description: リポジトリ単位の参照
   name: Repositories
+- description: 許可リストとロールの管理（管理者のみ）
+  name: Users
 paths:
+  /api/v1/audit-logs:
+    get:
+      operationId: list_2
+      parameters:
+      - description: 省略時は to の 30 日前
+        in: query
+        name: from
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: 省略時は現在時刻
+        in: query
+        name: to
+        required: false
+        schema:
+          type: string
+          format: date-time
+      - description: 操作種別（WAIVER_CREATED など）
+        in: query
+        name: action
+        required: false
+        schema:
+          type: string
+      - in: query
+        name: limit
+        required: false
+        schema:
+          type: integer
+          format: int32
+          default: 0
+      - in: query
+        name: cursor
+        required: false
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/AuditLogListResponse"
+          description: OK
+      summary: 監査ログを新しい順に一覧する
+      tags:
+      - AuditLogs
   /api/v1/dashboard:
     get:
       description: 不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。
@@ -101,7 +151,7 @@ paths:
       - Repositories
   /api/v1/runs:
     get:
-      operationId: list
+      operationId: list_1
       parameters:
       - in: query
         name: repositoryId
@@ -326,6 +376,65 @@ paths:
       summary: 処理状態と判定結果を取得する（CI のポーリング用）
       tags:
       - Ingest
+  /api/v1/users:
+    get:
+      operationId: list
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserList"
+          description: OK
+      summary: 許可リストの利用者を一覧する
+      tags:
+      - Users
+    post:
+      description: GitHub ログイン名の実在は確認しない。存在しない名前はログインできないだけで害がない。
+      operationId: add
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateUserRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+          description: OK
+      summary: 許可リストに利用者を追加する
+      tags:
+      - Users
+  /api/v1/users/{userId}:
+    patch:
+      description: 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
+      operationId: update
+      parameters:
+      - in: path
+        name: userId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateUserRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/UserResponse"
+          description: OK
+      summary: ロールの変更・無効化
+      tags:
+      - Users
 components:
   schemas:
     Alert:
@@ -338,6 +447,67 @@ components:
         repositoryId:
           type: string
           format: uuid
+    AuditLogItem:
+      type: object
+      properties:
+        action:
+          type: string
+        actorLogin:
+          type:
+          - string
+          - "null"
+          description: 日次バッチの操作は system
+        after:
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
+          description: 変更後の値
+        auditLogId:
+          type: string
+          format: uuid
+        before:
+          type:
+          - object
+          - "null"
+          additionalProperties: {}
+          description: 変更前の値
+        occurredAt:
+          type: string
+          format: date-time
+        targetId:
+          type:
+          - string
+          - "null"
+        targetType:
+          type: string
+      required:
+      - action
+      - actorLogin
+      - after
+      - auditLogId
+      - before
+      - occurredAt
+      - targetId
+      - targetType
+    AuditLogListResponse:
+      type: object
+      description: 監査ログ。新しいものから返す
+      properties:
+        hasMore:
+          type: boolean
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLogItem"
+        nextCursor:
+          type:
+          - string
+          - "null"
+      required:
+      - hasMore
+      - items
+      - nextCursor
     CreateRunRequest:
       type: object
       description: Run の作成要求。CI が計測開始時に送信する。
@@ -411,6 +581,23 @@ components:
           - EVALUATED
           - FAILED
           - ABANDONED
+    CreateUserRequest:
+      type: object
+      properties:
+        githubLogin:
+          type: string
+          minLength: 1
+          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
+        role:
+          type:
+          - string
+          - "null"
+          description: 省略時は VIEWER
+          enum:
+          - ADMIN
+          - VIEWER
+      required:
+      - githubLogin
     DashboardResponse:
       type: object
       description: ダッシュボード。repository_summaries を読むだけで応答する。
@@ -1194,6 +1381,23 @@ components:
       - label
       - points
       - seriesId
+    UpdateUserRequest:
+      type: object
+      properties:
+        role:
+          type:
+          - string
+          - "null"
+          enum:
+          - ADMIN
+          - VIEWER
+        status:
+          type:
+          - string
+          - "null"
+          enum:
+          - ACTIVE
+          - DISABLED
     UploadArtifactResponse:
       type: object
       properties:
@@ -1205,6 +1409,62 @@ components:
         sizeBytes:
           type: integer
           format: int64
+    UserList:
+      type: object
+      description: 利用者の一覧
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/UserResponse"
+      required:
+      - items
+    UserResponse:
+      type: object
+      description: 許可リストの利用者。ここに無い GitHub ユーザーはログインできない
+      properties:
+        avatarUrl:
+          type:
+          - string
+          - "null"
+        createdAt:
+          type: string
+          format: date-time
+        displayName:
+          type:
+          - string
+          - "null"
+          description: 初回ログインまでは null
+        githubLogin:
+          type: string
+        lastLoginAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: 一度もログインしていなければ null
+        role:
+          type: string
+          enum:
+          - ADMIN
+          - VIEWER
+        status:
+          type: string
+          enum:
+          - ACTIVE
+          - DISABLED
+        userId:
+          type: string
+          format: uuid
+      required:
+      - avatarUrl
+      - createdAt
+      - displayName
+      - githubLogin
+      - lastLoginAt
+      - role
+      - status
+      - userId
     Waiver:
       type: object
       properties:

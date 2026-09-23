@@ -45,6 +45,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AbstractIntegrationTest
 class JobWorkerIT {
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired RunRepository runs;
@@ -58,6 +59,7 @@ class JobWorkerIT {
 
     @BeforeEach
     void setUp() {
+        IntegrationCleanup.deleteAll(jdbc);
         jobs.deleteAll();
         artifacts.deleteAll();
         runs.deleteAll();

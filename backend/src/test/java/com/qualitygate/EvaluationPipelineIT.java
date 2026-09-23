@@ -119,6 +119,7 @@ class EvaluationPipelineIT {
             </pmd>
             """;
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired IngestTokenRepository tokens;
@@ -139,6 +140,7 @@ class EvaluationPipelineIT {
 
     @BeforeEach
     void setUp() {
+        IntegrationCleanup.deleteAll(jdbc);
         jobs.deleteAll();
         findings.deleteAll();
         measurements.deleteAll();

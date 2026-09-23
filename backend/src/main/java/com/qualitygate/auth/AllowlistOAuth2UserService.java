@@ -4,7 +4,10 @@ import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.UserAccountRepository;
+import com.qualitygate.platform.audit.AuditAction;
+import com.qualitygate.platform.audit.AuditLogger;
 import com.qualitygate.platform.id.Uuid7;
+import com.qualitygate.platform.security.Actor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -39,9 +42,11 @@ public class AllowlistOAuth2UserService implements OAuth2UserService<OAuth2UserR
 
     private final DefaultOAuth2UserService delegate = new DefaultOAuth2UserService();
     private final UserAccountRepository users;
+    private final AuditLogger auditLogger;
 
-    public AllowlistOAuth2UserService(UserAccountRepository users) {
+    public AllowlistOAuth2UserService(UserAccountRepository users, AuditLogger auditLogger) {
         this.users = users;
+        this.auditLogger = auditLogger;
     }
 
     @Override
@@ -86,8 +91,11 @@ public class AllowlistOAuth2UserService implements OAuth2UserService<OAuth2UserR
                     "許可リストに登録されていません。管理者に登録を依頼してください。", null));
         }
         log.warn("初期セットアップ: 最初のログインユーザーを管理者として登録します login={}", login);
-        UserAccount admin = new UserAccount(Uuid7.generate(), login,
-                UserRole.ADMIN, UserStatus.ACTIVE, null);
-        return users.save(admin);
+        UserAccount admin = users.save(new UserAccount(Uuid7.generate(), login,
+                UserRole.ADMIN, UserStatus.ACTIVE, null));
+        // 管理者が生まれた経路を必ず残す。後から「誰がいつ管理者になったか」を辿れるように
+        auditLogger.record(new Actor(admin.getId(), login, null), AuditAction.BOOTSTRAP_ADMIN,
+                "USER", admin.getId(), null, java.util.Map.of("githubLogin", login, "role", "ADMIN"));
+        return admin;
     }
 }
