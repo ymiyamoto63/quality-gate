@@ -182,6 +182,10 @@ class EvaluationPipelineIT {
                         org.assertj.core.groups.Tuple.tuple("M-01", MeasurementStatus.PASS),
                         // ミューテーションスコア 80% は合格
                         org.assertj.core.groups.Tuple.tuple("M-02", MeasurementStatus.PASS),
+                        // 専有ランナーで 3 回、p95 300ms 前後・エラー 0 件なので性能は合格
+                        org.assertj.core.groups.Tuple.tuple("M-03", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-04", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-05", MeasurementStatus.PASS),
                         // High 1 件で不合格
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
                         // ベース比較ができないため新規関数数は 0 で合格
@@ -204,6 +208,49 @@ class EvaluationPipelineIT {
         // 完全計測なので最後の完全計測も進む
         assertThat(summary.getLastFullMeasuredAt()).isEqualTo(run.getMeasuredAt());
         assertThat(summary.getCategoryStatus()).contains("セキュリティ").contains("FAIL");
+    }
+
+    /**
+     * GitHub ホストランナーの性能値は計算資源を共有しているため判定に耐えない。
+     * 値は残すが参考値とし、合否に影響させず、部分計測として扱う。
+     */
+    @Test
+    void GitHubホストランナーで計測した性能値は参考値になる() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"), RunnerType.GITHUB_HOSTED);
+        attachAllMetrics(run);
+        attachPit(run, "changed");
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.PARTIAL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-03"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.REFERENCE);
+                    assertThat(m.getValue()).isEqualByComparingTo("302");
+                    // 計測環境が系列を分ける軸になる
+                    assertThat(m.getVariant()).isEqualTo("perf-staging");
+                });
+    }
+
+    @Test
+    void 性能は同じ計測環境の前回値とだけ比べる() {
+        Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
+        attachAllMetrics(first);
+        attachPit(first, "changed");
+        evaluate(first);
+
+        Run second = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attachAllMetrics(second);
+        attachPit(second, "changed");
+        evaluate(second);
+
+        assertThat(measurements.findByRunId(second.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-03"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getPreviousValue()).isEqualByComparingTo("302"));
     }
 
     @Test
@@ -337,6 +384,8 @@ class EvaluationPipelineIT {
                   accessibility:
                     enabled: false
                   api_contract:
+                    enabled: false
+                  performance:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -584,6 +633,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   api_contract:
                     enabled: false
+                  performance:
+                    enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
 
@@ -684,6 +735,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   api_contract:
                     enabled: false
+                  performance:
+                    enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
 
@@ -707,11 +760,25 @@ class EvaluationPipelineIT {
     }
 
     private Run createRun(Instant measuredAt) {
+        return createRun(measuredAt, RunnerType.SELF_HOSTED);
+    }
+
+    private Run createRun(Instant measuredAt, RunnerType runnerType) {
         int attempt = runs.findMaxAttempt(repositoryId, commitOf(measuredAt)) + 1;
         Run run = new Run(Uuid7.generate(), repositoryId, commitOf(measuredAt), "main",
-                RunnerType.SELF_HOSTED, "github-actions", measuredAt, attempt);
+                runnerType, "github-actions", measuredAt, attempt);
         run.finalizeIngest();
-        return runs.save(run);
+        Run saved = runs.save(run);
+        attachPerformance(saved);
+        return saved;
+    }
+
+    /** 性能の成果物（3 回分）。性能以外を検証するテストでも、未提出で ERROR にならないよう送る。 */
+    private void attachPerformance(Run run) {
+        for (int i = 1; i <= 3; i++) {
+            attach(run, ArtifactType.K6_SUMMARY, "k6-summary-%d.json".formatted(i), null, null,
+                    PerformanceFixtures.summary(i), PerformanceFixtures.METADATA);
+        }
     }
 
     private static String commitOf(Instant measuredAt) {

@@ -43,6 +43,9 @@ public class IngestService {
 
     private static final Logger log = LoggerFactory.getLogger(IngestService.class);
 
+    /** 計測環境の名前の上限。measurements.variant の幅に合わせる。 */
+    private static final int MAX_ENVIRONMENT_NAME = 64;
+
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
     private final RunSkippedMetricRepository skippedMetrics;
@@ -187,10 +190,8 @@ public class IngestService {
     private void validateMetadata(ArtifactType type, String metadata) {
         JsonNode node = parseMetadata(metadata);
 
-        if (type.requiresEnvironmentMetadata() && !node.hasNonNull("environment")) {
-            throw new ApiException(ErrorCode.PERFORMANCE_METADATA_MISSING,
-                    "性能計測の成果物には environment メタデータが必要です"
-                            + "（name / runner / cpu / memory / datasetProfile など）");
+        if (type.requiresEnvironmentMetadata()) {
+            validateEnvironment(node.get("environment"));
         }
         if (type == ArtifactType.PIT_XML) {
             JsonNode scope = node.get(MutationScope.METADATA_KEY);
@@ -217,6 +218,27 @@ public class IngestService {
                         "metadata の %s は true / false で指定してください（受信値: %s）"
                                 .formatted(ParseContext.BASE_SPEC_MISSING, baseMissing));
             }
+        }
+    }
+
+    /**
+     * 性能計測の環境。名前はトレンドの系列を分ける軸になるため必須とする。
+     * 名前の無い値は、どの環境の性能か分からず比較できない。
+     */
+    private static void validateEnvironment(JsonNode environment) {
+        if (environment == null || environment.isNull()) {
+            throw new ApiException(ErrorCode.PERFORMANCE_METADATA_MISSING,
+                    "性能計測の成果物には environment メタデータが必要です"
+                            + "（name / runner / cpu / memory / datasetProfile など）");
+        }
+        JsonNode name = environment.isObject() ? environment.get("name") : null;
+        if (name == null || !name.isString() || name.asString().isBlank()) {
+            throw new ApiException(ErrorCode.PERFORMANCE_METADATA_MISSING,
+                    "environment.name（計測環境の名前。例: perf-staging）が必要です");
+        }
+        if (name.asString().strip().length() > MAX_ENVIRONMENT_NAME) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "environment.name は %d 文字以内で指定してください".formatted(MAX_ENVIRONMENT_NAME));
         }
     }
 

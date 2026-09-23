@@ -22,6 +22,9 @@ import java.util.Set;
  * @param contractMinSuccessRate     M-08 の合格ライン（成功率 %）
  * @param contractMinTestCount       M-08 の最小実行件数。下回れば値を確定できない（ERROR）
  * @param maxBreakingChanges         M-09 の合格ライン（破壊的変更の件数）
+ * @param performance                M-03 / M-04 / M-05 の合格ライン
+ * @param referenceOnlyEnvironments  ここで計測した性能値は参考値（REFERENCE）とする環境。
+ *        ランナー種別（github-hosted など）または計測環境の名前で書く
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -40,7 +43,22 @@ public record GateThresholds(
         List<String> accessibilityPages,
         BigDecimal contractMinSuccessRate,
         int contractMinTestCount,
-        int maxBreakingChanges) {
+        int maxBreakingChanges,
+        Performance performance,
+        Set<String> referenceOnlyEnvironments) {
+
+    /**
+     * 性能指標の合格ライン（docs/02-metrics-spec.md M-03）。
+     *
+     * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
+     * @param p95WarnMs      これを超えたら WARN（既定は合格ラインの 80%）
+     * @param arrivalRateRps M-04 の負荷条件（到達率）。実測が 95% を下回ったら WARN
+     * @param errorRatePct   M-05 の合格ライン（% 以下）。半分を超えたら WARN
+     * @param scenarios      判定すべきシナリオ。summary に無ければ ERROR
+     */
+    public record Performance(BigDecimal p95Ms, BigDecimal p95WarnMs, BigDecimal arrivalRateRps,
+                              BigDecimal errorRatePct, List<String> scenarios) {
+    }
 
     public static final String M_BRANCH_COVERAGE = "M-01";
     public static final String M_MUTATION = "M-02";
@@ -60,7 +78,8 @@ public record GateThresholds(
      * 未実装の指標まで判定対象に含めると、すべての Run が ERROR で不合格になる。
      */
     public static final Set<String> IMPLEMENTED_METRICS =
-            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_VULNERABILITIES, M_COMPLEXITY,
+            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
+                    M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
                     M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY);
 
     /** YAML の指標名と指標 ID の対応。 */
@@ -97,6 +116,8 @@ public record GateThresholds(
         GateConfigDocument.MetricConfig mutation = document.metric("mutation_score");
         GateConfigDocument.MetricConfig accessibility = document.metric("accessibility");
         GateConfigDocument.MetricConfig contract = document.metric("api_contract");
+        GateConfigDocument.MetricConfig performance = document.metric("performance");
+        BigDecimal p95 = performance.number("p95_ms").orElse(BigDecimal.valueOf(500));
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
         return new GateThresholds(
@@ -118,7 +139,13 @@ public record GateThresholds(
                 contract.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
                 // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
                 Math.max(1, contract.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
-                contract.number("breaking_changes").orElse(BigDecimal.ZERO).intValue());
+                contract.number("breaking_changes").orElse(BigDecimal.ZERO).intValue(),
+                new Performance(p95,
+                        p95.multiply(new BigDecimal("0.8")),
+                        performance.number("arrival_rate_rps").orElse(BigDecimal.valueOf(50)),
+                        performance.number("error_rate_pct").orElse(new BigDecimal("0.1")),
+                        List.copyOf(performance.list("scenarios"))),
+                Set.copyOf(document.execution().referenceOnlyEnvironments()));
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */

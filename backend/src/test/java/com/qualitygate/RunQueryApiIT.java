@@ -219,7 +219,7 @@ class RunQueryApiIT {
 
         // カテゴリは要件定義の指標表と同じ並び
         assertThat(detail.categories()).extracting(RunDetailResponse.RunCategory::category)
-                .containsExactly("機能テスト", "セキュリティ", "コード構造", "契約・互換性", "使いやすさ");
+                .containsExactly("機能テスト", "性能テスト", "セキュリティ", "コード構造", "契約・互換性", "使いやすさ");
 
         RunDetailResponse.RunCategory security = detail.categories().stream()
                 .filter(c -> c.category().equals("セキュリティ")).findFirst().orElseThrow();
@@ -248,7 +248,8 @@ class RunQueryApiIT {
 
         assertThat(detail.findingSummary().initial()).isEqualTo(3);
         assertThat(detail.findingSummary().newCount()).isZero();
-        assertThat(detail.artifactCount()).isEqualTo(7);
+        // 性能の summary 3 件を含む
+        assertThat(detail.artifactCount()).isEqualTo(10);
     }
 
     /**
@@ -644,7 +645,12 @@ class RunQueryApiIT {
                 RunnerType.SELF_HOSTED, "github-actions", measuredAt,
                 runs.findMaxAttempt(repositoryId, commitSha) + 1);
         run.finalizeIngest();
-        return runs.save(run);
+        Run saved = runs.save(run);
+        for (int i = 1; i <= 3; i++) {
+            attach(saved, ArtifactType.K6_SUMMARY, "k6-summary-%d.json".formatted(i), null,
+                    PerformanceFixtures.summary(i), PerformanceFixtures.METADATA);
+        }
+        return saved;
     }
 
     private void attach(Run run, ArtifactType type, String filename, String component,

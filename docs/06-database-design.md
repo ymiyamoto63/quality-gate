@@ -606,6 +606,7 @@ DELETE FROM runs
 | `V008__add_measurement_component_name.sql` | `measurements.component_name` の追加と一意インデックスの置き換え |
 | `V009__skipped_metric_acceptance_at_evaluation.sql` | `run_skipped_metrics.accepted` を NULL 許容にし、受理の可否を判定時に決める |
 | `V010__measurement_variant_and_not_applicable.sql` | `measurements.variant` の追加、一意インデックスの置き換え、`NOT_APPLICABLE` の追加と `status` の拡幅 |
+| `V011__widen_measurement_variant.sql` | `measurements.variant` を 64 文字に拡幅（性能指標の計測環境名を入れるため） |
 
 `waivers` と `findings` は相互に参照するため、
 `findings.waiver_id` の外部キーは `V004` の末尾で `ALTER TABLE` により追加する。

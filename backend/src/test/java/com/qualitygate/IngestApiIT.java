@@ -239,6 +239,32 @@ class IngestApiIT {
         assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
     }
 
+    @Test
+    void 性能成果物の環境名が無ければ拒否される() {
+        UUID runId = createRun();
+
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("file", new ByteArrayResource("{}".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "k6-summary.json";
+            }
+        });
+        form.add("type", "k6-summary");
+        form.add("metadata", "{\"environment\":{\"runner\":\"self-hosted\"}}");
+
+        ResponseEntity<Map> response = client.post()
+                .uri("/api/v1/runs/{runId}/artifacts", runId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().toEntity(Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
+        assertThat(String.valueOf(response.getBody().get("detail"))).contains("environment.name");
+    }
+
     /**
      * 変更範囲と全量の値は比較できない。どちらか分からない値は前回比にもトレンドにも
      * 置き場所がないため、取り込みの時点で拒否して CI のログに残す。
