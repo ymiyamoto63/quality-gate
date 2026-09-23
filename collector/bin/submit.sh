@@ -28,12 +28,24 @@ load_profile "$QG_REPOSITORY"
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
 
+# スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
 skipped_json() {
-  local id
-  for id in ${SKIP_METRICS:-}; do
-    jq -n --arg id "$id" '{metricId: $id, reason: "収集ランナーでは計測していないため"}'
-  done | jq -s '.'
+  local id reason
+  {
+    for id in ${SKIP_METRICS:-}; do
+      jq -n --arg id "$id" '{metricId: $id, reason: "収集ランナーでは計測していないため"}'
+    done
+    if [ -f "$REPORTS/skipped-metrics.tsv" ]; then
+      while IFS=$'\t' read -r id reason; do
+        if [ -n "$id" ]; then
+          jq -n --arg id "$id" --arg reason "$reason" '{metricId: $id, reason: $reason}'
+        fi
+      done < "$REPORTS/skipped-metrics.tsv"
+    fi
+  } | jq -s 'unique_by(.metricId)'
 }
+
+skipped() { [ -f "$REPORTS/skipped-metrics.tsv" ] && cut -f1 "$REPORTS/skipped-metrics.tsv" | grep -qx "$1"; }
 
 REQUEST=$(jq -n \
   --arg repository "$QG_REPOSITORY" \
@@ -79,6 +91,10 @@ FRONTEND=${FRONTEND_DIR##*/}
 
 if [ -n "${BACKEND_DIR:-}" ]; then
   upload jacoco-xml "$REPORTS/backend/jacoco.xml" "$BACKEND"
+  # 収集ランナーの PIT は常に全量（変更範囲への絞り込みはしない）
+  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && ! skipped M-02; then
+    upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND" '' '{"mutationScope":"all"}'
+  fi
   upload pmd-xml "$REPORTS/backend/pmd.xml" "$BACKEND" head
   # base の解析結果があれば、M-07 は「新規・悪化した関数」を判定できる
   if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/backend/pmd-base.xml" ]; then
