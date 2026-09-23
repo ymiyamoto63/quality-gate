@@ -1,0 +1,53 @@
+# Pull Request の CI: quality-gate 自身のユニットテストだけを実行する。
+#
+# 計測（カバレッジ・PIT・k6・Trivy・アクセシビリティ検査など）と quality-gate への送信は行わない。
+# 計測は main への push と手動実行のときだけ quality-gate.yml が行う。
+#
+# セルフホストランナーは計測専用（D-7）のため使わず、GitHub ホストランナーで動かす。
+# ランナーが止まっていても PR の CI は止まらない。
+name: ci
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+# 同じ PR に新しいコミットが来たら、古い実行は取り消す
+concurrency:
+  group: ci-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: バックエンドのユニットテスト
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+      # test フェーズまで（結合テスト *IT は verify フェーズのため動かない）。
+      # フロントエンドの同梱ビルドと JaCoCo の計測は行わない
+      - name: ユニットテスト（JUnit）
+        run: ./backend/mvnw -f backend/pom.xml -B -ntp test -DskipFrontend=true -Djacoco.skip=true
+
+  frontend:
+    name: フロントエンドのユニットテスト
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: ユニットテスト（Vitest）
+        working-directory: frontend
+        run: |
+          npm ci
+          npm test
