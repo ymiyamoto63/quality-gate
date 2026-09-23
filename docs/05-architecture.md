@@ -24,10 +24,10 @@ com.qualitygate
 ├ evaluate/     しきい値適用、指標判定、Run 集約、差分（新規 / 継続 / 解消）算出
 ├ config/       .quality-gate.yml の取得・検証・版管理
 ├ waiver/       免除の登録・期限管理
-├ notify/       Slack / メール / GitHub コメント
+├ notify/       メール通知（D-15）
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
 ├ job/          ジョブキューとスケジューラ
-├ github/       GitHub API クライアント（Contents 取得、merge-base 解決、PR コメント）
+├ github/       GitHub API クライアント（将来用。現時点では未使用）
 ├ config/       合成点。複数モジュールを組み立てる設定（SecurityConfig など）
 └ platform/     認証認可の部品、監査ログ、ArtifactStore、共通例外、設定
 ```
@@ -211,7 +211,7 @@ jobs テーブル ──▶ @Scheduled(fixedDelay = 1s) のポーラ ──▶ �
 | --- | --- | --- |
 | `EVALUATE_RUN` | `finalize` | 設定解決 → 正規化 → 判定（3.2） |
 | `REEVALUATE_RUN` | 手動 / 設定変更 / 日次 | 成果物を再利用し、最新の設定・脆弱性情報で判定し直す |
-| `SEND_NOTIFICATION` | 判定完了 | Slack / メール / PR コメント |
+| `SEND_NOTIFICATION` | 判定完了 | メール（監視対象ブランチの判定を通知条件に従って送る） |
 | `DAILY_REEVALUATION` | 毎日 02:00 | 各リポジトリの最新 Run を再評価（新規 CVE の反映） |
 | `EXPIRE_WAIVERS` | 毎日 02:10 | 期限切れ免除の無効化と、期限 7 日前の通知 |
 | `CHECK_FRESHNESS` | 毎日 09:00 | 計測途絶（48h）と完全計測途絶（7 日）の検知・通知 |
@@ -646,7 +646,7 @@ CI 側のスクリプトがこれらに依存しないようにする。
 | --- | --- |
 | 形式 | JSON 構造化ログ |
 | 相関 ID | `requestId`（全リクエスト）、`runId`（取り込み・判定）を MDC に載せる |
-| 秘匿情報 | Ingest Token、Slack Webhook URL、セッション ID、GitHub のアクセストークンはログに出さない。マスク処理をログ出力の共通層に実装する |
+| 秘匿情報 | Ingest Token、SMTP のパスワード、セッション ID、GitHub のアクセストークンはログに出さない。マスク処理をログ出力の共通層に実装する |
 | レベル | 判定結果は INFO。成果物の形式不正は WARN（システム異常ではないため）。ジョブの恒久的失敗は ERROR |
 
 成果物の形式不正を ERROR にしないのは、**それが日常的に起こる正常系**だからである。

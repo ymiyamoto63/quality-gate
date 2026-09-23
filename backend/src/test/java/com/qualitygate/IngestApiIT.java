@@ -48,6 +48,7 @@ class IngestApiIT {
     @Value("${local.server.port}")
     int port;
 
+    @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired IngestTokenRepository tokens;
@@ -61,6 +62,7 @@ class IngestApiIT {
 
     @BeforeEach
     void setUp() {
+        IntegrationCleanup.deleteAll(jdbc);
         jobs.deleteAll();
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
@@ -237,6 +239,32 @@ class IngestApiIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
+    }
+
+    @Test
+    void 性能成果物の環境名が無ければ拒否される() {
+        UUID runId = createRun();
+
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("file", new ByteArrayResource("{}".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "k6-summary.json";
+            }
+        });
+        form.add("type", "k6-summary");
+        form.add("metadata", "{\"environment\":{\"runner\":\"self-hosted\"}}");
+
+        ResponseEntity<Map> response = client.post()
+                .uri("/api/v1/runs/{runId}/artifacts", runId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().toEntity(Map.class);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
+        assertThat(String.valueOf(response.getBody().get("detail"))).contains("environment.name");
     }
 
     /**

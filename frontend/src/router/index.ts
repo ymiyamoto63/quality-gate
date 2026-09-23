@@ -4,7 +4,11 @@ import DashboardView from '@/views/DashboardView.vue'
 import LoginView from '@/views/LoginView.vue'
 import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
-import PlaceholderView from '@/views/PlaceholderView.vue'
+import RepositoryDetailView from '@/views/RepositoryDetailView.vue'
+import ConfigView from '@/views/ConfigView.vue'
+import WaiversView from '@/views/WaiversView.vue'
+import AdminRepositoriesView from '@/views/AdminRepositoriesView.vue'
+import AdminView from '@/views/AdminView.vue'
 import RunDetailView from '@/views/RunDetailView.vue'
 import FindingListView from '@/views/FindingListView.vue'
 import TrendView from '@/views/TrendView.vue'
@@ -29,8 +33,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/repositories/:repositoryId',
     name: 'repository',
-    component: PlaceholderView,
-    props: { title: 'リポジトリ詳細' },
+    component: RepositoryDetailView,
     meta: { title: 'リポジトリ詳細' },
   },
   {
@@ -42,8 +45,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/repositories/:repositoryId/config',
     name: 'config',
-    component: PlaceholderView,
-    props: { title: '設定' },
+    component: ConfigView,
     meta: { title: '設定' },
   },
   { path: '/runs/:runId', name: 'run', component: RunDetailView, meta: { title: 'Run 詳細' } },
@@ -56,16 +58,38 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/waivers',
     name: 'waivers',
-    component: PlaceholderView,
-    props: { title: '免除管理' },
+    component: WaiversView,
     meta: { title: '免除管理' },
+  },
+  {
+    path: '/admin/repositories',
+    name: 'admin-repositories',
+    component: AdminRepositoriesView,
+    meta: { title: 'リポジトリ管理', adminOnly: true },
   },
   {
     path: '/admin/users',
     name: 'users',
-    component: PlaceholderView,
-    props: { title: '利用者管理' },
+    component: AdminView,
     meta: { title: '利用者管理', adminOnly: true },
+  },
+  {
+    path: '/admin/audit-logs',
+    name: 'audit-logs',
+    component: AdminView,
+    meta: { title: '監査ログ', adminOnly: true },
+  },
+  {
+    path: '/admin/retention',
+    name: 'retention',
+    component: AdminView,
+    meta: { title: '保持期間', adminOnly: true },
+  },
+  {
+    path: '/admin/jobs',
+    name: 'jobs',
+    component: AdminView,
+    meta: { title: '失敗したジョブ', adminOnly: true },
   },
 
   {

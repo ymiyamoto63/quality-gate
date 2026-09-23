@@ -70,6 +70,32 @@ public class MonitoredRepository {
         return defaultBranch;
     }
 
+    public boolean isMeasurePullRequests() {
+        return measurePullRequests;
+    }
+
+    public UUID getCreatedBy() {
+        return createdBy;
+    }
+
+    public Instant getCreatedAt() {
+        return createdAt;
+    }
+
+    public Instant getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setDefaultBranch(String defaultBranch) {
+        this.defaultBranch = defaultBranch;
+        this.updatedAt = Instant.now();
+    }
+
+    public void setMeasurePullRequests(boolean measurePullRequests) {
+        this.measurePullRequests = measurePullRequests;
+        this.updatedAt = Instant.now();
+    }
+
     public boolean isEnabled() {
         return enabled;
     }

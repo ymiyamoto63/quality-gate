@@ -75,6 +75,11 @@ public class Run {
     @Column
     private Completeness completeness;
 
+    /** 再評価の直前の判定。通知の遷移判定の起点になる。初回の判定では null。 */
+    @Enumerated(EnumType.STRING)
+    @Column(name = "previous_verdict")
+    private Verdict previousVerdict;
+
     @Column(name = "error_code")
     private String errorCode;
 
@@ -142,6 +147,15 @@ public class Run {
         return baselineRunId;
     }
 
+    /** finalize されないまま滞留した Run を終端にする。ダッシュボードの最新から外す。 */
+    public void markAbandoned() {
+        this.status = RunStatus.ABANDONED;
+    }
+
+    public Verdict getPreviousVerdict() {
+        return previousVerdict;
+    }
+
     /** 処理そのものが失敗した場合。判定結果 FAIL とは区別する。 */
     public void markFailed(String errorCode, String errorDetail) {
         this.status = RunStatus.FAILED;
@@ -151,6 +165,8 @@ public class Run {
     }
 
     public void markEvaluated(Verdict verdict, Completeness completeness, Instant at) {
+        // 再評価では直前の判定を残す。上書きすると「合格 → 不合格」の遷移を検知できない
+        this.previousVerdict = this.verdict;
         this.status = RunStatus.EVALUATED;
         this.verdict = verdict;
         this.completeness = completeness;

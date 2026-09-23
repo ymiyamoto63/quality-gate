@@ -149,9 +149,26 @@ jobs:
     runs-on: ${{ needs.setup.outputs.runner }}
     steps:
       - uses: actions/checkout@v4
-      - name: 負荷試験（k6）
+      # 計測対象は専有の性能検証環境（QG_PERF_BASE_URL）。未設定なら何も送らず、
+      # submit ジョブが M-03〜05 のスキップを申告する（未提出の ERROR にしない）
+      - name: 負荷試験（k6 を 3 回実行し、中央値は quality-gate が取る）
+        if: vars.QG_PERF_BASE_URL != ''
+        env:
+          QG_PERF_BASE_URL: ${{ vars.QG_PERF_BASE_URL }}
+          QG_PERF_RUN_ID: ${{ vars.QG_PERF_RUN_ID }}
+          QG_PERF_SESSION: ${{ secrets.QG_PERF_SESSION }}
+          QG_PERF_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
         run: |
-          echo 'TODO: Phase 3 で k6 シナリオを追加する'
+          mkdir -p reports/perf
+          for i in 1 2 3; do
+            docker run --rm --network host -v "$PWD:/w" -w /w \
+              -e QG_PERF_BASE_URL -e QG_PERF_RUN_ID -e QG_PERF_SESSION -e QG_PERF_INGEST_TOKEN \
+              grafana/k6 run --summary-export="reports/perf/k6-summary-$i.json" perf/k6/quality-gate.js \
+              || [ $? -eq 99 ]   # 99 はしきい値の不成立。合否は quality-gate が判定する
+          done
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: { name: reports-perf, path: reports/, if-no-files-found: ignore }
 
   # 取り込み: 重量ジョブが動かなかった場合もスキップを申告するため必ず実行する
   submit:
@@ -171,7 +188,7 @@ jobs:
           if [ "${{ needs.mutation.result }}" = "skipped" ]; then
             SKIPPED="$SKIPPED M-02"
           fi
-          if [ "${{ needs.performance.result }}" = "skipped" ]; then
+          if [ "${{ needs.performance.result }}" = "skipped" ] || ! ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
             SKIPPED="$SKIPPED M-03 M-04 M-05"
           fi
           echo "runnerType=${{ needs.setup.outputs.runner_type }} skipped=[$SKIPPED]"
@@ -187,4 +204,7 @@ jobs:
           #   type=junit-xml で reports/contract/TEST-*ApiIT.xml を送信する（component=backend）
           #   type=oasdiff-json で reports/oasdiff.json を送信する。
           #   reports/oasdiff-base-spec-missing があれば metadata={"baseSpecMissing":true} を付ける
+          #   type=k6-summary で reports/perf/k6-summary-*.json を 1 ファイルずつ送信する。
+          #   metadata={"environment":{"name":"perf-staging","runner":"<runner_type>",
+          #   "cpu":..,"memory":..,"datasetProfile":..}} が必須（無いと 422 で拒否される）
         continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）

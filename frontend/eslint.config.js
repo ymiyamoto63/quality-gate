@@ -25,6 +25,10 @@ export default tseslint.config(
       complexity: ['warn', { max: 15 }],
       'vue/multi-word-component-names': 'off',
       '@typescript-eslint/no-explicit-any': 'error',
+      // 未定義の名前は TypeScript（vue-tsc）が検出する。no-undef はブラウザの
+      // グローバル（window / document）を知らず、.vue で誤検出するため切る
+      // （typescript-eslint の推奨どおり）
+      'no-undef': 'off',
     },
   },
   {

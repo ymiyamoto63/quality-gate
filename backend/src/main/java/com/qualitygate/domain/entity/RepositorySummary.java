@@ -103,6 +103,12 @@ public class RepositorySummary {
         }
     }
 
+    /** 免除の件数だけを現在値にする（過去の Run の再評価や免除の登録・失効時）。 */
+    public void updateWaiverCount(int activeWaiverCount) {
+        this.activeWaiverCount = activeWaiverCount;
+        this.updatedAt = Instant.now();
+    }
+
     public UUID getRepositoryId() {
         return repositoryId;
     }

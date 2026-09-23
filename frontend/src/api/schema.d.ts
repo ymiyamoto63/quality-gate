@@ -4,6 +4,23 @@
  */
 
 export interface paths {
+  '/api/v1/audit-logs': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 監査ログを新しい順に一覧する */
+    get: operations['list_5']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/dashboard': {
     parameters: {
       query?: never
@@ -24,6 +41,57 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/ingest-tokens/{tokenId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /** Ingest Token を失効させる（即座に無効になる） */
+    delete: operations['revoke_1']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/jobs/dead': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 恒久的に失敗したジョブを一覧する（新しい順に最大 100 件） */
+    get: operations['deadJobs']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/jobs/{jobId}/retry': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** 恒久的に失敗したジョブを再実行する */
+    post: operations['retry']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/me': {
     parameters: {
       query?: never
@@ -34,6 +102,128 @@ export interface paths {
     /** ログイン中の利用者とロールを返す */
     get: operations['me']
     put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 登録済みのリポジトリを一覧する */
+    get: operations['list_4']
+    put?: never
+    /** リポジトリを登録する */
+    post: operations['create_1']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * リポジトリ詳細を取得する
+     * @description 指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立てを 2 箇所に持たないため。
+     */
+    get: operations['detail']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /** リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効） */
+    patch: operations['update_3']
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}/components': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /** コンポーネントを定義する（同名があれば置き換える） */
+    post: operations['defineComponent']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}/config': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 現在の設定と版の履歴、直近の検証結果を取得する
+     * @description 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
+     */
+    get: operations['get_1']
+    /**
+     * UI から設定を更新する
+     * @description リポジトリ内のファイルが優先される。ファイルで管理されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
+     */
+    put: operations['update_1']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}/ingest-tokens': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 発行済みの Ingest Token を一覧する（平文は返さない） */
+    get: operations['tokens']
+    put?: never
+    /**
+     * Ingest Token を発行する
+     * @description token（平文）はこの応答でのみ返す。以後どの API からも取得できない。
+     */
+    post: operations['issue']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}/notification-settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 通知設定を取得する */
+    get: operations['get']
+    /**
+     * 通知設定を更新する
+     * @description 変更は監査ログに残す。
+     */
+    put: operations['update']
     post?: never
     delete?: never
     options?: never
@@ -69,7 +259,7 @@ export interface paths {
       cookie?: never
     }
     /** Run を新しい順に一覧する */
-    get: operations['list']
+    get: operations['list_2']
     put?: never
     /**
      * Run を作成する
@@ -93,7 +283,7 @@ export interface paths {
      * Run の判定結果を取得する
      * @description 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
      */
-    get: operations['detail']
+    get: operations['detail_1']
     put?: never
     post?: never
     delete?: never
@@ -109,13 +299,34 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    get?: never
+    /** Run に取り込んだ成果物を一覧する */
+    get: operations['list_3']
     put?: never
     /**
      * 成果物をアップロードする
      * @description この時点ではパースしない。受領・検証・保存のみを行い、パースは判定ジョブで実施する。
      */
     post: operations['uploadArtifact']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/runs/{runId}/artifacts/{artifactId}/content': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 成果物をダウンロードする
+     * @description 保持期間を過ぎて実体を削除済みなら 409 ARTIFACTS_DELETED。
+     */
+    get: operations['content']
+    put?: never
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -162,6 +373,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/runs/{runId}/reevaluate': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * Run を再評価する
+     * @description 保存済みの成果物を読み直し、最新の設定・免除・脆弱性情報で判定し直す。成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。
+     */
+    post: operations['reevaluate']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/runs/{runId}/status': {
     parameters: {
       query?: never
@@ -179,6 +410,112 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/settings/retention': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** データ保持期間を取得する */
+    get: operations['retention']
+    /**
+     * データ保持期間を変更する
+     * @description 翌日の保持期間バッチから効く。短くすると古いデータが削除される。
+     */
+    put: operations['updateRetention']
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /** 許可リストの利用者を一覧する */
+    get: operations['list_1']
+    put?: never
+    /**
+     * 許可リストに利用者を追加する
+     * @description GitHub ログイン名の実在は確認しない。存在しない名前はログインできないだけで害がない。
+     */
+    post: operations['add']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/users/{userId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    /**
+     * ロールの変更・無効化
+     * @description 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
+     */
+    patch: operations['update_2']
+    trace?: never
+  }
+  '/api/v1/waivers': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 免除を一覧する
+     * @description 有効なものを期限の近い順に先頭へ並べる。
+     */
+    get: operations['list']
+    put?: never
+    /**
+     * 免除を登録する
+     * @description 理由は 20 文字以上、期限は最長 90 日。登録と同時に最新 Run の再評価を積む。同じ対象に有効な免除があれば 409 WAIVER_ALREADY_EXISTS。
+     */
+    post: operations['create']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/waivers/{waiverId}': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    post?: never
+    /**
+     * 免除を失効させる
+     * @description 失効と同時に最新 Run の再評価を積む。
+     */
+    delete: operations['revoke']
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -188,6 +525,98 @@ export interface components {
       message?: string
       /** Format: uuid */
       repositoryId?: string
+    }
+    ArtifactItem: {
+      /** Format: uuid */
+      artifactId: string
+      component: string | null
+      /** @description 保持期間を過ぎて実体を削除済みなら true。ダウンロードできない */
+      deleted: boolean
+      filename: string
+      sha256: string
+      /** Format: int64 */
+      sizeBytes: number
+      type: string
+      /** Format: date-time */
+      uploadedAt: string
+    }
+    /** @description Run に取り込んだ成果物の一覧（FR-07-5） */
+    ArtifactListResponse: {
+      items: components['schemas']['ArtifactItem'][]
+    }
+    AuditLogItem: {
+      action: string
+      /** @description 日次バッチの操作は system */
+      actorLogin: string | null
+      /** @description 変更後の値 */
+      after: {
+        [key: string]: unknown
+      } | null
+      /** Format: uuid */
+      auditLogId: string
+      /** @description 変更前の値 */
+      before: {
+        [key: string]: unknown
+      } | null
+      /** Format: date-time */
+      occurredAt: string
+      targetId: string | null
+      targetType: string
+    }
+    /** @description 監査ログ。新しいものから返す */
+    AuditLogListResponse: {
+      hasMore: boolean
+      items: components['schemas']['AuditLogItem'][]
+      nextCursor: string | null
+    }
+    ComponentItem: {
+      language: string
+      name: string
+      pathPatterns: string[]
+    }
+    ConfigHistoryItem: {
+      /** Format: date-time */
+      createdAt: string
+      /** Format: uuid */
+      gateConfigId: string
+      sourceCommitSha: string | null
+      sourceType: string
+      /** Format: int32 */
+      version: number
+    }
+    /** @description 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる */
+    ConfigValidation: {
+      errors: components['schemas']['ValidationErrorItem'][]
+      /** @description 検証に失敗した設定ファイルの内容 */
+      rawYaml: string | null
+      /**
+       * Format: uuid
+       * @description 検証に失敗した Run
+       */
+      runId: string | null
+      valid: boolean
+    }
+    ConfigVersion: {
+      /** Format: date-time */
+      createdAt: string
+      /** Format: uuid */
+      gateConfigId: string
+      parsed: {
+        [key: string]: unknown
+      }
+      rawYaml: string
+      sourceCommitSha: string | null
+      sourceType: string
+      /** Format: int32 */
+      version: number
+    }
+    CreateRepositoryRequest: {
+      /** @description 省略時は main */
+      defaultBranch?: string | null
+      /** @description 省略時は true */
+      measurePullRequests?: boolean | null
+      name: string
+      owner: string
     }
     /** @description Run の作成要求。CI が計測開始時に送信する。 */
     CreateRunRequest: {
@@ -226,11 +655,57 @@ export interface components {
       status?:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
     }
+    CreateUserRequest: {
+      githubLogin: string
+      /**
+       * @description 省略時は VIEWER
+       * @enum {string|null}
+       */
+      role?: 'ADMIN' | 'VIEWER' | null
+    }
+    CreateWaiverRequest: {
+      /**
+       * Format: date-time
+       * @description 期限。現在より後、最大 90 日先まで
+       */
+      expiresAt: string
+      /** @description scope=FINDING のとき必須。違反一覧の fingerprint */
+      fingerprint?: string | null
+      metricId: string
+      reason: string
+      /** @enum {string} */
+      reasonCategory: 'UNREACHABLE' | 'FALSE_POSITIVE' | 'NO_FIX_AVAILABLE' | 'PLANNED'
+      /** Format: uuid */
+      repositoryId: string
+      /** @enum {string} */
+      scope: 'FINDING' | 'METRIC'
+    }
     /** @description ダッシュボード。repository_summaries を読むだけで応答する。 */
     DashboardResponse: {
       /** @description 計測途絶などの警告。画面側で判定させず、サーバが返す */
       alerts?: components['schemas']['Alert'][]
       repositories?: components['schemas']['RepositoryCard'][]
+    }
+    DeadJobItem: {
+      /** Format: int32 */
+      attempts: number
+      /** Format: date-time */
+      createdAt: string
+      dedupKey: string | null
+      /** Format: uuid */
+      jobId: string
+      lastError: string | null
+      type: string
+      /** Format: date-time */
+      updatedAt: string
+    }
+    DeadJobList: {
+      items: components['schemas']['DeadJobItem'][]
+    }
+    DefineComponentRequest: {
+      language: string
+      name: string
+      pathPatterns: string[]
     }
     FinalizeResponse: {
       detailUrl?: string
@@ -249,6 +724,8 @@ export interface components {
       filePath: string | null
       /** Format: uuid */
       findingId: string
+      /** @description Run をまたいで違反を同定するキー。免除はこの値で違反を指す */
+      fingerprint: string
       /** Format: int32 */
       line: number | null
       metricId: string
@@ -261,7 +738,7 @@ export interface components {
       /** @enum {string} */
       state: 'NEW' | 'CONTINUING' | 'RESOLVED' | 'INITIAL'
       title: string
-      /** @description 免除中の場合のみ。免除は解決ではないため画面では薄く表示しない。免除機能（FR-09）は未実装のため、現時点では常に null */
+      /** @description 判定時に免除されていた場合のみ。免除は解決ではないため画面では薄く表示しない */
       waiver: components['schemas']['Waiver']
     }
     /** @description Run に紐づく違反の一覧 */
@@ -270,6 +747,11 @@ export interface components {
       items: components['schemas']['FindingItem'][]
       /** @description 次ページのカーソル。最終ページでは null */
       nextCursor: string | null
+      /**
+       * Format: uuid
+       * @description Run の属するリポジトリ。免除の登録に使う
+       */
+      repositoryId: string
       /**
        * Format: int64
        * @description 絞り込み後の総件数。件数表示と「全部見た」の判断に使う
@@ -294,6 +776,20 @@ export interface components {
       /** Format: int32 */
       version: number | null
     }
+    IssueTokenRequest: {
+      /** @description 用途のメモ（例: GitHub Actions） */
+      description?: string | null
+    }
+    /** @description 発行した Ingest Token。token は<strong>この応答でのみ</strong>返す */
+    IssuedToken: {
+      /** Format: date-time */
+      createdAt: string
+      /** @description 平文のトークン。以後どの API からも取得できない */
+      token: string
+      /** Format: uuid */
+      tokenId: string
+      tokenPrefix: string
+    }
     LatestRun: {
       /** @enum {string} */
       completeness?: 'FULL' | 'PARTIAL'
@@ -307,6 +803,21 @@ export interface components {
        */
       verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
     }
+    LatestRunSummary: {
+      branch: string
+      commitSha: string
+      /** @enum {string|null} */
+      completeness: 'FULL' | 'PARTIAL' | null
+      /** Format: date-time */
+      measuredAt: string
+      /** Format: uuid */
+      runId: string
+      /** @enum {string} */
+      status:
+        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+      /** @enum {string|null} */
+      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
+    }
     /** @description ログイン中の利用者。フロントエンドはこの role で表示を制御する（防御は API 側）。 */
     MeResponse: {
       avatarUrl?: string
@@ -316,6 +827,38 @@ export interface components {
       role?: 'ADMIN' | 'VIEWER'
       /** Format: uuid */
       userId?: string
+    }
+    /** @description 通知設定。通知はメールで送る */
+    NotificationSettingsResponse: {
+      /** @enum {string} */
+      condition: 'EVERY_RUN' | 'TRANSITION' | 'FAIL_ONLY' | 'DISABLED'
+      /** @description サーバに SMTP が設定されているか。false ならメールは届かない */
+      emailAvailable: boolean
+      emailRecipients: string[]
+      /** Format: date-time */
+      updatedAt: string | null
+    }
+    /** @description 再評価を受け付けた。判定は非同期で行う */
+    ReevaluateResponse: {
+      /** Format: uuid */
+      jobId: string
+      /** Format: uuid */
+      runId: string
+      /**
+       * @description 受付時点の Run の状態
+       * @enum {string}
+       */
+      status:
+        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+    }
+    /** @description 登録・更新したリポジトリ */
+    RepositoryAdminResponse: {
+      defaultBranch: string
+      enabled: boolean
+      fullName: string
+      measurePullRequests: boolean
+      /** Format: uuid */
+      repositoryId: string
     }
     RepositoryCard: {
       /** Format: int32 */
@@ -330,10 +873,88 @@ export interface components {
       /** Format: uuid */
       repositoryId?: string
     }
+    /** @description 現在の設定と版の履歴。validation は直近に届いた設定ファイルの検証結果 */
+    RepositoryConfig: {
+      /** @description 設定版が 1 つも無ければ null（既定値で判定） */
+      current: components['schemas']['ConfigVersion']
+      /** @description 既定値の YAML。設定版が無いときの表示と UI 編集の初期値 */
+      defaultYaml: string
+      /** @description UI から編集できるか。ファイルで管理されていれば false */
+      editable: boolean
+      history: components['schemas']['ConfigHistoryItem'][]
+      validation: components['schemas']['ConfigValidation']
+    }
+    /** @description リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く */
+    RepositoryDetail: {
+      /** Format: int32 */
+      activeWaiverCount: number
+      components: components['schemas']['ComponentItem'][]
+      /**
+       * Format: int32
+       * @description 判定に使われている設定の版。既定値なら null
+       */
+      configVersion: number | null
+      freshness: components['schemas']['RepositoryFreshness']
+      /** Format: uuid */
+      lastFullRunId: string | null
+      /** @description 判定済みの最新 Run。まだ無ければ null */
+      latestRun: components['schemas']['LatestRunSummary']
+      repository: components['schemas']['RepositoryItem']
+    }
+    /** @description データの鮮度（FR-06-2 / FR-06-3）。基準日数はサーバが持つ */
+    RepositoryFreshness: {
+      /** Format: int32 */
+      fullMeasurementIntervalDays: number
+      /** Format: date-time */
+      lastFullMeasuredAt: string | null
+      /** Format: date-time */
+      lastMeasuredAt: string | null
+      staleFullMeasurement: boolean
+      staleMeasurement: boolean
+    }
+    RepositoryItem: {
+      /** Format: date-time */
+      createdAt: string
+      defaultBranch: string
+      enabled: boolean
+      fullName: string
+      measurePullRequests: boolean
+      name: string
+      owner: string
+      /** Format: uuid */
+      repositoryId: string
+    }
+    /** @description 登録済みのリポジトリ。無効化したものも含む */
+    RepositoryList: {
+      items: components['schemas']['RepositoryItem'][]
+    }
     RepositoryRef: {
       fullName: string | null
       /** Format: uuid */
       repositoryId: string
+    }
+    /** @description データ保持期間（日） */
+    RetentionSettings: {
+      /**
+       * Format: int32
+       * @description 成果物のファイル実体。既定 90 日
+       */
+      artifactDays: number
+      /**
+       * Format: int32
+       * @description 監査ログ。既定 730 日。削除は管理ロールのバッチが行う
+       */
+      auditLogDays: number
+      /**
+       * Format: int32
+       * @description 通知の送信履歴。既定 365 日
+       */
+      notificationDays: number
+      /**
+       * Format: int32
+       * @description Run・指標値・違反。既定 730 日（2 年）
+       */
+      runDays: number
     }
     RunCategory: {
       /** @description カテゴリ名（機能テスト など） */
@@ -509,6 +1130,25 @@ export interface components {
       name: string
       reason: string
     }
+    TokenList: {
+      items: components['schemas']['TokenSummary'][]
+    }
+    /** @description 発行済みのトークン。平文もハッシュも返さない */
+    TokenSummary: {
+      /** Format: date-time */
+      createdAt: string
+      description: string | null
+      /**
+       * Format: date-time
+       * @description 一度も使われていなければ null
+       */
+      lastUsedAt: string | null
+      /** Format: date-time */
+      revokedAt: string | null
+      /** Format: uuid */
+      tokenId: string
+      tokenPrefix: string
+    }
     TrendPoint: {
       commitSha: string
       /** Format: date-time */
@@ -547,6 +1187,26 @@ export interface components {
       points: components['schemas']['TrendPoint'][]
       seriesId: string
     }
+    UpdateConfigRequest: {
+      rawYaml: string
+    }
+    UpdateNotificationSettingsRequest: {
+      /** @enum {string|null} */
+      condition?: 'EVERY_RUN' | 'TRANSITION' | 'FAIL_ONLY' | 'DISABLED' | null
+      emailRecipients?: string[] | null
+    }
+    UpdateRepositoryRequest: {
+      defaultBranch?: string | null
+      /** @description false で無効化（ダッシュボードから外れ、取り込みも拒否される） */
+      enabled?: boolean | null
+      measurePullRequests?: boolean | null
+    }
+    UpdateUserRequest: {
+      /** @enum {string|null} */
+      role?: 'ADMIN' | 'VIEWER' | null
+      /** @enum {string|null} */
+      status?: 'ACTIVE' | 'DISABLED' | null
+    }
     UploadArtifactResponse: {
       /** Format: uuid */
       artifactId?: string
@@ -554,12 +1214,96 @@ export interface components {
       /** Format: int64 */
       sizeBytes?: number
     }
+    /** @description 利用者の一覧 */
+    UserList: {
+      items: components['schemas']['UserResponse'][]
+    }
+    /** @description 許可リストの利用者。ここに無い GitHub ユーザーはログインできない */
+    UserResponse: {
+      avatarUrl: string | null
+      /** Format: date-time */
+      createdAt: string
+      /** @description 初回ログインまでは null */
+      displayName: string | null
+      githubLogin: string
+      /**
+       * Format: date-time
+       * @description 一度もログインしていなければ null
+       */
+      lastLoginAt: string | null
+      /** @enum {string} */
+      role: 'ADMIN' | 'VIEWER'
+      /** @enum {string} */
+      status: 'ACTIVE' | 'DISABLED'
+      /** Format: uuid */
+      userId: string
+    }
+    ValidationErrorItem: {
+      /**
+       * Format: int32
+       * @description 1 始まりの行番号
+       */
+      line: number | null
+      message: string
+      path: string
+    }
     Waiver: {
       /** Format: date */
       expiresOn: string
       reason: string
+      /** @enum {string} */
+      reasonCategory: 'UNREACHABLE' | 'FALSE_POSITIVE' | 'NO_FIX_AVAILABLE' | 'PLANNED'
+      /**
+       * @description 現在の状態。判定後に失効・期限切れになっていれば ACTIVE 以外
+       * @enum {string}
+       */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
       /** Format: uuid */
       waiverId: string
+    }
+    /** @description 免除。理由の全文を返す（折りたたむと判断の妥当性を検証できない） */
+    WaiverItem: {
+      /** Format: date-time */
+      createdAt: string
+      createdByLogin: string | null
+      /** Format: date-time */
+      expiresAt: string
+      /** @description 期限まで 7 日以内の有効な免除 */
+      expiringSoon: boolean
+      fingerprint: string | null
+      metricId: string
+      metricName: string
+      reason: string
+      /** @enum {string} */
+      reasonCategory: 'UNREACHABLE' | 'FALSE_POSITIVE' | 'NO_FIX_AVAILABLE' | 'PLANNED'
+      reasonCategoryLabel: string
+      repositoryFullName: string
+      /** Format: uuid */
+      repositoryId: string
+      /** Format: date-time */
+      revokedAt: string | null
+      revokedByLogin: string | null
+      /** @enum {string} */
+      scope: 'FINDING' | 'METRIC'
+      /** @enum {string} */
+      status: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+      /** @description 登録時点の違反の見出し */
+      title: string | null
+      /** Format: uuid */
+      waiverId: string
+    }
+    WaiverList: {
+      /**
+       * Format: int64
+       * @description 有効な免除の件数
+       */
+      activeCount: number
+      /**
+       * Format: int64
+       * @description 7 日以内に期限切れになる有効な免除の件数
+       */
+      expiringSoonCount: number
+      items: components['schemas']['WaiverItem'][]
     }
   }
   responses: never
@@ -570,6 +1314,35 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  list_5: {
+    parameters: {
+      query?: {
+        /** @description 省略時は to の 30 日前 */
+        from?: string
+        /** @description 省略時は現在時刻 */
+        to?: string
+        /** @description 操作種別（WAIVER_CREATED など） */
+        action?: string
+        limit?: number
+        cursor?: string
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['AuditLogListResponse']
+        }
+      }
+    }
+  }
   dashboard: {
     parameters: {
       query?: never
@@ -590,6 +1363,66 @@ export interface operations {
       }
     }
   }
+  revoke_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        tokenId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  deadJobs: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['DeadJobList']
+        }
+      }
+    }
+  }
+  retry: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        jobId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
   me: {
     parameters: {
       query?: never
@@ -606,6 +1439,266 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['MeResponse']
+        }
+      }
+    }
+  }
+  list_4: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryList']
+        }
+      }
+    }
+  }
+  create_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateRepositoryRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryAdminResponse']
+        }
+      }
+    }
+  }
+  detail: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryDetail']
+        }
+      }
+    }
+  }
+  update_3: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateRepositoryRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryAdminResponse']
+        }
+      }
+    }
+  }
+  defineComponent: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['DefineComponentRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
+      }
+    }
+  }
+  get_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryConfig']
+        }
+      }
+    }
+  }
+  update_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateConfigRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RepositoryConfig']
+        }
+      }
+    }
+  }
+  tokens: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['TokenList']
+        }
+      }
+    }
+  }
+  issue: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['IssueTokenRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['IssuedToken']
+        }
+      }
+    }
+  }
+  get: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['NotificationSettingsResponse']
+        }
+      }
+    }
+  }
+  update: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateNotificationSettingsRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['NotificationSettingsResponse']
         }
       }
     }
@@ -641,7 +1734,7 @@ export interface operations {
       }
     }
   }
-  list: {
+  list_2: {
     parameters: {
       query: {
         repositoryId: string
@@ -689,7 +1782,7 @@ export interface operations {
       }
     }
   }
-  detail: {
+  detail_1: {
     parameters: {
       query?: never
       header?: never
@@ -707,6 +1800,28 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['RunDetailResponse']
+        }
+      }
+    }
+  }
+  list_3: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ArtifactListResponse']
         }
       }
     }
@@ -741,6 +1856,29 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['UploadArtifactResponse']
+        }
+      }
+    }
+  }
+  content: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        runId: string
+        artifactId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': string
         }
       }
     }
@@ -799,6 +1937,28 @@ export interface operations {
       }
     }
   }
+  reevaluate: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        runId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ReevaluateResponse']
+        }
+      }
+    }
+  }
   status: {
     parameters: {
       query?: never
@@ -818,6 +1978,189 @@ export interface operations {
         content: {
           '*/*': components['schemas']['RunStatusResponse']
         }
+      }
+    }
+  }
+  retention: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RetentionSettings']
+        }
+      }
+    }
+  }
+  updateRetention: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RetentionSettings']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['RetentionSettings']
+        }
+      }
+    }
+  }
+  list_1: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['UserList']
+        }
+      }
+    }
+  }
+  add: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateUserRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['UserResponse']
+        }
+      }
+    }
+  }
+  update_2: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        userId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpdateUserRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['UserResponse']
+        }
+      }
+    }
+  }
+  list: {
+    parameters: {
+      query?: {
+        /** @description 省略時は全リポジトリ */
+        repositoryId?: string
+        /** @description 省略時はすべての状態 */
+        status?: 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['WaiverList']
+        }
+      }
+    }
+  }
+  create: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateWaiverRequest']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['WaiverItem']
+        }
+      }
+    }
+  }
+  revoke: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        waiverId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }

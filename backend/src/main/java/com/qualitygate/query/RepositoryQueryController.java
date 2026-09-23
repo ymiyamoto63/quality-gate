@@ -1,5 +1,6 @@
 package com.qualitygate.query;
 
+import com.qualitygate.query.dto.RepositoryResponses;
 import com.qualitygate.query.dto.TrendResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -20,9 +21,26 @@ import java.util.UUID;
 public class RepositoryQueryController {
 
     private final TrendQueryService trends;
+    private final RepositoryQueryService repositories;
 
-    public RepositoryQueryController(TrendQueryService trends) {
+    public RepositoryQueryController(TrendQueryService trends,
+                                     RepositoryQueryService repositories) {
         this.trends = trends;
+        this.repositories = repositories;
+    }
+
+    @GetMapping
+    @Operation(summary = "登録済みのリポジトリを一覧する")
+    public RepositoryResponses.RepositoryList list() {
+        return repositories.list();
+    }
+
+    @GetMapping("/{repositoryId}")
+    @Operation(summary = "リポジトリ詳細を取得する",
+            description = "指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。"
+                    + "判定表の組み立てを 2 箇所に持たないため。")
+    public RepositoryResponses.RepositoryDetail detail(@PathVariable UUID repositoryId) {
+        return repositories.detail(repositoryId);
     }
 
     @GetMapping("/{repositoryId}/trends")

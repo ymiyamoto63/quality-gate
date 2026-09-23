@@ -21,6 +21,9 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     Optional<Run> findFirstByRepositoryIdAndBranchAndStatusOrderByMeasuredAtDesc(
             UUID repositoryId, String branch, RunStatus status);
 
+    Optional<Run> findFirstByRepositoryIdAndBranchAndStatusAndMeasuredAtLessThanOrderByMeasuredAtDesc(
+            UUID repositoryId, String branch, RunStatus status, Instant measuredAt);
+
     List<Run> findByRepositoryIdOrderByMeasuredAtDesc(UUID repositoryId, Pageable pageable);
 
     /**

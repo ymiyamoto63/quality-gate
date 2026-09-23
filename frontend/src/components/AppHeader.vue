@@ -20,6 +20,7 @@ function cycleTheme() {
     <nav aria-label="メインナビゲーション">
       <RouterLink to="/">ダッシュボード</RouterLink>
       <RouterLink to="/waivers">免除</RouterLink>
+      <RouterLink v-if="auth.isAdmin" to="/admin/repositories">リポジトリ管理</RouterLink>
       <RouterLink v-if="auth.isAdmin" to="/admin/users">管理</RouterLink>
     </nav>
 

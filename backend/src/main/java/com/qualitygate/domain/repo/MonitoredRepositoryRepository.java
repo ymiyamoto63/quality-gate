@@ -12,4 +12,8 @@ public interface MonitoredRepositoryRepository extends JpaRepository<MonitoredRe
     Optional<MonitoredRepository> findByOwnerAndName(String owner, String name);
 
     List<MonitoredRepository> findByEnabledTrueOrderByOwnerAscNameAsc();
+
+    Optional<MonitoredRepository> findByOwnerIgnoreCaseAndNameIgnoreCase(String owner, String name);
+
+    List<MonitoredRepository> findAllByOrderByOwnerAscNameAsc();
 }

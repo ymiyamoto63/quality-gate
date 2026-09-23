@@ -13,4 +13,6 @@ public interface IngestTokenRepository extends JpaRepository<IngestToken, UUID> 
     Optional<IngestToken> findByTokenPrefix(String tokenPrefix);
 
     List<IngestToken> findByRepositoryIdAndRevokedAtIsNull(UUID repositoryId);
+
+    List<IngestToken> findByRepositoryIdOrderByCreatedAtDesc(UUID repositoryId);
 }

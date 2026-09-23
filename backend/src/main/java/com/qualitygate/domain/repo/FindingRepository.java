@@ -25,6 +25,17 @@ public interface FindingRepository extends JpaRepository<Finding, UUID>, Finding
 
     long countByRunIdAndWaiverIdIsNotNull(UUID runId);
 
+    /** リポジトリで直近に検出された同じ違反。免除の対象の確認と見出しの複製に使う。 */
+    @Query("""
+            select f from Finding f, Run r
+            where r.id = f.runId and r.repositoryId = :repositoryId
+              and f.metricId = :metricId and f.fingerprint = :fingerprint
+            order by r.measuredAt desc limit 1
+            """)
+    java.util.Optional<Finding> findLatestInRepository(@Param("repositoryId") UUID repositoryId,
+                                                       @Param("metricId") String metricId,
+                                                       @Param("fingerprint") String fingerprint);
+
     /** 比較対象 Run の fingerprint 集合。差分（新規 / 継続 / 解消）の算出に使う。 */
     @Query("select f.fingerprint from Finding f where f.runId = :runId and f.state <> 'RESOLVED'")
     List<String> findActiveFingerprints(@Param("runId") UUID runId);

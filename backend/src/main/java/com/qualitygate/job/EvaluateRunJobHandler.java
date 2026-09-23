@@ -37,12 +37,14 @@ public class EvaluateRunJobHandler implements JobHandler {
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
     private final ObjectMapper objectMapper;
+    private final JobEnqueuer enqueuer;
 
     public EvaluateRunJobHandler(RunRepository runs, ArtifactRecordRepository artifacts,
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
-                                 ObjectMapper objectMapper) {
+                                 ObjectMapper objectMapper, JobEnqueuer enqueuer) {
+        this.enqueuer = enqueuer;
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
@@ -64,6 +66,12 @@ public class EvaluateRunJobHandler implements JobHandler {
                 () -> new IllegalStateException("Run が存在しません: " + runId));
 
         List<ArtifactRecord> records = artifacts.findByRunId(runId);
+        if (job.getType() == JobType.REEVALUATE_RUN
+                && records.stream().anyMatch(a -> a.getDeletedAt() != null)) {
+            // 実体の無い成果物を読むと全指標が ERROR になり、確定済みの判定を壊してしまう
+            throw new JobInputException("成果物が保持期間を過ぎて削除されているため再評価しません runId="
+                    + runId);
+        }
 
         GateConfigService.Resolved config;
         try {
@@ -83,8 +91,14 @@ public class EvaluateRunJobHandler implements JobHandler {
                 records.size(), input.metricsWithData(),
                 input.headFindings().size(), input.parseErrors().keySet());
 
-        evaluationService.evaluate(runId, input, thresholds,
+        Run evaluated = evaluationService.evaluate(runId, input, thresholds,
                 config.isDefault() ? null : config.gateConfig().getId());
+
+        // 通知は別のジョブにする。通知先の障害で判定が巻き戻らないように。
+        // 鍵に判定時刻を含め、再評価のたびに通知の要否を判断し直す
+        String evaluationKey = runId + ":" + evaluated.getEvaluatedAt().toEpochMilli();
+        enqueuer.enqueue(JobType.SEND_NOTIFICATION, evaluationKey,
+                java.util.Map.of("runId", runId.toString(), "evaluationKey", evaluationKey));
     }
 
     private void markConfigInvalid(Run run, ConfigValidationException e) {

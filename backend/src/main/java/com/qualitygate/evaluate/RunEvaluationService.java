@@ -19,6 +19,7 @@ import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
+import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -55,18 +56,21 @@ public class RunEvaluationService {
     private final MeasurementRepository measurements;
     private final FindingRepository findings;
     private final RepositorySummaryRepository summaries;
+    private final WaiverRepository waivers;
     private final List<MetricEvaluator> evaluators;
     private final ObjectMapper objectMapper;
 
+    @SuppressWarnings("java:S107")
     public RunEvaluationService(RunRepository runs, RunSkippedMetricRepository skippedMetrics,
                                 MeasurementRepository measurements, FindingRepository findings,
-                                RepositorySummaryRepository summaries,
+                                RepositorySummaryRepository summaries, WaiverRepository waivers,
                                 List<MetricEvaluator> evaluators, ObjectMapper objectMapper) {
         this.runs = runs;
         this.skippedMetrics = skippedMetrics;
         this.measurements = measurements;
         this.findings = findings;
         this.summaries = summaries;
+        this.waivers = waivers;
         this.evaluators = evaluators;
         this.objectMapper = objectMapper;
     }
@@ -83,10 +87,23 @@ public class RunEvaluationService {
 
         Optional<Run> baseline = findBaseline(run);
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
-        EvaluationContext context = new EvaluationContext(run, thresholds, input,
-                previousValuesOf(baseline), baseline.isPresent());
+        Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
 
+        // 免除は判定の直前に適用する（docs/05-architecture.md 3.2 の 5）。
+        // 判定時点で有効なものだけを使うため、期限切れは自動的に再びカウントされる
+        Instant now = Instant.now();
+        ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), now));
+        EvaluationContext context = new EvaluationContext(run, thresholds,
+                active.removeFrom(input), previousValues, baseline.isPresent());
         List<MetricResult> results = evaluateAll(context);
+        if (active.coversFindings()) {
+            // 免除した違反も一覧に残す（免除は解決ではない）。何が違反かは評価器が決めるため、
+            // 免除を適用しない入力でも判定し、その違反を免除の印つきで保存する
+            List<MetricResult> unwaived = evaluateAll(new EvaluationContext(run, thresholds,
+                    input, previousValues, baseline.isPresent()));
+            results = active.restoreWaivedFindings(results, unwaived);
+        }
+        results = active.applyMetricWaivers(results);
 
         // 再評価でも重複しないよう、この Run の既存の判定結果を置き換える
         measurements.deleteByRunId(runId);
@@ -95,13 +112,13 @@ public class RunEvaluationService {
         findings.flush();
 
         persistMeasurements(run, results, context);
-        persistFindings(run, results, baseline);
+        persistFindings(run, results, baseline, active);
 
         Verdict verdict = aggregate(results);
         Completeness completeness = completenessOf(results);
         run.markEvaluated(verdict, completeness, Instant.now());
 
-        updateSummary(run, results, verdict, completeness);
+        updateSummary(run, results, verdict, completeness, now, active);
 
         log.info("判定が完了しました runId={} verdict={} completeness={} 指標={}件",
                 runId, verdict, completeness, results.size());
@@ -197,7 +214,8 @@ public class RunEvaluationService {
      * <p>解消された違反も {@link FindingState#RESOLVED} として保存する。Run を
      * 不変のスナップショットに保ち、比較対象が削除されても表示が壊れないようにするため。
      */
-    private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline) {
+    private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline,
+                                 ActiveWaivers active) {
         Set<String> baselineFingerprints = baseline
                 .map(b -> Set.copyOf(findings.findActiveFingerprints(b.getId())))
                 .orElse(Set.of());
@@ -208,7 +226,9 @@ public class RunEvaluationService {
                 current.add(finding.fingerprint());
                 FindingState state = stateOf(finding.fingerprint(), baselineFingerprints,
                         baseline.isPresent());
-                findings.save(toEntity(run, finding, state));
+                Finding entity = toEntity(run, finding, state);
+                active.waiverOf(finding).ifPresent(entity::applyWaiver);
+                findings.save(entity);
             }
         }
 
@@ -276,10 +296,22 @@ public class RunEvaluationService {
         return partial ? Completeness.PARTIAL : Completeness.FULL;
     }
 
+    /**
+     * 比較対象 Run。同一ブランチで、この Run より前に計測された判定済みの Run。
+     *
+     * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
+     * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
+     */
     private Optional<Run> findBaseline(Run run) {
-        return runs.findFirstByRepositoryIdAndBranchAndStatusOrderByMeasuredAtDesc(
+        if (run.getBaselineRunId() != null) {
+            Optional<Run> previous = runs.findById(run.getBaselineRunId());
+            if (previous.isPresent()) {
+                return previous;
+            }
+        }
+        return runs.findFirstByRepositoryIdAndBranchAndStatusAndMeasuredAtLessThanOrderByMeasuredAtDesc(
                         run.getRepositoryId(), run.getBranch(),
-                        com.qualitygate.domain.model.RunStatus.EVALUATED)
+                        com.qualitygate.domain.model.RunStatus.EVALUATED, run.getMeasuredAt())
                 .filter(candidate -> !candidate.getId().equals(run.getId()));
     }
 
@@ -296,16 +328,33 @@ public class RunEvaluationService {
         return values;
     }
 
+    /**
+     * 読み取りモデルを更新する。
+     *
+     * <p>最新の Run より古い Run（過去の Run の再評価、遅れて届いた Run）では
+     * 最新の判定を書き換えない。ダッシュボードが過去の状態に巻き戻って見えるため。
+     * 免除の件数だけは常に現在値に更新する。
+     */
     private void updateSummary(Run run, List<MetricResult> results, Verdict verdict,
-                               Completeness completeness) {
+                               Completeness completeness, Instant now, ActiveWaivers active) {
         RepositorySummary summary = summaries.findById(run.getRepositoryId())
                 .orElseGet(() -> summaries.save(new RepositorySummary(run.getRepositoryId())));
+        int activeWaivers = (int) waivers.countEffective(run.getRepositoryId(), now);
 
-        long critical = countBySeverity(results, Severity.CRITICAL);
-        long high = countBySeverity(results, Severity.HIGH);
+        boolean isLatest = summary.getLatestMeasuredAt() == null
+                || !run.getMeasuredAt().isBefore(summary.getLatestMeasuredAt())
+                || run.getId().equals(summary.getLatestRunId());
+        if (!isLatest) {
+            summary.updateWaiverCount(activeWaivers);
+            summaries.save(summary);
+            return;
+        }
+
+        long critical = countBySeverity(results, Severity.CRITICAL, active);
+        long high = countBySeverity(results, Severity.HIGH, active);
 
         summary.update(run.getId(), verdict, completeness, run.getMeasuredAt(),
-                toJson(categoryStatusOf(results)), (int) critical, (int) high, 0);
+                toJson(categoryStatusOf(results)), (int) critical, (int) high, activeWaivers);
         summaries.save(summary);
     }
 
@@ -345,11 +394,14 @@ public class RunEvaluationService {
      * アクセシビリティ違反（M-10）も同じ深刻度で保存するため、混ぜると
      * 未解決の脆弱性が増えたように見える。
      */
-    private static long countBySeverity(List<MetricResult> results, Severity severity) {
+    private static long countBySeverity(List<MetricResult> results, Severity severity,
+                                        ActiveWaivers active) {
+        // 免除中の違反は「未解決」に数えない。判定と同じ件数をダッシュボードに出す
         return results.stream()
                 .filter(r -> GateThresholds.M_VULNERABILITIES.equals(r.metricId()))
                 .flatMap(r -> r.findingsToPersist().stream())
                 .filter(f -> f.finding().severity() == severity)
+                .filter(f -> active.waiverOf(f).isEmpty())
                 .count();
     }
 

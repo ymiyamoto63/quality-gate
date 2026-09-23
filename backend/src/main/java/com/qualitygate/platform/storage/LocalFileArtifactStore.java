@@ -69,6 +69,28 @@ public class LocalFileArtifactStore implements ArtifactStore {
     }
 
     @Override
+    public java.util.List<String> listKeysWrittenBefore(java.time.Instant before, int limit) {
+        if (!Files.isDirectory(root)) {
+            return java.util.List.of();
+        }
+        try (var paths = Files.walk(root, 2)) {
+            return paths.filter(Files::isRegularFile)
+                    .filter(path -> {
+                        try {
+                            return Files.getLastModifiedTime(path).toInstant().isBefore(before);
+                        } catch (IOException e) {
+                            return false;
+                        }
+                    })
+                    .limit(limit)
+                    .map(path -> root.relativize(path).toString().replace('\\', '/'))
+                    .toList();
+        } catch (IOException e) {
+            throw new IllegalStateException("成果物の一覧を取得できませんでした", e);
+        }
+    }
+
+    @Override
     public boolean exists(String storageKey) {
         return Files.exists(resolve(storageKey));
     }
