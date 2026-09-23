@@ -78,7 +78,7 @@ final class NotificationMessages {
                                      Instant last, String detailUrl) {
         String subject = "[quality-gate] %s: %s".formatted(repository.fullName(), what);
         String text = subject + "\n最後の計測: " + (last == null ? "なし" : DATE_TIME.format(last))
-                + "\nCI からの送信が止まっていないか確認してください。\n\nリポジトリ: " + detailUrl + "\n";
+                + "\nCI（または収集ランナー）からの送信が止まっていないか確認してください。\n\nリポジトリ: " + detailUrl + "\n";
         return new NotificationMessage(subject, text);
     }
 

@@ -171,7 +171,7 @@ public class RunEvaluationService {
             // 申告のない未提出は不合格として扱う（fail-closed）。
             // 計測できていないものを合格扱いにすると、計測の破綻に気づけない。
             return List.of(MetricResult.error(metricId,
-                    "成果物が提出されていません。CI から送信されているか確認してください"
+                    "成果物が提出されていません。CI（または収集ランナー）から送信されているか確認してください"
                             + "（意図的に計測しない場合は skippedMetrics で申告してください）"));
         }
 

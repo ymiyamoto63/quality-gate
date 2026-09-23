@@ -1,7 +1,8 @@
 # 実装状況
 
 **全 10 指標の判定・免除・通知・監査ログ・再評価・全画面まで実装済み（2026-09-23）。**
-CI から quality-gate への送信（`quality-gate-action`）は未実装のため、取り込みは現状 API を直接呼んで行う（[CI からの取り込み](operations/ingest.md)）。
+対象リポジトリの計測は、quality-gate 側の収集ランナーが対象を取得して行う（D-16。[収集ランナーで計測する](operations/collector.md)）。
+収集ランナーが計測するのは現状 M-01 / M-06〜M-09 で、M-02 / M-10 は段階 3・4 で追加する。
 
 | フェーズ | 状態 |
 | --- | --- |
@@ -10,11 +11,11 @@ CI から quality-gate への送信（`quality-gate-action`）は未実装のた
 | 基本設計（方式・DB・API・画面） | 完了 |
 | プロジェクト雛形 | 完了（ビルド・テスト・起動を確認済み） |
 | 正規化・判定エンジン | 完了（M-01〜M-10 の全 10 指標） |
-| 設定解決（`.quality-gate.yml`） | 完了（検証・版管理・Run への紐づけ） |
+| 設定解決（`.quality-gate.yml` / 画面の設定） | 完了（検証・版管理・Run への紐づけ） |
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
 | API と画面（S-01〜S-09） | 完了 |
-| CI からの送信（`quality-gate-action`） | 未着手 |
-| 収集ランナー（対象リポジトリに何も置かない計測） | 段階 1・2 を実装（M-01 / M-06〜M-09。手動実行と 15 分ごとの定期実行、PR の先頭も計測。[収集ランナーで計測する](operations/collector.md)） |
+| 収集ランナー（対象リポジトリに何も置かない計測。D-16） | 段階 1・2 を実装（M-01 / M-06〜M-09。手動実行と 15 分ごとの定期実行、PR の先頭も計測。[収集ランナーで計測する](operations/collector.md)）。段階 3（M-02）・4（M-10）は未着手 |
+| 対象の CI からの送信（`quality-gate-action`） | 未着手（D-16 により推奨に変更） |
 
 ## 動くもの
 
@@ -53,7 +54,9 @@ CI から quality-gate への送信（`quality-gate-action`）は未実装のた
   許可リストとロール・監査ログ・保持期間・失敗したジョブの再実行（S-09）、設定の表示と画面からの編集（S-06）、
   リポジトリ詳細（S-02）
 - **設定解決** — CI が送る `.quality-gate.yml` を行番号つきで検証し、
-  内容ハッシュで版管理して Run に紐づける
+  内容ハッシュで版管理して Run に紐づける。ファイルが送られない Run（収集ランナー）は画面で保存した設定で判定する
+- **収集ランナー** — quality-gate の GitHub Actions（セルフホストランナー）で対象リポジトリを取得・計測・送信する。
+  15 分ごとに既定ブランチと PR の先頭の未計測コミットを探して計測し、計測済みのコミットは記録して二重に計測しない
 - **Run 詳細（S-03）と違反一覧（S-04）** — 判定結果をカテゴリ別に読み、
   違反を状態・深刻度で絞り込み、GitHub の該当箇所へ辿れる
   - `GET /api/v1/runs/{runId}` / `GET /api/v1/runs/{runId}/findings` / `GET /api/v1/runs`
@@ -71,12 +74,13 @@ CI から quality-gate への送信（`quality-gate-action`）は未実装のた
 
 ## 未実装のもの
 
-- **CI からの送信** — GitHub Actions 用の composite action `quality-gate-action`（FR-03-4）と CLI（FR-03-5）。
-  `.github/workflows/quality-gate.yml` の `submit` ジョブは成果物を集めてスキップ対象を算出するところまでで、
+- **収集ランナーの残り** — M-02（PIT。段階 3）、M-10（アクセシビリティ。段階 4）、計測のコンテナ隔離
+- **対象の CI からの送信** — GitHub Actions 用の composite action `quality-gate-action`（FR-03-4。D-16 により推奨）と CLI（FR-03-5）。
+  quality-gate 自身の `.github/workflows/quality-gate.yml` の `submit` ジョブは成果物を集めてスキップ対象を算出するところまでで、
   送信部分は TODO のまま
 - `pact-verification` / `gatling-log` / `istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` 形式のアダプタ
   （Pact は JUnit XML、それ以外は SARIF など実装済みの形式で送れる。ただし M-07 は `pmd-xml` のみ）
-- `baseCommitSha` 省略時の merge-base の自動解決（GitHub API 連携は未実装。CI 側で算出して渡す）
+- `baseCommitSha` 省略時の merge-base の自動解決（バックエンドの GitHub API 連携は未実装。収集ランナーや CI 側で算出して渡す）
 - API のレート制限（`RATE_LIMITED` のエラーコードのみ定義済み）
 - 可観測性の一部 — JSON 構造化ログと相関 ID（MDC）、独自メトリクス（`qg.notifications` 以外の `qg.*`）
 - 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、

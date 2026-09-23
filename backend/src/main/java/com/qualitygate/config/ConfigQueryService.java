@@ -39,6 +39,10 @@ import java.util.UUID;
  * <p>優先順位は {@code .quality-gate.yml（CI が送信） > UI 設定 > システム既定値}。
  * ファイルで管理されているリポジトリでは UI 編集を受け付けない。優先順位を知らずに
  * UI で変更し、反映されずに混乱する事故を防ぐ（docs/initial/08-screen-design.md 4.6）。
+ *
+ * <p>ファイルで管理されているかは、直近に判定された Run がファイルの設定で判定されたかで決める。
+ * 収集ランナー（docs/architecture/collector-runner.md）は設定ファイルを送らないため、
+ * 対象の CI から収集ランナーへ切り替えた後は、過去のファイル由来の版が残っていても UI で編集できる。
  */
 @Service
 public class ConfigQueryService {
@@ -118,7 +122,7 @@ public class ConfigQueryService {
         return new ConfigResponses.RepositoryConfig(current,
                 versions.stream().map(ConfigQueryService::historyOf).toList(),
                 latestValidation(repositoryId),
-                isEditable(versions),
+                isEditable(repositoryId, versions),
                 DEFAULT_YAML);
     }
 
@@ -131,10 +135,11 @@ public class ConfigQueryService {
         Actor actor = currentUser.actor();
         requireRepository(repositoryId);
         List<GateConfig> versions = configs.findByRepositoryIdOrderByVersionDesc(repositoryId);
-        if (!isEditable(versions)) {
+        if (!isEditable(repositoryId, versions)) {
             throw new ApiException(ErrorCode.CONFIG_MANAGED_BY_FILE,
                     "このリポジトリの設定は .quality-gate.yml で管理されており、ファイルが優先されます。"
-                            + "設定を変えるにはファイルを編集してください");
+                            + "設定を変えるにはファイルを編集してください"
+                            + "（CI が .quality-gate.yml を送らなくなれば、次に判定された Run から画面で編集できます）");
         }
 
         GateConfigDocument document;
@@ -159,8 +164,19 @@ public class ConfigQueryService {
                 Map.of("version", saved.getVersion(), "sourceType", GateConfig.SOURCE_UI));
     }
 
-    /** 最新の版がファイル由来でなければ UI から編集できる。 */
-    private static boolean isEditable(List<GateConfig> versions) {
+    /**
+     * 直近に判定された Run がファイル由来の設定で判定されていなければ UI から編集できる。
+     * 判定済みの Run が無いときは、最新の版がファイル由来かで決める。
+     */
+    private boolean isEditable(UUID repositoryId, List<GateConfig> versions) {
+        Optional<Run> latest = runs.findFirstByRepositoryIdAndStatusOrderByMeasuredAtDesc(
+                repositoryId, RunStatus.EVALUATED);
+        if (latest.isPresent()) {
+            UUID applied = latest.get().getGateConfigId();
+            return applied == null || versions.stream()
+                    .filter(v -> v.getId().equals(applied))
+                    .noneMatch(v -> GateConfig.SOURCE_FILE.equals(v.getSourceType()));
+        }
         return versions.isEmpty()
                 || !GateConfig.SOURCE_FILE.equals(versions.getFirst().getSourceType());
     }

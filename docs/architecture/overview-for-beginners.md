@@ -125,7 +125,10 @@ like-chatgpt そのものには一切手を加えません。
 | **測るツールの版** | quality-gate リポジトリの `collector/versions.env` | JaCoCo 0.8.15、PMD 7.17.0 |
 
 like-chatgpt 自身の `.quality-gate.yml` やワークフロー（以前の方式の名残）は、収集ランナーでは**使いません**。
-残っていても害はなく、like-chatgpt 側の CI は今までどおり動きます（その場合、同じコミットの Run が 2 つできます）。
+ただし like-chatgpt 側の CI が quality-gate への送信を続けていると、同じコミットの Run が 2 つでき、
+その Run は like-chatgpt の `.quality-gate.yml` で判定されます（その間は画面 S-06 で設定を編集できません）。
+like-chatgpt 側の CI 用の Ingest Token を quality-gate の管理画面で失効させれば、like-chatgpt に触らずに送信を止められます
+（[対象の CI からの送信を止める](../operations/collector.md#対象の-ci-からの送信を止める)）。
 
 ### 4.3 like-chatgpt のコードは書き換えるのか
 
@@ -450,7 +453,8 @@ A. 収集ランナーで M-01 / M-06〜M-09 が問題なく測れることを確
 | --- | --- |
 | 収集ランナーの設定と実行の手順 | [収集ランナーで計測する](../operations/collector.md) |
 | セルフホストランナーの準備 | [セルフホストランナー](../operations/self-hosted-runner.md) |
-| 収集ランナー方式を選んだ理由と今後の計画 | [収集ランナー方式への変更の検討](collector-runner.md) |
+| 収集ランナー方式を選んだ理由と今後の計画 | [収集ランナー方式](collector-runner.md) |
+| 決定事項（D-1〜D-16） | [決定事項の記録と残課題](../initial/03-open-questions.md) |
 | ログインと GitHub App の詳細 | [認証と GitHub App](authentication.md) |
 | アプリの起動構成 | [起動の仕組み](runtime.md) |
 | 各指標の正確な定義と計算式 | [指標・判定仕様](../initial/02-metrics-spec.md) |

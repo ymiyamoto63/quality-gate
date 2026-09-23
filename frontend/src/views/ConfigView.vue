@@ -187,9 +187,11 @@ function sourceLabel(sourceType: string): string {
           反映されない変更をして混乱する事故を防ぐ（docs/initial/08-screen-design.md 4.6）。
         -->
         <p class="qg-panel">
-          リポジトリ内の <code>.quality-gate.yml</code> が画面の設定より優先されます。
+          CI が <code>.quality-gate.yml</code> を送った Run
+          では、そのファイルが画面の設定より優先されます。
+          収集ランナーはファイルを送らないため、画面の設定で判定します。
           <template v-if="!config.editable">
-            このリポジトリの設定はファイルで管理されているため、画面からは編集できません。
+            直近の Run がファイルの設定で判定されているため、画面からは編集できません。
           </template>
         </p>
         <p v-if="!auth.isAdmin" class="qg-muted">この操作には管理者権限が必要です。</p>

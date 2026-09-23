@@ -1,8 +1,15 @@
-# CI からの取り込みと判定ジョブ
+# 取り込み（Ingest API）と判定ジョブ
+
+計測結果は Ingest API で quality-gate に送ります。送り手は次の 2 つで、どちらも同じ API を使います。
+
+| 送り手 | 説明 |
+| --- | --- |
+| 収集ランナー（標準） | quality-gate 側のワークフローが対象を取得・計測して送る（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)） |
+| 対象の CI | 対象リポジトリのワークフローが自分で計測して送る（[CI から直接送る方式](target-repository.md)。quality-gate 自身もこの方式） |
 
 取り込みから表示までの流れ:
 
-1. CI が `POST /api/v1/runs` で Run を作成する（`repository` はトークンの発行元と一致する必要がある）
+1. 送り手が `POST /api/v1/runs` で Run を作成する（`repository` はトークンの発行元と一致する必要がある）
 2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` など）を
    アップロードする。この時点ではパースせず、`QG_ARTIFACT_ROOT` に保存するだけ
 3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、判定ジョブが DB のジョブキューに積まれ、すぐに `202` が返る
@@ -10,8 +17,9 @@
    正規化 → 判定 → 読み取りモデル更新を行う
 5. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 
-> CI から送信する部分（`quality-gate-action`）は未実装です。`.github/workflows/quality-gate.yml` の
-> `submit` ジョブは送信の手前で止まっているため、現状は下の手順のように API を直接呼んで取り込みます。
+> 対象の CI 向けの送信アクション（`quality-gate-action`）は未実装です。quality-gate 自身の `.github/workflows/quality-gate.yml` の
+> `submit` ジョブは送信の手前で止まっているため、quality-gate 自身の計測は現状、下の手順のように API を直接呼んで取り込みます。
+> 収集ランナーは `collector/bin/submit.sh` で送信まで行います。
 
 認証の経路（Ingest Token とセッション Cookie の使い分け）は [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。
 

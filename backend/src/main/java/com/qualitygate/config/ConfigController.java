@@ -35,7 +35,7 @@ public class ConfigController {
     @PutMapping
     @PreAuthorize("hasRole('ADMIN')")
     @Operation(summary = "UI から設定を更新する",
-            description = "リポジトリ内のファイルが優先される。ファイルで管理されている場合は "
+            description = "CI が送ったファイルが優先される。直近に判定された Run がファイルの設定で判定されている場合は "
                     + "409 CONFIG_MANAGED_BY_FILE。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。")
     public ConfigResponses.RepositoryConfig update(
             @PathVariable UUID repositoryId,

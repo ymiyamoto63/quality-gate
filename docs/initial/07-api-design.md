@@ -4,7 +4,7 @@
 | --- | --- |
 | ドキュメント名 | quality-gate API 設計（基本設計） |
 | バージョン | 1.0 |
-| 最終更新 | 2026-09-21 |
+| 最終更新 | 2026-09-23 |
 | 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
 
 本書で定義した API から `api/openapi.yml` が生成され、
@@ -110,7 +110,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 凡例: 認可の `—` は認証のみで可（`VIEWER` 以上）。
 
-### 2.1 Ingest API（CI → quality-gate）
+### 2.1 Ingest API（収集ランナー / CI → quality-gate）
 
 | メソッド | パス | 用途 | 認可 |
 | --- | --- | --- | --- |
@@ -667,7 +667,7 @@ API のパスはリポジトリ上のファイルではない。
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
 | トークン | 一覧は平文もハッシュも返さない。監査ログにも平文を残さない |
-| 設定 | `GET .../config` は `editable`（UI 編集の可否）と `defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す。`PUT` は最新の版がファイル由来なら `409 CONFIG_MANAGED_BY_FILE`、検証エラーは `422 CONFIG_VALIDATION_FAILED`（`errors` に行番号） |
+| 設定 | `GET .../config` は `editable`（UI 編集の可否）と `defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す。`PUT` は直近に判定された Run がファイル由来の設定で判定されていれば `409 CONFIG_MANAGED_BY_FILE`（判定済みの Run が無ければ最新の版がファイル由来かで決める。収集ランナーはファイルを送らないため、切り替え後は編集できる）、検証エラーは `422 CONFIG_VALIDATION_FAILED`（`errors` に行番号） |
 | 免除 | 違反の免除（`scope: FINDING`）は、そのリポジトリで検出されたことのある違反だけを対象にできる（無ければ 404）。登録時点の違反の見出しを `title` に複製する。指標の免除（`scope: METRIC`）は判定を `REFERENCE` にして本来の判定を理由に残し、ダッシュボードの `alerts` に `METRIC_WAIVED` を常に出す。違反の免除は違反を数える指標（M-06 / M-07 / M-09 / M-10）に効く。M-08 は件数の集計で判定するため、指標の免除を使う |
 | 違反一覧 | 各違反に `fingerprint`、応答に `repositoryId` を返す（免除の登録に使う）。`waiver.status` は判定後に失効・期限切れになっていれば `ACTIVE` 以外 |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` の `status` は受付時点の Run の状態。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
@@ -786,7 +786,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `USER_ALREADY_EXISTS` | 409 | 同じ GitHub ログイン名の利用者が既にある |
 | `ADMIN_REQUIRED` | 409 | 自分自身の降格・無効化、または有効な管理者が 0 人になる変更 |
 | `REPOSITORY_ALREADY_EXISTS` | 409 | 同じリポジトリが既に登録されている |
-| `CONFIG_MANAGED_BY_FILE` | 409 | 設定がリポジトリ内のファイルで管理されており、UI から編集できない |
+| `CONFIG_MANAGED_BY_FILE` | 409 | 直近の Run が CI の送った設定ファイルで判定されており、UI から編集できない |
 | `RUN_NOT_EVALUABLE` | 409 | 取り込みが確定していない Run の再評価 |
 | `WAIVER_ALREADY_EXISTS` | 409 | 同一対象に有効な免除が存在する |
 | `ARTIFACTS_DELETED` | 409 | 成果物が保持期間経過で削除済み（再評価不可） |

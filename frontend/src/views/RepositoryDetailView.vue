@@ -105,8 +105,8 @@ function metricLabel(metric: Schemas['RunMetric']): string {
       <section class="qg-panel" aria-labelledby="latest-heading">
         <h2 id="latest-heading">最新の判定</h2>
         <p v-if="!detail.latestRun" class="qg-empty">
-          まだ計測結果がありません。CI から送信されると表示されます（Ingest Token は管理 ›
-          リポジトリで発行します）。
+          まだ計測結果がありません。収集ランナー（または CI）から送信されると表示されます（Ingest
+          Token は管理 › リポジトリで発行します）。
         </p>
         <template v-else>
           <p class="qg-latest">

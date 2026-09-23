@@ -281,7 +281,7 @@ paths:
       tags:
       - Config
     put:
-      description: リポジトリ内のファイルが優先される。ファイルで管理されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは
+      description: CI が送ったファイルが優先される。直近に判定された Run がファイルの設定で判定されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは
         422 CONFIG_VALIDATION_FAILED（行番号付き）。
       operationId: update_1
       parameters:
@@ -1733,7 +1733,7 @@ components:
           description: 既定値の YAML。設定版が無いときの表示と UI 編集の初期値
         editable:
           type: boolean
-          description: UI から編集できるか。ファイルで管理されていれば false
+          description: UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false
         history:
           type: array
           items:

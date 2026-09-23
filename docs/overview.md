@@ -3,9 +3,11 @@
 quality-gate は、指定したリポジトリの品質指標を定量的に計測・蓄積し、あらかじめ定義した合格ラインに対する
 **合格 / 不合格を判定して可視化する**社内向け Web アプリケーションです。
 
-計測そのものは対象リポジトリの CI（GitHub Actions 等）で実行し、quality-gate は
-その成果物（JaCoCo / PIT / k6 / SARIF / Pact / axe-core など）を取り込んで
-正規化・判定・可視化・通知を担当します。
+計測は quality-gate 側の**収集ランナー**（quality-gate リポジトリの GitHub Actions とセルフホストランナー）が
+対象リポジトリを取得して行い、その成果物（JaCoCo / lcov / SARIF / PMD / JUnit XML / oasdiff など）を
+Ingest API で送ります。対象リポジトリには設定ファイルもワークフローも置きません（D-16）。
+バックエンドは送られた成果物を取り込んで、正規化・判定・可視化・通知を担当します（テストは実行しません。D-1）。
+対象の CI から Ingest API へ直接送ることもできます（quality-gate 自身の計測はこの方式）。
 
 ## 対象とする品質指標
 
@@ -42,8 +44,10 @@ quality-gate/
 ├ frontend/         Vue 3 + Vite
 │  └ src/api/schema.d.ts                openapi.yml から生成（コミットする）
 ├ api/openapi.yml   バックエンドから生成（コミットする）
+├ collector/        収集ランナー（計測スクリプト・対象ごとの計測プロファイル・ツールの版）
 ├ perf/k6/          性能テストのシナリオ（M-03〜05 の計測元）
 ├ docs/             ドキュメント（initial/ は初期の要件定義・設計）
+├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ quality-gate.yml（自身の CI）
 ├ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）
 └ .quality-gate.yml 自分自身の品質ゲート設定
 ```

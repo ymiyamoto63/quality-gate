@@ -218,6 +218,58 @@ class RepositoryAdminApiIT {
     }
 
     /**
+     * 対象の CI（ファイルを送る）から収集ランナー（ファイルを送らない）へ切り替えた後は、
+     * ファイル由来の版が残っていても UI から編集できる。編集できるかは直近に判定された Run が
+     * どの設定で判定されたかで決める。
+     */
+    @Test
+    void 直近のRunがファイルの設定で判定されていなければUIから編集できる() {
+        String repositoryId = createRepository();
+        java.util.UUID fileConfigId = Uuid7.generate();
+        jdbc.update("""
+                INSERT INTO gate_configs (id, repository_id, version, source_type, content_hash,
+                                          raw_yaml, parsed)
+                VALUES (?, ?::uuid, 1, 'FILE', 'h', 'version: 1', '{}'::jsonb)
+                """, fileConfigId, repositoryId);
+
+        // CI がファイルを送っていた頃の Run
+        evaluatedRun(repositoryId, "a", "2026-09-22T00:00:00Z", fileConfigId);
+        assertThat(mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
+                .with(as("viewer-user", "VIEWER")))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.editable").isEqualTo(false);
+
+        // 収集ランナーの Run（ファイルを送らないため既定値で判定され、設定版は紐づかない）
+        evaluatedRun(repositoryId, "b", "2026-09-23T00:00:00Z", null);
+        assertThat(mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
+                .with(as("viewer-user", "VIEWER")))
+                .hasStatusOk()
+                .bodyJson().extractingPath("$.editable").isEqualTo(true);
+
+        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
+                .with(as("admin-user", "ADMIN"))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"rawYaml\":\"version: 1\\n\"}"))
+                .hasStatusOk()
+                .bodyJson()
+                .satisfies(json -> {
+                    json.assertThat().extractingPath("$.current.version").isEqualTo(2);
+                    json.assertThat().extractingPath("$.current.sourceType").isEqualTo("UI");
+                });
+    }
+
+    private void evaluatedRun(String repositoryId, String sha, String measuredAt, java.util.UUID configId) {
+        var run = new com.qualitygate.domain.entity.Run(Uuid7.generate(),
+                java.util.UUID.fromString(repositoryId), sha.repeat(40), "main",
+                com.qualitygate.domain.model.RunnerType.SELF_HOSTED, "collector",
+                java.time.Instant.parse(measuredAt), 1);
+        run.applyGateConfig(configId);
+        run.markEvaluated(com.qualitygate.domain.model.Verdict.PASS,
+                com.qualitygate.domain.model.Completeness.FULL, java.time.Instant.parse(measuredAt));
+        runs.save(run);
+    }
+
+    /**
      * 直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを行番号付きで返す。
      * 画面は誤りを該当行の直下に出すため、行番号とパスを構造で持つ必要がある。
      */

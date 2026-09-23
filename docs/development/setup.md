@@ -49,7 +49,7 @@ cd frontend && npm ci && npm run dev
    | Homepage URL | `http://localhost:5173` |
    | Callback URL | `http://localhost:8080/login/oauth2/code/github` と `http://localhost:5173/login/oauth2/code/github` の両方（8080 だけで動かすなら前者のみでよい） |
    | Webhook の Active | チェックを外す |
-   | Repository permissions | 設定不要（Contents: Read-only は将来のリポジトリ読み取り用。現時点では使わない） |
+   | Repository permissions | ログインだけなら設定不要。収集ランナーで private の対象を計測するなら Contents / Pull requests を Read-only にする（[収集ランナーで計測する](../operations/collector.md#1-2-対象を読むための-github-appprivate-リポジトリの場合)） |
    | Where can this GitHub App be installed? | Only on this account |
 
    Callback URL は、ブラウザで開いたオリジン（8080 で直接開くか、5173 の dev server 経由か）
