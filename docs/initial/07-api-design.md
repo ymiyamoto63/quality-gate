@@ -164,13 +164,16 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 | メソッド | パス | 用途 | 認可 |
 | --- | --- | --- | --- |
-| GET | `/badges/{owner}/{name}.svg` | 最新判定のバッジ（FR-08-5。**未実装**） | 認証不要 |
+| GET | `/badges/{owner}/{name}.svg` | 既定ブランチの最新判定のバッジ（FR-08-5） | 認証不要 |
 | GET | `/actuator/health` | ヘルスチェック | 認証不要 |
 | GET | `/actuator/prometheus` | メトリクス | ADMIN（セッション） |
 
 バッジを認証不要にするのは、README に埋め込んだ画像を
 ブラウザが Cookie なしで取得するためである。
 バッジが返すのは**合否とリポジトリ名のみ**で、指標値や違反内容は含めない。
+対象は既定ブランチの最新の判定（`passing` / `passing with warnings` / `failing`）。未登録・無効化・未判定のリポジトリは
+どれも `unknown` を返し、どのリポジトリが登録されているかを外から見分けられないようにする。
+画像は `Cache-Control: max-age=300` で返す（GitHub の画像プロキシが古いバッジを出し続けないように）。
 
 ---
 

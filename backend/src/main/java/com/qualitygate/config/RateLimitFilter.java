@@ -79,7 +79,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     Limit limitOf(HttpServletRequest request) {
         String uri = request.getRequestURI();
-        if (uri.startsWith("/api/v1/badges/")) {
+        if (uri.startsWith("/badges/")) {
             return new Limit("badge", "ip:" + request.getRemoteAddr(), properties.badgePerMinute());
         }
         if (!uri.startsWith("/api/")) {

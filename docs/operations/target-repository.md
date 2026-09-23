@@ -179,3 +179,16 @@ Run 作成時に `skippedMetrics` で申告します（申告のない未提出�
 
 ファイルサイズの上限は 1 ファイル 50MB、1 Run あたり合計 200MB です。
 実際に全指標を送っている例は、quality-gate 自身のワークフロー [.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml) を参照してください。
+
+## README にバッジを貼る
+
+既定ブランチの最新の合否を示すバッジを、対象リポジトリの README に貼れます（FR-08-5。どちらの方式でも使えます）。
+
+```markdown
+[![quality gate](https://<quality-gate の URL>/badges/OWNER/NAME.svg)](https://<quality-gate の URL>/repositories)
+```
+
+- ログインなしで取得できます。返すのは合否（`passing` / `passing with warnings` / `failing`）だけで、指標値や違反の内容は含みません
+- 未登録・無効化・まだ判定されていないリポジトリは `unknown` になります
+- GitHub の README の画像は GitHub の画像プロキシ経由で取得されるため、**quality-gate にインターネットから到達できる**必要があります。
+  社内からしか到達できない場合は、社内の Wiki など社内から見る場所に貼ってください
