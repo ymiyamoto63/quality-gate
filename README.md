@@ -41,6 +41,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 
 | ドキュメント | 内容 |
 | --- | --- |
+| [対象リポジトリの前提と最小構成](docs/operations/target-repository.md) | 対象リポジトリに必要なもの・`.quality-gate.yml` の最小例・M-01 だけを取り込む手順 |
 | [CI からの取り込み](docs/operations/ingest.md) | Ingest API の流れと、ローカルでの取り込みの試し方 |
 | [セルフホストランナー](docs/operations/self-hosted-runner.md) | 計測ジョブ用ランナーの準備・登録・リポジトリ変数 |
 | [設定値](docs/operations/configuration.md) | 環境変数 / `.env` の一覧と優先順位 |
