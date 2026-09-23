@@ -8,11 +8,14 @@
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
 # 計測しない指標とその理由は reports/skipped-metrics.tsv に書き、submit.sh がスキップとして申告する。
 #
-# 必要なもの: git / curl / unzip / docker、JDK（バックエンド）、Node.js（フロントエンド）、
-#            Chromium の動作に必要なライブラリ（M-10）
+# 通常は measure-isolated.sh からコンテナの中で実行される（collector/runner/Dockerfile に必要なものがそろっている）。
+# コンテナの外で直接実行するときに必要なもの:
+#   git / curl / unzip / docker、JDK（バックエンド）、Node.js（フロントエンド）、Chromium の動作に必要なライブラリ（M-10）
 # 環境変数:
 #   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（既定: ~/.cache/quality-gate-collector）
 #   A11Y_CHROMIUM       M-10 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
+#   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
+#   QG_A11Y_TOOL_DIR    M-10 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -238,10 +241,16 @@ measure_accessibility() {
     set -e
     rm -rf "$tool"
     mkdir -p "$tool"
-    cp "$COLLECTOR_DIR"/a11y/{package.json,package-lock.json,scan.mjs} "$tool/"
-    cd "$tool"
-    npm ci --no-audit --no-fund
-    [ -n "${A11Y_CHROMIUM:-}" ] || npx playwright install chromium
+    cp "$COLLECTOR_DIR"/a11y/scan.mjs "$tool/"
+    if [ -n "${QG_A11Y_TOOL_DIR:-}" ]; then
+      # コンテナのイメージに Playwright・axe-core・Chromium が入っている
+      ln -s "$QG_A11Y_TOOL_DIR/node_modules" "$tool/node_modules"
+    else
+      cp "$COLLECTOR_DIR"/a11y/{package.json,package-lock.json} "$tool/"
+      cd "$tool"
+      npm ci --no-audit --no-fund
+      [ -n "${A11Y_CHROMIUM:-}" ] || npx playwright install chromium
+    fi
   ); then
     fail "M-10: 検査ツールを用意できませんでした"; endgroup; return
   fi
@@ -249,7 +258,7 @@ measure_accessibility() {
   # バックエンド。measure_backend の verify で出来た実行可能 jar を使う
   if [ -n "${A11Y_BACKEND_PORT:-}" ]; then
     jar=$(find "$SRC/$BACKEND_DIR/target" -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar' \
-      ! -name '*-javadoc.jar' 2>/dev/null | head -n 1)
+      ! -name '*-javadoc.jar' 2>/dev/null | head -n 1 || true)
     if [ -z "$jar" ]; then
       fail "M-10: バックエンドの jar がありません（ビルドに失敗しています）"; endgroup; return
     fi
@@ -282,6 +291,24 @@ measure_accessibility() {
   rm -rf "$tool"
 }
 
+# --- Trivy / oasdiff。コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす ----
+oasdiff() {
+  if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
+    command oasdiff "$@"
+  else
+    docker run --rm -v "$PWD:/w:ro" -w /w "$OASDIFF_IMAGE" "$@"
+  fi
+}
+
+trivy() {
+  if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
+    command trivy "$@"
+  else
+    # 出力は標準出力で受け取る（コンテナの root 権限で書かれたファイルを作業領域に残さない）
+    docker run --rm -v "$PWD:/src:ro" -w /src -v quality-gate-collector-trivy:/root/.cache/ "$TRIVY_IMAGE" "$@"
+  fi
+}
+
 # --- M-09（oasdiff）。コミットされている OpenAPI 定義を head と base で比べる --------
 measure_breaking_changes() {
   group "OpenAPI の破壊的変更（${OASDIFF_IMAGE}）"
@@ -295,8 +322,7 @@ measure_breaking_changes() {
   rm -f "$REPORTS/openapi-base.yml"
   if [ -n "$BASE_SHA" ] && git -C "$SRC" cat-file -e "$BASE_SHA:$OPENAPI_PATH" 2>/dev/null; then
     git -C "$SRC" show "$BASE_SHA:$OPENAPI_PATH" > "$REPORTS/openapi-base.yml"
-    if docker run --rm -v "$REPORTS:/w:ro" -w /w "$OASDIFF_IMAGE" \
-         breaking openapi-base.yml openapi-head.yml --format json > "$REPORTS/oasdiff.json"; then
+    if (cd "$REPORTS" && oasdiff breaking openapi-base.yml openapi-head.yml --format json) > "$REPORTS/oasdiff.json"; then
       # 変更が無いときの空出力は 0 件として送る
       [ -s "$REPORTS/oasdiff.json" ] || echo '[]' > "$REPORTS/oasdiff.json"
     else
@@ -314,9 +340,7 @@ measure_breaking_changes() {
 # --- M-06（Trivy）。依存関係を取得した後の作業ツリーを走査する（対象の CI と同じ順序） ----
 measure_vulnerabilities() {
   group "脆弱性スキャン（${TRIVY_IMAGE}）"
-  # 出力は標準出力で受け取る（コンテナの root 権限で書かれたファイルを作業領域に残さない）
-  if ! docker run --rm -v "$SRC:/src:ro" -w /src -v quality-gate-collector-trivy:/root/.cache/ \
-       "$TRIVY_IMAGE" fs --quiet --format sarif --severity CRITICAL,HIGH,MEDIUM . > "$REPORTS/trivy.sarif"; then
+  if ! (cd "$SRC" && trivy fs --quiet --format sarif --severity CRITICAL,HIGH,MEDIUM .) > "$REPORTS/trivy.sarif"; then
     rm -f "$REPORTS/trivy.sarif"
     fail "M-06: Trivy の実行に失敗しました"
   fi
