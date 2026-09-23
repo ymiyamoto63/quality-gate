@@ -80,6 +80,6 @@ metrics:
       - "/runs/:id/findings"
       - "/repositories/:id/trends"
 
+# 通知はメールで送る。条件と宛先は quality-gate の画面（管理 › 通知設定）で設定する
 notifications:
   on: transition_to_fail
-  slack_channel: "#quality-gate"

@@ -39,6 +39,13 @@ spring:
       initialize-schema: never   # スキーマは V007 で管理する
     timeout: 8h
 
+  mail:
+    # SMTP リレー。未設定（空）ならメール通知は送らず、送信履歴に理由を残す
+    host: ${QG_SMTP_HOST:}
+    port: ${QG_SMTP_PORT:25}
+    username: ${QG_SMTP_USERNAME:}
+    password: ${QG_SMTP_PASSWORD:}
+
   servlet:
     multipart:
       max-file-size: 50MB
@@ -67,6 +74,10 @@ quality-gate:
   max-run-bytes: 209715200          # 200MB
   base-url: ${QG_BASE_URL:http://localhost:8080}
   job-poll-interval: 1000
+  notification:
+    mail-from: ${QG_MAIL_FROM:quality-gate@localhost}
+  schedule:
+    zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
 
 springdoc:
   api-docs:

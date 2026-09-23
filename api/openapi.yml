@@ -16,16 +16,18 @@ servers:
 tags:
 - description: 全リポジトリのサマリ
   name: Dashboard
-- description: Run の参照
-  name: Runs
 - description: ログイン中の利用者
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
-- description: 保持期間などのシステム設定（管理者のみ）
-  name: Settings
 - description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
   name: RepositoryAdmin
+- description: Run の参照
+  name: Runs
+- description: 保持期間などのシステム設定（管理者のみ）
+  name: Settings
+- description: 通知条件とメールの宛先（管理者のみ）
+  name: Notifications
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
 - description: 再評価とジョブの運用（管理者のみ）
@@ -211,7 +213,7 @@ paths:
       tags:
       - Repositories
     patch:
-      operationId: update_2
+      operationId: update_3
       parameters:
       - in: path
         name: repositoryId
@@ -260,7 +262,7 @@ paths:
   /api/v1/repositories/{repositoryId}/config:
     get:
       description: 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
-      operationId: get
+      operationId: get_1
       parameters:
       - in: path
         name: repositoryId
@@ -281,7 +283,7 @@ paths:
     put:
       description: リポジトリ内のファイルが優先される。ファイルで管理されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは
         422 CONFIG_VALIDATION_FAILED（行番号付き）。
-      operationId: update
+      operationId: update_1
       parameters:
       - in: path
         name: repositoryId
@@ -350,6 +352,52 @@ paths:
       summary: Ingest Token を発行する
       tags:
       - RepositoryAdmin
+  /api/v1/repositories/{repositoryId}/notification-settings:
+    get:
+      operationId: get
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationSettingsResponse"
+          description: OK
+      summary: 通知設定を取得する
+      tags:
+      - Notifications
+    put:
+      description: 変更は監査ログに残す。
+      operationId: update
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotificationSettingsRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/NotificationSettingsResponse"
+          description: OK
+      summary: 通知設定を更新する
+      tags:
+      - Notifications
   /api/v1/repositories/{repositoryId}/trends:
     get:
       description: 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
@@ -759,7 +807,7 @@ paths:
   /api/v1/users/{userId}:
     patch:
       description: 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
-      operationId: update_1
+      operationId: update_2
       parameters:
       - in: path
         name: userId
@@ -1568,6 +1616,34 @@ components:
         userId:
           type: string
           format: uuid
+    NotificationSettingsResponse:
+      type: object
+      description: 通知設定。通知はメールで送る
+      properties:
+        condition:
+          type: string
+          enum:
+          - EVERY_RUN
+          - TRANSITION
+          - FAIL_ONLY
+          - DISABLED
+        emailAvailable:
+          type: boolean
+          description: サーバに SMTP が設定されているか。false ならメールは届かない
+        emailRecipients:
+          type: array
+          items:
+            type: string
+        updatedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+      required:
+      - condition
+      - emailAvailable
+      - emailRecipients
+      - updatedAt
     ReevaluateResponse:
       type: object
       description: 再評価を受け付けた。判定は非同期で行う
@@ -2407,6 +2483,29 @@ components:
           minLength: 0
       required:
       - rawYaml
+    UpdateNotificationSettingsRequest:
+      type: object
+      properties:
+        condition:
+          type:
+          - string
+          - "null"
+          enum:
+          - EVERY_RUN
+          - TRANSITION
+          - FAIL_ONLY
+          - DISABLED
+        emailRecipients:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+            format: email
+            maxLength: 254
+            minLength: 0
+          maxItems: 20
+          minItems: 0
     UpdateRepositoryRequest:
       type: object
       properties:

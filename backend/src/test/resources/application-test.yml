@@ -1,5 +1,8 @@
 # 結合テストの接続先は Testcontainers が動的に差し込む。
 spring:
+  mail:                      # NotificationIT が立てる偽の SMTP サーバ
+    host: localhost
+    port: 38025
   jpa:
     show-sql: false
   flyway:
