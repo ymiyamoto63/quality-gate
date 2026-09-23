@@ -41,6 +41,7 @@ repositories ──┬──▶ components
      │         ├──▶ ingest_tokens
      │         ├──▶ gate_configs
      │         ├──▶ waivers
+     │         ├──▶ notification_settings (1:1 通知設定)
      │         └──▶ repository_summaries (1:1 読み取りモデル)
      │
      └──▶ runs ──┬──▶ artifacts
@@ -49,8 +50,9 @@ repositories ──┬──▶ components
                  ├──▶ findings ──────▶ (waiver)
                  └──▶ notifications
 
-jobs        （独立。payload で他テーブルを参照）
-audit_logs  （独立。追記のみ）
+jobs            （独立。payload で他テーブルを参照）
+audit_logs      （独立。追記のみ）
+system_settings （独立。保持期間などのシステム設定）
 ```
 
 ---
@@ -177,6 +179,7 @@ CREATE TABLE runs (
     baseline_run_id     uuid        REFERENCES runs(id) ON DELETE SET NULL,
     status              varchar(16) NOT NULL,
     verdict             varchar(24),
+    previous_verdict    varchar(24),                -- 再評価の直前の判定（V013。通知の遷移判定用）
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
@@ -330,6 +333,7 @@ CREATE TABLE waivers (
     fingerprint     char(64),                   -- scope=FINDING のとき必須
     reason_category varchar(32) NOT NULL,       -- 'UNREACHABLE' / 'FALSE_POSITIVE' / ...
     reason          text        NOT NULL,
+    title           varchar(512),               -- 登録時点の違反の見出し（V013）
     status          varchar(12) NOT NULL DEFAULT 'ACTIVE',
     created_by      uuid        NOT NULL REFERENCES users(id),
     approved_by     uuid        REFERENCES users(id),   -- Phase 1 では created_by と同値
@@ -362,19 +366,23 @@ CREATE TABLE notifications (
     run_id      uuid        REFERENCES runs(id) ON DELETE CASCADE,
     repository_id uuid      NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
     event       varchar(32) NOT NULL,       -- 'VERDICT_TRANSITION' / 'WAIVER_EXPIRING' / ...
-    channel     varchar(16) NOT NULL,       -- 'SLACK' / 'EMAIL' / 'GITHUB_PR'
+    channel     varchar(16) NOT NULL,       -- 'EMAIL'（D-15 でメールのみ）
     status      varchar(16) NOT NULL,       -- 'SENT' / 'FAILED'
-    target      varchar(255),               -- チャネル名・宛先
-    external_id varchar(255),               -- PR コメント ID（更新して増殖させないため）
+    target      varchar(255),               -- 宛先
+    external_id varchar(255),               -- 未使用（PR コメント用に設けたが D-15 で不採用）
     error_detail text,
     sent_at     timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT notifications_unique_key UNIQUE (run_id, event, channel, target)
+    dedup_key   varchar(255),               -- Run を持たない通知の重複抑止（V012）
+    CONSTRAINT notifications_unique_key UNIQUE (run_id, event, channel, target),
+    CONSTRAINT notifications_status_check CHECK (status IN ('SENT','FAILED'))
 );
+CREATE UNIQUE INDEX ux_notifications_dedup ON notifications (event, channel, target, dedup_key)
+    WHERE dedup_key IS NOT NULL;
 ```
 
-一意制約が再送の抑止そのものになる（[05](05-architecture.md) 4.4）。
-`external_id` に PR コメントの ID を保持し、同一 PR では
-新規投稿ではなく更新を行う（FR-11-4）。
+一意制約が再送の抑止そのものになる（[05](05-architecture.md) 4.5）。
+免除の期限接近や計測途絶のように Run を持たない通知は `run_id` が NULL で一意制約が効かないため、
+`dedup_key` で抑止する。
 
 ### 3.13 `jobs` — ジョブキュー
 
@@ -426,6 +434,7 @@ CREATE TABLE repository_summaries (
     open_critical_count int         NOT NULL DEFAULT 0,
     open_high_count     int         NOT NULL DEFAULT 0,
     active_waiver_count int         NOT NULL DEFAULT 0,
+    version             bigint      NOT NULL DEFAULT 0,   -- 楽観ロック（9 章）
     updated_at          timestamptz NOT NULL DEFAULT now()
 );
 ```
@@ -462,13 +471,45 @@ CREATE INDEX ix_audit_logs_target   ON audit_logs (target_type, target_id);
 REVOKE UPDATE, DELETE ON audit_logs FROM quality_gate_app;
 ```
 
-保持期間の削除は、別の管理ロールで実行するバッチが行う。
+V006 はロール `quality_gate_app` が存在する場合だけこれを実行する。開発環境（所有者ロールで接続）では剥奪されない。
+
+保持期間の削除は、別の管理ロールで実行するバッチが行う。アプリの日次バッチも削除を試みるが、
+権限が剥奪された環境では警告を残して何もしない。
 アプリの実装ミスで監査ログが書き換わる経路を、権限の側で塞ぐ。
 
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が免除を登録したか」が失われないようにするため。
 
-### 3.16 Spring Session
+### 3.16 `notification_settings` — リポジトリごとの通知設定
+
+```sql
+CREATE TABLE notification_settings (
+    repository_id    uuid        PRIMARY KEY REFERENCES repositories(id) ON DELETE CASCADE,
+    condition        varchar(16) NOT NULL DEFAULT 'TRANSITION',
+    email_recipients jsonb       NOT NULL DEFAULT '[]'::jsonb,
+    updated_by       uuid        REFERENCES users(id) ON DELETE SET NULL,
+    updated_at       timestamptz NOT NULL DEFAULT now(),
+    CONSTRAINT notification_settings_condition_check CHECK (condition IN
+        ('EVERY_RUN','TRANSITION','FAIL_ONLY','DISABLED'))
+);
+```
+
+V012 で Slack の Webhook と PR コメントの列も作ったが、V014 で削除した（D-15）。
+
+### 3.17 `system_settings` — システム全体の設定
+
+```sql
+CREATE TABLE system_settings (
+    key        varchar(64) PRIMARY KEY,
+    value      jsonb       NOT NULL,
+    updated_by uuid        REFERENCES users(id) ON DELETE SET NULL,
+    updated_at timestamptz NOT NULL DEFAULT now()
+);
+```
+
+保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
+
+### 3.18 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
@@ -489,6 +530,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | `waivers.status` | `ACTIVE` / `EXPIRED` / `REVOKED` |
 | `waivers.reason_category` | `UNREACHABLE` / `FALSE_POSITIVE` / `NO_FIX_AVAILABLE` / `PLANNED` |
 | `users.role` | `ADMIN` / `VIEWER` |
+| `notification_settings.condition` | `EVERY_RUN` / `TRANSITION` / `FAIL_ONLY` / `DISABLED` |
 | `jobs.status` | `PENDING` / `RUNNING` / `SUCCEEDED` / `FAILED` / `DEAD` |
 
 ---
@@ -555,6 +597,9 @@ CREATE INDEX ix_waivers_expiry ON waivers (expires_at) WHERE status = 'ACTIVE';
 
 ## 7. 保持期間と削除
 
+下表の保持期間は既定値である。Run・成果物・監査ログ・通知の日数は管理画面（S-09）から変更でき、
+`system_settings` に保存する。
+
 | 対象 | 保持期間 | 削除方法 |
 | --- | --- | --- |
 | 成果物のファイル実体 | 90 日 | ファイルを削除し `artifacts.deleted_at` を設定 |
@@ -599,7 +644,7 @@ DELETE FROM runs
 | `V001__create_users_and_repositories.sql` | `users` / `repositories` / `components` / `ingest_tokens` |
 | `V002__create_gate_configs.sql` | `gate_configs` |
 | `V003__create_runs_and_artifacts.sql` | `runs` / `run_skipped_metrics` / `artifacts` |
-| `V004__create_measurements_and_findings.sql` | `measurements` / `findings` / `waivers` |
+| `V004__create_measurements_findings_waivers.sql` | `measurements` / `findings` / `waivers` |
 | `V005__create_jobs_and_notifications.sql` | `jobs` / `notifications` |
 | `V006__create_summaries_and_audit.sql` | `repository_summaries` / `audit_logs` と権限設定 |
 | `V007__create_spring_session.sql` | Spring Session JDBC のテーブル |

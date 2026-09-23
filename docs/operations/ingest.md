@@ -10,6 +10,9 @@
    正規化 → 判定 → 読み取りモデル更新を行う
 5. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 
+> CI から送信する部分（`quality-gate-action`）は未実装です。`.github/workflows/quality-gate.yml` の
+> `submit` ジョブは送信の手前で止まっているため、現状は下の手順のように API を直接呼んで取り込みます。
+
 認証の経路（Ingest Token とセッション Cookie の使い分け）は [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。
 
 ## ローカルで取り込みを試す

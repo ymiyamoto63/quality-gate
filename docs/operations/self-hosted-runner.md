@@ -17,7 +17,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 | 必要なもの | 使う箇所 |
 | --- | --- |
-| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`） |
+| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`）、k6（`docker run grafana/k6`） |
 | git | チェックアウトと merge-base の解決 |
 | パスワードなしの `sudo`、または Playwright の依存パッケージの事前導入 | `npx playwright install --with-deps chromium` が apt で OS パッケージを入れる |
 | github.com / Maven Central / npm レジストリへの外向き通信 | ランナーの接続、JDK・Node.js・依存関係の取得 |
@@ -62,7 +62,13 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | Variables | `QG_RUNNER` | `self-hosted`（既定）/ `ubuntu-latest` | 計測ジョブを実行するランナー。未設定なら `self-hosted` |
 | Variables | `QG_RUN_HEAVY_ON_GITHUB` | `false`（既定）/ `true` | GitHub ホストランナーでも PIT / k6 を実行するか。セルフホストでは常に実行する |
 | Variables | `QG_BASE_URL` | 例: `https://quality-gate.example.com` | 取り込み先の quality-gate の URL |
-| Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | リポジトリ単位の Ingest Token（[取り込み](ingest.md)を参照） |
+| Variables | `QG_PERF_BASE_URL` | 例: `https://perf-staging.example.com` | 負荷試験の対象（専有の性能検証環境）。未設定なら k6 を実行せず、M-03〜05 をスキップとして扱う |
+| Variables | `QG_PERF_RUN_ID` | Run の ID | 負荷試験で Run 詳細・状態取得に使う既存の Run |
+| Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | リポジトリ単位の Ingest Token（[取り込み](ingest.md)を参照）。負荷試験の状態取得にも使う |
+| Secrets | `QG_PERF_SESSION` | `SESSION` Cookie の値 | 負荷試験で参照 API を呼ぶためのセッション |
+
+`QG_BASE_URL` と `QG_INGEST_TOKEN` は `submit` ジョブが送信に使う想定ですが、送信処理（`quality-gate-action`）は
+まだ実装されていません（[実装状況](../status.md)）。
 
 ## 4. 動作確認
 
@@ -73,8 +79,8 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 セルフホストランナーが停止していると、計測ジョブはランナーの空きを待ったまま進みません。
 保守などで止める期間は、リポジトリ変数 `QG_RUNNER` を `ubuntu-latest` に変えてください。
-このとき PIT / k6 はスキップとして申告され（`QG_RUN_HEAVY_ON_GITHUB` が `false` の場合）、
-Run は部分計測として記録されます。完全計測が `execution.full_measurement_interval_days`（既定 7 日）を
+このとき PIT / k6 は実行されず（`QG_RUN_HEAVY_ON_GITHUB` が `false` の場合）、`submit` ジョブがスキップ対象として扱うため、
+Run は部分計測になります（送信処理の実装後）。完全計測が `execution.full_measurement_interval_days`（既定 7 日）を
 超えて途絶えると警告が出るため、復旧したら `self-hosted` に戻します。
 
 > **注意**: セルフホストランナーは、ワークフローを動かせる人なら誰でもそのマシン上で任意のコードを実行できます。

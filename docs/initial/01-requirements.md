@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate 要件定義書 |
-| バージョン | **1.1（確定）** |
+| バージョン | **1.2** |
 | 作成日 | 2026-09-21 |
-| 最終更新 | 2026-09-21 |
+| 最終更新 | 2026-09-23 |
 | ステータス | **確定**（2026-09-21）。以降の変更は改訂履歴に記録する |
 | 関連文書 | [02](02-metrics-spec.md) 指標・判定仕様 / [03](03-open-questions.md) 決定事項と残課題 / [04](04-tech-stack.md) 技術スタック |
 | 基本設計 | [05](05-architecture.md) 方式設計 / [06](06-database-design.md) DB 設計 / [07](07-api-design.md) API 設計 / [08](08-screen-design.md) 画面設計 |
@@ -43,6 +43,8 @@
 | D-11 | 認証 | GitHub OAuth（個人アカウント / Free）。許可リストで入口を制御 |
 | D-12 | ロールと免除 | Phase 1 は Admin / Viewer の 2 ロール。免除は登録で即時有効、承認フローなし |
 | D-13 | ランナー種別 | セルフホスト / GitHub ホストを切り替え可能。GitHub ホスト時は PIT / k6 のスキップを選択でき、スキップは申告制 |
+| D-14 | 技術スタックの詳細 | Maven / Java 25 LTS / SPA は Spring Boot 同梱（同一オリジン）/ openapi-typescript + openapi-fetch。成果物はローカルファイルシステムに保存 |
+| D-15 | 通知チャネル | メールのみ（Slack と PR コメントは不採用） |
 
 ### 残る未決事項
 
@@ -261,7 +263,7 @@ quality-gate 側が提供物として用意する（FR-03）。
 
 ## 5. 機能要件
 
-凡例: **必須** = Phase 1 で必須 / **推奨** = Phase 1 で可能なら / **Phase 2** = 次フェーズ
+凡例: **必須** = Phase 1 で必須 / **推奨** = Phase 1 で可能なら / **Phase 2** = 次フェーズ以降（実施時期は 14 章）
 
 ### 5.1 リポジトリ・設定管理
 
@@ -556,7 +558,7 @@ notifications:
 | POST | `/api/v1/runs` | Run を開始し、メタデータを登録して `runId` を返す |
 | POST | `/api/v1/runs/{runId}/artifacts` | 成果物をアップロード（`type` でフォーマットを指定、multipart） |
 | POST | `/api/v1/runs/{runId}/finalize` | 取り込み完了を宣言。正規化・判定が非同期で開始される |
-| GET | `/api/v1/runs/{runId}` | Run の状態と判定結果を取得（CI からのポーリング用） |
+| GET | `/api/v1/runs/{runId}/status` | Run の状態と判定結果を取得（CI からのポーリング用） |
 
 Run 開始時の必須メタデータ:
 
@@ -661,13 +663,17 @@ jobs:
 | リポジトリ変数（`QG_RUNNER`、`QG_RUN_HEAVY_ON_GITHUB`） | 常用の既定値。セルフホストランナーが停止している期間などに変更する |
 | `workflow_dispatch` の入力 | その回限りの上書き。手動で一度だけ全量を回したい場合など |
 
+実際のワークフローは `.github/workflows/quality-gate.yml` にある。上の例との差は次のとおり
+（2026-09-23 時点）。`base` ジョブの静的解析は Trivy のみで、Semgrep・gitleaks・ESLint は未導入。
+`submit` ジョブは成果物の収集とスキップ対象の算出までで、送信処理（FR-03-4 の `quality-gate-action`）は未実装。
+
 **重要**: `submit` ジョブは `if: always()` とし、重量ジョブが実行されなかった場合でも
 **必ず実行して `skippedMetrics` を申告する**こと。送信自体を行わないと、
 quality-gate から見れば Run が存在せず、スキップと計測失敗の区別がつかない。
 
 ### 7.2 参照 API（UI / 外部 → quality-gate）
 
-GitHub OAuth ログイン後のセッション（またはそこから発行したアクセストークン）で認証する REST API。
+GitHub OAuth ログイン後のセッションで認証する REST API。
 リポジトリ一覧、Run 一覧・詳細、指標時系列、Finding 一覧、Waiver 操作を提供する。
 仕様は springdoc により OpenAPI として自動生成・公開し、quality-gate 自身の
 契約テスト対象とする。
@@ -680,8 +686,8 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | 用途 | 方式 | 権限 |
 | --- | --- | --- |
 | ユーザーログイン（FR-13-1） | GitHub App の user-to-server 認可フロー | ユーザー識別（`read:user`相当）のみ |
-| `.quality-gate.yml` の取得 | GitHub App の Contents: Read | 読み取りのみ |
-| `baseCommitSha` の解決（merge-base） | GitHub App の Contents: Read | 読み取りのみ |
+| ~~`.quality-gate.yml` の取得~~ | —（CI が成果物として送る方式に変更。[05](05-architecture.md) 7.1） | — |
+| `baseCommitSha` の解決（merge-base） | GitHub App の Contents: Read（未実装。現状は CI が算出して渡す） | 読み取りのみ |
 | ~~PR サマリコメント（FR-11-4）~~ | —（v1.2 で不採用。D-15） | — |
 | Check Run 出力（Phase 2） | GitHub App の Checks: Write | 書き込み |
 
@@ -835,25 +841,28 @@ quality-gate 自身が WCAG 2.2 Level AA に適合する。具体的には、
 | フロントエンド | Vue 3 + TypeScript + Vite + **PrimeVue** + Pinia + Vue Router | 計測対象と同一構成 |
 | フロント / API 連携 | **openapi-typescript + openapi-fetch** | `openapi.yml` から型を生成。生成物の同期は CI で検証する |
 | SPA の配信 | **Spring Boot に同梱（同一オリジン）** | CORS 不要。認証を HttpOnly セッション Cookie で完結できる |
-| グラフ | PrimeVue `Chart`（Chart.js） | canvas は読み上げできないため、表形式の代替表現の併設を実装要件とする |
+| グラフ | インライン SVG（自前の `TrendChart.vue`） | 当初は Chart.js を想定したが、canvas は読み上げできないため実装時に変更（[04](04-tech-stack.md) 3.1） |
 | テスト | JUnit 5 / Testcontainers / Vitest / Playwright（+ axe-core） | |
 | 開発環境 | WSL2 + Docker Compose | リポジトリは WSL2 の Linux ファイルシステム側に置く |
 | 配布 | Docker イメージ + Docker Compose | 社内単一テナントのため小さく始める |
 
 ### 11.2 モジュール構成（バックエンド）
 
+主要なモジュールは次のとおり。全パッケージと依存規則は [05](05-architecture.md) 1 章を参照。
+
 ```
 quality-gate/
 ├ backend/
 │  ├ ingest/        取り込み API、トークン認証、成果物保管
-│  ├ adapter/       ツール別パーサ（jacoco, pit, stryker, k6, sarif, pmd, eslint, pact, axe, oasdiff）
+│  ├ adapter/       ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, junit, oasdiff, axe）
 │  ├ normalize/     正規化モデルへの変換、重複排除、fingerprint 生成
 │  ├ evaluate/      しきい値適用、指標判定、Run 集約、差分（新規/解消）算出
-│  ├ config/        .quality-gate.yml の取得・検証・版管理
+│  ├ config/        .quality-gate.yml の検証・版管理
 │  ├ waiver/        免除の登録・期限管理（承認フローは将来拡張）
 │  ├ notify/        メール通知
 │  ├ query/         ダッシュボード・トレンド向け参照 API（読み取り最適化）
-│  └ platform/      認証認可、監査ログ、スケジューラ、ArtifactStore（ストレージ抽象）
+│  ├ job/           DB ベースのジョブキューと日次バッチ
+│  └ platform/      監査ログ、ArtifactStore（ストレージ抽象）、共通例外
 └ frontend/         Vue 3 SPA
 ```
 

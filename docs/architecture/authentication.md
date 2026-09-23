@@ -33,5 +33,8 @@ Organization のメンバーシップによる制限は行っていません。
 
 | 経路 | 対象 | 認証 | CSRF |
 | --- | --- | --- | --- |
-| Ingest | `POST /api/v1/runs/**` と `GET /api/v1/runs/{id}/status` | `Authorization: Bearer qg_<prefix>_<secret>`（リポジトリ単位の Ingest Token） | 無効（Cookie を使わない） |
-| 画面 | それ以外の `/api/**` | GitHub ログインのセッション Cookie | 有効 |
+| Ingest | `POST /api/v1/runs/**`（`/reevaluate` を除く）と `GET /api/v1/runs/{id}/status` | `Authorization: Bearer qg_<prefix>_<secret>`（リポジトリ単位の Ingest Token） | 無効（Cookie を使わない） |
+| 画面 | それ以外の `/api/**` | GitHub ログインのセッション Cookie | 有効（`XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` ヘッダで送り返す） |
+
+再評価（`POST /api/v1/runs/{id}/reevaluate`）は `/api/v1/runs` 配下の POST ですが、管理者が画面から行う操作のため画面の経路で認証します。
+Ingest Token では参照 API を呼べません。

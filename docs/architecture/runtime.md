@@ -1,6 +1,6 @@
 # 起動の仕組み
 
-### 全体像
+## 全体像
 
 ```
                     ┌──────────────────────── ブラウザ ────────────────────────┐
@@ -27,7 +27,7 @@
 Vite の dev server は開発の利便性（HMR）のためのもので、本番には存在しません。
 ジョブキューも DB 上に実装しているため、Redis やメッセージブローカーは不要です。
 
-### 起動方法の 3 パターン
+## 起動方法の 3 パターン
 
 | パターン | 起動するもの | ブラウザで開く URL | 用途 |
 | --- | --- | --- | --- |
@@ -38,11 +38,12 @@ Vite の dev server は開発の利便性（HMR）のためのもので、本番
 パターン C では `Dockerfile` がマルチステージビルドで jar を作り（ビルドステージで Maven が
 Node.js を取得してフロントもビルドする）、JRE だけの実行イメージで起動します。
 DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` は `db` のヘルスチェックが
-通ってから起動します。GitHub App の認証情報は、Docker Compose がリポジトリ直下の `.env` を
-変数展開に使うことで `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` として渡されます。
+通ってから起動します。`app` に渡る環境変数は `compose.yaml` に列挙したもの
+（DB 接続・成果物の保存先・GitHub App の認証情報・`QG_SMTP_HOST` / `QG_SMTP_PORT` / `QG_MAIL_FROM`）だけで、
+値はリポジトリ直下の `.env` から Docker Compose が変数展開して渡します。
 成果物は `./data/artifacts` にマウントされます。
 
-### フロントエンドとバックエンドの連携
+## フロントエンドとバックエンドの連携
 
 **同一オリジンで動かすことが前提**です（CORS 設定なし、セッション Cookie 認証）。
 開発時と本番時で、同一オリジンを実現する方法が異なります。
@@ -53,7 +54,7 @@ DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` �
   2. 出力された `frontend/dist/` を `maven-resources-plugin` が `target/classes/static/` にコピーし、jar に含める
   3. Spring Boot が `classpath:/static/` から SPA を配信する。`/runs/xxx` のように
      静的ファイルとして存在しないパスは `SpaForwardingConfig` が `index.html` を返し、
-     ルーティングを Vue Router に任せる。ただし `api/` `actuator/` `oauth2/` `login/` `logout` などは
+     ルーティングを Vue Router に任せる。ただし `api/` `actuator/` `v3/` `swagger-ui` `badges/` `oauth2/` `login/` `logout` は
      対象外で、存在しない API には正しく 404 を返す
 
 - **開発時（パターン A）**
@@ -65,7 +66,7 @@ DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` �
     | `/oauth2` | ログイン開始（`/oauth2/authorization/github`） |
     | `/login/oauth2` | GitHub からの折り返し（`/login/oauth2/code/github`）。`/login` 全体ではない点に注意（SPA のログイン画面 `/login` は Vite が返す） |
     | `/logout` | ログアウト |
-    | `/badges` | バッジ |
+    | `/badges` | バッジ（将来用。現時点でバックエンドに実装はない） |
     | `/actuator` | ヘルスチェックなど |
 
   - `changeOrigin: false` にしているため、バックエンドから見ても Host は `localhost:5173` のままで、

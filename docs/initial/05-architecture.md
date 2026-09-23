@@ -19,17 +19,20 @@
 ```
 com.qualitygate
 ├ ingest/       取り込み API、Ingest Token 認証、成果物の受領と保管
-├ adapter/      ツール別パーサ（jacoco, pit, k6, sarif, pmd, eslint, junit, pact, axe, oasdiff, lcov）
+├ adapter/      ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, junit, oasdiff, axe）
 ├ normalize/    正規化モデルへの変換、重複排除、fingerprint 生成
 ├ evaluate/     しきい値適用、指標判定、Run 集約、差分（新規 / 継続 / 解消）算出
-├ config/       .quality-gate.yml の取得・検証・版管理
+├ config/       .quality-gate.yml の検証・版管理と、複数モジュールを組み立てる合成点（SecurityConfig など）
 ├ waiver/       免除の登録・期限管理
-├ notify/       メール通知（D-15）
+├ notify/       メール通知（D-15）と通知設定
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
+├ admin/        管理系の操作 API（利用者・リポジトリ・トークン・監査ログ・保持期間・ジョブの再実行）
+├ auth/         GitHub ログイン時の許可リスト照合、セッションのロール更新
 ├ job/          ジョブキューとスケジューラ
-├ github/       GitHub API クライアント（将来用。現時点では未使用）
-├ config/       合成点。複数モジュールを組み立てる設定（SecurityConfig など）
-└ platform/     認証認可の部品、監査ログ、ArtifactStore、共通例外、設定
+├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値
+└ platform/     監査ログ、ArtifactStore、共通例外、設定
+
+github/（GitHub API クライアント）は将来用で、現時点ではパッケージ自体が無い。
 ```
 
 ### 依存規則
@@ -41,9 +44,10 @@ com.qualitygate
 | `query` は書き込み系モジュール（`ingest` / `normalize` / `evaluate`）を呼ばない | 参照系は専用の読み取りモデルを持ち、書き込み側の都合に引きずられない |
 | すべてのモジュールが `platform` に依存してよい。逆は不可 | 共通基盤が業務ロジックを知らない状態を保つ |
 | 複数モジュールを組み立てる設定は `config` に置く | `SecurityConfig` は `auth` と `ingest` の両方を参照する。`platform` に置くと上の規則に違反する |
-| `github` への依存は `config` / `notify` / `platform` に限る | 外部 API の障害の影響範囲を閉じ込める |
+| `adapter` と `evaluate` は `config` を知らない | 判定とパースは解決済みの設定（`domain.gate`）と `ParseContext` だけを入力とする |
+| `adapter` / `evaluate` / `query` / `ingest` は `github` に依存しない | 外部 API の障害の影響範囲を閉じ込める |
 
-この依存規則は ArchUnit のテストで機械的に検証する。
+この依存規則は ArchUnit のテスト（`ModuleDependencyTest`）で機械的に検証する。
 規則が文書にしか存在しないと、半年後には守られていないためである。
 
 ---
@@ -149,7 +153,7 @@ CI                     Ingest API          ArtifactStore    Job Queue      Worke
 同期にすると CI の待ち時間が延びる。quality-gate の障害が CI を止めないという
 方針（NFR 10.3）とも整合する。
 
-CI が判定結果を知りたい場合は `GET /runs/{runId}` をポーリングする。
+CI が判定結果を知りたい場合は `GET /runs/{runId}/status` をポーリングする。
 ただし本フェーズではマージをブロックしないため、通常はポーリングしない。
 
 ### 3.2 判定ジョブの処理手順
@@ -225,8 +229,8 @@ jobs テーブル ──▶ @Scheduled(fixedDelay = 1s) のポーラ ──▶ �
 | 最大試行回数 | 5 回 |
 | バックオフ | 指数（1 分、2 分、4 分、8 分、16 分） |
 | 恒久的失敗 | `status = DEAD` として保持。管理画面から一覧・手動再実行できる |
-| リトライ対象 | 一時的な障害（GitHub API のタイムアウト、DB の一時エラー、通知先の 5xx） |
-| リトライ対象外 | 成果物の形式不正、設定ファイルの検証エラー。これらは再実行しても同じ結果になる |
+| リトライ対象 | ハンドラが一時的な障害として明示したもの（`RetryableJobException`。通知先の一時エラーなど） |
+| リトライ対象外 | 成果物の形式不正、設定ファイルの検証エラー（再実行しても同じ結果になる）と、想定外の例外。いずれも即座に `DEAD` にする |
 
 **形式不正をリトライしない**のは重要である。リトライすれば直るものと、
 入力そのものが誤っているものを区別せずに再試行すると、
@@ -269,9 +273,9 @@ poll()                          ← トランザクションなし
 | 対象 | 冪等性の担保 |
 | --- | --- |
 | Run 作成 | `(repository_id, commit_sha, attempt)` の一意制約。CI のリトライで重複 Run を作らない |
-| 成果物アップロード | `(run_id, type, filename)` の一意制約。同じファイルの再送は上書き |
+| 成果物アップロード | `(run_id, type, filename)` の一意制約。同じファイルの再送は制約違反で失敗する（上書きは未実装） |
 | ジョブ登録 | `(type, dedup_key)` の一意制約。`EVALUATE_RUN` の `dedup_key` は `runId` |
-| 通知送信 | `notifications` に送信済みレコードを残し、同一 `(run_id, channel, event)` の再送を抑止 |
+| 通知送信 | `notifications` に送信済みレコードを残し、同一 `(run_id, event, channel, target)` の再送を抑止。Run を持たない通知は `dedup_key` で抑止 |
 
 ---
 
@@ -329,23 +333,20 @@ record RawFinding(
 | --- | --- | --- |
 | `JacocoXmlAdapter` | `jacoco-xml` | M-01 |
 | `LcovAdapter` | `lcov` | M-01 |
-| `IstanbulJsonAdapter` | `istanbul-json` | M-01 |
 | `PitXmlAdapter` | `pit-xml` | M-02 |
 | `K6SummaryAdapter` | `k6-summary` | M-03 / M-04 / M-05 |
-| `SarifAdapter` | `sarif` | M-06 / M-07（`rules` の分類で振り分け） |
-| `OsvJsonAdapter` | `osv-json` | M-06 |
+| `SarifAdapter` | `sarif` | M-06 |
 | `PmdXmlAdapter` | `pmd-xml` | M-07 |
-| `EslintJsonAdapter` | `eslint-json` | M-07 |
-| `LizardCsvAdapter` | `lizard-csv` | M-07 |
 | `JUnitXmlAdapter` | `junit-xml` | M-08 |
-| `PactVerificationAdapter` | `pact-verification` | M-08 |
 | `OasdiffJsonAdapter` | `oasdiff-json` | M-09 |
 | `AxeJsonAdapter` | `axe-json` | M-10 |
 
-SARIF を第一形式としたため、`SarifAdapter` が M-06 と M-07 の両方を供給しうる。
-どちらの指標に属するかは、SARIF の `rules[].properties.tags` と
-ツール名（`driver.name`）から判定する。判定表は設定として外出しし、
-新しいツールの追加でコードを変更せずに済むようにする。
+`istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` / `pact-verification` のアダプタは未実装である
+（[02](02-metrics-spec.md) 0.5）。
+
+`SarifAdapter` は M-06 だけを供給する。SARIF は複雑度も運びうるが、ツール名（`driver.name`）が
+複雑度ツール（PMD / ESLint / lizard）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
+ツール名の判定表は `SarifAdapter` の定数にまとめ、ツールの追加でロジックを変えずに済むようにしている。
 
 ---
 
@@ -356,32 +357,34 @@ SARIF を第一形式としたため、`SarifAdapter` が M-06 と M-07 の両�
 ```java
 public interface MetricEvaluator {
     String metricId();
-    MetricResult evaluate(EvaluationContext context);
+    // コンポーネントごとに複数の結果を返しうる（M-01 は backend / frontend を別に判定する）
+    List<MetricResult> evaluate(EvaluationContext context);
 }
 
 record EvaluationContext(
     Run run,
-    GateConfig config,
-    List<RawMeasurement> measurements,
-    List<Finding>        findings,      // 免除適用済み
-    Optional<Run>        baselineRun,   // 差分算出の比較対象
-    Set<String>          skippedMetrics,
-    Set<String>          referenceOnlyMetrics
+    GateThresholds thresholds,             // 解決済みの設定（しきい値）
+    NormalizedInput input,                 // 正規化済みの実測値と違反（head / base）
+    Map<String, BigDecimal> previousValues, // 前回値。キーは指標 + コンポーネント + 計測条件
+    boolean hasBaseline
 ) {}
 
 record MetricResult(
     String  metricId,
     String  componentName,
-    Status  status,          // PASS / WARN / FAIL / SKIP / REFERENCE / ERROR
+    MeasurementStatus status,   // PASS / WARN / FAIL / SKIP / REFERENCE / ERROR / NOT_APPLICABLE
     BigDecimal value,
-    Object  threshold,
-    BigDecimal previousValue,
-    String  reason,          // 判定理由（UI にそのまま出せる日本語）
-    List<String> findingFingerprints
+    String  unit,
+    Map<String, Object> threshold,
+    String  reason,             // 判定理由（UI にそのまま出せる日本語）
+    Map<String, Object> detail,
+    List<IdentifiedFinding> findingsToPersist,
+    String  variant             // 計測条件（M-02 の実行範囲、性能の計測環境）
 ) {}
 ```
 
 指標ごとに 1 実装。指標の追加は `MetricEvaluator` の実装追加のみで完結する。
+スキップ申告（6.2 の 2）と免除の適用は評価器ではなく `RunEvaluationService` が行い、計測条件統制外の `REFERENCE`（6.2 の 4）は性能の評価器が判定する。
 
 ### 6.2 判定の優先順位
 
@@ -528,7 +531,7 @@ UI と CI ログの双方で原因が分かるようにする。
    │                   │                    │
    │                   │  ★ 許可リスト照合（8.2）
    │                   │                    │
-   │◀─ Set-Cookie: SESSION; HttpOnly; SameSite=Lax; Secure
+   │◀─ Set-Cookie: SESSION; HttpOnly; SameSite=Lax（HTTPS なら Secure）
    │◀─ 302 / ──────────│                    │
 ```
 
@@ -644,8 +647,8 @@ CI 側のスクリプトがこれらに依存しないようにする。
 
 | 項目 | 方針 |
 | --- | --- |
-| 形式 | JSON 構造化ログ |
-| 相関 ID | `requestId`（全リクエスト）、`runId`（取り込み・判定）を MDC に載せる |
+| 形式 | JSON 構造化ログ（未実装。現状は Spring Boot 既定のテキスト形式） |
+| 相関 ID | `requestId`（全リクエスト）、`runId`（取り込み・判定）を MDC に載せる（未実装） |
 | 秘匿情報 | Ingest Token、SMTP のパスワード、セッション ID、GitHub のアクセストークンはログに出さない。マスク処理をログ出力の共通層に実装する |
 | レベル | 判定結果は INFO。成果物の形式不正は WARN（システム異常ではないため）。ジョブの恒久的失敗は ERROR |
 
@@ -653,6 +656,9 @@ CI 側のスクリプトがこれらに依存しないようにする。
 ERROR を「対応が必要な異常」に限定しておかないと、アラートが意味を失う。
 
 ### 10.2 メトリクス（Micrometer）
+
+`/actuator/prometheus`（ADMIN のみ）で公開する。下表のうち実装済みは `qg.notifications` のみで、
+ほかは未実装である。
 
 | メトリクス | 用途 |
 | --- | --- |
@@ -681,7 +687,7 @@ ERROR を「対応が必要な異常」に限定しておかないと、アラ�
 | ダッシュボード p95 1.0 秒（NFR 10.1） | リポジトリごとの「最新 Run のサマリ」を専用の読み取りモデルとして保持し、判定完了時に更新する。表示時に Run を走査しない |
 | トレンド API p95 800ms | `measurements` に `(repository_id, metric_id, measured_at)` の複合インデックスを張り、期間で範囲検索する（[06](06-database-design.md) 5 章） |
 | 判定完了まで中央値 60 秒 | パースをトランザクション外に出し、DB への書き込みは一括 INSERT にする |
-| 同時取り込み 10 Run | 仮想スレッドで I/O 待ちを占有しない。ワーカーの同時実行数は設定可能とし、既定 4 |
+| 同時取り込み 10 Run | 仮想スレッドで I/O 待ちを占有しない。ワーカーは 1 回のポーリングで最大 4 件を取り出し、順に処理する（件数は定数） |
 
 読み取りモデルを別に持つ方式は、書き込み時に更新処理が増える。
 それでも採るのは、**ダッシュボードが最も頻繁に開かれる画面**であり、

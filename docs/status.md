@@ -1,18 +1,19 @@
 # 実装状況
 
-**Phase 1 の機能（全 10 指標・免除・通知・監査ログ・再評価・全画面）まで完了（2026-09-23）。**
+**全 10 指標の判定・免除・通知・監査ログ・再評価・全画面まで実装済み（2026-09-23）。**
+CI から quality-gate への送信（`quality-gate-action`）は未実装のため、取り込みは現状 API を直接呼んで行う（[CI からの取り込み](operations/ingest.md)）。
 
 | フェーズ | 状態 |
 | --- | --- |
-| 要件定義 | 完了（v1.1 確定） |
+| 要件定義 | 完了（v1.2。通知をメールのみに改訂） |
 | 技術スタック | 完了（v1.1 確定、雛形で検証済み） |
 | 基本設計（方式・DB・API・画面） | 完了 |
 | プロジェクト雛形 | 完了（ビルド・テスト・起動を確認済み） |
 | 正規化・判定エンジン | 完了（M-01〜M-10 の全 10 指標） |
 | 設定解決（`.quality-gate.yml`） | 完了（検証・版管理・Run への紐づけ） |
-| 参照 API と画面（S-03 Run 詳細 / S-04 違反一覧 / S-05 トレンド） | 完了 |
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
-| 画面（S-01〜S-09） | 完了 |
+| API と画面（S-01〜S-09） | 完了 |
+| CI からの送信（`quality-gate-action`） | 未着手 |
 
 ## 動くもの
 
@@ -69,8 +70,14 @@
 
 ## 未実装のもの
 
+- **CI からの送信** — GitHub Actions 用の composite action `quality-gate-action`（FR-03-4）と CLI（FR-03-5）。
+  `.github/workflows/quality-gate.yml` の `submit` ジョブは成果物を集めてスキップ対象を算出するところまでで、
+  送信部分は TODO のまま
 - `pact-verification` / `gatling-log` / `istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` 形式のアダプタ
-  （Pact は JUnit XML、それ以外は SARIF など実装済みの形式で送れる）
-- Phase 2 の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、
+  （Pact は JUnit XML、それ以外は SARIF など実装済みの形式で送れる。ただし M-07 は `pmd-xml` のみ）
+- `baseCommitSha` 省略時の merge-base の自動解決（GitHub API 連携は未実装。CI 側で算出して渡す）
+- API のレート制限（`RATE_LIMITED` のエラーコードのみ定義済み）
+- 可観測性の一部 — JSON 構造化ログと相関 ID（MDC）、独自メトリクス（`qg.notifications` 以外の `qg.*`）
+- 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、
   Check Run の出力、README 用のバッジ（FR-08-5）
-- 通知は**メールのみ**とした（Slack・PR コメントは運用上不要と判断し削除。V014）
+- 通知は**メールのみ**とした（Slack・PR コメントは運用上不要と判断し削除。D-15 / V014）

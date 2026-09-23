@@ -90,8 +90,8 @@ PMD の出した絶対パスに実際に `/<component>/<モジュール相対>` 
 | ブランチへの push の Run | そのブランチの直前の Run のコミット SHA。初回は既定ブランチとの merge-base |
 
 `baseCommitSha` は CI 側が算出して Ingest API に渡す。
-未指定の場合、quality-gate が GitHub App の Contents: Read 権限で merge-base を解決する。
-解決できない場合、差分ベースの指標は ERROR となる。
+未指定の場合に quality-gate が GitHub App の Contents: Read 権限で merge-base を解決する設計だが、
+GitHub API 連携は未実装であり、現状は解決しない（未指定のまま記録する）。
 
 ### 0.4 fingerprint
 
@@ -107,7 +107,7 @@ Finding を Run をまたいで同一と見なすキー。
 | M-10 a11y | `sha256(metricId + ページパス + ルールID + 要素の CSS セレクタ)`。ページパスは ID を `:id` に置き換えたもの（M-10「実装で確定した仕様」） |
 
 ファイル移動・リネームにより fingerprint が変化する場合、git の rename 検出結果を用いて
-旧 fingerprint との対応表を Run に保持し、「新規発生」と誤って扱わない。
+旧 fingerprint との対応表を Run に保持し、「新規発生」と誤って扱わない（未実装）。
 
 ### 0.5 対応入力フォーマット一覧
 
@@ -121,8 +121,8 @@ Finding を Run をまたいで同一と見なすキー。
 | M-03/04/05 | Gatling | simulation.log | `gatling-log` |
 | M-06 | Trivy / Semgrep / gitleaks / Dependency-Check | SARIF 2.1.0 | `sarif` |
 | M-06 | OSV-Scanner | osv JSON | `osv-json` |
-| M-07 | PMD | SARIF または XML | `sarif` / `pmd-xml` |
-| M-07 | ESLint | SARIF または JSON | `sarif` / `eslint-json` |
+| M-07 | PMD | XML | `pmd-xml` |
+| M-07 | ESLint | JSON | `eslint-json` |
 | M-07 | lizard | CSV / XML | `lizard-csv` |
 | M-08 | JUnit (surefire / failsafe / Vitest junit reporter) | JUnit XML | `junit-xml` |
 | M-08 | Pact | verification result JSON | `pact-verification` |
@@ -132,6 +132,13 @@ Finding を Run をまたいで同一と見なすキー。
 
 SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツールは SARIF で提出する。
 これによりアダプタ実装が 1 本に集約でき、ツールの差し替えコストが下がる。
+ただし `sarif` は M-06 にだけ使う。複雑度を報告するツール（PMD / ESLint / lizard）の SARIF は、
+M-06 の件数に混入させないため読み飛ばす。
+
+アダプタを実装済みの形式は `jacoco-xml` / `lcov` / `pit-xml` / `k6-summary` / `sarif` / `pmd-xml` /
+`junit-xml` / `oasdiff-json` / `axe-json` / `quality-gate-config` である。`istanbul-json` / `osv-json` /
+`eslint-json` / `lizard-csv` / `pact-verification` はアップロードを受け付けるが、判定時に形式不正として ERROR になる。
+`gatling-log` は種別として定義しておらず、アップロードが 422（`ARTIFACT_TYPE_UNKNOWN`）で拒否される。
 
 ---
 
@@ -603,7 +610,7 @@ CC が高い関数はテストが困難で、欠陥が混入しやすい。
 匿名関数・アロー関数は、宣言位置（親スコープの関数名 + 出現順）で同定する。
 
 ファイルの移動・リネームは git の rename 検出結果（類似度 50% 以上）を用いて追跡し、
-移動のみで「新規追加」と誤判定しない。
+移動のみで「新規追加」と誤判定しない（未実装。現状は移動・リネームした関数が新規扱いになる）。
 
 ### 入力
 
@@ -618,14 +625,16 @@ CC が高い関数はテストが困難で、欠陥が混入しやすい。
 > `switch` の各 `case` を数えるか等）。**同一リポジトリでは同一ツールを使い続ける**こと。
 > ツールを変更した場合はトレンド上で系列を分ける。
 
+現時点で M-07 として読めるのは PMD の XML（`pmd-xml`）だけであり、TypeScript / Vue（ESLint）の複雑度は判定に使われない。
+
 ### ベース側の CC 取得
 
 (b) の判定にはベースコミット時点の CC 値が必要となる。取得方法は 2 通り。
 
 1. **推奨** — CI が base / head の両方で解析を実行し、2 つの成果物を提出する
-   （`artifacts.type: sarif` に `scope: base` / `scope: head` を付与）
+   （`artifacts.type: pmd-xml` に `scope: base` / `scope: head` を付与）
 2. quality-gate が保持する過去 Run の複雑度データを流用する
-   （ベースコミットの Run が存在する場合のみ。存在しなければ 1 の提出が必須）
+   （ベースコミットの Run が存在する場合のみ。存在しなければ 1 の提出が必須。**未実装**）
 
 いずれも得られない場合、(b) の判定は行わず (a) のみを判定し、
 Run 詳細に「ベース比較不可のため新規追加分のみ判定」と明示する。

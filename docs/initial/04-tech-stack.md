@@ -122,10 +122,10 @@ quality-gate/
 | 状態管理 | Pinia | 4.x | |
 | ルーティング | Vue Router | 5.x | |
 | API 型・呼び出し | openapi-typescript + openapi-fetch | — | 4 章 |
-| グラフ | PrimeVue `Chart`（Chart.js） | — | 3.1 の注意事項あり |
+| グラフ | インライン SVG（`TrendChart.vue`） | — | 当初は PrimeVue `Chart`（Chart.js）を想定。3.1 で変更 |
 | 単体テスト | Vitest 5 + @vue/test-utils | — | カバレッジは `@vitest/coverage-v8`。`coverage.include` を指定し、未テストのファイルも分母に含める |
 | E2E / a11y | Playwright + `@axe-core/playwright` | — | M-10 の計測元 |
-| Lint | ESLint（`eslint-plugin-vue`、`complexity` ルール）+ Prettier | — | `complexity` は M-07 の計測元 |
+| Lint | ESLint（`eslint-plugin-vue`、`complexity` ルール）+ Prettier | — | `complexity` は M-07 の計測元とする想定。現時点で ESLint の結果は M-07 に取り込んでいない（[02](02-metrics-spec.md) M-07） |
 
 ### 3.1 グラフとアクセシビリティ
 
@@ -203,7 +203,7 @@ class OpenApiExportIT {
 // frontend/package.json（抜粋）
 {
   "scripts": {
-    "generate:api": "openapi-typescript ../api/openapi.yml -o src/api/schema.d.ts"
+    "generate:api": "openapi-typescript ../api/openapi.yml -o src/api/schema.d.ts && prettier --write src/api/schema.d.ts"
   }
 }
 ```
@@ -213,13 +213,13 @@ class OpenApiExportIT {
 import createClient from "openapi-fetch";
 import type { paths } from "./schema";
 
-export const api = createClient<paths>({ baseUrl: "/api" });
+export const api = createClient<paths>({ baseUrl: "/", credentials: "same-origin" });
 ```
 
 呼び出し側では、パス・パラメータ・レスポンスがすべて型で保証される。
 
 ```ts
-const { data, error } = await api.GET("/v1/runs/{runId}", {
+const { data, error } = await api.GET("/api/v1/runs/{runId}", {
   params: { path: { runId } },   // 型が違えばコンパイルエラー
 });
 ```
@@ -248,9 +248,8 @@ git diff --exit-code api/ frontend/src/api/schema.d.ts
 #   差分が出たら失敗 = 「実装を変えたのに生成物を更新していない」
 ```
 
-この検証は M-08（契約テスト成功率）の一部として扱う。
-生成物がずれている状態は、フロントエンドが古い契約に基づいて動いていることを意味し、
-契約テストの前提が崩れているためである。
+生成物がずれている状態は、フロントエンドが古い契約に基づいて動いていることを意味する。
+CI ではこの検証が失敗するとジョブを失敗させる（M-08 の成果物には含めず、ジョブの失敗として扱う）。
 
 ### 4.4 開発時の同一オリジン
 
@@ -289,8 +288,8 @@ Maven のビルドに frontend のビルドを組み込み、`frontend/dist` を
 | `frontend-maven-plugin`（com.github.eirslett） | Node.js の取得、`npm ci`、`npm run build` の実行 |
 | `maven-resources-plugin` | `frontend/dist` → `target/classes/static` へのコピー |
 
-バックエンドのみを速く回したい場合のために、frontend のビルドを飛ばす
-Maven プロファイル（`-P skip-frontend`）を用意する。
+frontend のビルドは Maven プロファイル `frontend` にまとめ、プロパティ `skipFrontend` が
+無いときに有効になるようにしている。バックエンドのみを速く回したい場合は `-DskipFrontend=true` を付ける。
 
 ---
 
@@ -302,7 +301,7 @@ Maven プロファイル（`-P skip-frontend`）を用意する。
 # compose.yaml（概念）
 services:
   db:
-    image: postgres:17
+    image: postgres:17-alpine
     environment: [POSTGRES_DB=qualitygate, ...]
     volumes: ["pgdata:/var/lib/postgresql/data"]
     healthcheck: { test: ["CMD-SHELL", "pg_isready -U ..."] }
@@ -365,6 +364,10 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 | M-09 破壊的変更 | oasdiff（`api/openapi.yml` の base/head 比較） | — |
 | M-10 アクセシビリティ | — | Playwright + `@axe-core/playwright` |
 
+2026-09-23 時点で CI（`.github/workflows/quality-gate.yml`）が実際に成果物を作っているのは次の範囲である。
+M-06 は Trivy のみ（Semgrep・gitleaks は未導入）、M-07 は PMD のみ（ESLint の複雑度は M-07 として読まない）、
+M-08 は backend の `*ApiIT` の JUnit XML のみ。送信処理（`submit` ジョブ）は未実装。
+
 ---
 
 ## 7. バージョン管理の方針
@@ -376,7 +379,7 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 | Node.js | `.nvmrc` に記載し、CI の `setup-node` が参照する |
 | Java 依存 | Spring Boot の BOM に従い、BOM 外のみ明示指定。バージョンレンジは使わない |
 | npm 依存 | `package-lock.json` をコミットし、CI では `npm ci` を使う |
-| 依存更新 | Dependabot による更新 PR。M-06 の脆弱性検出と連動させ、更新の必要性を数値で判断する |
+| 依存更新 | Dependabot による更新 PR（未設定）。M-06 の脆弱性検出と連動させ、更新の必要性を数値で判断する |
 
 ---
 
@@ -395,7 +398,7 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 | MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる（5.2） |
 | Spring WebFlux | 取り込みは I/O 中心だが、仮想スレッドで十分。リアクティブの学習・デバッグコストに見合わない |
 | ShedLock | 単一プロセス構成のため、スケジューラの多重実行が起こらない |
-| ECharts | PrimeVue に Chart.js ベースの `Chart` が含まれ、依存を増やさずに済む。密度が足りなくなった時点で再検討（3.1） |
+| Chart.js / ECharts | 本アプリのデータ密度ではインライン SVG で足り、依存も増えない。密度が足りなくなった時点で ECharts を再検討（3.1） |
 
 ---
 
@@ -406,7 +409,7 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 | T-1 | **PIT が Java 25 に未対応、または不具合がある** | M-02 が計測できない | 導入初日に PIT を単体で検証する。動作しない場合は、Maven Toolchains で **PIT の実行時のみ Java 21 を使う**。それでも解決しない場合、D-13 のスキップ申告により M-02 を `SKIP` として運用し、対応版を待つ（fail-closed を壊さずに待機できる） |
 | T-2 | Java 25 に対応していないライブラリがある | ビルド不能 | 依存は Spring Boot の BOM に揃え、BOM 外の依存を最小限にする。初期構築時に全依存の動作を確認する |
 | T-3 | 生成物（`openapi.yml` / `schema.d.ts`）の更新漏れ | フロントが古い契約で動く | CI で再生成して差分を検出し、失敗させる（4.3） |
-| T-4 | Chart.js のグラフがスクリーンリーダーで読めない | NFR 10.6 未達 | すべてのグラフに表形式の代替表現を併設することを実装要件とする（3.1） |
+| T-4 | Chart.js のグラフがスクリーンリーダーで読めない | NFR 10.6 未達 | グラフをインライン SVG で描くことで解消（3.1）。表形式の代替表現も併設する |
 | T-5 | WSL2 で `/mnt/c` 配下に配置され、開発が遅い | 開発効率の低下 | README に配置場所を明記し、セットアップ手順の最初に記載する（5.3） |
 | T-6 | Testcontainers が CI 環境で起動できない | 結合テストが動かない | GitHub ホストランナーは Docker を利用できる。セルフホストランナーでは Docker の利用可否を構築時に確認する |
 

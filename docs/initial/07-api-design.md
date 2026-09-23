@@ -35,7 +35,7 @@
 | 経路 | 対象 | 方式 |
 | --- | --- | --- |
 | セッション | `/api/v1/**`（Ingest を除く） | GitHub OAuth ログイン後の `SESSION` Cookie（HttpOnly / SameSite=Lax / Secure） |
-| Ingest Token | `/api/v1/runs`（POST 系） | `Authorization: Bearer qg_<prefix>_<secret>` |
+| Ingest Token | `/api/v1/runs` 配下の POST（`/reevaluate` を除く）と `GET /api/v1/runs/{runId}/status` | `Authorization: Bearer qg_<prefix>_<secret>` |
 
 同一オリジン構成のため CORS 設定は行わない。
 **状態変更を伴う操作には CSRF トークンを要求する**（Spring Security の既定）。
@@ -135,6 +135,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/runs/{runId}/artifacts/{artifactId}/content` | 成果物のダウンロード | — |
 | GET | `/api/v1/repositories/{id}/config` | 現在の設定と版履歴（S-06） | — |
 | GET | `/api/v1/waivers` | 免除の一覧（S-07） | — |
+| GET | `/api/v1/repositories/{id}/notification-settings` | 通知設定 | — |
 
 ### 2.3 操作 API
 
@@ -153,14 +154,19 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | POST | `/api/v1/users` | 許可リストへの追加 | ADMIN |
 | PATCH | `/api/v1/users/{id}` | ロール変更・無効化 | ADMIN |
 | GET | `/api/v1/audit-logs` | 監査ログ | ADMIN |
+| GET | `/api/v1/repositories/{id}/ingest-tokens` | トークン一覧（平文もハッシュも返さない） | ADMIN |
+| PUT | `/api/v1/repositories/{id}/notification-settings` | 通知条件とメール宛先の更新 | ADMIN |
+| GET / PUT | `/api/v1/settings/retention` | 保持期間の取得・更新 | ADMIN |
+| GET | `/api/v1/jobs/dead` | 恒久的に失敗したジョブの一覧 | ADMIN |
+| POST | `/api/v1/jobs/{id}/retry` | 失敗したジョブの再実行 | ADMIN |
 
 ### 2.4 認証以外の公開エンドポイント
 
 | メソッド | パス | 用途 | 認可 |
 | --- | --- | --- | --- |
-| GET | `/badges/{owner}/{name}.svg` | 最新判定のバッジ（FR-08-5） | 認証不要 |
+| GET | `/badges/{owner}/{name}.svg` | 最新判定のバッジ（FR-08-5。**未実装**） | 認証不要 |
 | GET | `/actuator/health` | ヘルスチェック | 認証不要 |
-| GET | `/actuator/prometheus` | メトリクス | 内部ネットワークのみ |
+| GET | `/actuator/prometheus` | メトリクス | ADMIN（セッション） |
 
 バッジを認証不要にするのは、README に埋め込んだ画像を
 ブラウザが Cookie なしで取得するためである。
@@ -196,7 +202,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- |
 | `repository` | ○ | `owner/name`。トークンの発行元と一致しない場合 403 |
 | `commitSha` | ○ | 40 桁の 16 進 |
-| `baseCommitSha` | | 省略時は quality-gate が GitHub API で merge-base を解決 |
+| `baseCommitSha` | | 省略時は quality-gate が GitHub API で merge-base を解決する設計（未実装。現状は未指定のまま記録する） |
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `runnerType` | ○ | `self-hosted` / `github-hosted` |
@@ -660,14 +666,14 @@ API のパスはリポジトリ上のファイルではない。
 | ロールの反映 | セッションのロールを信じず、リクエストのたびに `users` の現在値で置き換える。降格・無効化は次のリクエストから効く |
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
-| トークン | `GET /api/v1/repositories/{id}/ingest-tokens` で一覧（平文もハッシュも返さない）。監査ログにも平文を残さない |
+| トークン | 一覧は平文もハッシュも返さない。監査ログにも平文を残さない |
 | 設定 | `GET .../config` は `editable`（UI 編集の可否）と `defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す。`PUT` は最新の版がファイル由来なら `409 CONFIG_MANAGED_BY_FILE`、検証エラーは `422 CONFIG_VALIDATION_FAILED`（`errors` に行番号） |
 | 免除 | 違反の免除（`scope: FINDING`）は、そのリポジトリで検出されたことのある違反だけを対象にできる（無ければ 404）。登録時点の違反の見出しを `title` に複製する。指標の免除（`scope: METRIC`）は判定を `REFERENCE` にして本来の判定を理由に残し、ダッシュボードの `alerts` に `METRIC_WAIVED` を常に出す。違反の免除は違反を数える指標（M-06 / M-07 / M-09 / M-10）に効く。M-08 は件数の集計で判定するため、指標の免除を使う |
 | 違反一覧 | 各違反に `fingerprint`、応答に `repositoryId` を返す（免除の登録に使う）。`waiver.status` は判定後に失効・期限切れになっていれば `ACTIVE` 以外 |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` の `status` は受付時点の Run の状態。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
-| ジョブ | `GET /api/v1/jobs/dead` と `POST /api/v1/jobs/{id}/retry`（恒久的失敗の確認と手動再実行。本書 05 4.3） |
-| 保持期間 | `GET` / `PUT /api/v1/settings/retention`（Run・成果物・監査ログ・通知の日数） |
-| 通知設定 | `GET` / `PUT /api/v1/repositories/{id}/notification-settings`（通知条件とメールの宛先。D-15 でメールのみ） |
+| ジョブ | 恒久的失敗（`DEAD`）の確認と手動再実行（[05](05-architecture.md) 4.3） |
+| 保持期間 | Run・成果物・監査ログ・通知の日数を扱う |
+| 通知設定 | 通知条件とメールの宛先（D-15 でメールのみ） |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
 
 ---
@@ -791,13 +797,15 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
 | `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
-| `RATE_LIMITED` | 429 | レート制限超過 |
-| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害 |
+| `RATE_LIMITED` | 429 | レート制限超過（定義のみ。レート制限は未実装） |
+| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API 連携は未実装） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
 
 ---
 
 ## 8. レート制限
+
+**未実装。** 以下は設計時点の方針である。
 
 内部利用のため厳しい制限は設けないが、**暴走の歯止めとして**設定する。
 
