@@ -35,6 +35,9 @@ import java.util.Optional;
  *
  * <p>将来、多重防御として GitHub からの直接取得を足す余地は
  * {@code sourceType} と {@code sourceCommitSha} に残してある。
+ *
+ * <p>収集ランナー（docs/architecture/collector-runner.md）は設定ファイルを送らないため、
+ * その Run は UI で保存した設定（無ければ既定値）で判定される。
  */
 @Service
 public class GateConfigService {

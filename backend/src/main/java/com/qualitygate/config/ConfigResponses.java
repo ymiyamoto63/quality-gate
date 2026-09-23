@@ -22,7 +22,7 @@ public final class ConfigResponses {
             ConfigVersion current,
             @NotNull List<ConfigHistoryItem> history,
             @NotNull ConfigValidation validation,
-            @NotNull @Schema(description = "UI から編集できるか。ファイルで管理されていれば false")
+            @NotNull @Schema(description = "UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false")
             boolean editable,
             @NotNull @Schema(description = "既定値の YAML。設定版が無いときの表示と UI 編集の初期値")
             String defaultYaml) {

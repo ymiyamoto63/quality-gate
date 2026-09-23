@@ -1,7 +1,9 @@
 # 収集ランナーで計測する
 
 対象リポジトリに**何も置かずに**、quality-gate 側で対象を取得・計測して取り込む手順です。
-方式の検討と移行計画は [収集ランナー方式への変更の検討](../architecture/collector-runner.md) を参照してください。
+これが対象リポジトリを計測する標準の方法です（[決定事項 D-16](../initial/03-open-questions.md)）。
+方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
+しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
 計測する指標は **M-01 / M-06 / M-07 / M-08 / M-09** です。
 M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません。
@@ -87,27 +89,17 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 ### 1-4. quality-gate にリポジトリと合格ラインを登録する
 
-1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録し、Ingest Token を発行する（1-3 のシークレットに入れる）
+1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録し、Ingest Token を発行する（1-3 のシークレットに入れる）。
+   対象の CI 用のトークンがすでにある場合も、収集ランナー用に別のトークンを発行する（あとで CI 用だけを失効させられるように）
 2. like-chatgpt の **設定（S-06）** に `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` の内容を貼り付けて保存する
 
-2 を忘れると既定値（全指標が有効）で判定され、段階 1 で計測しない M-02 / M-10 などが ERROR になって Run 全体が FAIL になります。
+2 を忘れると既定値（全指標が有効）で判定され、まだ計測しない M-02 / M-10 などが ERROR になって Run 全体が FAIL になります。
 
-like-chatgpt の CI（現在の方式）から `.quality-gate.yml` 付きの Run がすでに届いている場合、
-**最新の設定がファイル由来のため S-06 から保存できません**（「このリポジトリの設定はファイルで管理されているため、画面からは編集できません」）。
-その場合は、画面の代わりに DB へ UI 由来の版として登録します（内容の検証は判定時に行われます）。
-
-```bash
-YAML=$(cat collector/targets/ymiyamoto63__like-chatgpt.gate.yml)
-HASH=$(printf %s "$YAML" | sha256sum | cut -d' ' -f1)   # 画面から保存したときと同じ計算
-docker compose exec -T db psql -U qualitygate -d qualitygate \
-  -v yaml="$YAML" -v hash="$HASH" <<'SQL'
-INSERT INTO gate_configs (id, repository_id, version, source_type, content_hash, raw_yaml, parsed)
-SELECT gen_random_uuid(), r.id,
-       (SELECT coalesce(max(version), 0) + 1 FROM gate_configs WHERE repository_id = r.id),
-       'UI', :'hash', :'yaml', '{}'::jsonb
-FROM repositories r WHERE r.owner = 'ymiyamoto63' AND r.name = 'like-chatgpt';
-SQL
-```
+対象の CI から `.quality-gate.yml` 付きの Run が届いていたリポジトリでは、**直近の Run がファイルの設定で判定されている間は S-06 から保存できません**
+（「直近の Run がファイルの設定で判定されているため、画面からは編集できません」）。
+収集ランナーで 1 回計測すると（既定値で判定されて FAIL になります）保存できるようになるので、
+保存した後にその Run を **Run 詳細 › 再評価** で判定し直してください。
+対象の CI がまだ送信を続けていると、そちらの Run が届くたびにまた編集できなくなります（[対象の CI からの送信を止める](#対象の-ci-からの送信を止める)）。
 
 ## 2. 手動で実行する
 
@@ -129,16 +121,16 @@ SQL
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
 
-## 3. 現在の方式と結果が一致するかを確かめる（段階 1 の完了条件）
+## 3. 従来の方式と結果が一致するかを確かめる（段階 1 の完了条件）
 
-同じコミットについて、like-chatgpt の CI（現在の方式）と収集ランナーの結果を比べます。
+同じコミットについて、like-chatgpt の CI（対象に計測用ファイルを置く従来の方式）と収集ランナーの結果を比べます。
 Ingest API は同一コミットへの再送信を別の Run（attempt を増やす）として受け付けるため、両方の Run が残ります。
 
 | 指標 | 一致すべきもの |
 | --- | --- |
 | M-01 | backend / frontend それぞれのブランチカバレッジ |
 | M-06 | 件数（Trivy の版の違いで差が出うる。差が出たら `versions.env` の版を揃えて確かめる） |
-| M-07 | **一致しないのが正しい**。現在の方式は base を送らないため「ベース比較不可」になり、収集ランナーは base 比較で判定する |
+| M-07 | **一致しないのが正しい**。従来の方式は base を送らないため「ベース比較不可」になり、収集ランナーは base 比較で判定する |
 | M-08 | 契約テストの件数と成功率 |
 | M-09 | 破壊的変更の件数（または「対象外」） |
 
@@ -212,6 +204,26 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 | PR の計測だけ | 計測プロファイルの `MEASURE_PULL_REQUESTS` を `false` にする |
 | 定期実行すべて（一時的に） | quality-gate の **Actions → collect → ︙ → Disable workflow**。手動実行もできなくなるので、再開するときは **Enable workflow** |
 
+## 判定結果を読むときの注意
+
+- **M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません**（段階 3・4 で追加予定）。
+  画面の設定（1-4）で無効にしておかないと、成果物が無いため ERROR になります
+- **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
+- **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
+  like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
+- **M-09 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
+- 判定には**画面（S-06）で保存した最新の設定**を使います。コミット時点の設定ではありません。設定の変更履歴は S-06 の「変更履歴」と監査ログで追えます
+
+## 対象の CI からの送信を止める
+
+収集ランナーだけで計測できるようになったら、対象リポジトリの CI から quality-gate への送信は不要です。
+両方から送ると、同じコミットの Run が 2 つでき、対象の CI が送る `.quality-gate.yml` が画面の設定より優先されます。
+
+対象リポジトリに手を入れずに止めるには、**quality-gate 側で対象の CI 用の Ingest Token を失効させます**（S-08）。
+収集ランナー用のトークンを別に発行しておけば、収集ランナーの送信には影響しません。
+対象リポジトリの計測用ファイル（`.quality-gate.yml`、`.github/workflows/quality-gate.yml`、`scripts/quality-gate-submit.sh` など）は
+収集ランナーでは使いません。消すかどうかは対象側の判断です（M-02 / M-10 を収集ランナーへ移すまでは、それらの計測に対象の CI を使い続ける選択もあります）。
+
 ## 手元で試す
 
 ワークフローと同じことを手元で実行できます（Docker・JDK・Node.js が必要）。
@@ -267,4 +279,4 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | 定期実行の `plan` で `トークンの owner（…）と違うため飛ばします` | 対象の owner が quality-gate の owner と違う。定期実行の対象外（手動実行で計測する） |
 | 定期実行の `plan` で `3 回失敗しているため計測しません` | そのコミットの計測が 3 回失敗した。原因を直して手動実行するか、4-4 の手順で記録を消す |
 | 定期実行が動かない | ワークフローが main に無い、Disable されている、またはランナーが止まっている（`plan` もセルフホストランナーで動く） |
-| S-06 で「ファイルで管理されているため、画面からは編集できません」 | 現在の方式の CI が `.quality-gate.yml` を送っている。1-4 の SQL で登録する |
+| S-06 で「直近の Run がファイルの設定で判定されているため、画面からは編集できません」 | 対象の CI が `.quality-gate.yml` を送っている。収集ランナーで 1 回計測してから保存する（1-4）。対象の CI からの送信を止める |

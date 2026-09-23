@@ -179,7 +179,7 @@ export interface paths {
     get: operations['get_1']
     /**
      * UI から設定を更新する
-     * @description リポジトリ内のファイルが優先される。ファイルで管理されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
+     * @description CI が送ったファイルが優先される。直近に判定された Run がファイルの設定で判定されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
      */
     put: operations['update_1']
     post?: never
@@ -879,7 +879,7 @@ export interface components {
       current: components['schemas']['ConfigVersion']
       /** @description 既定値の YAML。設定版が無いときの表示と UI 編集の初期値 */
       defaultYaml: string
-      /** @description UI から編集できるか。ファイルで管理されていれば false */
+      /** @description UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false */
       editable: boolean
       history: components['schemas']['ConfigHistoryItem'][]
       validation: components['schemas']['ConfigValidation']

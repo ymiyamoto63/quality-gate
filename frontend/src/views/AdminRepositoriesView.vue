@@ -152,7 +152,7 @@ async function closeTokenDialog(): Promise<void> {
 async function revoke(token: Token): Promise<void> {
   if (
     !window.confirm(
-      `トークン ${token.tokenPrefix} を失効させますか？ このトークンを使う CI は即座に送信できなくなります。`,
+      `トークン ${token.tokenPrefix} を失効させますか？ このトークンを使う収集ランナーや CI は即座に送信できなくなります。`,
     )
   ) {
     return
@@ -291,7 +291,8 @@ async function saveNotification(): Promise<void> {
       <section class="qg-panel" aria-labelledby="tokens-heading">
         <h3 id="tokens-heading">Ingest Token</h3>
         <p class="qg-muted">
-          CI が計測結果を送るためのトークンです。書き込み専用で、参照 API には使えません。
+          収集ランナー（または CI）が計測結果を送るためのトークンです。書き込み専用で、参照 API
+          には使えません。
         </p>
         <button type="button" class="qg-button qg-button--primary" @click="issueToken">
           トークンを発行

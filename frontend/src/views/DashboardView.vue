@@ -65,7 +65,8 @@ function formatDateTime(value: string | null): string {
     <!-- 空状態は「何が無いか」と「次に取るべき操作」を示す -->
     <p v-else-if="cards.length === 0" class="qg-empty">
       計測対象のリポジトリがまだ登録されていません。<br />
-      管理画面からリポジトリを登録し、発行した Ingest Token を CI に設定してください。
+      管理画面からリポジトリを登録し、発行した Ingest Token を収集ランナー（または
+      CI）に設定してください。
     </p>
 
     <ul v-else class="qg-cards">

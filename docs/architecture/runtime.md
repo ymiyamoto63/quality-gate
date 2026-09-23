@@ -13,7 +13,7 @@
              │  frontend/src を HMR で配信  │           │  ├ REST API (/api/v1/**)      │
              └─────────────────────────────┘           │  ├ OAuth ログイン（GitHub App）│
                                                        │  ├ 同梱 SPA (classpath:/static)│
-   CI（GitHub Actions）── Ingest API ────────────────▶ │  └ JobWorker（判定ジョブ）     │
+   収集ランナー / CI ──── Ingest API ────────────────▶ │  └ JobWorker（判定ジョブ）     │
     Bearer qg_xxx_yyy    POST /api/v1/runs/...         └──────┬──────────────┬─────────┘
                                                               │ JDBC         │ ファイル
                                                               ▼              ▼

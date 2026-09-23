@@ -1,10 +1,10 @@
-# like-chatgpt の合格ライン（収集ランナー用・段階 1）
+# like-chatgpt の合格ライン（収集ランナー用）
 #
 # 収集ランナーは .quality-gate.yml を送らないため、quality-gate は画面（S-06）で保存した設定で判定する。
 # この内容を S-06 に貼り付けて保存する（このファイル自体は判定に使われない。控えと差分確認用）。
 #
 # like-chatgpt の .quality-gate.yml との違い:
-#   - mutation_score / accessibility を無効にしている（段階 1 では計測しないため。
+#   - mutation_score / accessibility を無効にしている（収集ランナーが段階 3・4 まで計測しないため。
 #     有効のままだと未提出で ERROR になり、Run 全体が FAIL になる）
 version: 1
 enforcement: report-only

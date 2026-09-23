@@ -365,13 +365,13 @@ public class RunQueryService {
         }
         return switch (errorCode) {
             case "CONFIG_VALIDATION_FAILED" ->
-                    ".quality-gate.yml を修正して CI を再実行してください。"
+                    ".quality-gate.yml（CI が送った設定ファイル）を修正して CI を再実行してください。"
                             + "示された行番号とキー名がそのまま修正箇所です。";
             case "ARTIFACT_FORMAT_INVALID" ->
-                    "CI が出力した成果物が期待する形式か確認してください。"
+                    "CI（または収集ランナー）が出力した成果物が期待する形式か確認してください。"
                             + "形式が不正な場合は再実行しても直りません。";
             case "ARTIFACTS_DELETED" ->
-                    "この Run の成果物は保持期間を過ぎています。CI を再実行して計測し直してください。";
+                    "この Run の成果物は保持期間を過ぎています。CI（または収集ランナー）を再実行して計測し直してください。";
             default -> "再評価を試し、解消しない場合は管理者に連絡してください。";
         };
     }
