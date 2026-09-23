@@ -40,3 +40,6 @@ reports/
 # Playwright の失敗時トレース（e2e/fixtures は結合テストが生成する成果物なので追跡する）
 test-results/
 playwright-report/
+
+# セルフホストランナー本体（認証情報・バイナリを含む）
+actions-runner/

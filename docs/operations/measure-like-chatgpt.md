@@ -62,6 +62,16 @@ git clone https://github.com/ymiyamoto63/like-chatgpt.git
 cd like-chatgpt
 ```
 
+すでにクローンがある場合は、main を最新にします。
+計測用のファイル一式（`.quality-gate.yml` / `api/openapi.yml` / `scripts/` / ワークフロー）は
+PR #14（`c643edd`）で追加されたため、それより前のままだと以降の手順が通りません。
+
+```bash
+cd like-chatgpt
+git switch main && git pull --ff-only
+ls .quality-gate.yml api/openapi.yml scripts/quality-gate-submit.sh   # 3 つとも存在すれば OK
+```
+
 以降のコマンドはすべて like-chatgpt のルートで実行します。
 
 ### A-2. 計測する
@@ -223,6 +233,7 @@ PIT の成果物が無かったときは、M-02 のスキップを自動で申�
 | M-02 以外の指標が「成果物が提出されていません」で FAIL | その成果物が `reports/` に無かった。送信時の `::warning::成果物がありません` を確認する |
 | M-02 のスキップ申告が ERROR | `QG_SKIPPED` に M-02 以外を書いた。スキップを許可しているのは `mutation_score` だけ |
 | M-10 が ERROR（検査したページが無い、`pages` の画面が検査されていない、など） | `test:a11y` が途中で落ちて `reports/axe-results.json` が空、または Playwright が別のサーバー（5173 番の quality-gate など）を検査した |
+| `api/openapi.yml` / `.quality-gate.yml` / `scripts/` が無い | like-chatgpt のクローンが PR #14 より古い。`git pull --ff-only` で main を最新にする（A-1） |
 | M-09 の oasdiff が失敗する | shallow clone で比較元のコミットが無い。`git fetch --unshallow` するか clone し直す |
 | CI の送信ステップが `Could not resolve host` / 接続タイムアウト | `QG_BASE_URL` に GitHub ホストランナーから到達できない（B-1） |
 | CI で「送信をスキップします」の notice が出る | `QG_BASE_URL`（Variables）か `QG_INGEST_TOKEN`（Secrets）が未設定。種別の取り違え（Secrets に URL を入れた等）にも注意 |
