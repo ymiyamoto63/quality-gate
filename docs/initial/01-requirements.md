@@ -725,7 +725,7 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | ~~`.quality-gate.yml` の取得~~ | —（CI が成果物として送る方式に変更。[05](05-architecture.md) 7.1） | — |
 | 収集ランナーによる対象の clone（3.2） | GitHub App の Contents: Read。対象リポジトリにインストールし、ジョブごとに 1 時間有効のインストールトークンを発行する | 読み取りのみ |
 | 収集ランナーによる PR の一覧取得（3.2） | GitHub App の Pull requests: Read | 読み取りのみ |
-| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す（バックエンドでの解決は未実装） | — |
+| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す。省略された Run はバックエンドが判定ジョブの中で GitHub API により求める | — |
 | ~~PR サマリコメント（FR-11-4）~~ | —（v1.2 で不採用。D-15） | — |
 | Check Run 出力（Phase 2） | GitHub App の Checks: Write | 書き込み |
 

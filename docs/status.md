@@ -23,6 +23,7 @@
 - Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
+- 比較元（`baseCommitSha`）が省略された Run の merge-base を、判定ジョブの中で GitHub API により求める（GitHub App / トークン / 認証なし。失敗しても判定は続ける）
 - **取り込み → 正規化 → 判定 → 読み取りモデル更新**の一連の流れ
   - M-01 ブランチカバレッジ（JaCoCo XML / lcov / istanbul の coverage-final.json）
   - M-02 ミューテーションスコア（PIT `mutations.xml`）— status を数え直して仕様の式で計算し、
@@ -74,7 +75,6 @@
 
 ## 未実装のもの
 
-- `baseCommitSha` 省略時の merge-base の自動解決（バックエンドの GitHub API 連携は未実装。収集ランナーや CI 側で算出して渡す）
 - API のレート制限（`RATE_LIMITED` のエラーコードのみ定義済み）
 - 可観測性の一部 — JSON 構造化ログと相関 ID（MDC）、独自メトリクス（`qg.notifications` 以外の `qg.*`）
 - 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、

@@ -9,6 +9,10 @@
 | `QG_SMTP_HOST` / `QG_SMTP_PORT` | なし / `25` | メール通知に使う SMTP リレー。未設定ならメールは送らず、送信履歴に理由を残す |
 | `QG_SMTP_USERNAME` / `QG_SMTP_PASSWORD` | なし | SMTP 認証が要る場合のみ |
 | `QG_MAIL_FROM` | `quality-gate@localhost` | 通知メールの差出人 |
+| `QG_GITHUB_API_ENABLED` | `true` | `baseCommitSha` を省略した Run の比較元（merge-base）を GitHub API で求めるか（FR-05-4）。求められなくても判定は続く（比較元なし） |
+| `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | 比較元を求めるときの認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents と Pull requests の読み取り権限を付ける。収集ランナーの App と同じものでよい |
+| `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents / Pull requests: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
+| `QG_GITHUB_API_URL` | `https://api.github.com` | GitHub Enterprise Server なら `https://<host>/api/v3` |
 | `QG_SCHEDULE_ZONE` | `Asia/Tokyo` | 日次バッチ（02:00 再評価・02:10 免除の期限切れ・03:00 保持期間・03:10 滞留 Run・09:00 鮮度確認）のタイムゾーン。各時刻は `quality-gate.schedule.*` の cron 式で変えられる |
 
 優先順位は **環境変数 > `.env` > `application.yml` の既定値**です。

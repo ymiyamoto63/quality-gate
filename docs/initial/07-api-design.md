@@ -202,7 +202,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- |
 | `repository` | ○ | `owner/name`。トークンの発行元と一致しない場合 403 |
 | `commitSha` | ○ | 40 桁の 16 進 |
-| `baseCommitSha` | | 省略時は quality-gate が GitHub API で merge-base を解決する設計（未実装。現状は未指定のまま記録する） |
+| `baseCommitSha` | | 省略時は quality-gate が判定ジョブの中で GitHub API により求めて記録する（PR はマージ先との merge-base、既定ブランチは直前のコミット、それ以外は既定ブランチとの merge-base）。求められなければ未指定のまま判定する（`QG_GITHUB_*`、[設定値](../operations/configuration.md)） |
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `runnerType` | ○ | `self-hosted` / `github-hosted` |
@@ -798,7 +798,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
 | `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
 | `RATE_LIMITED` | 429 | レート制限超過（定義のみ。レート制限は未実装） |
-| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API 連携は未実装） |
+| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API を呼ぶのは判定ジョブの比較元の解決だけで、失敗しても比較元なしで判定を続けるため、API の応答としては返さない） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
 
 ---
