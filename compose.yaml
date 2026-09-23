@@ -35,6 +35,8 @@ services:
       QG_SMTP_HOST: ${QG_SMTP_HOST:-}
       QG_SMTP_PORT: ${QG_SMTP_PORT:-25}
       QG_MAIL_FROM: ${QG_MAIL_FROM:-quality-gate@localhost}
+      # コンテナで動かすときは JSON 構造化ログにする（ログ基盤で requestId / runId を検索できるように）
+      QG_LOG_FORMAT: ${QG_LOG_FORMAT:-ecs}
     ports:
       - "8080:8080"
     volumes:

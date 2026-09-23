@@ -1,6 +1,7 @@
 package com.qualitygate.config;
 
 import com.qualitygate.ingest.security.IngestAuthentication;
+import com.qualitygate.platform.observability.CorrelationIds;
 import com.qualitygate.platform.ratelimit.RateLimitProperties;
 import com.qualitygate.platform.ratelimit.RateLimiter;
 import io.micrometer.core.instrument.MeterRegistry;
@@ -108,6 +109,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
                 .formatted(labelOf(limit.category()), limit.perMinute(), retryAfterSeconds));
         problem.put("errorCode", "RATE_LIMITED");
         problem.put("timestamp", Instant.now().toString());
+        CorrelationIds.currentRequestId().ifPresent(id -> problem.put("traceId", id));
         response.setStatus(HttpStatus.TOO_MANY_REQUESTS.value());
         response.setHeader(HttpHeaders.RETRY_AFTER, Long.toString(retryAfterSeconds));
         response.setContentType(MediaType.APPLICATION_PROBLEM_JSON_VALUE);

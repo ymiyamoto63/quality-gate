@@ -26,4 +26,9 @@ public interface ArtifactRecordRepository extends JpaRepository<ArtifactRecord, 
     boolean existsByRunIdAndTypeAndFilename(UUID runId,
                                             com.qualitygate.domain.model.ArtifactType type,
                                             String filename);
+
+    /** 実体が残っている成果物の合計バイト数（ストレージ使用量のメトリクス）。 */
+    @org.springframework.data.jpa.repository.Query(
+            "select coalesce(sum(a.sizeBytes), 0) from ArtifactRecord a where a.deletedAt is null")
+    long sumStoredBytes();
 }
