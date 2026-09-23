@@ -97,6 +97,17 @@ class EvaluationPipelineIT {
                "violations": [] }]
             """;
 
+    /** 契約テストがすべて成功した Failsafe の結果。 */
+    private static final String JUNIT_CLEAN = """
+            <testsuite name="com.qualitygate.RunQueryApiIT" tests="2">
+              <testcase classname="com.qualitygate.RunQueryApiIT" name="Run詳細を返す"/>
+              <testcase classname="com.qualitygate.RunQueryApiIT" name="違反一覧を返す"/>
+            </testsuite>
+            """;
+
+    /** 破壊的変更の無い oasdiff の結果。 */
+    private static final String OASDIFF_CLEAN = "[]";
+
     private static final String PMD = """
             <?xml version="1.0" encoding="UTF-8"?>
             <pmd version="7.0.0">
@@ -156,6 +167,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
+        attachContract(run);
 
         Run evaluated = evaluate(run);
 
@@ -174,6 +186,9 @@ class EvaluationPipelineIT {
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
                         // ベース比較ができないため新規関数数は 0 で合格
                         org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
+                        // 契約テストはすべて成功し、破壊的変更も無い
+                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
                         // 重大なアクセシビリティ違反は無い
                         org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS));
 
@@ -203,7 +218,7 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-10");
+                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-08", "M-09", "M-10");
     }
 
     @Test
@@ -222,6 +237,7 @@ class EvaluationPipelineIT {
                 "GitHub ホストランナーのため実行しない"));
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
+        attachContract(run);
 
         Run evaluated = evaluate(run);
 
@@ -319,6 +335,8 @@ class EvaluationPipelineIT {
                   cyclomatic_complexity:
                     enabled: false
                   accessibility:
+                    enabled: false
+                  api_contract:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -437,6 +455,115 @@ class EvaluationPipelineIT {
                 });
     }
 
+    @Test
+    void 契約テストの失敗と破壊的変更は不合格になり違反として残る() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachPit(run, "changed");
+        attachAxe(run, AXE_CLEAN);
+        // provider（backend）は成功し、consumer（frontend）が 1 件失敗した
+        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+                JUNIT_CLEAN);
+        attach(run, ArtifactType.JUNIT_XML, "junit.xml", "frontend", null, """
+                <testsuites><testsuite name="src/api/client.contract.spec.ts">
+                  <testcase classname="src/api/client.contract.spec.ts" name="GET /runs/{runId}"/>
+                  <testcase classname="src/api/client.contract.spec.ts" name="GET /runs">
+                    <failure message="expected 200 but was 500"/>
+                  </testcase>
+                </testsuite></testsuites>
+                """);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, """
+                [{ "id": "api-path-removed-without-deprecation",
+                   "text": "api path removed without deprecation",
+                   "level": 3, "operation": "GET", "path": "/api/v1/runs" }]
+                """);
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-08") || m.getMetricId().equals("M-09"))
+                .extracting(Measurement::getMetricId, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        // 3 / 4 = 75%。consumer と provider を合算して判定する
+                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.FAIL));
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getValue()).isEqualByComparingTo("75"));
+        // テストクラス名や API のパスはファイルではない。GitHub へのリンクを作らない
+        assertThat(findings.findByRunId(run.getId()))
+                .filteredOn(f -> f.getMetricId().equals("M-08") || f.getMetricId().equals("M-09"))
+                .hasSize(2)
+                .allSatisfy(f -> {
+                    assertThat(f.getFilePath()).isNull();
+                    assertThat(f.getSeverity()).isEqualTo(Severity.HIGH);
+                });
+        // 契約テストの失敗はダッシュボードの脆弱性件数に数えない
+        assertThat(summaries.findById(repositoryId).orElseThrow().getOpenHighCount()).isZero();
+    }
+
+    @Test
+    void 契約テストが1件も実行されていなければ計測エラー() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attachAllMetrics(run);
+        attachPit(run, "changed");
+        attach(run, ArtifactType.JUNIT_XML, "TEST-Skipped.xml", "frontend", null, """
+                <testsuite name="A"><testcase classname="A" name="t"><skipped/></testcase></testsuite>
+                """);
+
+        Run evaluated = evaluate(run);
+
+        // 実行 0 件を「すべて成功」とは読まない。同じ Run に成功した成果物があれば合算される
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS_WITH_WARNINGS);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getStatus()).isEqualTo(MeasurementStatus.WARN));
+
+        Run onlySkipped = createRun(Instant.parse("2026-09-23T00:00:00Z"));
+        attach(onlySkipped, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(onlySkipped, ArtifactType.JUNIT_XML, "TEST-Skipped.xml", "frontend", null, """
+                <testsuite name="A"><testcase classname="A" name="t"><skipped/></testcase></testsuite>
+                """);
+        evaluate(onlySkipped);
+        assertThat(measurements.findByRunId(onlySkipped.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .singleElement()
+                .satisfies(m -> {
+                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
+                    assertThat(m.getValue()).isNull();
+                });
+    }
+
+    @Test
+    void 比較元にOpenAPI定義が無ければ破壊的変更は対象外() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attachPit(run, "changed");
+        attachAxe(run, AXE_CLEAN);
+        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+                JUNIT_CLEAN);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, "[]",
+                "{\"baseSpecMissing\":true}");
+
+        Run evaluated = evaluate(run);
+
+        // 対象外は合否にも部分計測にも影響しない
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.FULL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-09"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getStatus())
+                        .isEqualTo(MeasurementStatus.NOT_APPLICABLE));
+    }
+
     /** ジョブハンドラと同じ手順（設定解決 → 正規化 → 判定）を踏む。 */
     @Test
     void 設定ファイルのしきい値が判定に使われる() {
@@ -454,6 +581,8 @@ class EvaluationPipelineIT {
                   cyclomatic_complexity:
                     enabled: false
                   accessibility:
+                    enabled: false
+                  api_contract:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -530,6 +659,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
+        attachContract(run);
 
         Run evaluated = evaluate(run);
 
@@ -551,6 +681,8 @@ class EvaluationPipelineIT {
                   cyclomatic_complexity:
                     enabled: false
                   accessibility:
+                    enabled: false
+                  api_contract:
                     enabled: false
                 """);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
@@ -596,6 +728,13 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachAxe(run, AXE_CLEAN);
+        attachContract(run);
+    }
+
+    private void attachContract(Run run) {
+        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+                JUNIT_CLEAN);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, OASDIFF_CLEAN);
     }
 
     private void attachAxe(Run run, String json) {

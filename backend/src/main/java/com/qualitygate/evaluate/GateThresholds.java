@@ -19,6 +19,9 @@ import java.util.Set;
  * @param maxAccessibilityViolations M-10 の合格ライン（critical + serious の件数）
  * @param accessibilityStandard      M-10 の判定基準
  * @param accessibilityPages         M-10 で検査されているべきページ。空なら限定しない
+ * @param contractMinSuccessRate     M-08 の合格ライン（成功率 %）
+ * @param contractMinTestCount       M-08 の最小実行件数。下回れば値を確定できない（ERROR）
+ * @param maxBreakingChanges         M-09 の合格ライン（破壊的変更の件数）
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -34,7 +37,10 @@ public record GateThresholds(
         Set<String> mutationComponents,
         int maxAccessibilityViolations,
         WcagStandard accessibilityStandard,
-        List<String> accessibilityPages) {
+        List<String> accessibilityPages,
+        BigDecimal contractMinSuccessRate,
+        int contractMinTestCount,
+        int maxBreakingChanges) {
 
     public static final String M_BRANCH_COVERAGE = "M-01";
     public static final String M_MUTATION = "M-02";
@@ -55,7 +61,7 @@ public record GateThresholds(
      */
     public static final Set<String> IMPLEMENTED_METRICS =
             Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_VULNERABILITIES, M_COMPLEXITY,
-                    M_ACCESSIBILITY);
+                    M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY);
 
     /** YAML の指標名と指標 ID の対応。 */
     private static final Map<String, List<String>> METRIC_IDS_OF = Map.of(
@@ -90,6 +96,7 @@ public record GateThresholds(
         GateConfigDocument.MetricConfig complexity = document.metric("cyclomatic_complexity");
         GateConfigDocument.MetricConfig mutation = document.metric("mutation_score");
         GateConfigDocument.MetricConfig accessibility = document.metric("accessibility");
+        GateConfigDocument.MetricConfig contract = document.metric("api_contract");
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
         return new GateThresholds(
@@ -107,7 +114,11 @@ public record GateThresholds(
                 accessibility.number("max_critical").orElse(BigDecimal.ZERO).intValue(),
                 accessibility.text("standard").flatMap(WcagStandard::find)
                         .orElse(WcagStandard.DEFAULT),
-                List.copyOf(accessibility.list("pages")));
+                List.copyOf(accessibility.list("pages")),
+                contract.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
+                // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
+                Math.max(1, contract.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
+                contract.number("breaking_changes").orElse(BigDecimal.ZERO).intValue());
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */

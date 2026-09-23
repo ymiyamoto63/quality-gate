@@ -21,6 +21,12 @@ public record ParseContext(String componentName, String scope, List<String> excl
 
     public static final String SCOPE_BASE = "base";
 
+    /**
+     * M-09 の成果物のメタデータで、比較元（ベースコミット）に OpenAPI 定義が
+     * 無かったことを表すキー（真偽値）。新規 API では破壊的変更を数えようがない。
+     */
+    public static final String BASE_SPEC_MISSING = "baseSpecMissing";
+
     public ParseContext(String componentName, String scope, List<String> exclusions) {
         this(componentName, scope, exclusions, Map.of());
     }
@@ -34,6 +40,11 @@ public record ParseContext(String componentName, String scope, List<String> excl
         return metadata.get(key) instanceof String text && !text.isBlank()
                 ? Optional.of(text)
                 : Optional.empty();
+    }
+
+    /** 真偽値のメタデータ。無い・真偽値でない場合は false。 */
+    public boolean metadataFlag(String key) {
+        return Boolean.TRUE.equals(metadata.get(key));
     }
 
     public boolean isBaseScope() {

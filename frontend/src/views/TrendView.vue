@@ -22,6 +22,8 @@ const METRICS = [
   { metricId: 'M-02', name: 'ミューテーションスコア' },
   { metricId: 'M-06', name: '重大・高 脆弱性件数' },
   { metricId: 'M-07', name: '循環的複雑度 15 超の新規関数数' },
+  { metricId: 'M-08', name: 'API 契約テスト成功率' },
+  { metricId: 'M-09', name: '破壊的変更件数' },
   { metricId: 'M-10', name: 'アクセシビリティ違反' },
 ]
 

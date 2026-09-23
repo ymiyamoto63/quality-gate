@@ -80,6 +80,33 @@ jobs:
           git diff --exit-code api/ frontend/src/api/schema.d.ts \
             || { echo '::error::openapi.yml または schema.d.ts が最新ではありません。再生成してコミットしてください'; exit 1; }
 
+      # M-08 の契約テストは、API の応答を検証する結合テスト（*ApiIT）とする。
+      # 単体テストまで送ると、M-08 が単体テスト全体の成功率になってしまう
+      - name: 契約テストの結果の収集（M-08）
+        if: always()
+        run: |
+          mkdir -p reports/contract
+          cp backend/target/failsafe-reports/TEST-*ApiIT.xml reports/contract/
+
+      # M-09: 比較元（PR ならベースブランチとの merge-base、push なら直前のコミット）の
+      # api/openapi.yml と比べる。比較元に定義が無ければ新規 API として申告する
+      - name: OpenAPI の破壊的変更の検出（oasdiff / M-09）
+        run: |
+          if [ -n "${{ github.base_ref }}" ]; then
+            BASE=$(git merge-base HEAD "origin/${{ github.base_ref }}")
+          else
+            BASE=$(git rev-parse HEAD~1)
+          fi
+          if git show "$BASE:api/openapi.yml" > reports/openapi-base.yml 2>/dev/null; then
+            docker run --rm -v "$PWD:/w" -w /w tufin/oasdiff \
+              breaking reports/openapi-base.yml api/openapi.yml --format json > reports/oasdiff.json
+            # oasdiff は正常終了した。変更が無いときの空出力は 0 件として送る
+            [ -s reports/oasdiff.json ] || echo '[]' > reports/oasdiff.json
+          else
+            echo '[]' > reports/oasdiff.json
+            touch reports/oasdiff-base-spec-missing
+          fi
+
       - name: フロントエンドのテスト（Vitest / カバレッジ）
         run: cd frontend && npm run test:coverage
 
@@ -123,7 +150,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: 負荷試験（k6）
-        run: echo 'TODO: Phase 3 で k6 シナリオを追加する'
+        run: |
+          echo 'TODO: Phase 3 で k6 シナリオを追加する'
 
   # 取り込み: 重量ジョブが動かなかった場合もスキップを申告するため必ず実行する
   submit:
@@ -156,4 +184,7 @@ jobs:
           #   （mutation プロファイルは全クラスを対象にするため。無いと 422 で拒否される）
           #   type=axe-json で reports/axe-results.json を送信する（component=frontend）。
           #   reports/playwright-results.json はテストレポートであり axe の結果ではない
+          #   type=junit-xml で reports/contract/TEST-*ApiIT.xml を送信する（component=backend）
+          #   type=oasdiff-json で reports/oasdiff.json を送信する。
+          #   reports/oasdiff-base-spec-missing があれば metadata={"baseSpecMissing":true} を付ける
         continue-on-error: true   # quality-gate の障害が CI を止めない（NFR 10.3）

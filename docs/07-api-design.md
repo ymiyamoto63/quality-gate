@@ -227,7 +227,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `type` | `jacoco-xml` など（[02](02-metrics-spec.md) 0.5） |
 | `component` | `backend` / `frontend`（任意） |
 | `scope` | `base` / `head`（M-07 のベース比較用、任意） |
-| `metadata` | JSON オブジェクトの文字列。性能成果物では `environment`、PIT（`pit-xml`）では `mutationScope`（`changed` / `all`）が必須 |
+| `metadata` | JSON オブジェクトの文字列。性能成果物では `environment`、PIT（`pit-xml`）では `mutationScope`（`changed` / `all`）が必須。oasdiff（`oasdiff-json`）では比較元に OpenAPI 定義が無かったことを `baseSpecMissing: true` で申告できる |
 
 **応答（202）**
 
@@ -242,7 +242,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | 422 | `ARTIFACT_TYPE_UNKNOWN` | 未知の `type` |
 | 422 | `PERFORMANCE_METADATA_MISSING` | 性能成果物で `environment` が欠落 |
 | 422 | `MUTATION_SCOPE_MISSING` | PIT の成果物で `mutationScope` が欠落 |
-| 400 | `VALIDATION_FAILED` | `metadata` が JSON オブジェクトでない、`mutationScope` が選択肢に無い |
+| 400 | `VALIDATION_FAILED` | `metadata` が JSON オブジェクトでない、`mutationScope` が選択肢に無い、`baseSpecMissing` が真偽値でない |
 
 **この時点ではパースしない。** 受領・検証・保存のみを行い、
 パースは判定ジョブで実施する。アップロードごとにパースすると、
@@ -628,6 +628,26 @@ M-10 の違反は `filePath` / `line` / `sourceUrl` が `null` である。リ�
 画面の要素を指すため、GitHub へのリンクを組み立てると壊れたリンクになる。位置は `detail` の
 `page`（`/runs/:id`）と `selector`（CSS セレクタ）で示し、`impact`・`tags`・`helpUrl`・
 `html`（先頭 512 文字）・`failureSummary` を添える。
+
+### 契約・互換性（M-08 / M-09）の指標行と違反
+
+M-08 の `threshold` は `operator`（`>=`）/ `value`（成功率 %）に加え、最小実行件数 `minTestCount` を持つ。
+`detail` は実行件数 `executed` と結果別の `passed` / `failed` / `errored` / `skipped` / `flaky`
+（再実行で成功）を返し、コンポーネントを宣言した成果物があれば `components` にコンポーネント別の同じ内訳を返す。
+`value` は合算した成功率で、切り捨てで丸める（失敗があるのに `100` と表示しない）。
+
+M-08 の違反は失敗・エラー・スキップ・再実行で成功したテスト 1 件ごとに 1 件で、`ruleId` が
+`failed` / `errored` / `skipped` / `flaky` になる。`detail` に `testClass`・`testName`・`outcome`、
+あれば `failureType` と `message`（先頭 512 文字）を添える。
+
+M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破壊的になりうる変更 `warnings`（level 2）、
+非破壊的な変更 `informational`（level 1）の件数を返す。違反になるのは level 3 と 2 だけで、
+`ruleId` は oasdiff の変更 ID（`api-path-removed-without-deprecation` など）、`detail` に
+`level`（`error` / `warning`）・`operation`・`apiPath`・`operationId`・`section`・`source` を添える。
+比較元に OpenAPI 定義が無い Run では `status` が `NOT_APPLICABLE` になる。
+
+M-08 / M-09 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
+API のパスはリポジトリ上のファイルではない。
 
 ---
 
