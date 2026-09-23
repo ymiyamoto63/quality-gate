@@ -122,35 +122,23 @@ curl -sf -X POST "$QG/api/v1/runs/$RUN_ID/finalize" -H "Authorization: Bearer $T
 
 ### GitHub Actions から送る
 
-CI 用の送信アクション（`quality-gate-action`）は未実装のため、当面は `curl` で送ります。
 リポジトリの Secrets に `QG_INGEST_TOKEN`、Variables に `QG_BASE_URL`（CI から到達できる quality-gate の URL）を登録し、
-テストの後に次のステップを追加します。
+テストの後に `quality-gate-action` のステップを追加します（入力の一覧は [CI から送る](ci-submit.md)）。
 
 ```yaml
       - name: quality-gate へ送信
         if: always()                 # テストが落ちてもレポートは送る
-        continue-on-error: true      # quality-gate の障害で CI を止めない
-        env:
-          QG: ${{ vars.QG_BASE_URL }}
-          TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
-        run: |
-          set -euo pipefail
-          RUN_ID=$(curl -sf -X POST "$QG/api/v1/runs" \
-            -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-            -d "{\"repository\":\"${{ github.repository }}\",\"commitSha\":\"${{ github.sha }}\",
-                 \"branch\":\"${{ github.head_ref || github.ref_name }}\",\"runnerType\":\"github-hosted\",
-                 \"triggeredBy\":\"${{ github.event_name }}\",
-                 \"ciRunUrl\":\"${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}\",
-                 \"measuredAt\":\"$(date -u +%FT%TZ)\"}" | jq -r .runId)
-          curl -sf -X POST "$QG/api/v1/runs/$RUN_ID/artifacts?type=quality-gate-config" \
-            -H "Authorization: Bearer $TOKEN" -F file=@.quality-gate.yml
-          curl -sf -X POST "$QG/api/v1/runs/$RUN_ID/artifacts?type=jacoco-xml" \
-            -H "Authorization: Bearer $TOKEN" -F file=@target/site/jacoco/jacoco.xml
-          curl -sf -X POST "$QG/api/v1/runs/$RUN_ID/finalize" -H "Authorization: Bearer $TOKEN"
+        uses: ymiyamoto63/quality-gate/quality-gate-action@main
+        with:
+          base-url: ${{ vars.QG_BASE_URL }}
+          token: ${{ secrets.QG_INGEST_TOKEN }}
+          artifacts: |
+            jacoco-xml target/site/jacoco/jacoco.xml
 ```
 
-`runnerType` は実際に動いたランナーに合わせます（`self-hosted` / `github-hosted`）。
-M-01 の判定には影響しませんが、性能指標を有効にしたときに判定に使うかどうかがこれで決まります。
+コミット・ブランチ・PR 番号・ランナー種別（`self-hosted` / `github-hosted`）・CI の実行の URL は自動で埋まり、
+`.quality-gate.yml` も送られます。送信に失敗しても CI は止まりません（`fail-on-error: false` が既定）。
+GitHub Actions 以外の CI では、同じことを CLI（`cli/qg-submit`）で行えます。
 
 ## 4. 結果を確認する
 
