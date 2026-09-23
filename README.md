@@ -36,6 +36,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | --- | --- |
 | [起動の仕組み](docs/architecture/runtime.md) | 全体像・起動方法の 3 パターン・フロントエンドとバックエンドの連携 |
 | [認証と GitHub App](docs/architecture/authentication.md) | GitHub App の用途・ログインの流れ・認証の経路 |
+| [収集ランナー方式への変更の検討](docs/architecture/collector-runner.md) | 対象リポジトリを変更せずに計測する方式の検討（検討中） |
 
 ### 運用
 
