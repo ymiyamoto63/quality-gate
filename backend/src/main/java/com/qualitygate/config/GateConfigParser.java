@@ -183,6 +183,9 @@ public class GateConfigParser {
             if ("accessibility".equals(entry.getKey())) {
                 validateAccessibility(values, path, lines, errors);
             }
+            if ("api_contract".equals(entry.getKey())) {
+                validateContract(values, path, lines, errors);
+            }
 
             boolean enabled = !Boolean.FALSE.equals(values.get("enabled"));
             result.put(entry.getKey(), new GateConfigDocument.MetricConfig(enabled, values));
@@ -237,6 +240,23 @@ public class GateConfigParser {
             errors.add(error(lines, path + ".pages",
                     "/ で始まる画面のパスの配列で指定してください（例: [\"/login\", \"/runs/:id\"]。受信値: %s）"
                             .formatted(quote(pages))));
+        }
+    }
+
+    /**
+     * M-08 の最小実行件数。
+     *
+     * <p>0 を許すと、契約テストが 1 件も動かなかった Run が合格になる。
+     * 「検証していない」を「すべて成功」と読み違える設定は受け付けない。
+     */
+    private void validateContract(Map<String, Object> values, String path, YamlLineIndex lines,
+                                  List<ConfigValidationError> errors) {
+        Object minTestCount = values.get("min_test_count");
+        if (minTestCount instanceof Number number
+                && new BigDecimal(number.toString()).compareTo(BigDecimal.ONE) < 0) {
+            errors.add(error(lines, path + ".min_test_count",
+                    "1 以上を指定してください。実行 0 件は合格にしません（受信値: %s）"
+                            .formatted(number)));
         }
     }
 

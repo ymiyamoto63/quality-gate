@@ -203,6 +203,20 @@ class GateConfigParserTest {
     }
 
     @Test
+    void 契約テストの最小実行件数に0は指定できない() {
+        // 0 件で合格する設定は「検証していない」を「すべて成功」と読み違える
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  api_contract:
+                    min_test_count: 0
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("metrics.api_contract.min_test_count")
+                .hasMessageContaining("1 以上");
+    }
+
+    @Test
     void 編集距離が遠い候補は提示しない() {
         // 遠い候補を出すと、かえって迷わせる
         assertThat(GateConfigParser.closest("zzzzzzzz",

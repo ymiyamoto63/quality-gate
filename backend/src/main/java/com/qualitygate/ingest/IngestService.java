@@ -8,6 +8,7 @@ import com.qualitygate.domain.entity.RunSkippedMetric;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.model.MutationScope;
+import com.qualitygate.domain.report.ParseContext;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
@@ -206,6 +207,15 @@ public class IngestService {
                 throw new ApiException(ErrorCode.VALIDATION_FAILED,
                         "metadata の %s は %s のいずれかを指定してください（受信値: %s）"
                                 .formatted(MutationScope.METADATA_KEY, allowed, scope));
+            }
+        }
+        if (type == ArtifactType.OASDIFF_JSON) {
+            JsonNode baseMissing = node.get(ParseContext.BASE_SPEC_MISSING);
+            // "true" のような文字列を読み流すと、新規 API の申告が黙って無視される
+            if (baseMissing != null && !baseMissing.isNull() && !baseMissing.isBoolean()) {
+                throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                        "metadata の %s は true / false で指定してください（受信値: %s）"
+                                .formatted(ParseContext.BASE_SPEC_MISSING, baseMissing));
             }
         }
     }

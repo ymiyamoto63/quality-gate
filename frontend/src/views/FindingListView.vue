@@ -89,6 +89,9 @@ function detailLine(item: FindingItem): string | null {
   if (typeof item.detail.page === 'string') parts.push(`画面 ${item.detail.page}`)
   if (typeof item.detail.selector === 'string') parts.push(`要素 ${item.detail.selector}`)
   if (typeof item.detail.impact === 'string') parts.push(`axe impact: ${item.detail.impact}`)
+  // 契約テストはテストの失敗理由、破壊的変更は oasdiff の分類を添える
+  if (typeof item.detail.message === 'string') parts.push(item.detail.message)
+  if (typeof item.detail.level === 'string') parts.push(`oasdiff level: ${item.detail.level}`)
   return parts.length > 0 ? parts.join(' · ') : null
 }
 </script>

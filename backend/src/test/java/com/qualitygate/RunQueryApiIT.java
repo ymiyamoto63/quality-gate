@@ -113,6 +113,21 @@ class RunQueryApiIT {
             </pmd>
             """;
 
+    /** provider（backend）の契約テスト。すべて成功している。 */
+    private static final String JUNIT_PROVIDER = """
+            <testsuite name="com.qualitygate.RunQueryApiIT" tests="2">
+              <testcase classname="com.qualitygate.RunQueryApiIT" name="Run詳細を返す"/>
+              <testcase classname="com.qualitygate.RunQueryApiIT" name="違反一覧を返す"/>
+            </testsuite>
+            """;
+
+    /** consumer（frontend）の契約テスト。すべて成功している。 */
+    private static final String JUNIT_CONSUMER = """
+            <testsuites><testsuite name="src/api/client.contract.spec.ts">
+              <testcase classname="src/api/client.contract.spec.ts" name="GET /api/v1/runs/{runId}"/>
+            </testsuite></testsuites>
+            """;
+
     /** 違反の無い axe-core の結果。 */
     private static final String AXE_CLEAN = """
             [{ "url": "http://localhost:5173/login", "violations": [] }]
@@ -204,7 +219,7 @@ class RunQueryApiIT {
 
         // カテゴリは要件定義の指標表と同じ並び
         assertThat(detail.categories()).extracting(RunDetailResponse.RunCategory::category)
-                .containsExactly("機能テスト", "セキュリティ", "コード構造", "使いやすさ");
+                .containsExactly("機能テスト", "セキュリティ", "コード構造", "契約・互換性", "使いやすさ");
 
         RunDetailResponse.RunCategory security = detail.categories().stream()
                 .filter(c -> c.category().equals("セキュリティ")).findFirst().orElseThrow();
@@ -233,7 +248,7 @@ class RunQueryApiIT {
 
         assertThat(detail.findingSummary().initial()).isEqualTo(3);
         assertThat(detail.findingSummary().newCount()).isZero();
-        assertThat(detail.artifactCount()).isEqualTo(5);
+        assertThat(detail.artifactCount()).isEqualTo(7);
     }
 
     /**
@@ -581,6 +596,8 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CLEAN);
+        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]");
         return evaluate(run);
     }
 
@@ -605,6 +622,9 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CONTRAST);
+        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
+        attach(run, ArtifactType.JUNIT_XML, "junit.xml", "frontend", JUNIT_CONSUMER);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]");
         return evaluate(run);
     }
 

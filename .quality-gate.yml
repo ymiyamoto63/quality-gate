@@ -58,6 +58,8 @@ metrics:
     max_complexity: 15
     scope: new_and_modified
     warn_from: 11
+  # 契約テストは API の応答を検証する結合テスト（*ApiIT）の JUnit XML、
+  # 破壊的変更は merge-base の api/openapi.yml との oasdiff で計測する（CI の base ジョブ）
   api_contract:
     enabled: true
     min_success_rate: 100
