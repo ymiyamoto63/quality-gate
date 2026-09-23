@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01 / M-02 / M-06 / M-07 / M-08 / M-09）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01 / M-02 / M-06 / M-07 / M-08 / M-09 / M-10）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -8,9 +8,11 @@
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
 # 計測しない指標とその理由は reports/skipped-metrics.tsv に書き、submit.sh がスキップとして申告する。
 #
-# 必要なもの: git / curl / unzip / docker、JDK（バックエンド）、Node.js（フロントエンド）
+# 必要なもの: git / curl / unzip / docker、JDK（バックエンド）、Node.js（フロントエンド）、
+#            Chromium の動作に必要なライブラリ（M-10）
 # 環境変数:
 #   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（既定: ~/.cache/quality-gate-collector）
+#   A11Y_CHROMIUM       M-10 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -33,7 +35,7 @@ skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
-mkdir -p "$REPORTS/backend" "$REPORTS/contract"
+mkdir -p "$REPORTS/backend" "$REPORTS/contract" "$REPORTS/frontend"
 rm -f "$REPORTS/skipped-metrics.tsv"
 
 # --- バックエンド: M-01（JaCoCo）/ M-08（JUnit XML） ----------------------------------
@@ -197,6 +199,89 @@ measure_frontend() {
   [ -s "$REPORTS/frontend-coverage/lcov.info" ] || fail "M-01: lcov.info がありません"
 }
 
+# --- M-10（Playwright + axe-core）。対象アプリを起動して、計測プロファイルの画面を検査する ----
+# 対象の e2e（API のモック）は使わず、バックエンドの jar とビルドした画面を実際に起動する。
+# 検査のスクリプトとツールの版は quality-gate 側のもの（collector/a11y）
+SERVERS=()
+stop_servers() {
+  local pid
+  for pid in "${SERVERS[@]}"; do
+    # setsid で起動したので、npx などの子プロセスごとプロセスグループで止める
+    kill -- "-$pid" 2>/dev/null || true
+  done
+  SERVERS=()
+}
+trap stop_servers EXIT
+
+# start_server <ログ> <コマンド...>。バックグラウンドで起動し、PID を SERVERS に積む
+start_server() {
+  local log=$1; shift
+  setsid "$@" > "$log" 2>&1 < /dev/null &
+  SERVERS+=($!)
+}
+
+# wait_http <URL> <秒>。応答が返る（HTTP のステータスは問わない）まで待つ
+wait_http() {
+  local url=$1 limit=$2 i
+  for ((i = 0; i < limit; i++)); do
+    curl -s -o /dev/null --max-time 2 "$url" && return 0
+    sleep 1
+  done
+  return 1
+}
+
+measure_accessibility() {
+  local tool="$WORK/a11y" front="$SRC/$FRONTEND_DIR" jar port=${A11Y_FRONTEND_PORT:-4173}
+  [ -f "$front/package.json" ] || { fail "M-10: $FRONTEND_DIR/package.json がありません"; return; }
+  group "アクセシビリティ検査（Playwright + axe-core）"
+  if ! (
+    set -e
+    rm -rf "$tool"
+    mkdir -p "$tool"
+    cp "$COLLECTOR_DIR"/a11y/{package.json,package-lock.json,scan.mjs} "$tool/"
+    cd "$tool"
+    npm ci --no-audit --no-fund
+    [ -n "${A11Y_CHROMIUM:-}" ] || npx playwright install chromium
+  ); then
+    fail "M-10: 検査ツールを用意できませんでした"; endgroup; return
+  fi
+
+  # バックエンド。measure_backend の verify で出来た実行可能 jar を使う
+  if [ -n "${A11Y_BACKEND_PORT:-}" ]; then
+    jar=$(find "$SRC/$BACKEND_DIR/target" -maxdepth 1 -name '*.jar' ! -name '*-plain.jar' ! -name '*-sources.jar' \
+      ! -name '*-javadoc.jar' 2>/dev/null | head -n 1)
+    if [ -z "$jar" ]; then
+      fail "M-10: バックエンドの jar がありません（ビルドに失敗しています）"; endgroup; return
+    fi
+    start_server "$WORK/a11y-backend.log" java -jar "$jar" --server.port="$A11Y_BACKEND_PORT"
+    if ! wait_http "http://127.0.0.1:${A11Y_BACKEND_PORT}/" "${A11Y_START_TIMEOUT:-120}"; then
+      tail -n 50 "$WORK/a11y-backend.log" >&2
+      stop_servers
+      fail "M-10: バックエンドが起動しませんでした"; endgroup; return
+    fi
+  fi
+
+  # フロントエンド。本番と同じビルド結果を vite preview で配る（/api の proxy は vite.config の server.proxy を引き継ぐ）
+  if ! (cd "$front" && npx vite build); then
+    stop_servers
+    fail "M-10: フロントエンドのビルドに失敗しました"; endgroup; return
+  fi
+  start_server "$WORK/a11y-frontend.log" bash -c \
+    "cd \"\$1\" && exec npx vite preview --host 127.0.0.1 --port \"\$2\" --strictPort" _ "$front" "$port"
+  if ! wait_http "http://127.0.0.1:${port}/" "${A11Y_START_TIMEOUT:-120}"; then
+    tail -n 50 "$WORK/a11y-frontend.log" >&2
+    stop_servers
+    fail "M-10: フロントエンドが起動しませんでした"; endgroup; return
+  fi
+
+  A11Y_BASE_URL="http://127.0.0.1:${port}" A11Y_PAGES="$A11Y_PAGES" \
+    A11Y_READY_SELECTOR="${A11Y_READY_SELECTOR:-}" A11Y_OUTPUT="$REPORTS/frontend/axe-results.json" \
+    node "$tool/scan.mjs" || fail "M-10: 検査できなかった画面があります（その画面は ERROR になります）"
+  stop_servers
+  endgroup
+  rm -rf "$tool"
+}
+
 # --- M-09（oasdiff）。コミットされている OpenAPI 定義を head と base で比べる --------
 measure_breaking_changes() {
   group "OpenAPI の破壊的変更（${OASDIFF_IMAGE}）"
@@ -244,6 +329,7 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   measure_complexity
 fi
 [ -z "${FRONTEND_DIR:-}" ] || measure_frontend
+[ -z "${A11Y_PAGES:-}" ] || measure_accessibility
 [ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes
 measure_vulnerabilities
 

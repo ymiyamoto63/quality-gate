@@ -4,8 +4,6 @@
 # この内容を S-06 に貼り付けて保存する（このファイル自体は判定に使われない。控えと差分確認用）。
 #
 # like-chatgpt の .quality-gate.yml との違い:
-#   - accessibility を無効にしている（収集ランナーが段階 4 まで計測しないため。
-#     有効のままだと未提出で ERROR になり、Run 全体が FAIL になる）
 #   - mutation_score は対象と同じ（全量・60%）。収集ランナーは PR では PIT を実行せずスキップを申告するため、
 #     skippable_metrics に mutation_score が必要
 version: 1
@@ -61,7 +59,12 @@ metrics:
     min_test_count: 1
     breaking_changes: 0
   accessibility:
-    enabled: false                # 段階 4 で方式を決めてから有効にする
+    enabled: true
+    standard: wcag22aa
+    max_critical: 0
+    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-10 は ERROR
+    pages:
+      - "/"
 
 notifications:
   on: transition_to_fail
