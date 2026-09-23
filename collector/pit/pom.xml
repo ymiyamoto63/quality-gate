@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  収集ランナーが M-02（PIT）の実行に使うツール一式の取得用。ビルドはしない。
+  collector/bin/measure.sh が dependency:build-classpath でクラスパスだけを得る。
+  版は collector/versions.env から -D で渡す（対象リポジトリの PIT の設定は使わない）。
+
+  junit-platform-launcher は pitest-junit5-plugin が必要とするが、対象の依存には通常含まれない
+  （surefire が実行時に補うため）。対象の JUnit Platform と同じ版を measure.sh が求めて渡す。
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <groupId>com.qualitygate.collector</groupId>
+  <artifactId>pit-tools</artifactId>
+  <version>1</version>
+  <packaging>pom</packaging>
+
+  <properties>
+    <pitest.version>REQUIRED</pitest.version>
+    <pitest-junit5.version>REQUIRED</pitest-junit5.version>
+    <junit-platform.version>REQUIRED</junit-platform.version>
+  </properties>
+
+  <dependencies>
+    <dependency>
+      <groupId>org.pitest</groupId>
+      <artifactId>pitest-command-line</artifactId>
+      <version>${pitest.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.pitest</groupId>
+      <artifactId>pitest-junit5-plugin</artifactId>
+      <version>${pitest-junit5.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>org.junit.platform</groupId>
+      <artifactId>junit-platform-launcher</artifactId>
+      <version>${junit-platform.version}</version>
+    </dependency>
+  </dependencies>
+</project>

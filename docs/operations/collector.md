@@ -5,13 +5,15 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01 / M-06 / M-07 / M-08 / M-09** です。
-M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません。
+計測する指標は **M-01 / M-02 / M-06 / M-07 / M-08 / M-09** です。
+M-02（PIT）は**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
+M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません。
 
 | 段階 | 状態 | 内容 |
 | --- | --- | --- |
 | 1 | 実装済み | 手動実行（`workflow_dispatch`）で 1 コミットを計測する |
 | 2 | 実装済み | **15 分ごとの定期実行**で、既定ブランチと PR の先頭のうち未計測のコミットを計測する（[4. 定期実行](#4-定期実行段階-2)） |
+| 3 | 実装済み | **M-02（PIT）**を既定ブランチの計測で全量実行する（[5. M-02（PIT）](#5-m-02pit段階-3)） |
 
 ## 構成
 
@@ -24,8 +26,9 @@ M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はま
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない** |
 | `collector/bin/submit.sh` | Ingest API に送る。`.quality-gate.yml` は送らない（判定は画面の設定で行う） |
-| `collector/versions.env` | ツールの版（JaCoCo / PMD / oasdiff / Trivy）。対象の設定に関係なくこの版で計測する |
+| `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy）。対象の設定に関係なくこの版で計測する |
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
+| `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 画面（S-06）に保存する合格ラインの控え |
 
@@ -93,7 +96,9 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
    対象の CI 用のトークンがすでにある場合も、収集ランナー用に別のトークンを発行する（あとで CI 用だけを失効させられるように）
 2. like-chatgpt の **設定（S-06）** に `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` の内容を貼り付けて保存する
 
-2 を忘れると既定値（全指標が有効）で判定され、まだ計測しない M-02 / M-10 などが ERROR になって Run 全体が FAIL になります。
+2 を忘れると既定値（全指標が有効）で判定され、まだ計測しない M-10 などが ERROR になって Run 全体が FAIL になります。
+控えの設定は `execution.skippable_metrics` に `mutation_score` を入れています。PR の計測では M-02 のスキップを申告するため、
+これが無いと申告が受け付けられず、PR の Run の M-02 が ERROR になります。
 
 対象の CI から `.quality-gate.yml` 付きの Run が届いていたリポジトリでは、**直近の Run がファイルの設定で判定されている間は S-06 から保存できません**
 （「直近の Run がファイルの設定で判定されているため、画面からは編集できません」）。
@@ -129,6 +134,7 @@ Ingest API は同一コミットへの再送信を別の Run（attempt を増や
 | 指標 | 一致すべきもの |
 | --- | --- |
 | M-01 | backend / frontend それぞれのブランチカバレッジ |
+| M-02 | ミューテーションの総数と検出数（既定ブランチのみ）。対象のテストが乱数を固定していないと、同じ方式でも実行ごとに数件ずれる |
 | M-06 | 件数（Trivy の版の違いで差が出うる。差が出たら `versions.env` の版を揃えて確かめる） |
 | M-07 | **一致しないのが正しい**。従来の方式は base を送らないため「ベース比較不可」になり、収集ランナーは base 比較で判定する |
 | M-08 | 契約テストの件数と成功率 |
@@ -136,6 +142,9 @@ Ingest API は同一コミットへの再送信を別の Run（attempt を増や
 
 参考までに、like-chatgpt の `b581260`（main）を手元で計測した結果は、JaCoCo・lcov・PMD の各数値と
 契約テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
+M-02 はミューテーションの総数（143 件）が like-chatgpt 自身の `mvn -P mutation test` と一致し、検出数は 98〜99 件でした。
+1 件の差は、乱数を使うクラス（`RandomWalkMetricsGenerationAdapter`）のテストの結果が実行ごとに変わるためで、
+like-chatgpt 自身の方式で繰り返しても、検出されるミューテーションが入れ替わります。
 
 ## 4. 定期実行（段階 2）
 
@@ -204,10 +213,41 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 | PR の計測だけ | 計測プロファイルの `MEASURE_PULL_REQUESTS` を `false` にする |
 | 定期実行すべて（一時的に） | quality-gate の **Actions → collect → ︙ → Disable workflow**。手動実行もできなくなるので、再開するときは **Enable workflow** |
 
+## 5. M-02（PIT）（段階 3）
+
+| 項目 | 内容 |
+| --- | --- |
+| 実行する計測 | **既定ブランチ（`DEFAULT_BRANCH`）の計測だけ**。定期実行でも手動実行でも同じ |
+| 実行範囲 | 常に全量（`mutationScope: all`）。変更範囲への絞り込みはしない |
+| PR などの計測 | 実行せず、M-02 のスキップを申告する（Run 詳細では SKIP と理由が出る） |
+| 実行方法 | PIT のコマンドライン版を、対象のテストのクラスパス（`mvn dependency:build-classpath`）で動かす。対象の pom の PIT の設定は使わない |
+| 対象クラス | 計測プロファイルの `MUTATION_TARGET_CLASSES` など（下記） |
+| 所要時間 | like-chatgpt で約 1 分（2 スレッド） |
+
+計測プロファイルの設定:
+
+| キー | 説明 |
+| --- | --- |
+| `MUTATION_TARGET_CLASSES` | ミューテーションを加えるクラス（PIT の `targetClasses`。空白区切り）。**空にすると M-02 を計測しない** |
+| `MUTATION_TARGET_TESTS` | 実行するテスト（空なら `MUTATION_TARGET_CLASSES` と同じ） |
+| `MUTATION_EXCLUDED_CLASSES` | 除外するクラス（起動クラスや設定クラスなど） |
+| `MUTATION_EXCLUDED_TESTS` | 除外するテスト（結合テスト `*IT` など、時間のかかるもの） |
+| `MUTATION_THREADS` | PIT のスレッド数（既定: 2） |
+
+注意:
+
+- **テストが 1 件でも失敗していると PIT は動きません**（M-02 が ERROR になります）。M-01 と M-08 は失敗したテストがあっても送られます
+- 既定ブランチの新しいコミットごとに 1 回実行します（計測済みのコミットは実行しません）。
+  セルフホストランナーの占有が問題になるほど時間がかかるようになったら、夜間だけに絞ることを検討します（Q-6）
+- 生き残ったミューテーションの一覧は quality-gate には保存しません（M-02 は違反を作らない）。
+  個々に見たいときは、手元で PIT の HTML レポートを出してください
+
 ## 判定結果を読むときの注意
 
-- **M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません**（段階 3・4 で追加予定）。
+- **M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません**（段階 4 以降で追加予定）。
   画面の設定（1-4）で無効にしておかないと、成果物が無いため ERROR になります
+- **M-02 は既定ブランチの Run にだけ値が付きます。** PR の Run では SKIP です。
+  PR で M-02 が下がるかどうかは、マージ後の既定ブランチの Run で分かります
 - **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
 - **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
   like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
@@ -222,7 +262,7 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 対象リポジトリに手を入れずに止めるには、**quality-gate 側で対象の CI 用の Ingest Token を失効させます**（S-08）。
 収集ランナー用のトークンを別に発行しておけば、収集ランナーの送信には影響しません。
 対象リポジトリの計測用ファイル（`.quality-gate.yml`、`.github/workflows/quality-gate.yml`、`scripts/quality-gate-submit.sh` など）は
-収集ランナーでは使いません。消すかどうかは対象側の判断です（M-02 / M-10 を収集ランナーへ移すまでは、それらの計測に対象の CI を使い続ける選択もあります）。
+収集ランナーでは使いません。消すかどうかは対象側の判断です（M-10 を収集ランナーへ移すまでは、その計測に対象の CI を使い続ける選択もあります）。
 
 ## 手元で試す
 
@@ -272,9 +312,11 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `fetch` が `計測プロファイルがありません` | `collector/targets/` にそのリポジトリの `.env` が無い、または repository の綴りが違う |
 | `fetch` が `could not read Username` / `Repository not found` | App が対象にインストールされていない、Contents の権限が無い、または `QG_COLLECTOR_APP_ID` が未設定で private を取得しようとした |
 | `measure` で `バックエンドのビルドに失敗しました` | 対象がコンパイルできない、または `JAVA_VERSION` が対象の要求と合っていない |
+| `measure` で `M-02: PIT の実行に失敗しました` | テストに失敗がある（PIT は全テストが成功していないと動かない）、テストが JUnit 5 でない、または `MUTATION_TARGET_CLASSES` に合うクラスが無い（`No mutations found`） |
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
-| M-02 / M-10 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
+| M-10 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
+| PR の Run の M-02 が ERROR（スキップの申告が受け付けられない） | 画面の設定の `execution.skippable_metrics` に `mutation_score` が無い（1-4） |
 | 定期実行の `plan` で `PR の一覧を取得できませんでした` | App に Pull requests の読み取り権限が無い、または権限の追加をインストール先で承認していない |
 | 定期実行の `plan` で `トークンの owner（…）と違うため飛ばします` | 対象の owner が quality-gate の owner と違う。定期実行の対象外（手動実行で計測する） |
 | 定期実行の `plan` で `3 回失敗しているため計測しません` | そのコミットの計測が 3 回失敗した。原因を直して手動実行するか、4-4 の手順で記録を消す |

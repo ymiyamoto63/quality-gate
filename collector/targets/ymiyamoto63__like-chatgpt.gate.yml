@@ -4,14 +4,16 @@
 # この内容を S-06 に貼り付けて保存する（このファイル自体は判定に使われない。控えと差分確認用）。
 #
 # like-chatgpt の .quality-gate.yml との違い:
-#   - mutation_score / accessibility を無効にしている（収集ランナーが段階 3・4 まで計測しないため。
+#   - accessibility を無効にしている（収集ランナーが段階 4 まで計測しないため。
 #     有効のままだと未提出で ERROR になり、Run 全体が FAIL になる）
+#   - mutation_score は対象と同じ（全量・60%）。収集ランナーは PR では PIT を実行せずスキップを申告するため、
+#     skippable_metrics に mutation_score が必要
 version: 1
 enforcement: report-only
 on_missing_report: fail
 
 execution:
-  skippable_metrics: []
+  skippable_metrics: [mutation_score]   # PR の計測では M-02 をスキップする
   full_measurement_interval_days: 7
   reference_only_environments: [github-hosted]
 
@@ -37,7 +39,10 @@ metrics:
     per_component: true
     diff_threshold: 80
   mutation_score:
-    enabled: false                # 段階 3 で有効にする
+    enabled: true
+    threshold: 60
+    scope: all                    # 収集ランナーは既定ブランチで全量を実行する
+    components: [backend]
   performance:
     enabled: false
   vulnerabilities:

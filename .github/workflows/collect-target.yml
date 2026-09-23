@@ -2,7 +2,7 @@
 # collect.yml（手動実行と定期実行）から呼ばれる。単独では起動しない。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 計測する指標は M-01 / M-06 / M-07 / M-08 / M-09。
+# 計測する指標は M-01 / M-02（既定ブランチのみ）/ M-06 / M-07 / M-08 / M-09。
 #
 # 必要な設定（Settings → Secrets and variables → Actions。呼び出し側で secrets: inherit）:
 #   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
