@@ -109,6 +109,7 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   [ "$found" -eq 1 ] || warn "成果物がありません（type=junit-xml）: $REPORTS/contract/"
 fi
 [ -z "${FRONTEND_DIR:-}" ] || upload lcov "$REPORTS/frontend-coverage/lcov.info" "$FRONTEND"
+[ -z "${A11Y_PAGES:-}" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
 if [ -n "${OPENAPI_PATH:-}" ]; then
   if [ -e "$REPORTS/oasdiff-base-spec-missing" ]; then
     upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND" '' '{"baseSpecMissing":true}'
