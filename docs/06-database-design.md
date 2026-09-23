@@ -607,6 +607,9 @@ DELETE FROM runs
 | `V009__skipped_metric_acceptance_at_evaluation.sql` | `run_skipped_metrics.accepted` を NULL 許容にし、受理の可否を判定時に決める |
 | `V010__measurement_variant_and_not_applicable.sql` | `measurements.variant` の追加、一意インデックスの置き換え、`NOT_APPLICABLE` の追加と `status` の拡幅 |
 | `V011__widen_measurement_variant.sql` | `measurements.variant` を 64 文字に拡幅（性能指標の計測環境名を入れるため） |
+| `V012__create_notification_and_system_settings.sql` | `notification_settings`（リポジトリごとの通知条件と宛先）・`system_settings`（保持期間など）の追加、`notifications.dedup_key`（Run を持たない通知の重複抑止） |
+| `V013__waiver_title_and_run_status.sql` | `waivers.title`（登録時点の違反の見出し）、`runs.previous_verdict`（再評価の直前の判定。通知の遷移判定に使う） |
+| `V014__email_only_notifications.sql` | 通知をメールのみにしたため、V012 の Slack・PR コメントの列を削除（D-15） |
 
 `waivers` と `findings` は相互に参照するため、
 `findings.waiver_id` の外部キーは `V004` の末尾で `ALTER TABLE` により追加する。
