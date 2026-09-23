@@ -1,17 +1,24 @@
-# 収集ランナーで計測する（段階 1）
+# 収集ランナーで計測する
 
 対象リポジトリに**何も置かずに**、quality-gate 側で対象を取得・計測して取り込む手順です。
 方式の検討と移行計画は [収集ランナー方式への変更の検討](../architecture/collector-runner.md) を参照してください。
 
-段階 1 で計測する指標は **M-01 / M-06 / M-07 / M-08 / M-09** です。
+計測する指標は **M-01 / M-06 / M-07 / M-08 / M-09** です。
 M-02（PIT）・M-10（アクセシビリティ）・M-03〜05（性能）はまだ計測しません。
-実行は手動（`workflow_dispatch`）のみです。
+
+| 段階 | 状態 | 内容 |
+| --- | --- | --- |
+| 1 | 実装済み | 手動実行（`workflow_dispatch`）で 1 コミットを計測する |
+| 2 | 実装済み | **15 分ごとの定期実行**で、既定ブランチと PR の先頭のうち未計測のコミットを計測する（[4. 定期実行](#4-定期実行段階-2)） |
 
 ## 構成
 
 | ファイル | 役割 |
 | --- | --- |
-| `.github/workflows/collect.yml` | `fetch`（取得）→ `measure`（計測）→ `submit`（送信）の 3 ジョブ。すべてセルフホストランナーで動く |
+| `.github/workflows/collect.yml` | 入り口。定期実行と手動実行を受け付け、`plan` ジョブで計測する対象を決めて、対象ごとに `collect-target.yml` を呼ぶ |
+| `.github/workflows/collect-target.yml` | 1 コミットの計測。`fetch`（取得）→ `measure`（計測）→ `submit`（送信）の 3 ジョブ。すべてセルフホストランナーで動く |
+| `collector/bin/detect.sh` | 定期実行で、未計測の先頭コミット（既定ブランチと PR）を探す |
+| `collector/bin/state.sh` | 計測済みの記録（ランナーのマシン上のファイル） |
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない** |
 | `collector/bin/submit.sh` | Ingest API に送る。`.quality-gate.yml` は送らない（判定は画面の設定で行う） |
@@ -102,7 +109,9 @@ FROM repositories r WHERE r.owner = 'ymiyamoto63' AND r.name = 'like-chatgpt';
 SQL
 ```
 
-## 2. 実行する
+## 2. 手動で実行する
+
+定期実行（[4](#4-定期実行段階-2)）とは別に、いつでも手動で計測できます。計測済みのコミットでも計測し直します。
 
 1. quality-gate の **Actions → collect → Run workflow** を開く
 2. 入力して実行する
@@ -113,8 +122,9 @@ SQL
    | branch | （空） | 空なら既定ブランチ。PR の場合は PR のブランチ名 |
    | commit | （空） | 特定のコミットを測るときだけ 40 桁で指定する |
    | pull_request | （空） | PR を計測するときの番号 |
+   | base_branch | （空） | 比較元を決めるブランチ。空なら既定ブランチ。PR のマージ先が既定ブランチ以外のときに指定する |
 
-3. `submit` ジョブのログに `Run を作成しました: <runId>` と送信したファイルが出ていることを確かめる
+3. 実行画面に `plan` と、対象ごとのまとまり（例: `like-chatgpt main`）ができる。その中の `submit` ジョブのログに `Run を作成しました: <runId>` と送信したファイルが出ていることを確かめる
 4. quality-gate の Run 詳細で結果を見る。収集ランナーの Run は `triggeredBy` が `collector` になる
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
@@ -135,6 +145,73 @@ Ingest API は同一コミットへの再送信を別の Run（attempt を増や
 参考までに、like-chatgpt の `b581260`（main）を手元で計測した結果は、JaCoCo・lcov・PMD の各数値と
 契約テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
 
+## 4. 定期実行（段階 2）
+
+### 4-1. しくみ
+
+`collect` ワークフローは 15 分ごと（`*/15 * * * *`）に起動し、次のことを行います。
+
+1. `plan` ジョブが、計測プロファイルで `SCHEDULE=true` にした対象について、GitHub API で次の先頭コミットを調べる
+   - 既定ブランチ（`DEFAULT_BRANCH`）の先頭
+   - open な PR の先頭（`MEASURE_PULL_REQUESTS=true` のとき。**同じリポジトリのブランチから出ている PR だけ**。フォークからの PR は計測しない）
+2. そのうち**計測済みの記録に無いもの**を、1 回につき最大 5 件選ぶ（残りは次回に回る）
+3. 選んだコミットを 1 件ずつ `collect-target.yml` で計測する
+4. 送信まで終わったら「計測済み」として記録する。失敗したら「失敗」として記録し、**3 回失敗したコミットは定期実行では計測しない**
+
+比較元（base）は、既定ブランチなら直前のコミット、PR なら**マージ先のブランチ**との merge-base です。
+同じコミットでも、既定ブランチとしての計測と PR としての計測は比較元が違うため、別々に計測します。
+
+GitHub の定期実行は混雑すると数分〜十数分遅れることがあります。push から計測開始までは、おおむね 15〜30 分と考えてください。
+
+### 4-2. 事前の準備（段階 1 からの追加分）
+
+| 準備 | 内容 |
+| --- | --- |
+| 計測プロファイル | `SCHEDULE=true` と `MEASURE_PULL_REQUESTS=true` を書く（like-chatgpt は設定済み） |
+| GitHub App | 段階 1 の **Pull requests: Read-only** が必要（PR の一覧を読むため）。App は quality-gate と同じ owner（`ymiyamoto63`）のアカウントにインストールされていること |
+| ワークフローが main にあること | 定期実行は**既定ブランチ（main）にあるワークフローだけ**が動く |
+
+定期実行の `plan` ジョブは、quality-gate リポジトリの owner のインストールに対するトークンで API を読みます。
+**owner が違う対象（別アカウントのリポジトリ）は定期実行では飛ばします**（手動実行なら計測できます）。
+
+1 回で計測する件数の上限は、リポジトリ変数 `QG_COLLECTOR_MAX_PER_RUN`（既定 5）で変えられます。
+
+### 4-3. 重複と取りこぼしを防ぐしくみ
+
+| 状況 | 動き |
+| --- | --- |
+| 前回の定期実行がまだ動いているのに次の回が来た | 次の回は待機する（`concurrency`）。待機は 1 つだけ残り、前回の記録を見てから対象を選ぶので二重に計測しない |
+| 計測中にランナーが止まった・取り消した | 記録しない。次の回で計測し直す |
+| quality-gate が止まっていて送信に失敗した | 「失敗」として記録し、次の回で計測し直す（3 回まで） |
+| 対象のビルドが壊れている | 送信までは進む（該当の指標が ERROR の Run ができる）。「計測済み」として記録し、再計測しない |
+| 1 回の上限を超える未計測のコミットがある | 上限を超えた分は次の回に回る |
+
+手動実行は定期実行と独立して動きます。手動実行で計測したコミットも「計測済み」として記録され、定期実行では計測し直しません。
+
+### 4-4. 計測済みの記録
+
+記録は**ランナーのマシン上のファイル**です（ランナーを動かしているユーザーの `~/.local/state/quality-gate-collector/measured.tsv`）。
+1 行 1 件で「キー、結果（`ok` / `failed`）、日時」が追記されます。
+
+```bash
+# 記録を見る（ランナーのマシンで）
+sudo -iu runner cat ~/.local/state/quality-gate-collector/measured.tsv
+
+# 3 回失敗して諦めたコミットを、定期実行でもう一度計測させる（そのキーの行を消す）
+sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.local/state/quality-gate-collector/measured.tsv
+```
+
+ファイルを消しても、各ブランチ・PR の**いまの先頭**を 1 回ずつ計測し直すだけです（過去のコミットをさかのぼって計測することはありません）。
+ランナーを別のマシンに移したときも同じです。
+
+### 4-5. 定期実行を止める
+
+| 止めたい範囲 | 方法 |
+| --- | --- |
+| 特定の対象だけ | 計測プロファイルの `SCHEDULE` を `false` にする |
+| PR の計測だけ | 計測プロファイルの `MEASURE_PULL_REQUESTS` を `false` にする |
+| 定期実行すべて（一時的に） | quality-gate の **Actions → collect → ︙ → Disable workflow**。手動実行もできなくなるので、再開するときは **Enable workflow** |
+
 ## 手元で試す
 
 ワークフローと同じことを手元で実行できます（Docker・JDK・Node.js が必要）。
@@ -149,15 +226,21 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
   ./collector/bin/submit.sh "$WORK/reports"
 ```
 
-`fetch.sh` は `QG_BRANCH` / `QG_COMMIT` / `QG_PR_NUMBER` でワークフローの入力と同じ指定ができます。
+`fetch.sh` は `QG_BRANCH` / `QG_COMMIT` / `QG_PR_NUMBER` / `QG_BASE_BRANCH` でワークフローの入力と同じ指定ができます。
+
+定期実行が選ぶ対象は、次のように確かめられます（計測はしません）。
+
+```bash
+GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
+```
 
 ## 対象を追加する
 
-1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）
+1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）。定期実行するなら `SCHEDULE=true`
 2. 画面の設定の控えとして `collector/targets/<owner>__<name>.gate.yml` を作り、S-06 に保存する
 3. 1-2 の App を対象にもインストールし、1-3 に Ingest Token のシークレットを足す
 
-段階 1 のスクリプトは、Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけを扱います。
+スクリプトは、Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけを扱います。
 使わない側は計測プロファイルで空にしてください。
 
 ## 安全上の注意
@@ -167,7 +250,8 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
   自分たちが管理するリポジトリだけを対象にしてください
 - Maven と npm のキャッシュ（`~/.m2`、`~/.npm`）はランナーに残り、次の計測でも使われます
 - 取得したソースは `measure` ジョブの最後に削除します。ジョブ間の受け渡し用の成果物（`collector-source`）は 1 日で消えます
-- 段階 1 では計測をコンテナに隔離していません。隔離は対象を増やす前に検討します
+- 計測はコンテナに隔離していません。隔離は対象を増やす前に検討します
+- 定期実行で PR を計測するのは、同じリポジトリのブランチから出ている PR だけです。フォークからの PR（リポジトリに書き込み権限の無い人のコード）はセルフホストランナーで実行しません
 
 ## うまくいかないとき
 
@@ -179,4 +263,8 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
 | M-02 / M-10 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
+| 定期実行の `plan` で `PR の一覧を取得できませんでした` | App に Pull requests の読み取り権限が無い、または権限の追加をインストール先で承認していない |
+| 定期実行の `plan` で `トークンの owner（…）と違うため飛ばします` | 対象の owner が quality-gate の owner と違う。定期実行の対象外（手動実行で計測する） |
+| 定期実行の `plan` で `3 回失敗しているため計測しません` | そのコミットの計測が 3 回失敗した。原因を直して手動実行するか、4-4 の手順で記録を消す |
+| 定期実行が動かない | ワークフローが main に無い、Disable されている、またはランナーが止まっている（`plan` もセルフホストランナーで動く） |
 | S-06 で「ファイルで管理されているため、画面からは編集できません」 | 現在の方式の CI が `.quality-gate.yml` を送っている。1-4 の SQL で登録する |

@@ -1,18 +1,18 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 段階 1: 手動実行のみ。計測する指標は M-01 / M-06 / M-07 / M-08 / M-09。
+# 起動のしかた:
+#   - 定期実行（段階 2）: 15 分ごとに、計測プロファイルで SCHEDULE=true にした対象の
+#     既定ブランチと PR の先頭のうち、未計測のコミットを探して計測する（collector/bin/detect.sh）
+#   - 手動実行: 対象とブランチ（またはコミット・PR）を指定して計測する。計測済みでも計測し直す
 #
-# 必要な設定（Settings → Secrets and variables → Actions）:
-#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
-#              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
-#   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
-#              <計測プロファイルの INGEST_TOKEN_SECRET>  対象リポジトリの Ingest Token
-#
-# ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
+# 1 コミットの計測は collect-target.yml（fetch → measure → submit）が行う。
+# 必要な設定は collect-target.yml の先頭を参照。
 name: collect
 
 on:
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       repository:
@@ -26,146 +26,88 @@ on:
         description: 計測するコミット（40 桁。空ならブランチまたは PR の先頭）
         required: false
       pull_request:
-        description: PR を計測する場合の番号（比較元は既定ブランチとの merge-base）
+        description: PR を計測する場合の番号
+        required: false
+      base_branch:
+        description: 比較元を決めるブランチ（空なら既定ブランチ。PR ではマージ先のブランチ）
         required: false
 
 permissions:
   contents: read
 
+# 定期実行は 1 つずつ動かす。前回がまだ動いている間に次の回が来ても、待機は 1 つだけ残り、
+# 前回の計測済みの記録を見てから候補を選ぶため、同じコミットを二重に計測しない。
+# 手動実行は定期実行と独立させる（待機中の手動実行が定期実行に置き換えられないように）
 concurrency:
-  group: collect-${{ inputs.repository }}
+  group: ${{ github.event_name == 'schedule' && 'collect-schedule' || format('collect-manual-{0}', github.run_id) }}
   cancel-in-progress: false
 
 jobs:
-  fetch:
+  plan:
     runs-on: self-hosted
-    timeout-minutes: 15
+    timeout-minutes: 5
     outputs:
-      java_version: ${{ steps.profile.outputs.java_version }}
-      node_version: ${{ steps.node.outputs.node_version }}
-      token_secret: ${{ steps.profile.outputs.token_secret }}
+      targets: ${{ steps.plan.outputs.targets }}
+      count: ${{ steps.plan.outputs.count }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
 
-      - name: 計測プロファイルの読み込み
-        id: profile
-        env:
-          QG_TARGET: ${{ inputs.repository }}
-        run: |
-          source collector/bin/lib.sh
-          load_profile "$QG_TARGET"
-          {
-            echo "owner=${QG_TARGET%%/*}"
-            echo "name=${QG_TARGET#*/}"
-            echo "java_version=${JAVA_VERSION:-}"
-            echo "token_secret=${INGEST_TOKEN_SECRET}"
-            echo "node_version_file=${NODE_VERSION_FILE:-}"
-          } >> "$GITHUB_OUTPUT"
-
-      # 対象リポジトリだけを読める、1 時間で失効するトークン。
-      # App が未設定なら発行しない（public リポジトリはトークン無しで取得できる）
+      # 定期実行では、App がインストールされている対象（この owner のもの）の先頭コミットと PR を読む
       - name: 読み取り用トークンの発行
         id: app-token
-        if: vars.QG_COLLECTOR_APP_ID != ''
+        if: github.event_name == 'schedule' && vars.QG_COLLECTOR_APP_ID != ''
         uses: actions/create-github-app-token@v2
         with:
           app-id: ${{ vars.QG_COLLECTOR_APP_ID }}
           private-key: ${{ secrets.QG_COLLECTOR_APP_PRIVATE_KEY }}
-          owner: ${{ steps.profile.outputs.owner }}
-          repositories: ${{ steps.profile.outputs.name }}
+          owner: ${{ github.repository_owner }}
 
-      - name: 対象リポジトリの取得
+      - name: 計測する対象を決める
+        id: plan
         env:
+          EVENT: ${{ github.event_name }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          QG_TARGET: ${{ inputs.repository }}
-          QG_BRANCH: ${{ inputs.branch }}
-          QG_COMMIT: ${{ inputs.commit }}
-          QG_PR_NUMBER: ${{ inputs.pull_request }}
-        run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
-
-      - name: Node.js の版の解決
-        id: node
-        env:
-          NODE_VERSION_FILE: ${{ steps.profile.outputs.node_version_file }}
+          QG_OWNER: ${{ github.repository_owner }}
+          QG_COLLECTOR_MAX_PER_RUN: ${{ vars.QG_COLLECTOR_MAX_PER_RUN || '5' }}
+          IN_REPOSITORY: ${{ inputs.repository }}
+          IN_BRANCH: ${{ inputs.branch }}
+          IN_COMMIT: ${{ inputs.commit }}
+          IN_PR: ${{ inputs.pull_request }}
+          IN_BASE_BRANCH: ${{ inputs.base_branch }}
         run: |
-          VERSION=""
-          if [ -n "$NODE_VERSION_FILE" ] && [ -f "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE" ]; then
-            VERSION=$(tr -d '[:space:]' < "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE")
+          if [ "$EVENT" = "schedule" ]; then
+            TARGETS=$(./collector/bin/detect.sh)
+          else
+            source collector/bin/lib.sh
+            load_profile "$IN_REPOSITORY"   # 計測プロファイルが無ければここで止める
+            TARGETS=$(jq -cn --arg r "$IN_REPOSITORY" --arg b "$IN_BRANCH" --arg c "$IN_COMMIT" \
+              --arg p "$IN_PR" --arg bb "$IN_BASE_BRANCH" \
+              '[{repository: $r, branch: $b, commit: $c, pull_request: $p, base_branch: $bb}]')
           fi
-          echo "node_version=${VERSION:-22}" >> "$GITHUB_OUTPUT"
+          # 画面に出す名前（例: like-chatgpt main@b581260 / like-chatgpt #14@c643edd）
+          TARGETS=$(jq -c 'map(. + {label: ((.repository | split("/")[1]) + " "
+            + (if .pull_request != "" then "#" + .pull_request else (if .branch != "" then .branch else "default" end) end)
+            + (if .commit != "" then "@" + .commit[0:7] else "" end))})' <<< "$TARGETS")
+          echo "計測する対象: $TARGETS"
+          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
+          echo "count=$(jq length <<< "$TARGETS")" >> "$GITHUB_OUTPUT"
 
-      - name: 受け渡し用にまとめる
-        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: collector-source
-          path: ${{ runner.temp }}/qg-collector-source.tgz
-          retention-days: 1
-
-  measure:
-    needs: fetch
-    runs-on: self-hosted
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: collector-source
-          path: ${{ runner.temp }}
-      - name: 展開
-        run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
-
-      - uses: actions/setup-java@v4
-        if: needs.fetch.outputs.java_version != ''
-        with:
-          distribution: temurin
-          java-version: ${{ needs.fetch.outputs.java_version }}
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ needs.fetch.outputs.node_version }}
-
-      - name: 計測
-        env:
-          QG_TARGET: ${{ inputs.repository }}
-        run: ./collector/bin/measure.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
-
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: collector-reports
-          path: ${{ runner.temp }}/qg-reports/
-          retention-days: 7
-
-      # セルフホストランナーに対象のソースを残さない
-      - name: 作業領域の削除
-        if: always()
-        run: rm -rf "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-collector-source.tgz" "$RUNNER_TEMP/qg-reports"
-
-  submit:
-    needs: [fetch, measure]
-    runs-on: self-hosted
-    timeout-minutes: 10
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - uses: actions/download-artifact@v4
-        with:
-          name: collector-reports
-          path: ${{ runner.temp }}/qg-reports
-      - name: quality-gate へ送信
-        env:
-          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
-          QG_INGEST_TOKEN: ${{ secrets[needs.fetch.outputs.token_secret] }}
-          QG_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: |
-          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
-            echo "::error::QG_BASE_URL（Variables）または ${{ needs.fetch.outputs.token_secret }}（Secrets）が未設定です"
-            exit 1
-          fi
-          ./collector/bin/submit.sh "$RUNNER_TEMP/qg-reports"
+  collect:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    name: ${{ matrix.target.label }}
+    strategy:
+      fail-fast: false
+      max-parallel: 1          # セルフホストランナーは 1 台。性能計測と重ねない（D-7）
+      matrix:
+        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    uses: ./.github/workflows/collect-target.yml
+    with:
+      repository: ${{ matrix.target.repository }}
+      branch: ${{ matrix.target.branch }}
+      commit: ${{ matrix.target.commit }}
+      pull_request: ${{ matrix.target.pull_request }}
+      base_branch: ${{ matrix.target.base_branch }}
+    secrets: inherit

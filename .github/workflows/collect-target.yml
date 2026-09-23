@@ -1,0 +1,223 @@
+# 収集ランナー: 1 つの対象の 1 コミットを取得・計測し、Ingest API に送る（再利用ワークフロー）。
+# collect.yml（手動実行と定期実行）から呼ばれる。単独では起動しない。
+# 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
+#
+# 計測する指標は M-01 / M-06 / M-07 / M-08 / M-09。
+#
+# 必要な設定（Settings → Secrets and variables → Actions。呼び出し側で secrets: inherit）:
+#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
+#              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
+#   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
+#              <計測プロファイルの INGEST_TOKEN_SECRET>  対象リポジトリの Ingest Token
+#
+# ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
+# 送信まで終わったコミットはランナー上に記録し（collector/bin/state.sh）、定期実行で再計測しない。
+name: collect-target
+
+on:
+  workflow_call:
+    inputs:
+      repository:
+        description: 計測するリポジトリ（owner/name）
+        type: string
+        required: true
+      branch:
+        description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH）
+        type: string
+        default: ''
+      commit:
+        description: 計測するコミット（40 桁。空ならブランチまたは PR の先頭）
+        type: string
+        default: ''
+      pull_request:
+        description: PR を計測する場合の番号
+        type: string
+        default: ''
+      base_branch:
+        description: 比較元を決めるブランチ（空なら DEFAULT_BRANCH。PR ではマージ先）
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  fetch:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    outputs:
+      java_version: ${{ steps.profile.outputs.java_version }}
+      node_version: ${{ steps.node.outputs.node_version }}
+      token_secret: ${{ steps.profile.outputs.token_secret }}
+      state_key: ${{ steps.key.outputs.state_key }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 計測プロファイルの読み込み
+        id: profile
+        env:
+          QG_TARGET: ${{ inputs.repository }}
+        run: |
+          source collector/bin/lib.sh
+          load_profile "$QG_TARGET"
+          {
+            echo "owner=${QG_TARGET%%/*}"
+            echo "name=${QG_TARGET#*/}"
+            echo "java_version=${JAVA_VERSION:-}"
+            echo "token_secret=${INGEST_TOKEN_SECRET}"
+            echo "node_version_file=${NODE_VERSION_FILE:-}"
+          } >> "$GITHUB_OUTPUT"
+
+      # 対象リポジトリだけを読める、1 時間で失効するトークン。
+      # App が未設定なら発行しない（public リポジトリはトークン無しで取得できる）
+      - name: 読み取り用トークンの発行
+        id: app-token
+        if: vars.QG_COLLECTOR_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.QG_COLLECTOR_APP_ID }}
+          private-key: ${{ secrets.QG_COLLECTOR_APP_PRIVATE_KEY }}
+          owner: ${{ steps.profile.outputs.owner }}
+          repositories: ${{ steps.profile.outputs.name }}
+
+      - name: 対象リポジトリの取得
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          QG_TARGET: ${{ inputs.repository }}
+          QG_BRANCH: ${{ inputs.branch }}
+          QG_COMMIT: ${{ inputs.commit }}
+          QG_PR_NUMBER: ${{ inputs.pull_request }}
+          QG_BASE_BRANCH: ${{ inputs.base_branch }}
+        run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
+
+      # 計測済みの記録に使うキー。取得に失敗しても、コミットが指定されていれば失敗として記録できるようにする
+      - name: 記録用のキー
+        id: key
+        if: always()
+        env:
+          QG_TARGET: ${{ inputs.repository }}
+          QG_BRANCH: ${{ inputs.branch }}
+          QG_COMMIT: ${{ inputs.commit }}
+          QG_PR_NUMBER: ${{ inputs.pull_request }}
+        run: |
+          META="$RUNNER_TEMP/qg-collector/meta.env"
+          if [ -f "$META" ]; then
+            source collector/bin/lib.sh
+            load_env "$META"
+            KEY=$(./collector/bin/state.sh key "$QG_REPOSITORY" "$BRANCH" "$PR_NUMBER" "$COMMIT_SHA")
+          elif [ -n "$QG_COMMIT" ]; then
+            source collector/bin/lib.sh
+            load_profile "$QG_TARGET"
+            KEY=$(./collector/bin/state.sh key "$QG_TARGET" "${QG_BRANCH:-$DEFAULT_BRANCH}" "$QG_PR_NUMBER" "$QG_COMMIT")
+          else
+            KEY=""
+          fi
+          echo "state_key=$KEY" >> "$GITHUB_OUTPUT"
+
+      - name: Node.js の版の解決
+        id: node
+        env:
+          NODE_VERSION_FILE: ${{ steps.profile.outputs.node_version_file }}
+        run: |
+          VERSION=""
+          if [ -n "$NODE_VERSION_FILE" ] && [ -f "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE" ]; then
+            VERSION=$(tr -d '[:space:]' < "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE")
+          fi
+          echo "node_version=${VERSION:-22}" >> "$GITHUB_OUTPUT"
+
+      - name: 受け渡し用にまとめる
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: collector-source
+          path: ${{ runner.temp }}/qg-collector-source.tgz
+          retention-days: 1
+
+  measure:
+    needs: fetch
+    runs-on: self-hosted
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: collector-source
+          path: ${{ runner.temp }}
+      - name: 展開
+        run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
+
+      - uses: actions/setup-java@v4
+        if: needs.fetch.outputs.java_version != ''
+        with:
+          distribution: temurin
+          java-version: ${{ needs.fetch.outputs.java_version }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ needs.fetch.outputs.node_version }}
+
+      - name: 計測
+        env:
+          QG_TARGET: ${{ inputs.repository }}
+        run: ./collector/bin/measure.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: collector-reports
+          path: ${{ runner.temp }}/qg-reports/
+          retention-days: 7
+
+      # セルフホストランナーに対象のソースを残さない
+      - name: 作業領域の削除
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-collector-source.tgz" "$RUNNER_TEMP/qg-reports"
+
+  submit:
+    needs: [fetch, measure]
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: collector-reports
+          path: ${{ runner.temp }}/qg-reports
+      - name: quality-gate へ送信
+        env:
+          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+          QG_INGEST_TOKEN: ${{ secrets[needs.fetch.outputs.token_secret] }}
+          QG_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
+            echo "::error::QG_BASE_URL（Variables）または ${{ needs.fetch.outputs.token_secret }}（Secrets）が未設定です"
+            exit 1
+          fi
+          ./collector/bin/submit.sh "$RUNNER_TEMP/qg-reports"
+
+      - name: 計測済みとして記録
+        env:
+          STATE_KEY: ${{ needs.fetch.outputs.state_key }}
+        run: ./collector/bin/state.sh record "$STATE_KEY" ok
+
+  # 失敗した回数を数え、同じコミットで失敗し続けないようにする（上限は detect.sh）。
+  # 取り消し（cancelled）は記録しない。ランナーの停止などで中断したものは次回やり直す
+  record-failure:
+    needs: [fetch, measure, submit]
+    if: failure() && needs.fetch.outputs.state_key != ''
+    runs-on: self-hosted
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: 失敗として記録
+        env:
+          STATE_KEY: ${{ needs.fetch.outputs.state_key }}
+        run: ./collector/bin/state.sh record "$STATE_KEY" failed

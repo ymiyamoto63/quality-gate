@@ -9,6 +9,7 @@
 #   QG_BRANCH     計測するブランチ（既定: 計測プロファイルの DEFAULT_BRANCH）
 #   QG_COMMIT     計測するコミット（40 桁。既定: ブランチの先頭）
 #   QG_PR_NUMBER  PR を計測する場合の番号。PR の先頭（refs/pull/<番号>/head）を計測する
+#   QG_BASE_BRANCH 比較元を決めるブランチ（既定: DEFAULT_BRANCH）。PR ではマージ先のブランチ
 #   QG_REMOTE_URL clone 元の URL（既定: https://github.com/<owner/name>.git。試験用）
 #
 # 出力:
@@ -23,6 +24,7 @@ WORK=$2
 load_profile "$REPOSITORY"
 
 BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
+BASE_BRANCH=${QG_BASE_BRANCH:-$DEFAULT_BRANCH}
 PR_NUMBER=${QG_PR_NUMBER:-}
 REMOTE=${QG_REMOTE_URL:-https://github.com/${REPOSITORY}.git}
 [ -z "$PR_NUMBER" ] || [[ "$PR_NUMBER" =~ ^[0-9]+$ ]] || die "PR 番号が不正です: $PR_NUMBER"
@@ -52,12 +54,12 @@ COMMIT=${QG_COMMIT:-$(git rev-parse "$HEAD_REF")}
 git cat-file -e "${COMMIT}^{commit}" 2>/dev/null || die "コミットが見つかりません: $COMMIT"
 git checkout --quiet --detach "$COMMIT"
 
-# 比較元: 既定ブランチ上の計測なら直前のコミット、それ以外は既定ブランチとの merge-base。
+# 比較元: 既定ブランチ上の計測なら直前のコミット、それ以外は比較先のブランチ（PR ならマージ先）との merge-base。
 # 対象リポジトリの CI（push なら HEAD~1、PR なら merge-base）と同じ決め方にする
-if [ -z "$PR_NUMBER" ] && [ "$BRANCH" = "$DEFAULT_BRANCH" ]; then
+if [ -z "$PR_NUMBER" ] && [ "$BRANCH" = "$BASE_BRANCH" ]; then
   BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 else
-  BASE=$(git merge-base "$COMMIT" "origin/${DEFAULT_BRANCH}" || true)
+  BASE=$(git merge-base "$COMMIT" "origin/${BASE_BRANCH}" || true)
   [ "$BASE" != "$COMMIT" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 fi
 
