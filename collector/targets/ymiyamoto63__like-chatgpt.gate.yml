@@ -1,0 +1,62 @@
+# like-chatgpt の合格ライン（収集ランナー用・段階 1）
+#
+# 収集ランナーは .quality-gate.yml を送らないため、quality-gate は画面（S-06）で保存した設定で判定する。
+# この内容を S-06 に貼り付けて保存する（このファイル自体は判定に使われない。控えと差分確認用）。
+#
+# like-chatgpt の .quality-gate.yml との違い:
+#   - mutation_score / accessibility を無効にしている（段階 1 では計測しないため。
+#     有効のままだと未提出で ERROR になり、Run 全体が FAIL になる）
+version: 1
+enforcement: report-only
+on_missing_report: fail
+
+execution:
+  skippable_metrics: []
+  full_measurement_interval_days: 7
+  reference_only_environments: [github-hosted]
+
+components:
+  - name: backend
+    language: java
+    paths: ["backend/**"]
+  - name: frontend
+    language: typescript
+    paths: ["frontend/**"]
+
+exclusions:
+  - "**/ChatBackendApplication.java"
+  - "**/main.ts"
+  - "**/*.d.ts"
+  - "**/*.config.ts"
+
+metrics:
+  branch_coverage:
+    enabled: true
+    threshold: 75
+    scope: overall
+    per_component: true
+    diff_threshold: 80
+  mutation_score:
+    enabled: false                # 段階 3 で有効にする
+  performance:
+    enabled: false
+  vulnerabilities:
+    enabled: true
+    max_critical: 0
+    max_high: 0
+    max_medium: null
+  cyclomatic_complexity:
+    enabled: true
+    max_complexity: 15
+    scope: new_and_modified
+    warn_from: 11
+  api_contract:
+    enabled: true
+    min_success_rate: 100
+    min_test_count: 1
+    breaking_changes: 0
+  accessibility:
+    enabled: false                # 段階 4 で方式を決めてから有効にする
+
+notifications:
+  on: transition_to_fail
