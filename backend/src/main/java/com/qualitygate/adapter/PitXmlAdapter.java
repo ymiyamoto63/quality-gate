@@ -22,7 +22,7 @@ import java.util.Set;
  * PIT の {@code mutations.xml} から M-02（ミューテーションスコア）を読む。
  *
  * <p>PIT が出す「Mutation Coverage」は使わず、<strong>各 mutation の status を
- * 数え直す</strong>（docs/02-metrics-spec.md M-02）。PIT の値は NO_COVERAGE の扱いが
+ * 数え直す</strong>（docs/initial/02-metrics-spec.md M-02）。PIT の値は NO_COVERAGE の扱いが
  * 仕様の式と異なり、テストの届いていない箇所が多いほど良く見えてしまうためである。
  *
  * <p>status ごとの件数を内訳（{@code detail}）として渡す。評価器は複数の成果物を
@@ -141,7 +141,7 @@ public class PitXmlAdapter implements ArtifactAdapter {
 
         /**
          * 除外の照合に使うパス。JaCoCo と同じ「パッケージ相対」（com/example/Foo.java）にする。
-         * 同じ exclusions を M-01 と M-02 に書けるようにするため（docs/02-metrics-spec.md 0.2）。
+         * 同じ exclusions を M-01 と M-02 に書けるようにするため（docs/initial/02-metrics-spec.md 0.2）。
          */
         private String sourcePath() {
             String className = mutatedClass == null ? "" : mutatedClass;

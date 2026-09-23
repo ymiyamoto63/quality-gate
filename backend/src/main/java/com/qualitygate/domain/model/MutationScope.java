@@ -4,7 +4,7 @@ import java.util.Arrays;
 import java.util.Optional;
 
 /**
- * ミューテーションテストの実行範囲（docs/02-metrics-spec.md M-02）。
+ * ミューテーションテストの実行範囲（docs/initial/02-metrics-spec.md M-02）。
  *
  * <p>変更範囲に限った値と全量の値は比較できない。変更したクラスだけを
  * 測れば、よくテストされた既存コードが分母から抜けるためである。

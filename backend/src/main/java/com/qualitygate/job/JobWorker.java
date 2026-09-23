@@ -13,7 +13,7 @@ import java.util.UUID;
  * ジョブキューのポーラ。
  *
  * <p>専用のメッセージキューは導入しない。1 日 10〜30 Run の規模に対して
- * 運用コストが見合わないためである（docs/05-architecture.md 4.1）。
+ * 運用コストが見合わないためである（docs/initial/05-architecture.md 4.1）。
  *
  * <p><strong>このクラスに {@code @Transactional} は付けない。</strong>
  * トランザクションは {@link JobQueue} に閉じる（理由はそちらの Javadoc）。

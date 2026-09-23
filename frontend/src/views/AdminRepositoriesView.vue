@@ -381,7 +381,7 @@ async function saveNotification(): Promise<void> {
 
     <!--
       発行したトークンは一度しか表示しない。コピーするまで閉じられず、
-      Esc と背景クリックでも閉じない（docs/08-screen-design.md 4.8）。
+      Esc と背景クリックでも閉じない（docs/initial/08-screen-design.md 4.8）。
     -->
     <AppDialog
       :open="issuedToken !== null"

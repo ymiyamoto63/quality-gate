@@ -27,7 +27,7 @@ const value = computed(() =>
     : formatValue(props.metric.value, props.metric.unit),
 )
 /**
- * 指標そのものの限界。判定結果によらず常に添える（docs/02-metrics-spec.md M-10）。
+ * 指標そのものの限界。判定結果によらず常に添える（docs/initial/02-metrics-spec.md M-10）。
  * 「重大 0 件」を適合の証明と受け取られると、手動での確認が省かれる。
  */
 const NOTES: Record<string, string> = {

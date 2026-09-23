@@ -89,7 +89,7 @@ public class RunEvaluationService {
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
         Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
 
-        // 免除は判定の直前に適用する（docs/05-architecture.md 3.2 の 5）。
+        // 免除は判定の直前に適用する（docs/initial/05-architecture.md 3.2 の 5）。
         // 判定時点で有効なものだけを使うため、期限切れは自動的に再びカウントされる
         Instant now = Instant.now();
         ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), now));
@@ -145,7 +145,7 @@ public class RunEvaluationService {
     }
 
     /**
-     * 指標 1 件の判定。優先順位は docs/05-architecture.md 6.2 に従う。
+     * 指標 1 件の判定。優先順位は docs/initial/05-architecture.md 6.2 に従う。
      *
      * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
      * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。

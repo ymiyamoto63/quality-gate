@@ -38,7 +38,7 @@ import java.util.UUID;
  *
  * <p>優先順位は {@code .quality-gate.yml（CI が送信） > UI 設定 > システム既定値}。
  * ファイルで管理されているリポジトリでは UI 編集を受け付けない。優先順位を知らずに
- * UI で変更し、反映されずに混乱する事故を防ぐ（docs/08-screen-design.md 4.6）。
+ * UI で変更し、反映されずに混乱する事故を防ぐ（docs/initial/08-screen-design.md 4.6）。
  */
 @Service
 public class ConfigQueryService {

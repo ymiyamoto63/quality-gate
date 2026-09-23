@@ -139,7 +139,7 @@ public class RepositoryAdminService {
     /**
      * トークンを発行する。平文は戻り値でのみ返し、保存するのはハッシュだけにする。
      *
-     * <p>形式は {@code qg_<8 文字の prefix>_<32 文字の秘密>}（docs/05-architecture.md 8.3）。
+     * <p>形式は {@code qg_<8 文字の prefix>_<32 文字の秘密>}（docs/initial/05-architecture.md 8.3）。
      * prefix は検索用の公開値で、一意制約に当たれば引き直す。
      */
     @Transactional

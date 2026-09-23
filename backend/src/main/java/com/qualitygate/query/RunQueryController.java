@@ -35,7 +35,7 @@ import java.util.stream.Collectors;
 @Tag(name = "Runs", description = "Run の参照")
 public class RunQueryController {
 
-    /** 既定の絞り込み。解消済みは明示的に選んだときだけ出す（docs/08-screen-design.md 4.4）。 */
+    /** 既定の絞り込み。解消済みは明示的に選んだときだけ出す（docs/initial/08-screen-design.md 4.4）。 */
     private static final Set<FindingState> DEFAULT_STATES =
             Set.of(FindingState.NEW, FindingState.CONTINUING, FindingState.INITIAL);
 

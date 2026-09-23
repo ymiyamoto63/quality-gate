@@ -3,7 +3,7 @@ import { computed, ref } from 'vue'
 import { useWaiverStore, type CreateWaiverRequest } from '@/stores/waivers'
 
 /**
- * 免除の登録フォーム（docs/08-screen-design.md 4.7）。
+ * 免除の登録フォーム（docs/initial/08-screen-design.md 4.7）。
  *
  * 理由は 20 文字以上、期限は既定 30 日・最大 90 日。「この違反は判定から除外されます」
  * と明示してから実行させる。

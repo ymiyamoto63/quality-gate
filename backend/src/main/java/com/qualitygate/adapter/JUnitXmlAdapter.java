@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JUnit XML から M-08（API 契約テスト成功率）を読む（docs/02-metrics-spec.md M-08）。
+ * JUnit XML から M-08（API 契約テスト成功率）を読む（docs/initial/02-metrics-spec.md M-08）。
  *
  * <p>Surefire / Failsafe と Vitest の junit reporter の出力を受け付ける。ルートは
  * {@code <testsuites>} でも {@code <testsuite>} でもよい。

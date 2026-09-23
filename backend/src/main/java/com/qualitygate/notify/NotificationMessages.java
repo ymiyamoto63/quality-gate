@@ -21,7 +21,7 @@ import java.util.Objects;
  * 通知の本文（FR-11-5: 合否・変化した指標・前回値 → 今回値・Run 詳細への直リンク）。
  *
  * <p>色の付かないメールでも合否が読めるよう、
- * ステータスは記号とラベルで書く（docs/08-screen-design.md 3.1）。
+ * ステータスは記号とラベルで書く（docs/initial/08-screen-design.md 3.1）。
  */
 final class NotificationMessages {
 

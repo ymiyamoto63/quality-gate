@@ -48,7 +48,7 @@ public record GateThresholds(
         Set<String> referenceOnlyEnvironments) {
 
     /**
-     * 性能指標の合格ライン（docs/02-metrics-spec.md M-03）。
+     * 性能指標の合格ライン（docs/initial/02-metrics-spec.md M-03）。
      *
      * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
      * @param p95WarnMs      これを超えたら WARN（既定は合格ラインの 80%）

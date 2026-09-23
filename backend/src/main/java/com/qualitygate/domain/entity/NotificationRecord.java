@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * 通知の送信履歴。一意制約が再送の抑止そのものになる（docs/05-architecture.md 4.5）。
+ * 通知の送信履歴。一意制約が再送の抑止そのものになる（docs/initial/05-architecture.md 4.5）。
  */
 @Entity
 @Table(name = "notifications")

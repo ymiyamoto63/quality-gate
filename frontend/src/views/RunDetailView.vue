@@ -152,7 +152,7 @@ const runnerLabel = computed(() =>
 
       <!--
         処理失敗（FAILED）は判定結果 FAIL とは別物なので、判定表を出さずに
-        何が起きたかと次の行動を示す（docs/08-screen-design.md 3.3）。
+        何が起きたかと次の行動を示す（docs/initial/08-screen-design.md 3.3）。
       -->
       <div v-if="detail.failure" class="qg-failure" role="alert">
         <h2>{{ detail.failure.title }}</h2>

@@ -1,7 +1,7 @@
 package com.qualitygate.domain.metric;
 
 /**
- * 指標の定義（docs/02-metrics-spec.md）。
+ * 指標の定義（docs/initial/02-metrics-spec.md）。
  *
  * @param metricId 指標 ID（{@code M-01} など）
  * @param name     画面に出す名称

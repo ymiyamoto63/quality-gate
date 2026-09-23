@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * M-05 エラー率（docs/02-metrics-spec.md M-03）。
+ * M-05 エラー率（docs/initial/02-metrics-spec.md M-03）。
  *
  * <p>合格ライン（既定 0.1%）以下で PASS、その半分（既定 0.05%）を超えたら WARN。
  * 5% を超える場合は基底クラスが ERROR にする。

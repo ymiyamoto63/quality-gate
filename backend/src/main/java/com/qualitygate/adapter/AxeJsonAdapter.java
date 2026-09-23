@@ -27,7 +27,7 @@ import java.util.regex.Pattern;
 
 /**
  * axe-core の結果 JSON から M-10（アクセシビリティ違反）を読む
- * （docs/02-metrics-spec.md M-10）。
+ * （docs/initial/02-metrics-spec.md M-10）。
  *
  * <p>受け付けるのは {@code @axe-core/playwright} の {@code analyze()} の戻り値そのもの
  * （1 ページ分のオブジェクト）か、その配列（複数ページ分）。
@@ -157,7 +157,7 @@ public class AxeJsonAdapter implements ArtifactAdapter {
         String help = violation.path("help").asString("");
         String title = truncate(help.isBlank() ? ruleId : help, MAX_HTML);
 
-        // docs/02-metrics-spec.md 0.4: ページパス + ルール ID + 要素の CSS セレクタ
+        // docs/initial/02-metrics-spec.md 0.4: ページパス + ルール ID + 要素の CSS セレクタ
         String identity = page + "|" + ruleId + "|" + selector;
         return new RawFinding(METRIC_ID, ruleId, severityOf(impact), title,
                 null, null, context.componentName(), identity, detail);

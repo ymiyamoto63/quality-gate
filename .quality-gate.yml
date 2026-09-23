@@ -1,5 +1,5 @@
 # quality-gate 自身の品質ゲート設定（ドッグフーディング）
-# 仕様: docs/02-metrics-spec.md
+# 仕様: docs/initial/02-metrics-spec.md
 version: 1
 enforcement: report-only          # report-only | check-run | blocking
 on_missing_report: fail           # fail | warn
