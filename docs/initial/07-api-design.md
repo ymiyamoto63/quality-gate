@@ -797,15 +797,13 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
 | `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
-| `RATE_LIMITED` | 429 | レート制限超過（定義のみ。レート制限は未実装） |
+| `RATE_LIMITED` | 429 | レート制限超過（8 章）。`Retry-After` ヘッダに待つ秒数を付ける |
 | `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API を呼ぶのは判定ジョブの比較元の解決だけで、失敗しても比較元なしで判定を続けるため、API の応答としては返さない） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
 
 ---
 
 ## 8. レート制限
-
-**未実装。** 以下は設計時点の方針である。
 
 内部利用のため厳しい制限は設けないが、**暴走の歯止めとして**設定する。
 
@@ -819,6 +817,19 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 超過時は 429 と `Retry-After` ヘッダを返す。
 CI の不具合で同じジョブが無限に再実行されるような事故で、
 ストレージと DB が食い潰されることを防ぐのが目的である。
+
+**実装で確定した仕様。**
+
+- トークンバケットで数える。容量は 1 分あたりの上限、補充は上限 ÷ 60 秒の速さで連続的に行う
+  （固定の 1 分窓のように、窓の境目で上限の 2 倍が通ることがない）
+- Ingest API の「成果物アップロード」は `POST /api/v1/runs/{runId}/artifacts`、それ以外の Ingest API
+  （Run 作成・確定・状態取得）は「Ingest API」の枠で数える。単位は Ingest Token
+- 参照 API はログインした利用者ごとに数える。未ログインの要求（どのみち 401 になる）は IP ごと
+- API 以外（画面の静的ファイル、`/actuator/**`）は制限しない
+- 枠はプロセスのメモリに持つ（単一ホストでの運用が前提。Q-10）。再起動すると枠は戻る
+- 上限は `quality-gate.rate-limit.*`、無効にするなら `QG_RATE_LIMIT_ENABLED=false`。
+  超過の回数はメトリクス `qg.rate_limit.rejected`（`category` タグ）で数える
+- CLI（`qg-submit`）は 429 を受けると `Retry-After` に従って 3 回まで再試行する（curl の `--retry`）
 
 ---
 
