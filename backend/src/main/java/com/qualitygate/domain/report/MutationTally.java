@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * ミューテーションの status 別件数と、M-02 の計算式（docs/02-metrics-spec.md M-02）。
+ * ミューテーションの status 別件数と、M-02 の計算式（docs/initial/02-metrics-spec.md M-02）。
  *
  * <p>式をここに 1 つだけ置く。アダプタ（1 ファイル分の参考値）と評価器
  * （複数ファイルを合算した判定値）が同じ式を使わないと、画面の値と判定が食い違う。
@@ -28,7 +28,7 @@ public record MutationTally(
 
     public static final MutationTally EMPTY = new MutationTally(0, 0, 0, 0, 0, 0, 0, 0);
 
-    /** PIT の status 1 件を数える。対応は docs/02-metrics-spec.md M-02 の表に従う。 */
+    /** PIT の status 1 件を数える。対応は docs/initial/02-metrics-spec.md M-02 の表に従う。 */
     public MutationTally plusStatus(String status) {
         return switch (status == null ? "" : status) {
             case "KILLED" -> plus(new MutationTally(1, 0, 0, 0, 0, 0, 0, 0));

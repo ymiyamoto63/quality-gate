@@ -2,7 +2,7 @@
 import { nextTick, ref, watch } from 'vue'
 
 /**
- * モーダルダイアログ（docs/08-screen-design.md A-8）。
+ * モーダルダイアログ（docs/initial/08-screen-design.md A-8）。
  *
  * ネイティブの <dialog> を showModal() で開く。背景は inert になり、フォーカスは
  * ダイアログ内に閉じる。閉じたら開いた要素へフォーカスを戻す。

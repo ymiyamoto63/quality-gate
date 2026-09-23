@@ -184,7 +184,7 @@ function sourceLabel(sourceType: string): string {
       <div v-else role="tabpanel">
         <!--
           ファイルが優先されることを明示し、ファイル管理のリポジトリでは編集させない。
-          反映されない変更をして混乱する事故を防ぐ（docs/08-screen-design.md 4.6）。
+          反映されない変更をして混乱する事故を防ぐ（docs/initial/08-screen-design.md 4.6）。
         -->
         <p class="qg-panel">
           リポジトリ内の <code>.quality-gate.yml</code> が画面の設定より優先されます。

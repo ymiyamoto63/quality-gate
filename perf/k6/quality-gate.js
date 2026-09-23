@@ -1,5 +1,5 @@
 // quality-gate 自身の負荷試験（M-03 / M-04 / M-05）。
-// 仕様: docs/02-metrics-spec.md M-03
+// 仕様: docs/initial/02-metrics-spec.md M-03
 //
 //   負荷モデル   constant-arrival-rate（到達率を固定し、VU 数は固定しない）
 //   ウォームアップ 60 秒。phase=warmup のタグを付け、集計（phase=measure）から除く

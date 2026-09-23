@@ -1,0 +1,21 @@
+# API の型生成
+
+バックエンドが `api/openapi.yml` を生成し、フロントエンドがそこから型を生成します。
+**両方ともリポジトリにコミットします。**
+
+```bash
+cd backend && ./mvnw verify          # api/openapi.yml を再生成
+cd ../frontend && npm run generate:api   # src/api/schema.d.ts を再生成（prettier で整形まで行う）
+git diff --exit-code api/ frontend/src/api/schema.d.ts   # ずれていないか検証
+```
+
+この差分検証は CI でも実行します。生成物がずれている状態は、
+フロントエンドが古い契約に基づいて動いていることを意味します。
+
+`frontend/e2e/fixtures/` の応答例も同じ扱いの生成物です。
+結合テスト（`RunQueryApiIT` / `TrendApiIT`）が実物の API から書き出し、
+アクセシビリティ検査がそれを読んで画面を描きます。
+
+書き出す際、UUID と処理時刻は固定値へ置き換えます（`FixtureWriter`）。
+そのままだと実行のたびに差分が出て、生成物なのに
+「再生成して差分がないこと」を検証できなくなるためです。

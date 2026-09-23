@@ -43,7 +43,7 @@ public record MetricResult(
 
     /**
      * ツールの制約で、このコンポーネントでは計測しようがない場合。
-     * 未計測（SKIP）とは区別する（docs/02-metrics-spec.md M-02）。
+     * 未計測（SKIP）とは区別する（docs/initial/02-metrics-spec.md M-02）。
      */
     public static MetricResult notApplicable(String metricId, String componentName,
                                              String reason) {

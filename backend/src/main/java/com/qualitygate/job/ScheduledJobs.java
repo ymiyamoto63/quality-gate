@@ -11,7 +11,7 @@ import java.time.ZoneId;
 import java.util.Map;
 
 /**
- * 日次バッチの起動（docs/05-architecture.md 4.2）。
+ * 日次バッチの起動（docs/initial/05-architecture.md 4.2）。
  *
  * <p>ここではジョブを積むだけで、処理はジョブキューのワーカーが行う。
  * 鍵に日付を含めるため、プロセスを複数動かしても同じ日のジョブは 1 つにまとまる。

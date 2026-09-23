@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * M-08 API 契約テスト成功率（docs/02-metrics-spec.md M-08）。
+ * M-08 API 契約テスト成功率（docs/initial/02-metrics-spec.md M-08）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>

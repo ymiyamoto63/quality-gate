@@ -6,7 +6,7 @@ import com.fasterxml.jackson.annotation.JsonValue;
 import java.util.List;
 
 /**
- * 取り込む成果物の形式（docs/02-metrics-spec.md 0.5）。
+ * 取り込む成果物の形式（docs/initial/02-metrics-spec.md 0.5）。
  *
  * <p>SARIF を静的解析系の第一形式とし、アダプタ実装を集約する。
  */

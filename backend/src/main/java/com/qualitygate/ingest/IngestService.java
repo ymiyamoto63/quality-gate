@@ -205,7 +205,7 @@ public class IngestService {
                     .collect(Collectors.joining(" / "));
             if (scope == null || scope.isNull()) {
                 // 変更範囲だけの値と全量の値は比較できない。どちらか分からない値は
-                // 前回比にもトレンドにも置き場所がない（docs/02-metrics-spec.md M-02）
+                // 前回比にもトレンドにも置き場所がない（docs/initial/02-metrics-spec.md M-02）
                 throw new ApiException(ErrorCode.MUTATION_SCOPE_MISSING,
                         "PIT の成果物には metadata の %s（%s）が必要です"
                                 .formatted(MutationScope.METADATA_KEY, allowed));

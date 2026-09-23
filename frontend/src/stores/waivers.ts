@@ -8,7 +8,7 @@ export type WaiverItem = Schemas['WaiverItem']
 export type WaiverStatus = WaiverItem['status']
 export type CreateWaiverRequest = Schemas['CreateWaiverRequest']
 
-/** 免除の一覧・登録・失効（docs/08-screen-design.md 7 章 useWaiverStore）。 */
+/** 免除の一覧・登録・失効（docs/initial/08-screen-design.md 7 章 useWaiverStore）。 */
 export const useWaiverStore = defineStore('waivers', () => {
   const state = ref<'idle' | 'loading' | 'ready' | 'error'>('idle')
   const items = ref<WaiverItem[]>([])

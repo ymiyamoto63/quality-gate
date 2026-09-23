@@ -107,7 +107,7 @@ public class IngestController {
             return ArtifactType.fromWire(type);
         } catch (IllegalArgumentException e) {
             throw new ApiException(ErrorCode.ARTIFACT_TYPE_UNKNOWN,
-                    "未知の成果物種別です: %s（対応形式は docs/02-metrics-spec.md 0.5 を参照）"
+                    "未知の成果物種別です: %s（対応形式は docs/initial/02-metrics-spec.md 0.5 を参照）"
                             .formatted(type));
         }
     }

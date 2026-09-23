@@ -1,6 +1,6 @@
 package com.qualitygate.domain.model;
 
-/** 免除の理由区分（docs/02-metrics-spec.md M-06「免除」）。 */
+/** 免除の理由区分（docs/initial/02-metrics-spec.md M-06「免除」）。 */
 public enum WaiverReasonCategory {
     /** 脆弱なコードパスをアプリケーションが呼び出していない。推奨期限 90 日。 */
     UNREACHABLE("到達不能", 90),

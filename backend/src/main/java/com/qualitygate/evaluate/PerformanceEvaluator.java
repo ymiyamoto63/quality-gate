@@ -13,7 +13,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * 性能指標（M-03 / M-04 / M-05）に共通する判定の骨組み（docs/02-metrics-spec.md M-03）。
+ * 性能指標（M-03 / M-04 / M-05）に共通する判定の骨組み（docs/initial/02-metrics-spec.md M-03）。
  *
  * <p>コンポーネントと計測環境の組ごとに 1 つの結果を出す。同じ組に届いた成果物は
  * 「同じ条件での繰り返し実行」とみなし、値の中央値で判定する。
