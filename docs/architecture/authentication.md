@@ -1,14 +1,15 @@
 # 認証と GitHub App
 
 quality-gate は GitHub App を **「ログイン手段」として使います**（OAuth App は使いません。D-11）。
-計測データを GitHub から取りに行くことはなく、計測結果は CI が Ingest API で送ってきます。
+計測結果は CI または収集ランナーが Ingest API で送ってきます。収集ランナーは、計測対象のリポジトリを読むためにも同じ App を使います。
+しくみの全体像は [はじめての人向け: quality-gate のしくみ](overview-for-beginners.md) を参照してください。
 
 | 用途 | 使うもの | 状態 |
 | --- | --- | --- |
 | 画面へのログイン | GitHub App の Client ID / Client Secret（user-to-server 認可、スコープ `read:user`） | 実装済み |
 | CI からの計測結果の送信 | GitHub App ではなく **Ingest Token**（quality-gate が発行する Bearer トークン。管理 › リポジトリ管理で発行） | 実装済み |
 | 違反箇所へのリンク | `https://github.com/<owner>/<repo>/blob/<sha>/<path>#L<n>` を組み立てるだけ（API 呼び出しなし） | 実装済み |
-| リポジトリ内容の読み取り | GitHub App の Contents: Read-only 権限 | 将来用。現時点では不要 |
+| 計測対象リポジトリの読み取り（収集ランナー） | GitHub App の Contents / Pull requests: Read-only 権限と、対象リポジトリへのインストール。秘密鍵から 1 時間有効のトークンを発行して clone する（[収集ランナーで計測する](../operations/collector.md)） | 実装済み（段階 1） |
 
 ## ログインの流れ（`SecurityConfig` の `oauth2Login`）
 
