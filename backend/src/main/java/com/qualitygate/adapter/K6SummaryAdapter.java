@@ -156,7 +156,7 @@ public class K6SummaryAdapter implements ArtifactAdapter {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Object> environmentDetailOf(ParseContext context) {
+    static Map<String, Object> environmentDetailOf(ParseContext context) {
         Object environment = context.metadata().get(ENVIRONMENT);
         return environment instanceof Map<?, ?> map
                 ? Map.copyOf((Map<String, Object>) map)

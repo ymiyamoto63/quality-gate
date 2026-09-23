@@ -136,10 +136,16 @@ SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツ�
 ただし `sarif` は M-06 にだけ使う。複雑度を報告するツール（PMD / ESLint / lizard）の SARIF は、
 M-06 の件数に混入させないため読み飛ばす。
 
-アダプタを実装済みの形式は `jacoco-xml` / `lcov` / `pit-xml` / `k6-summary` / `sarif` / `pmd-xml` /
-`junit-xml` / `oasdiff-json` / `axe-json` / `quality-gate-config` である。`istanbul-json` / `osv-json` /
-`eslint-json` / `lizard-csv` / `pact-verification` はアップロードを受け付けるが、判定時に形式不正として ERROR になる。
-`gatling-log` は種別として定義しておらず、アップロードが 422（`ARTIFACT_TYPE_UNKNOWN`）で拒否される。
+上の形式はすべてアダプタを実装済みである。形式ごとの読み方の要点:
+
+| `type` | 読み方 |
+| --- | --- |
+| `istanbul-json` | 各ファイルの `b`（分岐 ID → 経路ごとの実行回数）の経路を 1 本ずつ数え、1 回以上実行された経路を「実行された分岐」とする（lcov の BRF / BRH と同じ数え方） |
+| `gatling-log` | **テキスト形式**の simulation.log の `REQUEST` 行から、応答時間（終了 − 開始）の p95（最近順位法）、到達率（件数 ÷ 最初の開始から最後の終了まで）、失敗率（`KO` の割合）を求める。グループ名をシナリオ名とする。`environment.warmupSeconds` があれば最初のリクエストからその秒数の間に始まったリクエストを除く。Gatling 3.8 以降の既定のバイナリ形式は読めない（理由つきで ERROR） |
+| `osv-json` | `osv-scanner --format json` の出力。パッケージごとに `groups`（同じ脆弱性の別名の束）を 1 件とする。深刻度は `groups[].max_severity`（CVSS）、無ければ `database_specific.severity` の表記。ルール ID は CVE があれば CVE（Trivy の SARIF と名寄せが揃う） |
+| `eslint-json` | `eslint -f json` の出力のうち `complexity` ルールの報告だけを読む。全関数の CC を得るため、ルールは上限 0（`["error", 0]`）で動かす。関数名の無い関数はファイル内の出現順で区別する |
+| `lizard-csv` | `lizard --csv` の出力（関数ごとに 1 行）。関数の同定子は引数まで含む `long_name` |
+| `pact-verification` | Pact Broker に送る検証結果（`testResults[]`）か、pact-jvm の JSON レポート（`execution[].interactions[]`）。インタラクション 1 件を契約テスト 1 件と数える |
 
 ---
 
@@ -470,6 +476,9 @@ quality-gate は同じコンポーネント・同じ計測環境に届いた値�
 前回比は同じ環境の値とだけ取り、トレンドも環境ごとに別系列にする。名前が変われば比較値は出ない。
 これが「計測環境の構成が前回から変化」の扱いになる（構成を変えたら環境名も変える運用とする）。
 
+**Gatling（`gatling-log`）も同じ扱いにする。** 1 ファイル = 1 回の実行で、`environment.name` が必須。
+ウォームアップは `environment.warmupSeconds` で除く。
+
 **ウォームアップの除外は k6 側のタグで行う。** 計測区間のリクエストに `phase: measure` のタグを付け、
 `http_req_duration{phase:measure}` などにしきい値を定義して部分指標を出力させる。
 アダプタはこの部分指標があれば全体の指標より優先する（`perf/k6/quality-gate.js`）。
@@ -626,7 +635,8 @@ CC が高い関数はテストが困難で、欠陥が混入しやすい。
 > `switch` の各 `case` を数えるか等）。**同一リポジトリでは同一ツールを使い続ける**こと。
 > ツールを変更した場合はトレンド上で系列を分ける。
 
-現時点で M-07 として読めるのは PMD の XML（`pmd-xml`）だけであり、TypeScript / Vue（ESLint）の複雑度は判定に使われない。
+M-07 として読めるのは PMD の XML（`pmd-xml`）、ESLint の JSON（`eslint-json`）、lizard の CSV（`lizard-csv`）である。
+ESLint は SARIF ではなく JSON（`eslint -f json`）で送る（`sarif` の複雑度は M-06 に混ぜないため読み飛ばす）。
 
 ### ベース側の CC 取得
 
@@ -734,8 +744,8 @@ OpenAPI 定義（springdoc が生成）を単一の真実とし、
 出力を受け付ける。ルートは `<testsuites>` でも `<testsuite>` でもよく、同じ Run に複数送ってよい。
 **どのテストが契約テストかは、CI がどのレポートを送るかで決まる。** quality-gate は単体テストと
 契約テストを見分けない。単体テスト全体のレポートを送ると、M-08 は単体テストの成功率になる。
-`pact-verification` は形式を受け付けるがアダプタは未実装で、送ると ERROR になる。
-Pact の provider verification を JUnit 5 で動かせば `junit-xml` として送れる。
+`pact-verification` は Pact の provider verification の結果 JSON を読み、インタラクション 1 件を 1 件と数える
+（`junit-xml` と同じ式で成功率を出す）。Pact の provider verification を JUnit 5 で動かして `junit-xml` として送ってもよい。
 
 **テストの数え方。** `<testsuite>` の `tests` / `failures` 属性は使わず、`<testcase>` を 1 件ずつ数え直す。
 属性の数え方（スキップを含むか、再実行をどう数えるか）がツールごとに揃わないためである。
