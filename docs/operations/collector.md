@@ -15,6 +15,7 @@ M-03〜05（性能）は計測しません（移行の対象外。[収集ラン�
 | 2 | 実装済み | **15 分ごとの定期実行**で、既定ブランチと PR の先頭のうち未計測のコミットを計測する（[4. 定期実行](#4-定期実行段階-2)） |
 | 3 | 実装済み | **M-02（PIT）**を既定ブランチの計測で全量実行する（[5. M-02（PIT）](#5-m-02pit段階-3)） |
 | 4 | 実装済み | **M-10（アクセシビリティ）**。対象アプリをランナー上で起動し、画面を axe-core で検査する（[6. M-10（アクセシビリティ）](#6-m-10アクセシビリティ段階-4)） |
+| — | 実装済み | **計測のコンテナ隔離**。対象のビルド・テストのコードはコンテナの中だけで動く（[7. 計測のコンテナ隔離](#7-計測のコンテナ隔離)） |
 
 ## 構成
 
@@ -25,9 +26,11 @@ M-03〜05（性能）は計測しません（移行の対象外。[収集ラン�
 | `collector/bin/detect.sh` | 定期実行で、未計測の先頭コミット（既定ブランチと PR）を探す |
 | `collector/bin/state.sh` | 計測済みの記録（ランナーのマシン上のファイル） |
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
+| `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない** |
 | `collector/bin/submit.sh` | Ingest API に送る。`.quality-gate.yml` は送らない（判定は画面の設定で行う） |
-| `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy）。対象の設定に関係なくこの版で計測する |
+| `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
+| `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
@@ -61,13 +64,15 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 | 必要なもの | 使う箇所 |
 | --- | --- |
-| `curl` / `unzip` / `jq` | PMD の取得、送信 |
-| Chromium の動作に必要なライブラリ | M-10。Chromium 本体は計測のたびに `npx playwright install chromium` で取得する（2 回目からはランナーのキャッシュを使う）。ライブラリが無ければ一度だけ `sudo npx playwright install-deps chromium` を実行する |
-| npm レジストリへの外向き通信 | M-10 の検査ツール（Playwright・axe-core）と Chromium の取得 |
-| 空いているポート 8080 / 4173 | M-10 で対象アプリを起動する（計測プロファイルの `A11Y_BACKEND_PORT` / `A11Y_FRONTEND_PORT`） |
-| Docker Hub への外向き通信 | `tufin/oasdiff` / `aquasec/trivy` のイメージ |
-| github.com への外向き通信 | 対象の clone、PMD の取得（GitHub Releases） |
+| Docker（ランナーの利用者が `docker` を使えること） | 計測用のコンテナ（[7 章](#7-計測のコンテナ隔離)）。JDK・Node.js・Chromium などはコンテナに入るため、ランナーに入れる必要はない |
+| `curl` / `jq` | Node.js の版の解決、送信 |
+| Docker Hub への外向き通信 | 計測用のコンテナのベース（`eclipse-temurin`）と、Ubuntu のパッケージ |
+| github.com / nodejs.org / archive.apache.org / npm レジストリへの外向き通信 | 対象の clone、Trivy・oasdiff・PMD・Node.js・Maven・Playwright の取得、Maven Central と npm の依存関係 |
 | quality-gate への到達性 | `submit` ジョブもセルフホストランナーで動く |
+
+計測プロファイルで `ISOLATION=none` にした対象は、コンテナを使わずランナー上で直接計測します。
+その場合は、加えて `unzip`、Chromium の動作に必要なライブラリ（`sudo npx playwright install-deps chromium` を一度）、
+空いているポート 8080 / 4173（M-10 で対象アプリを起動する）が必要です。
 
 ランナーは 1 台なので、収集ジョブと性能計測のジョブは同時には動きません（D-7 の「同居させない」を満たす）。
 
@@ -253,7 +258,7 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 
 | 項目 | 内容 |
 | --- | --- |
-| 方式 | 対象アプリを**ランナー上で起動**して検査する（共有の検証環境の URL は使わない。コミットごとの画面を検査するため） |
+| 方式 | 対象アプリを**計測用のコンテナの中で起動**して検査する（共有の検証環境の URL は使わない。コミットごとの画面を検査するため） |
 | 起動するもの | バックエンド: `measure_backend` のビルドで出来た実行可能 jar（`java -jar`）。フロントエンド: `vite build` の結果を `vite preview` で配る。`/api` の proxy は対象の `vite.config` の `server.proxy` がそのまま使われる |
 | 検査する画面 | 計測プロファイルの `A11Y_PAGES`。画面の設定の `accessibility.pages` と一致させる（一致しないと ERROR） |
 | 検査の内容 | 各画面をライト・ダークの 2 通りで開き、WCAG 2.2 AA のタグ（`wcag2a` 〜 `wcag22aa`）で axe-core を実行する。対象の e2e と同じ条件 |
@@ -280,6 +285,38 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
   `accessibility.pages` との照合で M-10 が ERROR になり、失敗が合格に見えることはありません
 - 検査の結果は `reports/frontend/axe-results.json`（`axe-json`、component は frontend）として送ります
 
+## 7. 計測のコンテナ隔離
+
+`measure` ジョブは `collector/bin/measure-isolated.sh` を呼び、`measure.sh` を**計測用のコンテナの中で**実行します。
+対象のビルド・テストのコード（Maven のプラグイン、npm の依存関係のスクリプトも含む）は、このコンテナの中だけで動きます。
+
+| 項目 | 内容 |
+| --- | --- |
+| コンテナに見せるもの | 作業ディレクトリ（取得したソース）と `reports/`（読み書き）、`collector/`（読み取りのみ）、キャッシュ用のボリューム `quality-gate-collector-home`（Maven・npm・PMD・Trivy の DB） |
+| 見せないもの | ランナーのマシンの他のファイル、Docker のソケット、他のジョブの作業領域、GitHub の認証情報（そもそも `measure` ジョブに無い） |
+| 権限 | ランナーの利用者の UID で動かし、`--cap-drop ALL` と `no-new-privileges` で権限を落とす。メモリ（既定 6 GB）とプロセス数に上限を付ける |
+| 通信 | 外向きの通信はできる（Maven Central・npm から依存関係を取るため）。M-10 で起動する対象アプリのポートはコンテナの中に閉じ、ランナーのポートを使わない |
+| イメージ | `collector/runner/Dockerfile`。JDK は計測プロファイルの `JAVA_VERSION`、Node.js は対象の `.nvmrc` の版で、初回の計測でビルドする。版と Dockerfile が同じなら作り直さない |
+| Trivy / oasdiff | コンテナの中から Docker は使えないため、`versions.env` の版と同じバイナリをイメージに入れて使う |
+
+設定:
+
+| 設定 | 説明 |
+| --- | --- |
+| 計測プロファイルの `ISOLATION` | `container`（既定）か `none`（コンテナを使わずランナー上で直接実行する。1-1 の追加の準備が要る） |
+| 環境変数 `QG_COLLECTOR_MEMORY` | コンテナのメモリ上限（既定: `6g`） |
+| 環境変数 `QG_COLLECTOR_CPUS` | コンテナの CPU 上限（既定: 制限しない） |
+| 環境変数 `QG_COLLECTOR_DOCKER_ARGS` | `docker run` に足す引数（空白区切り）。社内のプロキシを通すときなどに使う（例: `--env HTTPS_PROXY --env JAVA_TOOL_OPTIONS`）。**ソケットやホストのディレクトリを見せる引数は足さない**（隔離の意味が無くなる） |
+| 環境変数 `QG_COLLECTOR_BASE_IMAGE` | ベースのイメージ（既定: `eclipse-temurin:<JAVA_VERSION>-jdk-noble`）。社内のミラーや、社内の CA を入れたイメージを使うときに指定する |
+
+注意:
+
+- 初回の計測（とツールの版を上げた後）はイメージのビルドに数分かかります。古いイメージは `docker image prune` で消せます
+  （タグは `quality-gate-collector:java<版>-node<版>-...`）
+- キャッシュのボリュームを消すと（`docker volume rm quality-gate-collector-home`）、次の計測で依存関係を取り直します
+- 隔離は「対象のコードからランナーのマシンを守る」ためのものです。コンテナから外への通信は制限しないため、
+  対象のコードが取得したソースを外に送ることは防げません（対象は自分たちのリポジトリに限る方針は変わりません）
+
 ## 判定結果を読むときの注意
 
 - **M-03〜05（性能）は計測しません**。
@@ -304,13 +341,15 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 
 ## 手元で試す
 
-ワークフローと同じことを手元で実行できます（Docker・JDK・Node.js が必要）。
+ワークフローと同じことを手元で実行できます（Docker と `curl` / `jq` が必要）。
 
 ```bash
 WORK=/tmp/qg-collector
 # private リポジトリなら GH_TOKEN に読み取り権限のあるトークンを入れる
 ./collector/bin/fetch.sh ymiyamoto63/like-chatgpt "$WORK"
-./collector/bin/measure.sh ymiyamoto63/like-chatgpt "$WORK" "$WORK/reports"
+./collector/bin/measure-isolated.sh ymiyamoto63/like-chatgpt "$WORK" "$WORK/reports"
+# コンテナを使わずに直接計測するなら（JDK・Node.js・Docker が必要）
+# ./collector/bin/measure.sh ymiyamoto63/like-chatgpt "$WORK" "$WORK/reports"
 
 QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
   ./collector/bin/submit.sh "$WORK/reports"
@@ -335,12 +374,12 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 
 ## 安全上の注意
 
-- `measure` ジョブは**対象のビルド・テストのコードをセルフホストランナー上で直接実行**します。
-  認証情報は渡していませんが（トークンを使うのは `fetch` と `submit` だけ）、ランナーのマシン自体は対象のコードから触れます。
-  自分たちが管理するリポジトリだけを対象にしてください
-- Maven と npm のキャッシュ（`~/.m2`、`~/.npm`）はランナーに残り、次の計測でも使われます
+- `measure` ジョブは対象のビルド・テストのコードを**計測用のコンテナの中で**実行します（[7 章](#7-計測のコンテナ隔離)）。
+  認証情報は渡していません（トークンを使うのは `fetch` と `submit` だけ）。コンテナからはランナーのマシンのファイルや Docker に触れません。
+  ただし外向きの通信はできるため、自分たちが管理するリポジトリだけを対象にしてください
+- Maven と npm のキャッシュは Docker のボリューム（`quality-gate-collector-home`）に残り、次の計測でも使われます。
+  キャッシュは対象の間で共有されるため、対象を増やすときは対象ごとにボリュームを分けることを検討します
 - 取得したソースは `measure` ジョブの最後に削除します。ジョブ間の受け渡し用の成果物（`collector-source`）は 1 日で消えます
-- 計測はコンテナに隔離していません。隔離は対象を増やす前に検討します
 - 定期実行で PR を計測するのは、同じリポジトリのブランチから出ている PR だけです。フォークからの PR（リポジトリに書き込み権限の無い人のコード）はセルフホストランナーで実行しません
 
 ## うまくいかないとき
@@ -355,6 +394,9 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
 | M-03〜05 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
 | `measure` で `M-10: バックエンドが起動しませんでした` / `フロントエンドが起動しませんでした` | ポートが使われている、起動に外部のサービスが要る、または起動が `A11Y_START_TIMEOUT` 秒に収まらない。ログにアプリの出力の末尾が出る |
+| `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない（1-1） |
+| `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
+| `measure` で `Node.js の版を解決できませんでした` | 対象の `.nvmrc` の書き方が解釈できない（`22` / `v22.21.1` / `lts/*` の形に対応）、または nodejs.org に届かない |
 | `measure` で `M-10: 検査ツールを用意できませんでした` | npm レジストリに届かない、または Chromium の取得に失敗した（1-1） |
 | M-10 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と画面の設定の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
 | Chromium が `error while loading shared libraries` で起動しない | ランナーに Chromium のライブラリが無い。`sudo npx playwright install-deps chromium` を一度実行する |

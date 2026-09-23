@@ -11,6 +11,7 @@
 #              <計測プロファイルの INGEST_TOKEN_SECRET>  対象リポジトリの Ingest Token
 #
 # ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
+# measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh。計測プロファイルの ISOLATION）。
 # 送信まで終わったコミットはランナー上に記録し（collector/bin/state.sh）、定期実行で再計測しない。
 name: collect-target
 
@@ -47,6 +48,7 @@ jobs:
     timeout-minutes: 15
     outputs:
       java_version: ${{ steps.profile.outputs.java_version }}
+      isolation: ${{ steps.profile.outputs.isolation }}
       node_version: ${{ steps.node.outputs.node_version }}
       token_secret: ${{ steps.profile.outputs.token_secret }}
       state_key: ${{ steps.key.outputs.state_key }}
@@ -66,6 +68,7 @@ jobs:
             echo "owner=${QG_TARGET%%/*}"
             echo "name=${QG_TARGET#*/}"
             echo "java_version=${JAVA_VERSION:-}"
+            echo "isolation=${ISOLATION:-container}"
             echo "token_secret=${INGEST_TOKEN_SECRET}"
             echo "node_version_file=${NODE_VERSION_FILE:-}"
           } >> "$GITHUB_OUTPUT"
@@ -151,19 +154,22 @@ jobs:
       - name: 展開
         run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
 
+      # コンテナを使わない場合（ISOLATION=none）だけ、ランナーに JDK と Node.js を用意する。
+      # コンテナの中の版は collector/runner/Dockerfile で、同じ JAVA_VERSION と .nvmrc から決まる
       - uses: actions/setup-java@v4
-        if: needs.fetch.outputs.java_version != ''
+        if: needs.fetch.outputs.isolation == 'none' && needs.fetch.outputs.java_version != ''
         with:
           distribution: temurin
           java-version: ${{ needs.fetch.outputs.java_version }}
       - uses: actions/setup-node@v4
+        if: needs.fetch.outputs.isolation == 'none'
         with:
           node-version: ${{ needs.fetch.outputs.node_version }}
 
       - name: 計測
         env:
           QG_TARGET: ${{ inputs.repository }}
-        run: ./collector/bin/measure.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
+        run: ./collector/bin/measure-isolated.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
 
       - uses: actions/upload-artifact@v4
         if: always()
