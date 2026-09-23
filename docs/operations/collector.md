@@ -85,6 +85,23 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 2 を忘れると既定値（全指標が有効）で判定され、段階 1 で計測しない M-02 / M-10 などが ERROR になって Run 全体が FAIL になります。
 
+like-chatgpt の CI（現在の方式）から `.quality-gate.yml` 付きの Run がすでに届いている場合、
+**最新の設定がファイル由来のため S-06 から保存できません**（「このリポジトリの設定はファイルで管理されているため、画面からは編集できません」）。
+その場合は、画面の代わりに DB へ UI 由来の版として登録します（内容の検証は判定時に行われます）。
+
+```bash
+YAML=$(cat collector/targets/ymiyamoto63__like-chatgpt.gate.yml)
+HASH=$(printf %s "$YAML" | sha256sum | cut -d' ' -f1)   # 画面から保存したときと同じ計算
+docker compose exec -T db psql -U qualitygate -d qualitygate \
+  -v yaml="$YAML" -v hash="$HASH" <<'SQL'
+INSERT INTO gate_configs (id, repository_id, version, source_type, content_hash, raw_yaml, parsed)
+SELECT gen_random_uuid(), r.id,
+       (SELECT coalesce(max(version), 0) + 1 FROM gate_configs WHERE repository_id = r.id),
+       'UI', :'hash', :'yaml', '{}'::jsonb
+FROM repositories r WHERE r.owner = 'ymiyamoto63' AND r.name = 'like-chatgpt';
+SQL
+```
+
 ## 2. 実行する
 
 1. quality-gate の **Actions → collect → Run workflow** を開く
@@ -162,3 +179,4 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
 | M-02 / M-10 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
+| S-06 で「ファイルで管理されているため、画面からは編集できません」 | 現在の方式の CI が `.quality-gate.yml` を送っている。1-4 の SQL で登録する |
