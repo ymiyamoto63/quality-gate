@@ -24,16 +24,16 @@
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
 - **取り込み → 正規化 → 判定 → 読み取りモデル更新**の一連の流れ
-  - M-01 ブランチカバレッジ（JaCoCo XML / lcov）
+  - M-01 ブランチカバレッジ（JaCoCo XML / lcov / istanbul の coverage-final.json）
   - M-02 ミューテーションスコア（PIT `mutations.xml`）— status を数え直して仕様の式で計算し、
     実行範囲（変更範囲 / 全量）ごとに前回比とトレンドの系列を分ける。
     frontend は「未計測」ではなく「対象外」と表示する
-  - M-03 応答時間 p95 / M-04 スループット / M-05 エラー率（k6 の summary JSON）— 3 回実行の中央値で判定し、
+  - M-03 応答時間 p95 / M-04 スループット / M-05 エラー率（k6 の summary JSON / Gatling のテキスト形式の simulation.log）— 3 回実行の中央値で判定し、
     計測環境（`environment.name`）ごとに前回比とトレンドの系列を分ける。GitHub ホストランナーの値は参考値。
     シナリオ単位の p95 も判定し、エラー率 5% 超は負荷試験が成立していないとして ERROR（`perf/k6/`）
-  - M-06 重大・高 脆弱性件数（SARIF）
-  - M-07 循環的複雑度 15 超の新規関数数（PMD XML）
-  - M-08 API 契約テスト成功率（JUnit XML）— `<testcase>` を数え直し、consumer と provider を
+  - M-06 重大・高 脆弱性件数（SARIF / OSV-Scanner の JSON）
+  - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON / lizard の CSV）
+  - M-08 API 契約テスト成功率（JUnit XML / Pact の検証結果 JSON）— `<testcase>` を数え直し、consumer と provider を
     合算して判定する。実行 0 件は「すべて成功」ではなく ERROR、スキップと再実行での成功は WARN
   - M-09 OpenAPI の破壊的変更件数（oasdiff の JSON）— level 3 を破壊的変更として数え、level 2 は WARN。
     比較元に OpenAPI 定義が無い新規 API は「対象外」
@@ -74,8 +74,6 @@
 
 ## 未実装のもの
 
-- `pact-verification` / `gatling-log` / `istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` 形式のアダプタ
-  （Pact は JUnit XML、それ以外は SARIF など実装済みの形式で送れる。ただし M-07 は `pmd-xml` のみ）
 - `baseCommitSha` 省略時の merge-base の自動解決（バックエンドの GitHub API 連携は未実装。収集ランナーや CI 側で算出して渡す）
 - API のレート制限（`RATE_LIMITED` のエラーコードのみ定義済み）
 - 可観測性の一部 — JSON 構造化ログと相関 ID（MDC）、独自メトリクス（`qg.notifications` 以外の `qg.*`）

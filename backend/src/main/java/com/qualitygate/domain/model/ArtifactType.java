@@ -17,6 +17,7 @@ public enum ArtifactType implements WireValued {
     ISTANBUL_JSON("istanbul-json", "M-01"),
     PIT_XML("pit-xml", "M-02"),
     K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
+    GATLING_LOG("gatling-log", "M-03", "M-04", "M-05"),
     SARIF("sarif", "M-06", "M-07"),
     OSV_JSON("osv-json", "M-06"),
     PMD_XML("pmd-xml", "M-07"),
@@ -60,7 +61,7 @@ public enum ArtifactType implements WireValued {
 
     /** 性能計測の成果物か（environment メタデータが必須になる）。 */
     public boolean requiresEnvironmentMetadata() {
-        return this == K6_SUMMARY;
+        return this == K6_SUMMARY || this == GATLING_LOG;
     }
 
     /** 指標の計測結果ではなく、判定の設定を運ぶ成果物か。 */
