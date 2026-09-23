@@ -1,6 +1,7 @@
 # 収集ランナー方式への変更の検討
 
-> **状態: 検討中（未決定）**。本書は方針変更の是非と進め方を検討するための資料であり、
+> **状態: 検討中（未決定）。段階 1 を実装済み**（[収集ランナーで計測する](../operations/collector.md)）。
+> 本書は方針変更の是非と進め方を検討するための資料であり、
 > 決定までは [決定事項 D-1](../initial/03-open-questions.md)（CI 成果物の取り込み型）が有効です。
 
 ## 1. 目的
@@ -50,8 +51,8 @@
  quality-gate リポジトリ (private)                 │
    .github/workflows/collect.yml                   │
    collector/                                      ▼
-     targets/<owner>__<name>.yml   ──►  セルフホストランナー
-     scripts/*.sh                        1. 新しいコミットを検出
+     targets/<owner>__<name>.env   ──►  セルフホストランナー
+     bin/*.sh                            1. 新しいコミットを検出
      rulesets/pmd-complexity.xml         2. clone（head と base）
      a11y/ (Playwright + axe)            3. 計測（ツールは quality-gate 側で版を固定）
                                          4. Ingest API へ送信
@@ -112,19 +113,22 @@
 
 **計測プロファイル**は、対象ごとに異なる計測上の情報を quality-gate 側で持つファイルです。
 合格ラインではなく「どう測るか」だけを書きます（合格ラインは画面 S-06 の設定）。
+段階 1 では、追加のツールなしにシェルで読めるよう `KEY=VALUE` 形式にしました（シェルとしては実行しません）。
 
-```yaml
-# collector/targets/ymiyamoto63__like-chatgpt.yml（案）
-repository: ymiyamoto63/like-chatgpt
-components:
-  backend:  { path: backend,  build: maven, java: "21" }
-  frontend: { path: frontend, build: npm,   node_version_file: .nvmrc }
-contract_tests: ["*ControllerTest"]   # M-08 に使う JUnit XML
-openapi: api/openapi.yml               # M-09
-accessibility:                         # M-10（段階 4 以降）
-  start: dockerfile                   # 対象アプリの起動方法（ルートの Dockerfile）
-  pages: ["/"]
+```bash
+# collector/targets/ymiyamoto63__like-chatgpt.env（抜粋）
+QG_REPOSITORY=ymiyamoto63/like-chatgpt
+DEFAULT_BRANCH=main
+INGEST_TOKEN_SECRET=QG_INGEST_TOKEN_LIKE_CHATGPT
+BACKEND_DIR=backend
+JAVA_VERSION=21
+CONTRACT_TEST_REPORTS=surefire-reports/TEST-*ControllerTest.xml   # M-08
+OPENAPI_PATH=api/openapi.yml                                       # M-09
+FRONTEND_DIR=frontend
+FRONTEND_COVERAGE_INCLUDE=src/**/*.{ts,vue}
 ```
+
+M-10 の設定（対象アプリの起動方法、検査する画面）は段階 4 で追加します。
 
 ### 4.6 実行時の安全対策
 
@@ -134,7 +138,7 @@ accessibility:                         # M-10（段階 4 以降）
 | リスク | 対策 |
 | --- | --- |
 | 対象のテストコードが同じジョブのシークレット（App のトークン、Ingest Token）を読む | **ジョブを 3 つに分ける**。取得（App トークンを使う）→ 計測（シークレットを渡さない）→ 送信（Ingest Token を使う）。ジョブ間は Actions の成果物で受け渡す（保持期間 1 日） |
-| 前回の計測の残骸や、計測中に書き換えられたファイルが次回に影響する | 計測はコンテナ内で行い、作業領域はジョブの最後に必ず削除する |
+| 前回の計測の残骸や、計測中に書き換えられたファイルが次回に影響する | 作業領域はジョブの最後に必ず削除する。**段階 1 ではコンテナに隔離せず、ランナー上で直接実行している**（対象は自分たちのリポジトリのみ）。対象を増やす前に隔離を検討する |
 | private のソースやテスト出力がログから漏れる | quality-gate リポジトリを private に保つ。ログにソースを出さない |
 | フォークからの PR で任意のコードが実行される | 計測するのは同一リポジトリ内のブランチからの PR だけにする |
 | 性能計測と同じランナーで重なり、性能値が乱れる（D-7） | `concurrency` グループで収集ジョブと性能計測を直列化する。重なりが問題になるほど頻度が上がったら、収集用のランナーを別に用意する |
@@ -182,7 +186,7 @@ accessibility:                         # M-10（段階 4 以降）
 | 段階 | 内容 | 完了条件 |
 | --- | --- | --- |
 | 0 | GitHub App に読み取り権限を追加して対象にインストールする。画面（S-06）に like-chatgpt の設定を保存する | 収集ランナーから対象を clone できる |
-| 1 | M-01 / M-06 / M-07 / M-08 / M-09 を収集ランナーで計測する。手動実行のみ | **同じコミットに対して、現在の CI と実測値が一致する**（M-07 は base 比較の分だけ差が出るのが正しい） |
+| 1（**実装済み**） | M-01 / M-06 / M-07 / M-08 / M-09 を収集ランナーで計測する。手動実行のみ | **同じコミットに対して、現在の CI と実測値が一致する**（M-07 は base 比較の分だけ差が出るのが正しい）。手元での計測では JaCoCo・lcov・PMD・契約テストの件数が対象自身のビルドと一致した。GitHub Actions 上での確認は未実施 |
 | 2 | 定期実行と計測済み判定を入れる。PR の先頭コミットも計測する | 1 週間、取りこぼしなく計測できる |
 | 3 | M-02（PIT）を追加する。時間がかかるため既定ブランチのみ・夜間などに絞る（Q-6） | 実測値が一致する |
 | 4 | M-10 の方式を決めて実装する（アプリの起動か、検証環境の URL か） | 検査対象の画面が `pages` と一致する |

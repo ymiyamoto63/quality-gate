@@ -36,7 +36,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | --- | --- |
 | [起動の仕組み](docs/architecture/runtime.md) | 全体像・起動方法の 3 パターン・フロントエンドとバックエンドの連携 |
 | [認証と GitHub App](docs/architecture/authentication.md) | GitHub App の用途・ログインの流れ・認証の経路 |
-| [収集ランナー方式への変更の検討](docs/architecture/collector-runner.md) | 対象リポジトリを変更せずに計測する方式の検討（検討中） |
+| [収集ランナー方式への変更の検討](docs/architecture/collector-runner.md) | 対象リポジトリを変更せずに計測する方式の検討（検討中。段階 1 は実装済み） |
 
 ### 運用
 
@@ -44,6 +44,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | --- | --- |
 | [対象リポジトリの前提と最小構成](docs/operations/target-repository.md) | 対象リポジトリに必要なもの・`.quality-gate.yml` の最小例・M-01 だけを取り込む手順 |
 | [like-chatgpt を計測する手順](docs/operations/measure-like-chatgpt.md) | 計測対象の具体例。ローカルでの計測・送信と GitHub Actions からの送信 |
+| [収集ランナーで計測する](docs/operations/collector.md) | 対象リポジトリに何も置かずに、quality-gate 側で取得・計測・送信する（段階 1） |
 | [CI からの取り込み](docs/operations/ingest.md) | Ingest API の流れと、ローカルでの取り込みの試し方 |
 | [セルフホストランナー](docs/operations/self-hosted-runner.md) | 計測ジョブ用ランナーの準備・登録・リポジトリ変数 |
 | [設定値](docs/operations/configuration.md) | 環境変数 / `.env` の一覧と優先順位 |
