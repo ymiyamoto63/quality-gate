@@ -10,6 +10,7 @@ import com.qualitygate.domain.metric.MetricCategory;
 import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
+import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.Verdict;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -98,14 +99,15 @@ public class RunEvaluationService {
         // 判定時点で有効なものだけを使うため、期限切れは自動的に再びカウントされる
         Instant now = Instant.now();
         ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), now));
+        Map<String, Integer> pastBase = pastBaseComplexity(run, input);
         EvaluationContext context = new EvaluationContext(run, thresholds,
-                active.removeFrom(input), previousValues, baseline.isPresent());
+                active.removeFrom(input), previousValues, baseline.isPresent(), pastBase);
         List<MetricResult> results = evaluateAll(context);
         if (active.coversFindings()) {
             // 免除した違反も一覧に残す（免除は解決ではない）。何が違反かは評価器が決めるため、
             // 免除を適用しない入力でも判定し、その違反を免除の印つきで保存する
             List<MetricResult> unwaived = evaluateAll(new EvaluationContext(run, thresholds,
-                    input, previousValues, baseline.isPresent()));
+                    input, previousValues, baseline.isPresent(), pastBase));
             results = active.restoreWaivedFindings(results, unwaived);
         }
         results = active.applyMetricWaivers(results);
@@ -144,7 +146,7 @@ public class RunEvaluationService {
         Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
         ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), Instant.now()));
         EvaluationContext context = new EvaluationContext(run, thresholds,
-                active.removeFrom(input), previousValues, baseline.isPresent());
+                active.removeFrom(input), previousValues, baseline.isPresent(), pastBaseComplexity(run, input));
         List<MetricResult> results = active.applyMetricWaivers(evaluateAll(context));
         return new Simulation(aggregate(results), completenessOf(results), results);
     }
@@ -333,6 +335,46 @@ public class RunEvaluationService {
      * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
      * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
      */
+    /**
+     * M-07 の比較元を、比較元コミットで判定済みの過去の Run から求める（指標仕様書 M-07「ベース側の CC 取得」の 2）。
+     *
+     * <p>比較元の解析結果（scope=base）が送られていて、Run に比較元コミットがあり、そのコミットの Run で M-07 が
+     * 判定されている場合だけ使う。過去の Run が保存しているのは注意水準（{@code warn_from}）以上の関数だけだが、
+     * 判定に要るのは「合格ラインを超えた関数が比較元より悪化したか」なので足りる。保存されていない関数は
+     * 比較元で注意水準未満（または存在しない）であり、合格ラインを超えた今の CC より必ず小さい。
+     *
+     * @return fingerprint → CC。使えなければ null（比較元なしとして判定する）
+     */
+    private Map<String, Integer> pastBaseComplexity(Run run, NormalizedInput input) {
+        if (!input.baseFindingsOf(GateThresholds.M_COMPLEXITY).isEmpty() || run.getBaseCommitSha() == null
+                || run.getBaseCommitSha().equals(run.getCommitSha())) {
+            return null;
+        }
+        Optional<Run> baseRun = runs.findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(
+                run.getRepositoryId(), run.getBaseCommitSha(), RunStatus.EVALUATED);
+        boolean judged = baseRun.map(base -> measurements.findByRunId(base.getId()).stream()
+                        .anyMatch(m -> GateThresholds.M_COMPLEXITY.equals(m.getMetricId())
+                                && JUDGED.contains(m.getStatus())))
+                .orElse(false);
+        if (!judged) {
+            return null;
+        }
+        Map<String, Integer> complexity = new HashMap<>();
+        for (Finding finding : findings.findByRunId(baseRun.get().getId())) {
+            if (GateThresholds.M_COMPLEXITY.equals(finding.getMetricId())) {
+                Object value = objectMapper.readValue(finding.getDetail(), Map.class).get("complexity");
+                if (value instanceof Number number) {
+                    complexity.put(finding.getFingerprint(), number.intValue());
+                }
+            }
+        }
+        return complexity;
+    }
+
+    /** M-07 が値をもって判定された状態。ERROR・SKIP などの Run は比較元に使わない。 */
+    private static final Set<MeasurementStatus> JUDGED =
+            Set.of(MeasurementStatus.PASS, MeasurementStatus.WARN, MeasurementStatus.FAIL);
+
     private Optional<Run> findBaseline(Run run) {
         if (run.getBaselineRunId() != null) {
             Optional<Run> previous = runs.findById(run.getBaselineRunId());

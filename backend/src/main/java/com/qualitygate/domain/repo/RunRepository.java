@@ -26,6 +26,10 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
 
     Optional<Run> findFirstByRepositoryIdAndStatusOrderByMeasuredAtDesc(UUID repositoryId, RunStatus status);
 
+    /** 同じコミットで判定済みの Run のうち、最後の試行。 */
+    Optional<Run> findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(UUID repositoryId, String commitSha,
+                                                                              RunStatus status);
+
     List<Run> findByRepositoryIdOrderByMeasuredAtDesc(UUID repositoryId, Pageable pageable);
 
     /**
