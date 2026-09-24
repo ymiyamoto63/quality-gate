@@ -123,7 +123,7 @@ public class PmdXmlAdapter implements ArtifactAdapter {
      * 同じ関数が別物と見なされるため、モジュール相対（{@code src/...} 以下）に寄せる。
      * fingerprint の安定性はこの形に依存する。
      */
-    static String relativize(String filePath) {
+    public static String relativize(String filePath) {
         if (filePath == null) {
             return null;
         }

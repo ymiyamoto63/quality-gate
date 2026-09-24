@@ -73,7 +73,8 @@ final class ActiveWaivers {
         }
         return new NormalizedInput(input.measurements(),
                 input.headFindings().stream().filter(f -> waiverOf(f).isEmpty()).toList(),
-                input.baseFindings(), input.metricsWithData(), input.parseErrors());
+                input.baseFindings(), input.metricsWithData(), input.parseErrors(),
+                input.previousFingerprints());
     }
 
     /**

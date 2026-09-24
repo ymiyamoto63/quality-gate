@@ -10,6 +10,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -79,6 +81,11 @@ public class Run {
     @Enumerated(EnumType.STRING)
     @Column(name = "previous_verdict")
     private Verdict previousVerdict;
+
+    /** ファイルの移動・リネームの対応表（JSON。新しいパス → 移動前のパス）。求めていなければ null。 */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "renamed_files", columnDefinition = "jsonb")
+    private String renamedFiles;
 
     @Column(name = "error_code")
     private String errorCode;
@@ -191,6 +198,14 @@ public class Run {
 
     public void setBaseCommitSha(String baseCommitSha) {
         this.baseCommitSha = baseCommitSha;
+    }
+
+    public String getRenamedFiles() {
+        return renamedFiles;
+    }
+
+    public void setRenamedFiles(String renamedFiles) {
+        this.renamedFiles = renamedFiles;
     }
 
     public String getBranch() {

@@ -23,7 +23,11 @@ public final class Fingerprints {
     }
 
     public static String of(RawFinding finding) {
-        return sha256(finding.metricId() + "\u0000" + finding.identity());
+        return of(finding.metricId(), finding.identity());
+    }
+
+    static String of(String metricId, String identity) {
+        return sha256(metricId + "\u0000" + identity);
     }
 
     private static String sha256(String value) {

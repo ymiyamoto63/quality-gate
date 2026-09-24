@@ -2,11 +2,13 @@ package com.qualitygate;
 
 import com.qualitygate.config.GateConfigService;
 import com.qualitygate.domain.entity.ArtifactRecord;
+import com.qualitygate.domain.entity.Finding;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
+import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
@@ -41,10 +43,12 @@ import java.util.Map;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.tuple;
 
 /**
  * M-07 の比較元に、比較元コミットで判定済みの過去の Run を使う（指標仕様書 M-07「ベース側の CC 取得」の 2）。
  * base スコープの解析結果を送らない CI でも、新規・悪化した関数だけを数えられる。
+ * ファイルの移動・リネーム（指標仕様書 0.4）も、Run に保持した対応表で追跡する。
  */
 @SpringBootTest
 @AbstractIntegrationTest
@@ -139,18 +143,50 @@ class ComplexityPastBaseIT {
         assertThat(m07.getDetail()).contains("\"baseComparisonAvailable\": false");
     }
 
+    @Test
+    void ファイルを移動しただけの関数は新規にも解消にもしない() {
+        evaluate(BASE_COMMIT, null, Map.of("legacy", 20));
+
+        Measurement m07 = evaluate(HEAD_COMMIT, BASE_COMMIT, "Renamed.java", Map.of("legacy", 20, "added", 16),
+                "{\"backend/src/main/java/com/qualitygate/Renamed.java\": "
+                        + "\"backend/src/main/java/com/qualitygate/Service.java\"}");
+
+        // legacy は比較元（過去の Run）の Service.java の関数と同じとみなし、新規は added だけ
+        assertThat(m07.getValue()).isEqualByComparingTo("1");
+        assertThat(findings.findByRunId(m07.getRunId()))
+                .extracting(f -> f.getTitle().contains("legacy") ? "legacy" : "added", Finding::getState)
+                .containsExactlyInAnyOrder(tuple("legacy", FindingState.CONTINUING), tuple("added", FindingState.NEW));
+    }
+
+    @Test
+    void 移動の対応表が無ければ移動した関数は新規になる() {
+        evaluate(BASE_COMMIT, null, Map.of("legacy", 20));
+
+        Measurement m07 = evaluate(HEAD_COMMIT, BASE_COMMIT, "Renamed.java", Map.of("legacy", 20), null);
+
+        assertThat(m07.getValue()).isEqualByComparingTo("1");
+        assertThat(findings.findByRunId(m07.getRunId())).extracting(Finding::getState)
+                .containsExactlyInAnyOrder(FindingState.NEW, FindingState.RESOLVED);
+    }
+
     private Measurement evaluate(String commit, String baseCommit, Map<String, Integer> complexity) {
+        return evaluate(commit, baseCommit, "Service.java", complexity, null);
+    }
+
+    private Measurement evaluate(String commit, String baseCommit, String file, Map<String, Integer> complexity,
+                                 String renamedFiles) {
         Run run = new Run(Uuid7.generate(), repositoryId, commit, "main", RunnerType.SELF_HOSTED, "it",
                 Instant.parse(baseCommit == null ? "2026-09-20T00:00:00Z" : "2026-09-21T00:00:00Z"), 1);
         run.setBaseCommitSha(baseCommit);
+        run.setRenamedFiles(renamedFiles);
         run.finalizeIngest();
         runs.save(run);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, CONFIG);
         StringBuilder pmd = new StringBuilder("""
                 <?xml version="1.0" encoding="UTF-8"?>
                 <pmd version="7.0.0">
-                  <file name="/build/backend/src/main/java/com/qualitygate/Service.java">
-                """);
+                  <file name="/build/backend/src/main/java/com/qualitygate/%s">
+                """.formatted(file));
         complexity.forEach((method, cc) -> pmd.append("""
                     <violation beginline="10" rule="CyclomaticComplexity" method="%1$s">
                 The method '%1$s()' has a cyclomatic complexity of %2$d.
@@ -162,7 +198,7 @@ class ComplexityPastBaseIT {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
         GateConfigService.Resolved config = gateConfigService.resolve(run, records);
         GateThresholds thresholds = GateThresholds.from(config.document());
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
+        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions(), normalizer.renamesOf(run));
         evaluationService.evaluate(run.getId(), input, thresholds,
                 config.isDefault() ? null : config.gateConfig().getId());
         return measurements.findByRunId(run.getId()).stream()
