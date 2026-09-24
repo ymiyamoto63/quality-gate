@@ -705,6 +705,7 @@ jobs:
 実際のワークフローは `.github/workflows/quality-gate.yml` にある。上の例との差は次のとおり
 （2026-09-23 時点）。`base` ジョブの静的解析は Trivy のみで、Semgrep・gitleaks・ESLint は未導入。
 `submit` ジョブは成果物とスキップ対象を決め、`quality-gate-action`（FR-03-4）で送信する（[CI から送る](../operations/ci-submit.md)）。
+quality-gate 自身は性能を計測しないため（D-17）、`performance` ジョブを持たない。
 また quality-gate 自身の Pull Request では計測を行わず、`.github/workflows/ci.yml` がユニットテスト（JUnit / Vitest）だけを
 GitHub ホストランナーで実行する。計測は main への push と手動実行のときだけ行う。
 
@@ -808,6 +809,8 @@ App を private として登録すれば、所有アカウント自身のリポ�
 | 成果物取り込み（finalize 後の判定完了まで） | 中央値 60 秒以内、p95 5 分以内 |
 | 同時取り込み | 10 Run まで劣化なく処理 |
 
+これらの目標は自動の負荷試験では検証しない（quality-gate 自身の性能は計測しない。D-17）。
+
 ### 10.2 規模想定
 
 | 項目 | 初期 | 3 年後 |
@@ -860,7 +863,7 @@ quality-gate 自身が WCAG 2.2 Level AA に適合する。具体的には、
 
 ### 10.7 保守性
 
-- quality-gate 自身を quality-gate で計測し、本要件が定める全指標に合格する（ドッグフーディング）
+- quality-gate 自身を quality-gate で計測し、本要件が定める全指標（性能 M-03〜05 を除く。D-17）に合格する（ドッグフーディング）
 - 新しい指標・新しいツールフォーマットの追加が、アダプタ実装の追加のみで完結する構造とする
 
 ---
@@ -1015,7 +1018,7 @@ quality-gate/
 | A-4 | 同一 Run を再評価すると、同じ設定版の下で同じ判定結果が再現される |
 | A-5 | 免除を登録すると判定から除外され、期限超過後は自動的に再カウントされる。登録・失効が監査ログに残る |
 | A-6 | 合格→不合格の遷移時に、設定したチャネルへ 5 分以内に通知が到達する |
-| A-7 | quality-gate 自身を quality-gate で計測し、全指標が合格する |
+| A-7 | quality-gate 自身を quality-gate で計測し、性能（M-03〜05）を除く全指標が合格する（D-17） |
 | A-8 | quality-gate の主要 9 画面について、axe-core の critical / serious 違反が 0 件である |
 | A-9 | 監査対象操作がすべて監査ログに記録され、Admin が検索・確認できる |
 | A-10 | GitHub ホストランナーで PIT / k6 をスキップして送信した Run が、ERROR ではなく `SKIP` として記録され、部分計測と表示される |

@@ -492,7 +492,7 @@ quality-gate は同じコンポーネント・同じ計測環境に届いた値�
 
 **ウォームアップの除外は k6 側のタグで行う。** 計測区間のリクエストに `phase: measure` のタグを付け、
 `http_req_duration{phase:measure}` などにしきい値を定義して部分指標を出力させる。
-アダプタはこの部分指標があれば全体の指標より優先する（`perf/k6/quality-gate.js`）。
+アダプタはこの部分指標があれば全体の指標より優先する。
 シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む。
 
 **値の定義:**

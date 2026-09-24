@@ -198,7 +198,9 @@ class GateConfigParserTest {
 
         assertThat(document.version()).isEqualTo(1);
         assertThat(document.execution().skippableMetrics())
-                .containsExactlyInAnyOrder("mutation_score", "performance");
+                .containsExactly("mutation_score");
+        // quality-gate 自身の性能は計測しない（D-17）
+        assertThat(document.metrics().get("performance").enabled()).isFalse();
         assertThat(document.exclusions()).isNotEmpty();
     }
 

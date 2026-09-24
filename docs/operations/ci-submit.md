@@ -111,7 +111,6 @@ export QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx   # 引数で渡すとプロセス�
 | --- | --- |
 | Variables `QG_BASE_URL` | 送信先。未設定なら送信のステップを飛ばす |
 | Secrets `QG_INGEST_TOKEN` | quality-gate 自身の Ingest Token |
-| Variables `QG_PERF_ENVIRONMENT`（任意） | 性能の計測環境（JSON。例: `{"name":"perf-staging","cpu":"8 vCPU","memory":"16 GiB"}`）。未設定なら `{"name":"perf-staging"}`。`runner` はランナー種別で埋まる |
 
-動かなかった重量ジョブ（PIT / k6）の指標は、スキップとして申告します（D-13）。
+動かなかった重量ジョブ（PIT）の指標は、スキップとして申告します（D-13）。性能（M-03〜05）は計測しません（D-17）。
 M-07 は head の PMD の結果だけを送るため、base との比較はできません（「新規・悪化した関数」の判定には収集ランナーを使う）。

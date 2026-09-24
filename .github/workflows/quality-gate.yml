@@ -1,12 +1,14 @@
 # quality-gate 自身を計測するワークフロー（main への push と手動実行のみ）。
 # Pull Request では計測せず、ユニットテストだけを ci.yml で実行する。
 #
-# ランナー種別と重量ジョブ（PIT / k6）の実行可否を切り替えられる。
+# 性能（M-03〜05）は計測しない（D-17。performance は .quality-gate.yml で無効にしている）。
+#
+# ランナー種別と重量ジョブ（PIT）の実行可否を切り替えられる。
 #   - 常用の既定値: リポジトリ変数 QG_RUNNER / QG_RUN_HEAVY_ON_GITHUB
 #   - その回限りの上書き: workflow_dispatch の入力
 #
 # GitHub Free のプライベートリポジトリでは Actions の無料枠が月 2,000 分のため、
-# 実行時間の長い PIT と k6 は既定でセルフホストランナーに寄せる
+# 実行時間の長い PIT は既定でセルフホストランナーに寄せる
 # （セルフホストランナーの実行時間は無料枠を消費しない）。
 name: quality-gate
 
@@ -21,7 +23,7 @@ on:
         options: [self-hosted, ubuntu-latest]
         default: self-hosted
       run_heavy_jobs:
-        description: GitHub ホストランナーでも PIT / k6 を実行する
+        description: GitHub ホストランナーでも PIT を実行する
         type: boolean
         default: false
 
@@ -151,36 +153,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with: { name: reports-mutation, path: backend/target/pit-reports/ }
 
-  performance:
-    needs: setup
-    if: needs.setup.outputs.run_heavy == 'true'
-    runs-on: ${{ needs.setup.outputs.runner }}
-    steps:
-      - uses: actions/checkout@v4
-      # 計測対象は専有の性能検証環境（QG_PERF_BASE_URL）。未設定なら何も送らず、
-      # submit ジョブが M-03〜05 のスキップを申告する（未提出の ERROR にしない）
-      - name: 負荷試験（k6 を 3 回実行し、中央値は quality-gate が取る）
-        if: vars.QG_PERF_BASE_URL != ''
-        env:
-          QG_PERF_BASE_URL: ${{ vars.QG_PERF_BASE_URL }}
-          QG_PERF_RUN_ID: ${{ vars.QG_PERF_RUN_ID }}
-          QG_PERF_SESSION: ${{ secrets.QG_PERF_SESSION }}
-          QG_PERF_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
-        run: |
-          mkdir -p reports/perf
-          for i in 1 2 3; do
-            docker run --rm --network host -v "$PWD:/w" -w /w \
-              -e QG_PERF_BASE_URL -e QG_PERF_RUN_ID -e QG_PERF_SESSION -e QG_PERF_INGEST_TOKEN \
-              grafana/k6 run --summary-export="reports/perf/k6-summary-$i.json" perf/k6/quality-gate.js \
-              || [ $? -eq 99 ]   # 99 はしきい値の不成立。合否は quality-gate が判定する
-          done
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with: { name: reports-perf, path: reports/, if-no-files-found: ignore }
-
   # 取り込み: 重量ジョブが動かなかった場合もスキップを申告するため必ず実行する
   submit:
-    needs: [setup, base, mutation, performance]
+    needs: [setup, base, mutation]
     if: always()
     runs-on: ubuntu-latest
     steps:
@@ -192,23 +167,15 @@ jobs:
         id: plan
         env:
           MUTATION_RESULT: ${{ needs.mutation.result }}
-          PERFORMANCE_RESULT: ${{ needs.performance.result }}
           RUNNER_TYPE: ${{ needs.setup.outputs.runner_type }}
-          PERF_ENVIRONMENT: ${{ vars.QG_PERF_ENVIRONMENT }}
         run: |
           SKIPPED=""
           if [ "$MUTATION_RESULT" = "skipped" ]; then
             SKIPPED+=$'M-02 ミューテーションテストを実行しない設定のため\n'
           fi
-          if [ "$PERFORMANCE_RESULT" = "skipped" ] || ! ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
-            for id in M-03 M-04 M-05; do SKIPPED+="$id 負荷試験を実行しない設定、または性能検証環境が未設定のため"$'\n'; done
-          fi
           # 比較元に OpenAPI 定義が無ければ、M-09 は新規 API として申告する
           OASDIFF_META=""
           [ ! -e reports/oasdiff-base-spec-missing ] || OASDIFF_META=' metadata={"baseSpecMissing":true}'
-          # 性能の計測環境（必須のメタデータ）。リポジトリ変数 QG_PERF_ENVIRONMENT（JSON）で詳細を指定できる
-          ENVIRONMENT=${PERF_ENVIRONMENT:-'{"name":"perf-staging"}'}
-          PERF_META=$(jq -c --arg runner "$RUNNER_TYPE" '{environment: ({runner: $runner} + .)}' <<< "$ENVIRONMENT")
           {
             echo "skipped<<EOF"
             printf '%s' "$SKIPPED"
@@ -222,9 +189,6 @@ jobs:
             echo "sarif reports/trivy.sarif"
             echo "oasdiff-json reports/oasdiff.json${OASDIFF_META}"
             [ "$MUTATION_RESULT" = "skipped" ] || echo 'pit-xml reports/mutations.xml component=backend metadata={"mutationScope":"all"}'
-            if ls reports/perf/k6-summary-*.json >/dev/null 2>&1; then
-              echo "k6-summary reports/perf/k6-summary-*.json metadata=${PERF_META}"
-            fi
             echo "EOF"
           } >> "$GITHUB_OUTPUT"
           echo "runnerType=$RUNNER_TYPE"

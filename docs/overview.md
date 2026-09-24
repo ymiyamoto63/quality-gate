@@ -45,7 +45,6 @@ quality-gate/
 │  └ src/api/schema.d.ts                openapi.yml から生成（コミットする）
 ├ api/openapi.yml   バックエンドから生成（コミットする）
 ├ collector/        収集ランナー（計測スクリプト・対象ごとの計測プロファイル・ツールの版）
-├ perf/k6/          性能テストのシナリオ（M-03〜05 の計測元）
 ├ docs/             ドキュメント（initial/ は初期の要件定義・設計）
 ├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ quality-gate.yml（自身の CI）
 ├ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）

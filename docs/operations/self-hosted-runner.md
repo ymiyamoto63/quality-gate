@@ -5,18 +5,15 @@ quality-gate リポジトリの次のワークフローが、**セルフホス�
 | ワークフロー | ジョブ | 用途 |
 | --- | --- | --- |
 | `collect.yml` / `collect-target.yml` | `plan` / `fetch` / `measure` / `submit` のすべて | 収集ランナー。対象リポジトリの計測（15 分ごとの定期実行と手動実行。[収集ランナーで計測する](collector.md)） |
-| `quality-gate.yml` | `base` / `mutation` / `performance`（既定） | quality-gate 自身の計測（main への push と手動実行のみ） |
+| `quality-gate.yml` | `base` / `mutation`（既定） | quality-gate 自身の計測（main への push と手動実行のみ） |
 
 Pull Request の CI（`ci.yml`）はユニットテストだけを GitHub ホストランナー（`ubuntu-latest`）で実行し、
 セルフホストランナーを使いません。ランナーが止まっていても PR の CI は止まりません。
 
 収集ランナーは常にセルフホストランナーで動きます（D-13 の切り替えの対象外）。
-`quality-gate.yml` の計測ジョブをセルフホストランナーで動かす理由は 2 つです。
-
-- 実行時間の長い PIT と k6 を GitHub ホストランナーで回すと、Actions の無料枠（月 2,000 分）を使い切ってしまう。
-  セルフホストランナーの実行時間は無料枠を消費しない
-- 性能指標（M-03〜05）は専有環境で計測したときだけ判定に使う（D-7）。GitHub ホストランナーでの計測値は
-  `REFERENCE`（参考値）になる（[指標・判定仕様](../initial/02-metrics-spec.md)「ランナー種別の影響」）
+`quality-gate.yml` の計測ジョブをセルフホストランナーで動かすのは、実行時間の長い PIT を GitHub ホストランナーで回すと
+Actions の無料枠（月 2,000 分）を使い切ってしまうためです。セルフホストランナーの実行時間は無料枠を消費しません。
+quality-gate 自身の性能（M-03〜05）は計測しません（D-17）。
 
 なお `quality-gate.yml` の `setup` と `submit` の 2 ジョブは短時間で終わるため、常に `ubuntu-latest` で動きます。
 
@@ -27,7 +24,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 | 必要なもの | 使う箇所 |
 | --- | --- |
-| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`）、Trivy（収集ランナー）、k6（`docker run grafana/k6`） |
+| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`）、Trivy（収集ランナー） |
 | git | チェックアウトと merge-base の解決 |
 | curl / unzip / jq | 収集ランナー（`collect.yml`）の PMD の取得と送信（[収集ランナーで計測する](collector.md)） |
 | パスワードなしの `sudo`、または Playwright の依存パッケージの事前導入 | `npx playwright install --with-deps chromium` が apt で OS パッケージを入れる |
@@ -75,12 +72,9 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | 種別 | 名前 | 値 | 説明 |
 | --- | --- | --- | --- |
 | Variables | `QG_RUNNER` | `self-hosted`（既定）/ `ubuntu-latest` | 計測ジョブを実行するランナー。未設定なら `self-hosted` |
-| Variables | `QG_RUN_HEAVY_ON_GITHUB` | `false`（既定）/ `true` | GitHub ホストランナーでも PIT / k6 を実行するか。セルフホストでは常に実行する |
+| Variables | `QG_RUN_HEAVY_ON_GITHUB` | `false`（既定）/ `true` | GitHub ホストランナーでも PIT を実行するか。セルフホストでは常に実行する |
 | Variables | `QG_BASE_URL` | 例: `https://quality-gate.example.com` | 取り込み先の quality-gate の URL |
-| Variables | `QG_PERF_BASE_URL` | 例: `https://perf-staging.example.com` | 負荷試験の対象（専有の性能検証環境）。未設定なら k6 を実行せず、M-03〜05 をスキップとして扱う |
-| Variables | `QG_PERF_RUN_ID` | Run の ID | 負荷試験で Run 詳細・状態取得に使う既存の Run |
-| Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | quality-gate 自身の Ingest Token（[取り込み](ingest.md)を参照）。負荷試験の状態取得にも使う |
-| Secrets | `QG_PERF_SESSION` | `SESSION` Cookie の値 | 負荷試験で参照 API を呼ぶためのセッション |
+| Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | quality-gate 自身の Ingest Token（[取り込み](ingest.md)を参照） |
 
 `QG_BASE_URL` と `QG_INGEST_TOKEN` は `submit` ジョブが `quality-gate-action` で送信に使います（[CI から送る](ci-submit.md)）。
 `QG_BASE_URL` が未設定なら送信のステップを飛ばします。
@@ -88,7 +82,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 ## 4. 動作確認
 
 **Actions → quality-gate → Run workflow** で `runner` に `self-hosted` を選んで実行し、
-`base` / `mutation` / `performance` がセルフホストランナーで動くことを確かめます。
+`base` / `mutation` がセルフホストランナーで動くことを確かめます。
 収集ランナーの確認は [収集ランナーで計測する](collector.md#2-手動で実行する) の手動実行で行います。
 
 ## ランナーを止めるとき
@@ -102,7 +96,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 以下は quality-gate 自身の CI（`quality-gate.yml`）の扱いです。
 保守などで止める期間は、リポジトリ変数 `QG_RUNNER` を `ubuntu-latest` に変えてください。
-このとき PIT / k6 は実行されず（`QG_RUN_HEAVY_ON_GITHUB` が `false` の場合）、`submit` ジョブがスキップ対象として扱うため、
+このとき PIT は実行されず（`QG_RUN_HEAVY_ON_GITHUB` が `false` の場合）、`submit` ジョブがスキップ対象として扱うため、
 Run は部分計測になります（送信処理の実装後）。完全計測が `execution.full_measurement_interval_days`（既定 7 日）を
 超えて途絶えると警告が出るため、復旧したら `self-hosted` に戻します。
 
