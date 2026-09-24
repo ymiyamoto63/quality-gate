@@ -2,8 +2,7 @@
 
 対象の CI が自分で計測して quality-gate に送るための道具です（FR-03-4 / FR-03-5）。
 対象リポジトリの計測は、通常は quality-gate 側の[収集ランナー](collector.md)が行います（D-16）。
-ここで扱う道具は、収集ランナーが扱えない構成の対象や、quality-gate 自身の計測
-（[.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml)）のように、**CI から直接送る場合**に使います。
+ここで扱う道具は、収集ランナーが扱えない構成の対象のように、**CI から直接送る場合**に使います。
 
 | 道具 | 置き場所 | 使いどころ |
 | --- | --- | --- |
@@ -102,15 +101,3 @@ export QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx   # 引数で渡すとプロセス�
 | 3 | `--wait` の時間内に判定が終わらなかった |
 
 収集ランナーの送信（`collector/bin/submit.sh`）は、計測プロファイルと `reports/` の置き方を前提にした専用のスクリプトで、この CLI は使っていません。
-
-## quality-gate 自身の計測
-
-[.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml) の `submit` ジョブが `uses: ./quality-gate-action` で送ります。
-
-| 設定 | 内容 |
-| --- | --- |
-| Variables `QG_BASE_URL` | 送信先。未設定なら送信のステップを飛ばす |
-| Secrets `QG_INGEST_TOKEN` | quality-gate 自身の Ingest Token |
-
-動かなかった重量ジョブ（PIT）の指標は、スキップとして申告します（D-13）。性能（M-03〜05）は計測しません（D-17）。
-M-07 は head の PMD の結果だけを送るため、base との比較はできません（「新規・悪化した関数」の判定には収集ランナーを使う）。
