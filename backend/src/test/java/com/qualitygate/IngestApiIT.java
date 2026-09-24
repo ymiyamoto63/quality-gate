@@ -56,6 +56,7 @@ class IngestApiIT {
     @Autowired RunSkippedMetricRepository skippedMetrics;
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired JobRepository jobs;
+    @Autowired com.qualitygate.platform.storage.ArtifactStore artifactStore;
 
     private RestClient client;
     private UUID repositoryId;
@@ -317,6 +318,55 @@ class IngestApiIT {
         if (metadata != null) {
             form.add("metadata", metadata);
         }
+        return client.post()
+                .uri("/api/v1/runs/{runId}/artifacts", runId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().toEntity(Map.class);
+    }
+
+    @Test
+    void 同じ種別と名前の成果物を送り直すと置き換える() throws Exception {
+        UUID runId = createRun();
+        assertThat(upload(runId, "sarif", "report.json", "{\"runs\": [1]}").getStatusCode())
+                .isEqualTo(HttpStatus.ACCEPTED);
+
+        ResponseEntity<Map> again = upload(runId, "sarif", "report.json", "{\"runs\": [1, 2]}");
+
+        assertThat(again.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
+        assertThat(artifacts.findByRunId(runId)).singleElement().satisfies(record -> {
+            assertThat(record.getSizeBytes()).isEqualTo(16);
+            try (var in = artifactStore.open(record.getStorageKey())) {
+                assertThat(new String(in.readAllBytes(), StandardCharsets.UTF_8)).isEqualTo("{\"runs\": [1, 2]}");
+            }
+        });
+    }
+
+    /** 保存先を成果物ごとに分けているため、種別の違う同名のファイルが互いを上書きしない。 */
+    @Test
+    void 種別の違う同名の成果物はそれぞれ残る() throws Exception {
+        UUID runId = createRun();
+        upload(runId, "sarif", "report.json", "{\"runs\": []}");
+        upload(runId, "osv-json", "report.json", "{\"results\": []}");
+
+        assertThat(artifacts.findByRunId(runId)).hasSize(2).allSatisfy(record -> {
+            try (var in = artifactStore.open(record.getStorageKey())) {
+                String content = new String(in.readAllBytes(), StandardCharsets.UTF_8);
+                assertThat(content).contains(record.getType().wire().equals("sarif") ? "runs" : "results");
+            }
+        });
+    }
+
+    private ResponseEntity<Map> upload(UUID runId, String type, String filename, String content) {
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("file", new ByteArrayResource(content.getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return filename;
+            }
+        });
+        form.add("type", type);
         return client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)

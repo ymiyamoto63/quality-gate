@@ -273,7 +273,7 @@ poll()                          ← トランザクションなし
 | 対象 | 冪等性の担保 |
 | --- | --- |
 | Run 作成 | `(repository_id, commit_sha, attempt)` の一意制約。CI のリトライで重複 Run を作らない |
-| 成果物アップロード | `(run_id, type, filename)` の一意制約。同じファイルの再送は制約違反で失敗する（上書きは未実装） |
+| 成果物アップロード | `(run_id, type, filename)` の一意制約。確定前の Run への同じ種別・同じファイル名の再送は**置き換え**になる（古い行を消してから新しい行を記録し、古いファイルはコミット後に消す）。ファイルの保存先は成果物ごとに分け（`<runId>/<成果物 ID>_<ファイル名>`）、再送や種別違いの同名ファイルが既存のファイルを上書きしないようにする |
 | ジョブ登録 | `(type, dedup_key)` の一意制約。`EVALUATE_RUN` の `dedup_key` は `runId` |
 | 通知送信 | `notifications` に送信済みレコードを残し、同一 `(run_id, event, channel, target)` の再送を抑止。Run を持たない通知は `dedup_key` で抑止 |
 

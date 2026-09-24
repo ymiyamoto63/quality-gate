@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
@@ -34,6 +36,7 @@ import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -137,11 +140,19 @@ public class IngestService {
         }
         validateMetadata(type, metadata);
 
+        // 同じ種別・同じファイル名の再送は置き換える（CI のリトライや、作り直した成果物の送り直し）。
+        // 確定前の Run に限るため、判定済みの結果が変わることはない
+        Optional<ArtifactRecord> replaced = artifacts.findByRunIdAndTypeAndFilename(runId, type, filename);
+
         // ファイルを先に保存し、成功後に DB へ記録する。逆順にすると、
         // 参照先ファイルの無いレコードという扱いにくい壊れ方をする。
-        StoredArtifact stored = artifactStore.store(runId.toString(), filename, content);
+        // 保存先は成果物ごとに分ける。ファイル名だけで決めると、再送や種別違いの同名ファイルが
+        // 既存の成果物のファイルを上書きし、記録（サイズ・ハッシュ）と中身が食い違う
+        UUID artifactId = Uuid7.generate();
+        StoredArtifact stored = artifactStore.store(runId.toString(), artifactId + "_" + filename, content);
 
-        long total = artifacts.sumSizeBytesByRunId(runId) + stored.sizeBytes();
+        long total = artifacts.sumSizeBytesByRunId(runId) + stored.sizeBytes()
+                - replaced.map(ArtifactRecord::getSizeBytes).orElse(0L);
         if (total > properties.maxRunBytes()) {
             artifactStore.delete(stored.storageKey());
             throw new ApiException(ErrorCode.ARTIFACT_TOO_LARGE,
@@ -149,12 +160,35 @@ public class IngestService {
                             .formatted(properties.maxRunBytes() / 1024 / 1024));
         }
 
-        ArtifactRecord record = new ArtifactRecord(Uuid7.generate(), runId, type, filename,
+        replaced.ifPresent(old -> {
+            artifacts.delete(old);
+            // 一意制約（run_id, type, filename）に当たらないよう、新しい行より先に消す
+            artifacts.flush();
+            // 古いファイルは確定（コミット）してから消す。ロールバックされたら古い成果物が残る
+            deleteAfterCommit(old.getStorageKey());
+            log.info("成果物を置き換えました runId={} type={} filename={}", runId, type.wire(), filename);
+        });
+
+        ArtifactRecord record = new ArtifactRecord(artifactId, runId, type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
                 componentName, scope, metadata);
         artifacts.save(record);
         run.markUploading();
         return record;
+    }
+
+    private void deleteAfterCommit(String storageKey) {
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    artifactStore.delete(storageKey);
+                } catch (RuntimeException e) {
+                    // 取り込みは成功している。残ったファイルは日次バッチの孤児ファイルの削除で消える
+                    log.warn("置き換えた成果物の古いファイルを消せませんでした key={} 理由={}", storageKey, e.getMessage());
+                }
+            }
+        });
     }
 
     @Transactional

@@ -23,9 +23,10 @@ public interface ArtifactRecordRepository extends JpaRepository<ArtifactRecord, 
 
     boolean existsByStorageKey(String storageKey);
 
-    boolean existsByRunIdAndTypeAndFilename(UUID runId,
-                                            com.qualitygate.domain.model.ArtifactType type,
-                                            String filename);
+    /** 同じ Run に同じ種別・同じファイル名で送られた成果物（再送は置き換える）。 */
+    java.util.Optional<ArtifactRecord> findByRunIdAndTypeAndFilename(UUID runId,
+                                                                  com.qualitygate.domain.model.ArtifactType type,
+                                                                  String filename);
 
     /** 実体が残っている成果物の合計バイト数（ストレージ使用量のメトリクス）。 */
     @org.springframework.data.jpa.repository.Query(
