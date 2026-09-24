@@ -205,6 +205,25 @@ class GateConfigParserTest {
     }
 
     @Test
+    void 収集ランナーの対象の合格ラインを読める() {
+        // collector/targets/*.gate.yml は画面（S-06）に貼り付ける控え。貼り付けて保存できる内容であることを保証する
+        String yaml;
+        try {
+            yaml = java.nio.file.Files.readString(java.nio.file.Path.of(
+                    "..", "collector", "targets", "ymiyamoto63__like-chatgpt.gate.yml"));
+        } catch (java.io.IOException e) {
+            throw new AssertionError("like-chatgpt の合格ラインを読めません", e);
+        }
+
+        GateConfigDocument document = parser.parse(yaml);
+
+        // PR の計測では M-02 と M-03〜05 をスキップする
+        assertThat(document.execution().skippableMetrics())
+                .containsExactly("mutation_score", "performance");
+        assertThat(document.metrics().get("performance").enabled()).isTrue();
+    }
+
+    @Test
     void 契約テストの最小実行件数に0は指定できない() {
         // 0 件で合格する設定は「検証していない」を「すべて成功」と読み違える
         assertThatThrownBy(() -> parser.parse("""

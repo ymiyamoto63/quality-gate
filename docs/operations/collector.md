@@ -5,9 +5,8 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01 / M-02 / M-06 / M-07 / M-08 / M-09 / M-10** です。
-M-02（PIT）は**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
-M-03〜05（性能）は計測しません（移行の対象外。[収集ランナー方式](../architecture/collector-runner.md) 4.5）。
+計測する指標は **M-01〜M-10 の全指標**です。
+M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
 
 | 段階 | 状態 | 内容 |
 | --- | --- | --- |
@@ -15,6 +14,7 @@ M-03〜05（性能）は計測しません（移行の対象外。[収集ラン�
 | 2 | 実装済み | **15 分ごとの定期実行**で、既定ブランチと PR の先頭のうち未計測のコミットを計測する（[4. 定期実行](#4-定期実行段階-2)） |
 | 3 | 実装済み | **M-02（PIT）**を既定ブランチの計測で全量実行する（[5. M-02（PIT）](#5-m-02pit段階-3)） |
 | 4 | 実装済み | **M-10（アクセシビリティ）**。対象アプリをランナー上で起動し、画面を axe-core で検査する（[6. M-10（アクセシビリティ）](#6-m-10アクセシビリティ段階-4)） |
+| 5 | 実装済み | **M-03〜05（性能）**。対象のバックエンドをランナー上で起動し、k6 で負荷をかける（[8. M-03〜05（性能）](#8-m-0305性能段階-5)） |
 | — | 実装済み | **計測のコンテナ隔離**。対象のビルド・テストのコードはコンテナの中だけで動く（[7. 計測のコンテナ隔離](#7-計測のコンテナ隔離)） |
 
 ## 構成
@@ -36,6 +36,7 @@ M-03〜05（性能）は計測しません（移行の対象外。[収集ラン�
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 画面（S-06）に保存する合格ラインの控え |
+| `collector/targets/<owner>__<name>.k6.js` | M-03〜05 の負荷試験のシナリオ（k6） |
 
 ### 指標ごとの計測方法
 
@@ -47,6 +48,7 @@ M-03〜05（性能）は計測しません（移行の対象外。[収集ラン�
 | M-07 | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-08 | `mvn verify` が出す JUnit XML のうち、計測プロファイルの `CONTRACT_TEST_REPORTS` に合うものだけを送る |
 | M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
+| M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
 | M-10 | バックエンドの jar と `vite build` した画面（`vite preview`）を起動し、計測プロファイルの `A11Y_PAGES` をライト・ダークの両方で axe-core により検査する |
 
 テストが失敗しても計測は止めません（失敗は M-08 などの判定材料として送ります）。
@@ -72,9 +74,10 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 計測プロファイルで `ISOLATION=none` にした対象は、コンテナを使わずランナー上で直接計測します。
 その場合は、加えて `unzip`、Chromium の動作に必要なライブラリ（`sudo npx playwright install-deps chromium` を一度）、
-空いているポート 8080 / 4173（M-10 で対象アプリを起動する）が必要です。
+空いているポート 8080 / 4173（M-10 と M-03〜05 で対象アプリを起動する）が必要です。
 
-ランナーは 1 台なので、収集ジョブと性能計測のジョブは同時には動きません（D-7 の「同居させない」を満たす）。
+ランナーは 1 台なので、収集ジョブは同時には動きません（`max-parallel: 1`）。
+性能計測（M-03〜05）の値が他のジョブに乱されないよう、**このマシンには他のランナーや常駐サービスを置かないでください**（D-7 の「同居させない」）。
 
 ### 1-2. 対象を読むための GitHub App（private リポジトリの場合）
 
@@ -107,9 +110,9 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
    対象の CI 用のトークンがすでにある場合も、収集ランナー用に別のトークンを発行する（あとで CI 用だけを失効させられるように）
 2. like-chatgpt の **設定（S-06）** に `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` の内容を貼り付けて保存する
 
-2 を忘れると既定値（全指標が有効）で判定され、計測しない性能（M-03〜05）などが ERROR になって Run 全体が FAIL になります。
-控えの設定は `execution.skippable_metrics` に `mutation_score` を入れています。PR の計測では M-02 のスキップを申告するため、
-これが無いと申告が受け付けられず、PR の Run の M-02 が ERROR になります。
+2 を忘れると既定値で判定され、性能のシナリオ名（`performance.scenarios`）が照合されないなど、控えと違う合格ラインで判定されます。
+控えの設定は `execution.skippable_metrics` に `mutation_score` と `performance` を入れています。PR の計測では M-02 と M-03〜05 のスキップを申告するため、
+これが無いと申告が受け付けられず、PR の Run の M-02 / M-03〜05 が ERROR になります。
 
 対象の CI から `.quality-gate.yml` 付きの Run が届いていたリポジトリでは、**直近の Run がファイルの設定で判定されている間は S-06 から保存できません**
 （「直近の Run がファイルの設定で判定されているため、画面からは編集できません」）。
@@ -317,12 +320,53 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 - 隔離は「対象のコードからランナーのマシンを守る」ためのものです。コンテナから外への通信は制限しないため、
   対象のコードが取得したソースを外に送ることは防げません（対象は自分たちのリポジトリに限る方針は変わりません）
 
+## 8. M-03〜05（性能）（段階 5）
+
+| 項目 | 内容 |
+| --- | --- |
+| 実行する計測 | **既定ブランチ（`DEFAULT_BRANCH`）の計測だけ**。PR などの計測では M-03〜05 のスキップを申告する |
+| 方式 | `measure_backend` のビルドで出来たバックエンドの jar を起動し、k6 で API に負荷をかける。画面（静的アセット）は対象にしない |
+| シナリオ | 計測プロファイルの `PERF_SCRIPT`（`collector/targets/` のファイル）。like-chatgpt は `chat`（25 req/s）・`suggest`（15 req/s）・`monitoring`（10 req/s）の合計 50 req/s |
+| 計測条件 | 仕様（[指標・判定仕様](../initial/02-metrics-spec.md) M-03）のとおり。到達率一定、ウォームアップ 60 秒を除き 300 秒計測、3 回実行して quality-gate が中央値で判定する |
+| 所要時間 | 1 回 約 6 分 × 3 回 = **約 18 分**（起動を含む） |
+| ツールの版 | `collector/versions.env` の `K6_VERSION`。初回にキャッシュ（`quality-gate-collector-home`）へ取得する |
+| 送るもの | `k6-summary` を 3 ファイル（component はバックエンド）。metadata の `environment` に計測環境の名前・CPU 数・メモリ・シードデータ・k6 の版を入れる。k6 が異常終了した回は `aborted: true` を付けて送り、その Run の M-03〜05 は ERROR になる |
+
+計測プロファイルのキー:
+
+| キー | 説明 |
+| --- | --- |
+| `PERF_SCRIPT` | k6 のシナリオ（`collector/targets/` からの相対）。**空にすると M-03〜05 を計測しない** |
+| `PERF_BACKEND_PORT` | バックエンドを起動するポート（既定: 8080） |
+| `PERF_ENVIRONMENT` | 計測環境の名前（既定: `collector`）。前回比とトレンドはこの名前ごとに分かれる。**ランナーのマシンや計測条件を変えたら名前も変える** |
+| `PERF_DATASET_PROFILE` | シードデータの名前（任意。記録用） |
+| `PERF_RUNS` | 実行回数（既定: 3。3 回未満は quality-gate が WARN を付ける） |
+| `PERF_JAVA_OPTS` | バックエンドの JVM の引数（任意。例: `-Xmx512m`） |
+| `PERF_START_TIMEOUT` | 起動を待つ秒数（既定: 120） |
+| `PERF_WARMUP_SECONDS` / `PERF_DURATION_SECONDS` | ウォームアップと計測の秒数（既定: 60 / 300）。**手元で試すときだけ**短くする。仕様と違う値で送った結果は判定に使わないでください |
+
+シナリオの書き方（`collector/targets/ymiyamoto63__like-chatgpt.k6.js` を写して書き換える）:
+
+- 計測区間のシナリオに `phase: measure` のタグを付け、ウォームアップには `phase: warmup` を付ける
+- シナリオ名（`options.scenarios` のキー）を画面の設定の `performance.scenarios` と一致させる。
+  シナリオごとに `http_req_duration{scenario:<名前>}` のしきい値を書いておく（k6 はしきい値のあるタグ付き指標だけを出力する）
+- 計測区間の到達率の合計を画面の設定の `performance.arrival_rate_rps` と一致させる
+- `handleSummary` で `http_reqs{phase:measure}` の rate を「件数 ÷ 計測秒数」に直して出力する。
+  k6 の rate はテスト全体の時間（ウォームアップを含む）で割るため、そのままでは到達率が 5/6 に見え、M-04 が WARN になる
+
+注意:
+
+- **負荷をかける側（k6）とアプリは同じコンテナ（隔離しない場合は同じマシン）で動きます。** 値はこの構成での値で、本番の性能ではありません。
+  前回との比較（性能の劣化の検出）に使ってください
+- **データベースなど外部のサービスが要る対象は、今のしくみでは起動できません**（M-10 と同じ）。like-chatgpt はメモリ上の固定データだけで応答し、外部の API も呼びません。
+  外部の有料 API を呼ぶ対象では、スタブに差し替える手段を用意するまで性能を計測しないでください
+- 計測中はランナーが約 18 分ふさがります。既定ブランチへのマージが続くと、PR の計測がその分待たされます
+
 ## 判定結果を読むときの注意
 
-- **M-03〜05（性能）は計測しません**。
-  画面の設定（1-4）で無効にしておかないと、成果物が無いため ERROR になります
-- **M-02 は既定ブランチの Run にだけ値が付きます。** PR の Run では SKIP です。
-  PR で M-02 が下がるかどうかは、マージ後の既定ブランチの Run で分かります
+- **M-02 と M-03〜05 は既定ブランチの Run にだけ値が付きます。** PR の Run では SKIP です。
+  PR で下がるかどうかは、マージ後の既定ブランチの Run で分かります
+- **M-03〜05 は計測環境（`PERF_ENVIRONMENT`）ごとに比べます。** 名前を変えると前回比が出なくなり、トレンドも新しい系列になります
 - **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
 - **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
   like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
@@ -357,6 +401,10 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
 
 `fetch.sh` は `QG_BRANCH` / `QG_COMMIT` / `QG_PR_NUMBER` / `QG_BASE_BRANCH` でワークフローの入力と同じ指定ができます。
 
+既定ブランチの計測では負荷試験（約 18 分）も実行されます。k6 のシナリオを手元で確かめるだけなら、
+計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます
+（その結果は quality-gate に送らないでください）。
+
 定期実行が選ぶ対象は、次のように確かめられます（計測はしません）。
 
 ```bash
@@ -367,6 +415,7 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 
 1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）。定期実行するなら `SCHEDULE=true`
 2. 画面の設定の控えとして `collector/targets/<owner>__<name>.gate.yml` を作り、S-06 に保存する
+   （性能を計測するなら `collector/targets/<owner>__<name>.k6.js` も作る。[8 章](#8-m-0305性能段階-5)）
 3. 1-2 の App を対象にもインストールし、1-3 に Ingest Token のシークレットを足す
 
 スクリプトは、Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけを扱います。
@@ -392,7 +441,11 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `measure` で `M-02: PIT の実行に失敗しました` | テストに失敗がある（PIT は全テストが成功していないと動かない）、テストが JUnit 5 でない、または `MUTATION_TARGET_CLASSES` に合うクラスが無い（`No mutations found`） |
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
-| M-03〜05 が ERROR で Run 全体が FAIL | 1-4 の 2（画面の設定の保存）をしていない |
+| PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 1-4 の 2（画面の設定の保存）をしていない。`skippable_metrics` に `mutation_score` と `performance` が必要 |
+| M-03 が ERROR（シナリオがありません） | k6 のシナリオ名と画面の設定の `performance.scenarios` が一致していない |
+| M-04 が WARN（到達率が設定値の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `arrival_rate_rps` が一致していない |
+| `measure` で `M-03〜05: バックエンドが起動しませんでした` | ポート（`PERF_BACKEND_PORT`）が使われている、または起動に外部のサービスが要る |
+| `measure` で `M-03〜05: k6 を取得できませんでした` | github.com に届かない |
 | `measure` で `M-10: バックエンドが起動しませんでした` / `フロントエンドが起動しませんでした` | ポートが使われている、起動に外部のサービスが要る、または起動が `A11Y_START_TIMEOUT` 秒に収まらない。ログにアプリの出力の末尾が出る |
 | `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない（1-1） |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
