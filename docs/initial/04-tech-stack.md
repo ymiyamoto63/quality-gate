@@ -60,7 +60,7 @@ quality-gate/
 │  └ openapi.yml                        バックエンドから生成（コミットする）
 ├ docs/
 ├ compose.yaml
-└ .quality-gate.yml                     自分自身の品質ゲート設定
+└ .quality-gate.yml                     CI から直接送る方式の設定例（D-18）
 ```
 
 ---
@@ -348,25 +348,19 @@ volumes: { pgdata: }
 
 ---
 
-## 6. 品質ツールの自己適用（ドッグフーディング）
+## 6. 品質ツールの自己適用
 
-quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け入れ基準 A-7）。
-各指標を、どのツールで、どのコンポーネントに対して計測するかを以下に定める。
+quality-gate 自身は quality-gate で計測しない（D-18。2026-09-24 に A-7 を取り下げた）。
+代わりに Pull Request の CI（`.github/workflows/ci.yml`）で次を実行し、失敗すればマージしない。
 
-| 指標 | backend | frontend |
+| 検査 | ツール | 基準 |
 | --- | --- | --- |
-| M-01 ブランチカバレッジ | JaCoCo | Vitest（`@vitest/coverage-v8`） |
-| M-02 ミューテーションスコア | PIT | **対象外**（D-9） |
-| M-03〜05 性能 | k6（専有ランナー） | — |
-| M-06 脆弱性 | Trivy（依存・イメージ）、Semgrep（SAST）、gitleaks（シークレット） | 同左（npm 依存を含む） |
-| M-07 循環的複雑度 | PMD | ESLint `complexity` |
-| M-08 契約テスト成功率 | 契約テスト（JUnit）+ 4.3 の生成物同期検証 | Vitest（JUnit reporter） |
-| M-09 破壊的変更 | oasdiff（`api/openapi.yml` の base/head 比較） | — |
-| M-10 アクセシビリティ | — | Playwright + `@axe-core/playwright` |
+| ユニットテスト・結合テスト | JUnit（Testcontainers）/ Vitest | すべて成功 |
+| 生成物の同期検証 | `api/openapi.yml` と `frontend/src/api/schema.d.ts` の再生成 | 差分が無い |
+| アクセシビリティ | Playwright + `@axe-core/playwright` | critical / serious 0 件 |
+| 脆弱性 | Trivy（依存関係） | 修正版のある重大・高 0 件 |
 
-2026-09-23 時点で CI（`.github/workflows/quality-gate.yml`）が実際に成果物を作っているのは次の範囲である。
-M-06 は Trivy のみ（Semgrep・gitleaks は未導入）、M-07 は PMD のみ（ESLint の複雑度は M-07 として読まない）、
-M-08 は backend の `*ApiIT` の JUnit XML のみ。送信は `submit` ジョブが `quality-gate-action` で行う（[CI から送る](../operations/ci-submit.md)）。
+PIT・PMD・oasdiff は自身には適用しない。自身の指標を画面で見たくなった場合は、収集ランナーの対象に登録する。
 
 ---
 

@@ -5,7 +5,7 @@
 | 方式 | 対象リポジトリの変更 | 使いどころ |
 | --- | --- | --- |
 | **収集ランナー**（標準。[D-16](../initial/03-open-questions.md)） | **不要** | quality-gate 側が対象を取得・計測して送る。手順は [収集ランナーで計測する](collector.md) |
-| CI から直接送る（本書） | 必要（`.quality-gate.yml` と送信ステップ） | 収集ランナーが扱えない構成の対象、quality-gate 自身の計測（[.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml)） |
+| CI から直接送る（本書） | 必要（`.quality-gate.yml` と送信ステップ） | 収集ランナーが扱えない構成の対象 |
 
 本書は、どちらの方式にも共通する対象リポジトリの前提と、**CI から直接送る方式**で
 **ブランチカバレッジ（M-01）だけ**を取り込んで判定が出るところまでの手順をまとめたものです。
@@ -84,7 +84,7 @@ metrics:
   設定エラーの Run は判定されず、`status=FAILED`・`errorCode=CONFIG_VALIDATION_FAILED` になります（エラー箇所は行番号付きで記録される）
 - `on_missing_report: warn` を書いても、現状は未提出の指標は ERROR のままです。外したい指標は `enabled: false` にしてください
 - 除外パターン（`exclusions`）は、各ツールが報告するパスの形に合わせて書きます。
-  書き方は quality-gate 自身の [.quality-gate.yml](../../.quality-gate.yml) のコメントを参照してください
+  書き方は [.quality-gate.yml](../../.quality-gate.yml)（設定例）のコメントを参照してください
 
 ## 3. 成果物を送る
 
@@ -179,7 +179,7 @@ Run 作成時に `skippedMetrics` で申告します（申告のない未提出�
 | `test-junit-xml` | M-11 テスト成功率 / M-12 スキップされたテスト数 | すべてのテストの JUnit XML。`component=` を付ける（コンポーネントごとに判定する）。`.quality-gate.yml` の `test_results` で有効にしたときだけ判定する |
 
 ファイルサイズの上限は 1 ファイル 50MB、1 Run あたり合計 200MB です。
-実際に全指標を送っている例は、quality-gate 自身のワークフロー [.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml) を参照してください。
+各指標の成果物を作る手順は、収集ランナーの計測スクリプト [collector/bin/measure.sh](../../collector/bin/measure.sh) が参考になります。
 
 ## README にバッジを貼る
 

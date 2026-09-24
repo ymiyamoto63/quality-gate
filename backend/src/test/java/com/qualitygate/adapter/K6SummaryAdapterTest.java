@@ -69,6 +69,25 @@ class K6SummaryAdapterTest {
     }
 
     @Test
+    void 収集ランナーのk6シナリオの出力を読める() throws Exception {
+        // collector/targets/ymiyamoto63__like-chatgpt.k6.js を k6 1.8 で実行した実物（計測 10 秒）。
+        // handleSummary が http_reqs{phase:measure} の rate を「件数 ÷ 計測秒数」に直している
+        NormalizedReport report;
+        try (var in = K6SummaryAdapterTest.class.getResourceAsStream("/k6/handle-summary-k6-1.8.json")) {
+            report = adapter.parse(in, new ParseContext(null, null, List.of(), ENVIRONMENT));
+        }
+
+        RawMeasurement p95 = measurement(report, "M-03");
+        assertThat(p95.value()).isEqualByComparingTo("3.4962814");
+        assertThat(p95.detail()).containsEntry("requests", 503L);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> scenarios = (Map<String, Object>) p95.detail().get("scenarios");
+        assertThat(scenarios).containsOnlyKeys("chat", "suggest", "monitoring");
+        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("50.3");
+        assertThat(measurement(report, "M-05").value()).isEqualByComparingTo("0");
+    }
+
+    @Test
     void 計測区間のタグ付き指標があればウォームアップを除いた値を使う() {
         NormalizedReport report = parse("""
                 {

@@ -2,7 +2,7 @@
 
 **全 10 指標の判定・免除・通知・監査ログ・再評価・全画面まで実装済み（2026-09-23）。**
 対象リポジトリの計測は、quality-gate 側の収集ランナーが対象を取得して行う（D-16。[収集ランナーで計測する](operations/collector.md)）。
-収集ランナーが計測するのは性能（M-03〜05）を除く M-01 / M-02 / M-06〜M-12 で、M-02 は既定ブランチのみ。
+収集ランナーは M-01〜M-12 の全指標を計測する。M-02（PIT）と M-03〜05（k6 の負荷試験）は既定ブランチのみ。
 要件定義の後に、M-11 テスト成功率 / M-12 スキップされたテスト数を追加した（既定では無効。設定の `test_results` で有効にする）。
 
 | フェーズ | 状態 |
@@ -16,7 +16,7 @@
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
 | API と画面（S-01〜S-10） | 完了 |
 | 収集ランナー（対象リポジトリに何も置かない計測。D-16） | 段階 1〜4 を実装（M-01 / M-02 / M-06〜M-12。M-07 は backend と frontend。手動実行と 15 分ごとの定期実行、PR の先頭も計測。M-02 は既定ブランチのみ。M-10 は対象アプリを起動して検査。対象のコードは計測用のコンテナの中で動かす。[収集ランナーで計測する](operations/collector.md)） |
-| 対象の CI からの送信（`quality-gate-action` / CLI） | 完了（GitHub Actions の composite action と、他の CI 向けの CLI `qg-submit`。quality-gate 自身の計測もこれで送る。[CI から送る](operations/ci-submit.md)） |
+| 対象の CI からの送信（`quality-gate-action` / CLI） | 完了（GitHub Actions の composite action と、他の CI 向けの CLI `qg-submit`。[CI から送る](operations/ci-submit.md)） |
 
 ## 動くもの
 
@@ -42,7 +42,7 @@
   - M-03 応答時間 p95 / M-04 スループット / M-05 エラー率（k6 の summary JSON / Gatling のテキスト形式の simulation.log）— 3 回実行の中央値で判定し、
     計測環境（`environment.name`）ごとに前回比とトレンドの系列を分ける。GitHub ホストランナーの値は参考値。
     シナリオ単位の p95 も判定し、エラー率 5% 超は負荷試験が成立していないとして ERROR。
-    quality-gate 自身の性能は計測しない（D-17）
+    対象リポジトリは収集ランナーが k6 で計測する（既定ブランチのみ）。quality-gate 自身の性能は計測しない（D-17）
   - M-06 重大・高 脆弱性件数（SARIF / OSV-Scanner の JSON）
   - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON / lizard の CSV）— 比較元は base スコープの解析結果、
     無ければ比較元コミットで判定済みの過去の Run。収集ランナーは frontend も quality-gate 側の ESLint の設定で解析する
