@@ -79,7 +79,7 @@ public class ReportNormalizer {
                 measurements.addAll(report.measurements());
                 collect(report.findings(), context.isBaseScope() ? baseFindings : headFindings);
                 if (!context.isBaseScope()) {
-                    metricsWithData.addAll(artifact.getType().metricIds());
+                    metricsWithData.addAll(report.metricIdsWithData());
                 }
             } catch (ArtifactFormatException e) {
                 // 形式不正は再実行しても直らない。当該指標を ERROR とし、理由を残す。

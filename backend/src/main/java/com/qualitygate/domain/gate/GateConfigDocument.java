@@ -84,6 +84,8 @@ public record GateConfigDocument(
         // 成果物を送っていないリポジトリの Run がすべて ERROR（不合格）に変わる
         metrics.put("test_results", new MetricConfig(false, Map.of(
                 "min_success_rate", 100, "min_test_count", 1, "max_skipped_increase", 0)));
+        metrics.put("secrets", new MetricConfig(false, Map.of("max_secrets", 0)));
+        metrics.put("licenses", new MetricConfig(false, Map.of("max_forbidden", 0)));
 
         return new GateConfigDocument(1, "report-only", "fail",
                 new Execution(Set.of("mutation_score", "performance"), 7,

@@ -665,6 +665,104 @@ class EvaluationPipelineIT {
     }
 
     @Test
+    void 走査対象を宣言したSARIFはシークレットとライセンスを別の指標で判定する() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  branch_coverage:
+                    enabled: false
+                  mutation_score:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
+                    enabled: false
+                  api_contract:
+                    enabled: false
+                  performance:
+                    enabled: false
+                  secrets:
+                    max_secrets: 0
+                  licenses:
+                    max_forbidden: 0
+                """);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, """
+                { "version": "2.1.0", "runs": [{
+                  "tool": { "driver": { "name": "Trivy", "rules": [
+                    { "id": "aws-access-key-id", "properties": { "security-severity": "9.5", "tags": ["secret"] } }
+                  ]}},
+                  "results": [
+                    { "ruleId": "aws-access-key-id", "level": "error", "message": { "text": "Secret" },
+                      "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "config.py" } } }] }
+                  ]
+                }]}
+                """, "{\"scanners\":[\"vuln\",\"secret\"]}");
+        attach(run, ArtifactType.SARIF, "trivy-license.sarif", null, null, """
+                { "version": "2.1.0", "runs": [{
+                  "tool": { "driver": { "name": "Trivy", "rules": [
+                    { "id": "a:LGPL-2.1-only", "properties": { "tags": ["license"] } },
+                    { "id": "a:EPL-2.0", "properties": { "tags": ["license"] } }
+                  ]}},
+                  "results": [
+                    { "ruleId": "a:LGPL-2.1-only", "message": { "text": "Classification: restricted" },
+                      "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "backend/pom.xml" } } }] },
+                    { "ruleId": "a:EPL-2.0", "message": { "text": "Classification: reciprocal" },
+                      "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "backend/pom.xml" } } }] }
+                  ]
+                }]}
+                """, "{\"scanners\":[\"license\"]}");
+
+        Run evaluated = evaluate(run);
+
+        // シークレットは M-06（脆弱性）ではなく M-13 で数える
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .extracting(Measurement::getMetricId, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.FAIL),
+                        // デュアルライセンスは緩いほう（EPL-2.0）を採る
+                        org.assertj.core.groups.Tuple.tuple("M-14", MeasurementStatus.PASS));
+        assertThat(findings.findByRunId(run.getId()))
+                .extracting(f -> f.getMetricId())
+                .containsExactly("M-13");
+    }
+
+    @Test
+    void シークレットを有効にしても走査を宣言していなければ計測エラー() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  branch_coverage:
+                    enabled: false
+                  mutation_score:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
+                    enabled: false
+                  api_contract:
+                    enabled: false
+                  performance:
+                    enabled: false
+                  secrets:
+                    enabled: true
+                """);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+
+        evaluate(run);
+
+        // 走査したか分からないものを「0 件」として合格にしない
+        assertThat(measurements.findByRunId(run.getId()))
+                .extracting(Measurement::getMetricId, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.ERROR));
+    }
+
+    @Test
     void 比較元にOpenAPI定義が無ければ破壊的変更は対象外() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);

@@ -26,6 +26,8 @@ import java.util.Set;
  * @param referenceOnlyEnvironments  ここで計測した性能値は参考値（REFERENCE）とする環境。
  *        ランナー種別（github-hosted など）または計測環境の名前で書く
  * @param testResults                M-11 / M-12 の合格ライン
+ * @param maxSecrets                 M-13 の合格ライン（シークレットの件数）
+ * @param licenses                   M-14 の合格ライン
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -47,7 +49,19 @@ public record GateThresholds(
         int maxBreakingChanges,
         Performance performance,
         Set<String> referenceOnlyEnvironments,
-        TestResults testResults) {
+        TestResults testResults,
+        int maxSecrets,
+        Licenses licenses) {
+
+    /**
+     * ライセンスの合格ライン（docs/initial/02-metrics-spec.md M-14）。件数はパッケージの数。
+     *
+     * @param maxForbidden  分類が forbidden のパッケージの上限
+     * @param maxRestricted 分類が restricted のパッケージの上限。null なら件数では問わない（WARN にとどめる）
+     * @param maxUnknown    分類が分からないパッケージの上限。null なら件数では問わない（WARN にとどめる）
+     */
+    public record Licenses(int maxForbidden, Integer maxRestricted, Integer maxUnknown) {
+    }
 
     /**
      * 性能指標の合格ライン（docs/initial/02-metrics-spec.md M-03）。
@@ -86,6 +100,8 @@ public record GateThresholds(
     public static final String M_ACCESSIBILITY = "M-10";
     public static final String M_TEST_SUCCESS = "M-11";
     public static final String M_SKIPPED_TESTS = "M-12";
+    public static final String M_SECRETS = "M-13";
+    public static final String M_LICENSES = "M-14";
 
     /**
      * 判定器を実装済みの指標。
@@ -97,7 +113,7 @@ public record GateThresholds(
             Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
                     M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
                     M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY,
-                    M_TEST_SUCCESS, M_SKIPPED_TESTS);
+                    M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES);
 
     /** YAML の指標名と指標 ID の対応。 */
     private static final Map<String, List<String>> METRIC_IDS_OF = Map.ofEntries(
@@ -108,7 +124,9 @@ public record GateThresholds(
             Map.entry("cyclomatic_complexity", List.of(M_COMPLEXITY)),
             Map.entry("api_contract", List.of(M_API_CONTRACT, M_BREAKING_CHANGES)),
             Map.entry("accessibility", List.of(M_ACCESSIBILITY)),
-            Map.entry("test_results", List.of(M_TEST_SUCCESS, M_SKIPPED_TESTS)));
+            Map.entry("test_results", List.of(M_TEST_SUCCESS, M_SKIPPED_TESTS)),
+            Map.entry("secrets", List.of(M_SECRETS)),
+            Map.entry("licenses", List.of(M_LICENSES)));
 
     public static GateThresholds defaults() {
         return from(GateConfigDocument.defaults());
@@ -136,6 +154,8 @@ public record GateThresholds(
         GateConfigDocument.MetricConfig contract = document.metric("api_contract");
         GateConfigDocument.MetricConfig performance = document.metric("performance");
         GateConfigDocument.MetricConfig tests = document.metric("test_results");
+        GateConfigDocument.MetricConfig secrets = document.metric("secrets");
+        GateConfigDocument.MetricConfig licenses = document.metric("licenses");
         BigDecimal p95 = performance.number("p95_ms").orElse(BigDecimal.valueOf(500));
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
@@ -170,7 +190,12 @@ public record GateThresholds(
                         // M-08 と同じく、0 を書かれても 1 件は求める
                         Math.max(1, tests.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
                         tests.number("max_skipped").map(BigDecimal::intValue).orElse(null),
-                        tests.number("max_skipped_increase").orElse(BigDecimal.ZERO).intValue()));
+                        tests.number("max_skipped_increase").orElse(BigDecimal.ZERO).intValue()),
+                secrets.number("max_secrets").orElse(BigDecimal.ZERO).intValue(),
+                new Licenses(
+                        licenses.number("max_forbidden").orElse(BigDecimal.ZERO).intValue(),
+                        licenses.number("max_restricted").map(BigDecimal::intValue).orElse(null),
+                        licenses.number("max_unknown").map(BigDecimal::intValue).orElse(null)));
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */

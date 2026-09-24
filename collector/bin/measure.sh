@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-12）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-14）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -502,12 +502,27 @@ measure_breaking_changes() {
   endgroup
 }
 
-# --- M-06（Trivy）。依存関係を取得した後の作業ツリーを走査する（対象の CI と同じ順序） ----
+# --- M-06 / M-13（Trivy の脆弱性とシークレットの走査）。依存関係を取得した後の作業ツリーを走査する（対象の CI と同じ順序） ----
 measure_vulnerabilities() {
-  group "脆弱性スキャン（${TRIVY_IMAGE}）"
-  if ! (cd "$SRC" && trivy fs --quiet --format sarif --severity CRITICAL,HIGH,MEDIUM .) > "$REPORTS/trivy.sarif"; then
+  group "脆弱性とシークレットのスキャン（${TRIVY_IMAGE}）"
+  # 走査する対象を明示し、submit.sh がメタデータ（scanners）で申告する。
+  # quality-gate は脆弱性を M-06、シークレットを M-13 に振り分ける
+  if ! (cd "$SRC" && trivy fs --quiet --scanners vuln,secret --format sarif --severity CRITICAL,HIGH,MEDIUM .) \
+      > "$REPORTS/trivy.sarif"; then
     rm -f "$REPORTS/trivy.sarif"
-    fail "M-06: Trivy の実行に失敗しました"
+    fail "M-06/M-13: Trivy の実行に失敗しました"
+  fi
+  endgroup
+}
+
+# --- M-14（Trivy のライセンスの走査）。依存関係を取得した後の作業ツリーを走査する ------------
+# 深刻度で絞らない。1 つのパッケージに並ぶ緩いライセンス（MIT など）まで見ないと、
+# デュアルライセンスのパッケージを厳しいほうのライセンスで数えてしまう（選べるものは緩いほうを採る）
+measure_licenses() {
+  group "ライセンスの走査（${TRIVY_IMAGE}）"
+  if ! (cd "$SRC" && trivy fs --quiet --scanners license --format sarif .) > "$REPORTS/trivy-license.sarif"; then
+    rm -f "$REPORTS/trivy-license.sarif"
+    fail "M-14: Trivy（ライセンス）の実行に失敗しました"
   fi
   endgroup
 }
@@ -527,6 +542,7 @@ cleanup_base
 [ -z "${PERF_SCRIPT:-}" ] || measure_performance
 [ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes
 measure_vulnerabilities
+measure_licenses
 
 log "計測結果:"
 (cd "$REPORTS" && find . -type f ! -name '*.env' ! -name '*.tsv' | sort | sed 's/^/  /') >&2

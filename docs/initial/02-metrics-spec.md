@@ -141,6 +141,8 @@ fingerprint にファイルパスを含むのは M-07 だけなので、対象�
 | M-09 | oasdiff | breaking changes JSON | `oasdiff-json` |
 | M-10 | axe-core (@axe-core/playwright) | axe results JSON | `axe-json` |
 | M-11/12 | JUnit (surefire / failsafe / Vitest junit reporter) | JUnit XML | `test-junit-xml` |
+| M-13 | Trivy（`--scanners secret`）/ gitleaks | SARIF 2.1.0 | `sarif`（メタデータ `scanners` に `secret`） |
+| M-14 | Trivy（`--scanners license`） | SARIF 2.1.0 | `sarif`（メタデータ `scanners` に `license`） |
 | — | （設定ファイル） | `.quality-gate.yml` | `quality-gate-config` |
 
 SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツールは SARIF で提出する。
@@ -538,6 +540,10 @@ quality-gate は同じコンポーネント・同じ計測環境に届いた値�
 | SAST（ソースコード） | Java、TypeScript / Vue | Semgrep、SpotBugs + FindSecBugs |
 | コンテナイメージ | ビルド成果物のイメージ | Trivy |
 | シークレット混入 | リポジトリ全体 | gitleaks |
+
+> SARIF のメタデータで走査した対象（`scanners`）を申告した場合、シークレットは M-06 ではなく
+> **M-13** で、ライセンスは **M-14** で数える（[M-13 / M-14](#m-13-シークレット検出件数--m-14-ライセンス違反件数)）。
+> 申告の無い SARIF は従来どおり、シークレットも M-06 として数える。
 
 ### 深刻度の正規化
 
@@ -1048,6 +1054,80 @@ fingerprint は `テストクラス名#テスト名`（M-08 と同じ）。行�
 収集ランナーは backend の `target/surefire-reports/TEST-*.xml` と `target/failsafe-reports/TEST-*.xml`
 （計測プロファイルの `TEST_REPORTS` で変えられる）と、Vitest を junit reporter つきで動かした結果を
 `test-junit-xml` で送る。契約テストのレポート（`junit-xml`）とは別に送る。
+
+---
+
+## M-13 シークレット検出件数 / M-14 ライセンス違反件数
+
+要件定義の後に追加した指標（カテゴリは「セキュリティ」）。どちらも Trivy の SARIF から読む。
+
+### 走査した対象の申告
+
+SARIF の成果物に、メタデータ `{"scanners": ["vuln", "secret"]}` のように**走査した対象**を添える
+（Trivy の `--scanners` と同じ書き方。`vuln` / `misconfig` → M-06、`secret` → M-13、`license` → M-14）。
+
+- 申告があれば、検出を指標に振り分ける。シークレット（ルールの tags に `secret`、または gitleaks などの
+  シークレット専用ツール）は M-13、ライセンス（tags に `license`）は M-14、それ以外は M-06
+- 値を与えるのは**申告した対象の指標だけ**。ライセンスだけを走査した SARIF で M-06 を「0 件」として
+  合格にしないため。申告していない対象の検出は捨てる
+- 申告が無い SARIF は従来どおり、すべてを M-06 として読む（M-13 / M-14 には値を与えない）。
+  シークレットの分離を知らない送り手のシークレットが、判定から黙って消えないようにするため
+- 未知の値（`vulnerabilities` など）は形式不正（ERROR）にする。書き間違いで指標が 0 件にならないため
+
+### M-13 定義
+
+```
+シークレット検出件数 = 検出されたシークレットの件数（ルール ID とファイルの組み合わせで名寄せ）
+```
+
+コミットされた鍵やトークンは、履歴に残った時点で漏えいとみなす。M-07 のように新規だけを数えることはせず、
+**検出されたものすべて**を数える。誤検出や失効済みの鍵は、違反単位の免除（理由と期限つき）で外す。
+深刻度はすべて Critical。違反の内容には、ツールが伏せ字にした一致だけを残し、値そのものは持たない。
+
+| 項目 | キー | 既定値 |
+| --- | --- | --- |
+| 合格ライン | `max_secrets` | 0 件 |
+
+### M-14 定義
+
+```
+ライセンス違反件数 = 分類が forbidden のパッケージ数
+```
+
+Trivy のライセンスの分類（緩い順に unencumbered / permissive / notice / reciprocal / restricted / forbidden、
+分からなければ unknown）で判定する。数える単位は**パッケージ**。
+
+**1 つのパッケージに複数のライセンスが並ぶ場合は、選べる（OR）とみなし、最も緩いものを採る。**
+logback（EPL-2.0 または LGPL-2.1）や jakarta.*（EPL-2.0 または GPL-2.0 + Classpath 例外）のような
+デュアルライセンスを厳しいほうで数えると、ほとんどの Java のアプリが不合格になる。
+このため収集ランナーはライセンスの走査を**深刻度で絞らずに**行う（MIT などの緩いライセンスも見えないと、
+緩いほうを選べない）。unknown は、同じパッケージに分類の分かるライセンスがあればそちらを採る。
+
+| 項目 | キー | 既定値 |
+| --- | --- | --- |
+| 合格ライン | `max_forbidden` | 0 パッケージ |
+| restricted の上限 | `max_restricted` | 無し（件数では落とさず WARN）。GPL などを使えない配布形態なら 0 を設定する |
+| 分類不明の上限 | `max_unknown` | 無し（件数では落とさず WARN） |
+
+判定の優先順位:
+
+1. forbidden が `max_forbidden` を超えた、または restricted / unknown が上限（設定したときだけ）を超えた → FAIL
+2. restricted / unknown のパッケージがある → WARN（利用形態で可否が変わるため、既定では落とさない）
+3. それ以外 → PASS
+
+違反として残すのは、forbidden / restricted / unknown になったパッケージの、その分類のライセンスだけ
+（走査は全パッケージを報告するため、全件を残すと違反でない行が大量に積まれる）。fingerprint は
+`パッケージ|ライセンス`。使ってよいと判断したパッケージは違反単位の免除で外す。
+
+### 既定値と境界条件
+
+M-13 / M-14 は `.quality-gate.yml` の `metrics.secrets` / `metrics.licenses` で設定する。**既定では無効**
+（M-11 / M-12 と同じ理由）。
+
+| 条件 | 扱い |
+| --- | --- |
+| `scanners` に `secret`（`license`）を申告した SARIF が無い | M-13（M-14）は ERROR |
+| 申告どおりに走査して検出 0 件 | M-13 / M-14 とも PASS |
 
 ---
 

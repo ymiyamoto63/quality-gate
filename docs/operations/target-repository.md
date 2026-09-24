@@ -171,7 +171,7 @@ Run 作成時に `skippedMetrics` で申告します（申告のない未提出�
 | `jacoco-xml` / `lcov` / `istanbul-json` | M-01 ブランチカバレッジ | コンポーネントを分けるなら `component=` を付ける（値は合算しない） |
 | `pit-xml` | M-02 ミューテーションスコア | `metadata={"mutationScope":"all"}`（または `changed`）が必須 |
 | `k6-summary` / `gatling-log` | M-03〜05 性能 | `metadata={"environment":{"name":"..."}}` が必須。Gatling はテキスト形式の simulation.log |
-| `sarif` / `osv-json` | M-06 脆弱性 | SARIF は M-07 にも使える |
+| `sarif` / `osv-json` | M-06 脆弱性 | SARIF は M-07 にも使える。`metadata={"scanners":["vuln","secret"]}` のように走査した対象を申告すると、シークレットは M-13、ライセンスは M-14 に振り分ける |
 | `pmd-xml` / `eslint-json` / `lizard-csv` / `sarif` | M-07 循環的複雑度 | |
 | `junit-xml` / `pact-verification` | M-08 契約テスト成功率 | 契約テストのレポートだけを送る |
 | `oasdiff-json` | M-09 破壊的変更 | 比較元に定義が無いときは `metadata={"baseSpecMissing":true}` |

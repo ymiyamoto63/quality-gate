@@ -69,6 +69,14 @@ metrics:
     min_success_rate: 100
     min_test_count: 1
     max_skipped_increase: 0
+  # シークレット（M-13）とライセンス（M-14）。SARIF のメタデータで走査した対象（scanners）を申告したときだけ値が付く
+  secrets:
+    enabled: true
+    max_secrets: 0
+  licenses:
+    enabled: true
+    max_forbidden: 0
+    # max_restricted: 0            # restricted（GPL など）も不合格にする場合
   accessibility:
     enabled: true
     standard: wcag22aa

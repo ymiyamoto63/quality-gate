@@ -18,7 +18,7 @@ public enum ArtifactType implements WireValued {
     PIT_XML("pit-xml", "M-02"),
     K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
     GATLING_LOG("gatling-log", "M-03", "M-04", "M-05"),
-    SARIF("sarif", "M-06", "M-07"),
+    SARIF("sarif", "M-06", "M-07", "M-13", "M-14"),
     OSV_JSON("osv-json", "M-06"),
     PMD_XML("pmd-xml", "M-07"),
     ESLINT_JSON("eslint-json", "M-07"),

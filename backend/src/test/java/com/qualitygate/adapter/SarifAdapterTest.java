@@ -161,6 +161,84 @@ class SarifAdapterTest {
                 .hasMessageContaining("runs 配列が見つかりません");
     }
 
+    /** Trivy 0.74 が脆弱性・シークレット・ライセンスを走査したときの SARIF（実際の出力を縮めたもの）。 */
+    private static final String TRIVY_ALL_SCANNERS = """
+            { "version": "2.1.0", "runs": [{
+              "tool": { "driver": { "name": "Trivy", "rules": [
+                { "id": "CVE-2026-1234", "name": "LanguageSpecificPackageVulnerability",
+                  "properties": { "security-severity": "8.1", "tags": ["vulnerability", "security", "HIGH"] } },
+                { "id": "aws-access-key-id", "name": "Secret",
+                  "properties": { "security-severity": "9.5", "tags": ["secret", "security", "CRITICAL"] } },
+                { "id": "ch.qos.logback:logback-core:LGPL-2.1-only", "name": "License",
+                  "properties": { "security-severity": "8.0", "tags": ["license", "security", "HIGH"] } },
+                { "id": "ch.qos.logback:logback-core:EPL-2.0", "name": "License",
+                  "properties": { "security-severity": "5.5", "tags": ["license", "security", "MEDIUM"] } }
+              ]}},
+              "results": [
+                { "ruleId": "CVE-2026-1234", "level": "error", "message": { "text": "脆弱性" },
+                  "properties": { "package": "com.example:lib" },
+                  "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "backend/pom.xml" } } }] },
+                { "ruleId": "aws-access-key-id", "level": "error",
+                  "message": { "text": "Artifact: config.py / Secret AWS Access Key ID / Match: KEY = ****" },
+                  "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "config.py" },
+                    "region": { "startLine": 3 } } }] },
+                { "ruleId": "ch.qos.logback:logback-core:LGPL-2.1-only", "level": "error",
+                  "message": { "text": "Artifact: backend/pom.xml\\nLicense LGPL-2.1-only\\nPkgName: ch.qos.logback:logback-core\\n Classification: restricted" },
+                  "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "backend/pom.xml" } } }] },
+                { "ruleId": "ch.qos.logback:logback-core:EPL-2.0", "level": "warning",
+                  "message": { "text": "Artifact: backend/pom.xml\\nLicense EPL-2.0\\nPkgName: ch.qos.logback:logback-core\\n Classification: reciprocal" },
+                  "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "backend/pom.xml" } } }] }
+              ]
+            }]}
+            """;
+
+    @Test
+    void 走査した対象を宣言すればシークレットとライセンスを別の指標に振り分ける() {
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+                List.of(), java.util.Map.of("scanners", List.of("vuln", "secret", "license"))));
+
+        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-13", "M-14");
+        assertThat(report.findings()).extracting(RawFinding::metricId)
+                .containsExactly("M-06", "M-13", "M-14", "M-14");
+        RawFinding secret = report.findings().get(1);
+        assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
+        assertThat(secret.filePath()).isEqualTo("config.py");
+        RawFinding license = report.findings().get(2);
+        assertThat(license.detail())
+                .containsEntry("package", "ch.qos.logback:logback-core")
+                .containsEntry("license", "LGPL-2.1-only")
+                .containsEntry("classification", "restricted");
+        assertThat(license.severity()).isEqualTo(Severity.HIGH);
+        assertThat(license.identity()).isEqualTo("ch.qos.logback:logback-core|LGPL-2.1-only");
+    }
+
+    @Test
+    void 宣言していない対象の検出は捨て値も与えない() {
+        // ライセンスだけを走査した SARIF で、M-06 を「0 件」として合格にしない
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+                List.of(), java.util.Map.of("scanners", List.of("license"))));
+
+        assertThat(report.metricIdsWithData()).containsExactly("M-14");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-14");
+    }
+
+    @Test
+    void 宣言が無ければ従来どおりすべてをM06として読む() {
+        // シークレットの分離を知らない送り手のシークレットを、判定から黙って消さない
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), context(List.of()));
+
+        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-07");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-06");
+    }
+
+    @Test
+    void 未知の走査対象はERRORにする() {
+        assertThatThrownBy(() -> adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+                List.of(), java.util.Map.of("scanners", List.of("vulnerabilities")))))
+                .isInstanceOf(ArtifactFormatException.class)
+                .hasMessageContaining("vulnerabilities");
+    }
+
     private static ParseContext context(List<String> exclusions) {
         return new ParseContext(null, "head", exclusions);
     }
