@@ -9,5 +9,7 @@ public enum JobType {
     EXPIRE_WAIVERS,
     CHECK_FRESHNESS,
     CLEANUP_RETENTION,
-    ABANDON_STALE_RUNS
+    ABANDON_STALE_RUNS,
+    /** 判定結果を GitHub の Check Run として出す（enforcement: check-run / blocking）。 */
+    PUBLISH_CHECK_RUN
 }

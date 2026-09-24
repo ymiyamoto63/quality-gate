@@ -237,12 +237,17 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 段階的に次の順で強度を上げる想定とする。
 
 1. **Phase 1（本要件の範囲）** — 計測・可視化・通知のみ。合否は「情報」として提示
-2. **Phase 2** — GitHub Check Run を `neutral` で出力し、PR 上でも合否が見える状態にする
+2. **Phase 2** — GitHub Check Run を `neutral` で出力し、PR 上でも合否が見える状態にする（`enforcement: check-run`。実装済み）
 3. **Phase 3（スコープ外）** — 必須チェック化し、不合格でマージ不可にする
 
 判定ロジックと合否そのものは Phase 1 から本番同等に動かす。Phase 3 で追加されるのは
 「ブロックするかどうか」の一点だけであり、そのための設定項目
 （`enforcement: report-only | check-run | blocking`）は Phase 1 から持つ。
+
+`check-run` / `blocking` の Run は、判定の後に別のジョブで Check Run（名前は `quality-gate`）を出す。
+`check-run` は合否に関わらず `neutral`、`blocking` は合格を `success`・不合格を `failure` にする。
+`blocking` でも quality-gate 自身はマージを止めない。止めるかどうかは、対象リポジトリのブランチ保護で
+`quality-gate` を必須チェックにするかで決まる（Phase 3。GitHub Free の private リポジトリでは使えない。Q-14）。
 
 ---
 
@@ -725,11 +730,11 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | ~~`.quality-gate.yml` の取得~~ | —（CI が成果物として送る方式に変更。[05](05-architecture.md) 7.1） | — |
 | 収集ランナーによる対象の clone（3.2） | GitHub App の Contents: Read。対象リポジトリにインストールし、ジョブごとに 1 時間有効のインストールトークンを発行する | 読み取りのみ |
 | 収集ランナーによる PR の一覧取得（3.2） | GitHub App の Pull requests: Read | 読み取りのみ |
-| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す。省略された Run はバックエンドが判定ジョブの中で GitHub API により求める | — |
+| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す。省略された Run はバックエンドが判定ジョブの中で GitHub API により求める（Contents / Pull requests: Read） | 読み取りのみ |
 | ~~PR サマリコメント（FR-11-4）~~ | —（v1.2 で不採用。D-15） | — |
-| Check Run 出力（Phase 2） | GitHub App の Checks: Write | 書き込み |
+| Check Run 出力（Phase 2） | GitHub App の Checks: Read and write。`enforcement: check-run` / `blocking` のときだけ使い、トークンは Checks の書き込みだけに絞って発行する | 書き込み（Checks のみ） |
 
-GitHub App の権限は上記に限定する。書き込み権限とワークフローの起動権限は付与しない。
+GitHub App の権限は上記に限定する。Checks 以外の書き込み権限とワークフローの起動権限は付与しない。
 App の秘密鍵は quality-gate リポジトリの Actions Secrets に置き、収集ランナーの取得ジョブだけが使う（バックエンドには置かない）。
 
 GitHub App の登録・インストールは**個人アカウント（GitHub Free）で追加費用なく可能**である。

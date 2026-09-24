@@ -65,7 +65,7 @@ Run 全体が不合格（FAIL）になります（fail-closed）。
 
 ```yaml
 version: 1
-enforcement: report-only   # まだ CI を止めない
+enforcement: report-only   # check-run にすると PR に Check Run（neutral）を出す（GitHub App が必要）
 
 metrics:
   branch_coverage:
