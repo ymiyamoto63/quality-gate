@@ -130,6 +130,29 @@ public class RunEvaluationService {
         return run;
     }
 
+    /**
+     * 保存せずに判定だけを行う（設定変更のドライラン。FR-02-5）。
+     *
+     * <p>{@link #evaluate} と同じ手順（比較対象・免除の適用）で判定し、結果は返すだけで DB に書かない。
+     * 読み取り専用のトランザクションにし、スキップ申告の受理の可否（エンティティの更新）も保存されないようにする。
+     */
+    @Transactional(readOnly = true)
+    public Simulation simulate(UUID runId, NormalizedInput input, GateThresholds thresholds) {
+        Run run = runs.findById(runId).orElseThrow(
+                () -> new IllegalStateException("Run が見つかりません: " + runId));
+        Optional<Run> baseline = findBaseline(run);
+        Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
+        ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), Instant.now()));
+        EvaluationContext context = new EvaluationContext(run, thresholds,
+                active.removeFrom(input), previousValues, baseline.isPresent());
+        List<MetricResult> results = active.applyMetricWaivers(evaluateAll(context));
+        return new Simulation(aggregate(results), completenessOf(results), results);
+    }
+
+    /** ドライランの結果。 */
+    public record Simulation(Verdict verdict, Completeness completeness, List<MetricResult> results) {
+    }
+
     private List<MetricResult> evaluateAll(EvaluationContext context) {
         Map<String, MetricEvaluator> byMetric = new HashMap<>();
         evaluators.forEach(e -> byMetric.put(e.metricId(), e));

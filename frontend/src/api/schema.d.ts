@@ -229,6 +229,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/repositories/{repositoryId}/config/dry-run': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    get?: never
+    put?: never
+    /**
+     * 設定の変更を過去の Run で試算する（ドライラン）
+     * @description 既定ブランチで判定された直近の Run を、保存前の設定で判定し直した結果を返す（FR-02-5）。何も保存しない。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
+     */
+    post: operations['dryRun']
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/repositories/{repositoryId}/ingest-tokens': {
     parameters: {
       query?: never
@@ -764,6 +784,32 @@ export interface components {
       name: string
       pathPatterns: string[]
     }
+    /** @description 設定変更のドライラン（FR-02-5） */
+    DryRunResponse: {
+      /**
+       * Format: int32
+       * @description 試算した Run の数
+       */
+      evaluated: number
+      /**
+       * Format: int32
+       * @description 合格 → 不合格に変わる Run の数
+       */
+      newlyFailing: number
+      /**
+       * Format: int32
+       * @description 不合格 → 合格に変わる Run の数
+       */
+      newlyPassing: number
+      runs: components['schemas']['RunResult'][]
+      /** @description 成果物が保持期間で削除されているなど、試算できなかった Run */
+      skipped: components['schemas']['SkippedRun'][]
+      /**
+       * Format: int32
+       * @description 判定結果が変わる Run の数
+       */
+      verdictChanged: number
+    }
     FinalizeResponse: {
       detailUrl?: string
       /** Format: uuid */
@@ -880,6 +926,21 @@ export interface components {
       role?: 'ADMIN' | 'VIEWER'
       /** Format: uuid */
       userId?: string
+    }
+    MetricChange: {
+      componentName: string | null
+      /**
+       * @description 現在の状態。現在は判定されていない指標なら null
+       * @enum {string|null}
+       */
+      currentStatus:
+        'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE' | null
+      metricId: string
+      reason: string | null
+      /** @enum {string} */
+      simulatedStatus: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
+      unit: string | null
+      value: number | null
     }
     MetricRow: {
       /** @description 最新の値 − 最初の値 */
@@ -1035,6 +1096,15 @@ export interface components {
        */
       runs: number
     }
+    Request: {
+      /** @description 試す .quality-gate.yml の内容 */
+      rawYaml: string
+      /**
+       * Format: int32
+       * @description 試算する直近の Run の数（既定 10、最大 30）
+       */
+      runs?: number | null
+    }
     /** @description データ保持期間（日） */
     RetentionSettings: {
       /**
@@ -1176,6 +1246,19 @@ export interface components {
       /** @description 計測条件の表示名（変更範囲 / 全量 など） */
       variantLabel: string | null
     }
+    RunResult: {
+      /** @description 判定（合否または指標の状態）が変わる指標だけを並べる */
+      changes: components['schemas']['MetricChange'][]
+      commitSha: string
+      /** @enum {string} */
+      currentVerdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
+      /** Format: date-time */
+      measuredAt: string
+      /** Format: uuid */
+      runId: string
+      /** @enum {string} */
+      simulatedVerdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
+    }
     /** @description CI がポーリングするための軽量な状態応答。 */
     RunStatusResponse: {
       /** @enum {string} */
@@ -1231,6 +1314,11 @@ export interface components {
       metricId: string
       name: string
       reason: string
+    }
+    SkippedRun: {
+      reason: string
+      /** Format: uuid */
+      runId: string
     }
     TokenList: {
       items: components['schemas']['TokenSummary'][]
@@ -1752,6 +1840,32 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['RepositoryConfig']
+        }
+      }
+    }
+  }
+  dryRun: {
+    parameters: {
+      query?: never
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['Request']
+      }
+    }
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['DryRunResponse']
         }
       }
     }

@@ -4,7 +4,9 @@ import { useRoute } from 'vue-router'
 import { api, messageOf } from '@/api/client'
 import type { components } from '@/api/schema'
 import { useAuthStore } from '@/stores/auth'
-import { formatDateTime, shortSha } from '@/api/format'
+import { formatDateTime, formatValue, shortSha } from '@/api/format'
+import StatusChip from '@/components/StatusChip.vue'
+import { verdictToStatus, type MeasurementStatus, type Verdict } from '@/api/status'
 
 type Schemas = components['schemas']
 type ValidationError = Schemas['ValidationErrorItem']
@@ -80,6 +82,38 @@ async function save(): Promise<void> {
   }
   config.value = data
   saveMessage.value = `v${data.current?.version} として保存しました。次の判定から使われます。`
+}
+
+/**
+ * 設定の変更を過去の Run で試算する（ドライラン。FR-02-5）。保存はしない。
+ * 保存する前に「どの Run の判定が変わるか」を確かめられるようにする。
+ */
+const dryRunning = ref(false)
+const dryRun = ref<Schemas['DryRunResponse'] | null>(null)
+
+async function simulate(): Promise<void> {
+  dryRunning.value = true
+  saveErrors.value = []
+  saveMessage.value = null
+  dryRun.value = null
+  const { data, error } = await api.POST('/api/v1/repositories/{repositoryId}/config/dry-run', {
+    params: { path: { repositoryId: repositoryId.value } },
+    body: { rawYaml: draft.value },
+  })
+  dryRunning.value = false
+  if (error) {
+    const problem = error as { errors?: ValidationError[] }
+    saveErrors.value = problem.errors ?? []
+    saveMessage.value = messageOf(error, '試算できませんでした')
+    return
+  }
+  dryRun.value = data
+}
+
+function verdictLabel(verdict: string): string {
+  return (
+    { PASS: '合格', PASS_WITH_WARNINGS: '合格（警告あり）', FAIL: '不合格' }[verdict] ?? verdict
+  )
 }
 
 function sourceLabel(sourceType: string): string {
@@ -227,8 +261,83 @@ function sourceLabel(sourceType: string): string {
             >
               検証して保存
             </button>
+            <button
+              type="button"
+              class="qg-button"
+              :disabled="!auth.isAdmin || dryRunning"
+              @click="simulate"
+            >
+              過去の Run で試算（保存しない）
+            </button>
           </div>
         </form>
+
+        <section v-if="dryRun" class="qg-dry-run" aria-labelledby="dry-run-title">
+          <h2 id="dry-run-title">試算の結果（保存していません）</h2>
+          <p role="status">
+            既定ブランチの直近 {{ dryRun.evaluated }} 件の Run のうち、判定が変わるのは
+            {{ dryRun.verdictChanged }} 件です（不合格になる
+            {{ dryRun.newlyFailing }} 件、合格になる {{ dryRun.newlyPassing }} 件）。
+          </p>
+          <table v-if="dryRun.runs.length > 0">
+            <caption class="qg-visually-hidden">
+              Run ごとの現在の判定と、この設定での判定
+            </caption>
+            <thead>
+              <tr>
+                <th scope="col">計測日時</th>
+                <th scope="col">コミット</th>
+                <th scope="col">現在の判定</th>
+                <th scope="col">この設定での判定</th>
+                <th scope="col">状態が変わる指標</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-for="run in dryRun.runs" :key="run.runId">
+                <td>{{ formatDateTime(run.measuredAt) }}</td>
+                <td>
+                  <RouterLink :to="{ name: 'run', params: { runId: run.runId } }">
+                    {{ shortSha(run.commitSha) }}
+                  </RouterLink>
+                </td>
+                <td>
+                  <StatusChip :status="verdictToStatus(run.currentVerdict as Verdict)" />
+                  {{ verdictLabel(run.currentVerdict) }}
+                </td>
+                <td>
+                  <StatusChip :status="verdictToStatus(run.simulatedVerdict as Verdict)" />
+                  {{ verdictLabel(run.simulatedVerdict) }}
+                </td>
+                <td>
+                  <span v-if="run.changes.length === 0" class="qg-muted">なし</span>
+                  <ul v-else>
+                    <li
+                      v-for="change in run.changes"
+                      :key="`${change.metricId}|${change.componentName ?? ''}`"
+                    >
+                      {{ change.metricId
+                      }}<template v-if="change.componentName">
+                        （{{ change.componentName }}）</template
+                      >:
+                      <StatusChip
+                        v-if="change.currentStatus"
+                        :status="change.currentStatus as MeasurementStatus"
+                      />
+                      →
+                      <StatusChip :status="change.simulatedStatus as MeasurementStatus" />
+                      {{ formatValue(change.value, change.unit) }}
+                    </li>
+                  </ul>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+          <ul v-if="dryRun.skipped.length > 0" class="qg-muted">
+            <li v-for="skip in dryRun.skipped" :key="skip.runId">
+              {{ shortSha(skip.runId) }}: {{ skip.reason }}
+            </li>
+          </ul>
+        </section>
       </div>
     </template>
   </section>
@@ -258,6 +367,23 @@ function sourceLabel(sourceType: string): string {
 }
 .qg-invalid {
   border-color: var(--status-error);
+}
+.qg-dry-run {
+  margin-top: 1.5rem;
+}
+.qg-dry-run table {
+  border-collapse: collapse;
+}
+.qg-dry-run th,
+.qg-dry-run td {
+  padding: 0.3rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+.qg-dry-run ul {
+  margin: 0;
+  padding-left: 1rem;
 }
 textarea {
   font-family: var(--font-mono, ui-monospace, monospace);
