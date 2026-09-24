@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -31,10 +32,12 @@ public class DashboardController {
     private final RepositorySummaryRepository summaries;
     private final FreshnessPolicy freshness;
     private final WaiverRepository waivers;
+    private final Clock clock;
 
     public DashboardController(MonitoredRepositoryRepository repositories,
                                RepositorySummaryRepository summaries, FreshnessPolicy freshness,
-                               WaiverRepository waivers) {
+                               WaiverRepository waivers, Clock clock) {
+        this.clock = clock;
         this.repositories = repositories;
         this.summaries = summaries;
         this.freshness = freshness;
@@ -46,7 +49,7 @@ public class DashboardController {
             description = "不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。")
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         List<DashboardResponse.Alert> alerts = new ArrayList<>();
 
         List<DashboardResponse.RepositoryCard> cards =
