@@ -10,7 +10,7 @@
 | `QG_SMTP_USERNAME` / `QG_SMTP_PASSWORD` | なし | SMTP 認証が要る場合のみ |
 | `QG_MAIL_FROM` | `quality-gate@localhost` | 通知メールの差出人 |
 | `QG_GITHUB_API_ENABLED` | `true` | `baseCommitSha` を省略した Run の比較元（merge-base）を GitHub API で求めるか（FR-05-4）。求められなくても判定は続く（比較元なし） |
-| `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | 比較元を求めるときの認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents と Pull requests の読み取り権限を付ける。収集ランナーの App と同じものでよい |
+| `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | 比較元を求めるときの認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents と Pull requests の読み取り権限を付ける。収集ランナーの App と同じものでよい。`enforcement: check-run` / `blocking` で Check Run を出すには、加えて **Checks: Read and write** が要る（Check Run は App でしか作れない） |
 | `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents / Pull requests: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
 | `QG_GITHUB_API_URL` | `https://api.github.com` | GitHub Enterprise Server なら `https://<host>/api/v3` |
 | `QG_RATE_LIMIT_ENABLED` | `true` | API のレート制限（Ingest Token ごとに 60 回 / 分、成果物のアップロードは 100 回 / 分、参照 API は利用者ごとに 600 回 / 分）。上限は `quality-gate.rate-limit.*` で変えられる。超過すると 429 と `Retry-After` を返す |
