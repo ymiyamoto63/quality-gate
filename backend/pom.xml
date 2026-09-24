@@ -22,6 +22,9 @@
     <maven.compiler.release>25</maven.compiler.release>
     <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
     <springdoc.version>3.1.1</springdoc.version>
+    <!-- Spring Boot 4.1.1 が管理する 11.0.24 には修正版のある CRITICAL の脆弱性がある
+         （CVE-2026-65182 / CVE-2026-65905 / CVE-2026-68525）。Spring Boot が 11.0.25 以降を管理する版に上げたら消す -->
+    <tomcat.version>11.0.25</tomcat.version>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <node.version>v24.21.0</node.version>
     <pitest.version>1.20.4</pitest.version>
