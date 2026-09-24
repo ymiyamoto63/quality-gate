@@ -31,6 +31,8 @@ const METRICS = [
   ['M-08', 'API 契約テスト成功率'],
   ['M-09', '破壊的変更件数'],
   ['M-10', 'アクセシビリティ違反'],
+  ['M-11', 'テスト成功率'],
+  ['M-12', 'スキップされたテスト数'],
 ] as const
 
 const status = ref<WaiverStatus | ''>('ACTIVE')

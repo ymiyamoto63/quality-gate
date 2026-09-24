@@ -122,7 +122,7 @@ public class ReportNormalizer {
                 .orElseThrow(() -> new ArtifactFormatException(
                         "この形式のアダプタが未実装です: " + artifact.getType().wire()));
         try (InputStream in = artifactStore.open(artifact.getStorageKey())) {
-            return adapter.parse(in, context);
+            return adapter.parse(in, context, artifact.getType());
         } catch (java.io.IOException e) {
             throw new ArtifactFormatException(
                     "成果物を読み出せませんでした: " + artifact.getFilename(), e);

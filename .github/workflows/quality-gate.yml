@@ -90,6 +90,13 @@ jobs:
           cp backend/target/site/jacoco/jacoco.xml reports/backend/ || true
           cp backend/target/pmd.xml reports/backend/ || true
 
+      # M-11 / M-12 はすべてのテスト（単体テストと結合テスト）の結果で判定する
+      - name: テストの結果の収集（M-11 / M-12）
+        if: always()
+        run: |
+          mkdir -p reports/tests/backend
+          cp backend/target/surefire-reports/TEST-*.xml backend/target/failsafe-reports/TEST-*.xml reports/tests/backend/ || true
+
       # M-08 の契約テストは、API の応答を検証する結合テスト（*ApiIT）とする。
       # 単体テストまで送ると、M-08 が単体テスト全体の成功率になってしまう
       - name: 契約テストの結果の収集（M-08）
@@ -117,8 +124,20 @@ jobs:
             touch reports/oasdiff-base-spec-missing
           fi
 
+      # テストの結果は JUnit XML でも出す（M-11 / M-12）
       - name: フロントエンドのテスト（Vitest / カバレッジ）
-        run: cd frontend && npm run test:coverage
+        run: |
+          cd frontend && npm run test:coverage -- \
+            --reporter=default --reporter=junit --outputFile.junit=../reports/tests/frontend/junit.xml
+
+      # M-07（フロントエンド）: complexity の上限を 0 にして全関数の CC 値を出す（判定は quality-gate が行う）。
+      # 比較元の解析は送らない（backend の PMD と同じく、比較元コミットの過去の Run の値と比べる）
+      - name: 循環的複雑度（フロントエンド、ESLint / M-07）
+        if: always()
+        run: |
+          mkdir -p reports/frontend
+          cd frontend && npx eslint -f json -o ../reports/frontend/eslint.json \
+            --rule 'complexity: [warn, 0]' --ignore-pattern '**/*.spec.ts' src
 
       - name: 脆弱性スキャン（Trivy）
         uses: aquasecurity/trivy-action@master
@@ -183,6 +202,9 @@ jobs:
             echo "artifacts<<EOF"
             echo "jacoco-xml reports/backend/jacoco.xml component=backend"
             echo "pmd-xml reports/backend/pmd.xml component=backend"
+            echo "eslint-json reports/frontend/eslint.json component=frontend"
+            echo "test-junit-xml reports/tests/backend/TEST-*.xml component=backend"
+            echo "test-junit-xml reports/tests/frontend/junit.xml component=frontend"
             echo "junit-xml reports/contract/TEST-*ApiIT.xml component=backend"
             echo "lcov reports/frontend-coverage/lcov.info component=frontend"
             echo "axe-json reports/axe-results.json component=frontend"

@@ -25,6 +25,7 @@ import java.util.Set;
  * @param performance                M-03 / M-04 / M-05 の合格ライン
  * @param referenceOnlyEnvironments  ここで計測した性能値は参考値（REFERENCE）とする環境。
  *        ランナー種別（github-hosted など）または計測環境の名前で書く
+ * @param testResults                M-11 / M-12 の合格ライン
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -45,7 +46,8 @@ public record GateThresholds(
         int contractMinTestCount,
         int maxBreakingChanges,
         Performance performance,
-        Set<String> referenceOnlyEnvironments) {
+        Set<String> referenceOnlyEnvironments,
+        TestResults testResults) {
 
     /**
      * 性能指標の合格ライン（docs/initial/02-metrics-spec.md M-03）。
@@ -60,6 +62,18 @@ public record GateThresholds(
                               BigDecimal errorRatePct, List<String> scenarios) {
     }
 
+    /**
+     * テスト結果の合格ライン（docs/initial/02-metrics-spec.md M-11 / M-12）。
+     *
+     * @param minSuccessRate     M-11 の合格ライン（成功率 %）
+     * @param minTestCount       M-11 の最小実行件数。下回れば値を確定できない（ERROR）
+     * @param maxSkipped         M-12 のスキップ件数の上限。null なら件数そのものは問わない
+     * @param maxSkippedIncrease M-12 の比較対象 Run からの増加の上限（件）
+     */
+    public record TestResults(BigDecimal minSuccessRate, int minTestCount, Integer maxSkipped,
+                              int maxSkippedIncrease) {
+    }
+
     public static final String M_BRANCH_COVERAGE = "M-01";
     public static final String M_MUTATION = "M-02";
     public static final String M_PERFORMANCE_P95 = "M-03";
@@ -70,6 +84,8 @@ public record GateThresholds(
     public static final String M_API_CONTRACT = "M-08";
     public static final String M_BREAKING_CHANGES = "M-09";
     public static final String M_ACCESSIBILITY = "M-10";
+    public static final String M_TEST_SUCCESS = "M-11";
+    public static final String M_SKIPPED_TESTS = "M-12";
 
     /**
      * 判定器を実装済みの指標。
@@ -80,17 +96,19 @@ public record GateThresholds(
     public static final Set<String> IMPLEMENTED_METRICS =
             Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
                     M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
-                    M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY);
+                    M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY,
+                    M_TEST_SUCCESS, M_SKIPPED_TESTS);
 
     /** YAML の指標名と指標 ID の対応。 */
-    private static final Map<String, List<String>> METRIC_IDS_OF = Map.of(
-            "branch_coverage", List.of(M_BRANCH_COVERAGE),
-            "mutation_score", List.of(M_MUTATION),
-            "performance", List.of(M_PERFORMANCE_P95, M_THROUGHPUT, M_ERROR_RATE),
-            "vulnerabilities", List.of(M_VULNERABILITIES),
-            "cyclomatic_complexity", List.of(M_COMPLEXITY),
-            "api_contract", List.of(M_API_CONTRACT, M_BREAKING_CHANGES),
-            "accessibility", List.of(M_ACCESSIBILITY));
+    private static final Map<String, List<String>> METRIC_IDS_OF = Map.ofEntries(
+            Map.entry("branch_coverage", List.of(M_BRANCH_COVERAGE)),
+            Map.entry("mutation_score", List.of(M_MUTATION)),
+            Map.entry("performance", List.of(M_PERFORMANCE_P95, M_THROUGHPUT, M_ERROR_RATE)),
+            Map.entry("vulnerabilities", List.of(M_VULNERABILITIES)),
+            Map.entry("cyclomatic_complexity", List.of(M_COMPLEXITY)),
+            Map.entry("api_contract", List.of(M_API_CONTRACT, M_BREAKING_CHANGES)),
+            Map.entry("accessibility", List.of(M_ACCESSIBILITY)),
+            Map.entry("test_results", List.of(M_TEST_SUCCESS, M_SKIPPED_TESTS)));
 
     public static GateThresholds defaults() {
         return from(GateConfigDocument.defaults());
@@ -117,6 +135,7 @@ public record GateThresholds(
         GateConfigDocument.MetricConfig accessibility = document.metric("accessibility");
         GateConfigDocument.MetricConfig contract = document.metric("api_contract");
         GateConfigDocument.MetricConfig performance = document.metric("performance");
+        GateConfigDocument.MetricConfig tests = document.metric("test_results");
         BigDecimal p95 = performance.number("p95_ms").orElse(BigDecimal.valueOf(500));
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
@@ -145,7 +164,13 @@ public record GateThresholds(
                         performance.number("arrival_rate_rps").orElse(BigDecimal.valueOf(50)),
                         performance.number("error_rate_pct").orElse(new BigDecimal("0.1")),
                         List.copyOf(performance.list("scenarios"))),
-                Set.copyOf(document.execution().referenceOnlyEnvironments()));
+                Set.copyOf(document.execution().referenceOnlyEnvironments()),
+                new TestResults(
+                        tests.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
+                        // M-08 と同じく、0 を書かれても 1 件は求める
+                        Math.max(1, tests.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
+                        tests.number("max_skipped").map(BigDecimal::intValue).orElse(null),
+                        tests.number("max_skipped_increase").orElse(BigDecimal.ZERO).intValue()));
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */

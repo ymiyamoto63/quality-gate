@@ -437,6 +437,8 @@ Phase 1 では承認フローを設けず、Admin が登録した時点で免除
 | M-08 | 契約・互換性 | API 契約テスト成功率 | 100% | JUnit XML、Pact verification JSON |
 | M-09 | 契約・互換性 | OpenAPI 破壊的変更件数（副指標） | 0 件 | oasdiff JSON |
 | M-10 | 使いやすさ | アクセシビリティ重大違反件数 | 0 件（impact: critical / serious） | axe-core JSON |
+| M-11 | 機能テスト | テスト成功率（追加。既定は無効） | 100% | JUnit XML（すべてのテスト） |
+| M-12 | 機能テスト | スキップされたテスト数（追加。既定は無効） | 比較対象 Run から増やさない | JUnit XML（すべてのテスト） |
 
 ### 6.2 指標単位の判定ステータス
 

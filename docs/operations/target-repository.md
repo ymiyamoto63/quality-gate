@@ -57,7 +57,7 @@ Run 作成時の `repository` がトークンの発行元と一致しないと�
 設定ファイルを送らなかった場合は、画面（S-06）で保存した設定、それも無ければシステム既定値で判定します
 （収集ランナーは設定ファイルを送らないため、常に画面の設定で判定されます）。
 設定ファイルを送った Run が直近に判定されている間は、画面からは設定を編集できません。
-**既定値では 7 つの指標グループがすべて有効**で、成果物が届かなかった指標は ERROR になり、
+**既定値では要件定義の 7 つの指標グループがすべて有効**で（後から追加した `test_results` は既定で無効）、成果物が届かなかった指標は ERROR になり、
 Run 全体が不合格（FAIL）になります（fail-closed）。
 
 最小構成では、使わない指標を `enabled: false` で明示的に外します。
@@ -173,9 +173,10 @@ Run 作成時に `skippedMetrics` で申告します（申告のない未提出�
 | `k6-summary` / `gatling-log` | M-03〜05 性能 | `metadata={"environment":{"name":"..."}}` が必須。Gatling はテキスト形式の simulation.log |
 | `sarif` / `osv-json` | M-06 脆弱性 | SARIF は M-07 にも使える |
 | `pmd-xml` / `eslint-json` / `lizard-csv` / `sarif` | M-07 循環的複雑度 | |
-| `junit-xml` / `pact-verification` | M-08 契約テスト成功率 | |
+| `junit-xml` / `pact-verification` | M-08 契約テスト成功率 | 契約テストのレポートだけを送る |
 | `oasdiff-json` | M-09 破壊的変更 | 比較元に定義が無いときは `metadata={"baseSpecMissing":true}` |
 | `axe-json` | M-10 アクセシビリティ | `.quality-gate.yml` の `accessibility.pages` の画面がすべて含まれている必要がある |
+| `test-junit-xml` | M-11 テスト成功率 / M-12 スキップされたテスト数 | すべてのテストの JUnit XML。`component=` を付ける（コンポーネントごとに判定する）。`.quality-gate.yml` の `test_results` で有効にしたときだけ判定する |
 
 ファイルサイズの上限は 1 ファイル 50MB、1 Run あたり合計 200MB です。
 実際に全指標を送っている例は、quality-gate 自身のワークフロー [.github/workflows/quality-gate.yml](../../.github/workflows/quality-gate.yml) を参照してください。

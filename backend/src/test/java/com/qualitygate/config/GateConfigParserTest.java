@@ -219,6 +219,36 @@ class GateConfigParserTest {
     }
 
     @Test
+    void テスト結果の指標は既定で無効で書けば有効になる() {
+        // 既定で有効にすると、成果物を送っていないリポジトリの Run がすべて ERROR になる
+        GateConfigDocument defaults = parser.parse("version: 1");
+        assertThat(defaults.metric("test_results").enabled()).isFalse();
+
+        GateConfigDocument document = parser.parse("""
+                version: 1
+                metrics:
+                  test_results:
+                    min_success_rate: 100
+                    max_skipped_increase: 0
+                """);
+        assertThat(document.metric("test_results").enabled()).isTrue();
+    }
+
+    @Test
+    void テスト結果の最小実行件数に0は指定できない() {
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  test_results:
+                    min_test_count: 0
+                    max_skipped: -1
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("metrics.test_results.min_test_count")
+                .hasMessageContaining("metrics.test_results.max_skipped");
+    }
+
+    @Test
     void 編集距離が遠い候補は提示しない() {
         // 遠い候補を出すと、かえって迷わせる
         assertThat(GateConfigParser.closest("zzzzzzzz",

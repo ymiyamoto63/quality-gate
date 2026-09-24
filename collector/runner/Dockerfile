@@ -44,6 +44,12 @@ RUN cd /opt/qg-a11y \
  && npx playwright install --with-deps chromium \
  && rm -rf /root/.npm /var/lib/apt/lists/*
 
+# M-07（フロントエンド）の ESLint とパーサ。設定ファイル（eslint.config.mjs）は measure.sh が collector/ から写す
+COPY complexity/package.json complexity/package-lock.json /opt/qg-complexity/
+RUN cd /opt/qg-complexity \
+ && npm ci --no-audit --no-fund \
+ && rm -rf /root/.npm
+
 # 計測はランナーの利用者の UID で動かす（作業領域のファイルの持ち主をそろえ、ジョブの最後に消せるようにする）。
 # その UID には名前が無いため、HOME は誰でも書ける場所にし、キャッシュ用のボリュームを重ねる
 RUN mkdir -p /cache/home && chmod 1777 /cache/home
@@ -52,4 +58,5 @@ RUN mkdir -p /cache/home && chmod 1777 /cache/home
 ENV HOME=/cache/home \
     MAVEN_OPTS=-Duser.home=/cache/home \
     QG_COLLECTOR_IN_CONTAINER=1 \
-    QG_A11Y_TOOL_DIR=/opt/qg-a11y
+    QG_A11Y_TOOL_DIR=/opt/qg-a11y \
+    QG_COMPLEXITY_TOOL_DIR=/opt/qg-complexity

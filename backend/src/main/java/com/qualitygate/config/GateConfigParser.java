@@ -48,17 +48,19 @@ public class GateConfigParser {
     private static final Set<String> ON_MISSING_REPORT_VALUES = Set.of("fail", "warn");
 
     /** 指標名（YAML のキー）と、それぞれに書ける項目。 */
-    private static final Map<String, Set<String>> METRIC_KEYS = Map.of(
-            "branch_coverage", Set.of("enabled", "threshold", "scope", "per_component",
-                    "diff_threshold"),
-            "mutation_score", Set.of("enabled", "threshold", "scope", "components"),
-            "performance", Set.of("enabled", "p95_ms", "arrival_rate_rps", "error_rate_pct",
-                    "scenarios"),
-            "vulnerabilities", Set.of("enabled", "max_critical", "max_high", "max_medium"),
-            "cyclomatic_complexity", Set.of("enabled", "max_complexity", "scope", "warn_from"),
-            "api_contract", Set.of("enabled", "min_success_rate", "min_test_count",
-                    "breaking_changes"),
-            "accessibility", Set.of("enabled", "standard", "max_critical", "pages"));
+    private static final Map<String, Set<String>> METRIC_KEYS = Map.ofEntries(
+            Map.entry("branch_coverage", Set.of("enabled", "threshold", "scope", "per_component",
+                    "diff_threshold")),
+            Map.entry("mutation_score", Set.of("enabled", "threshold", "scope", "components")),
+            Map.entry("performance", Set.of("enabled", "p95_ms", "arrival_rate_rps", "error_rate_pct",
+                    "scenarios")),
+            Map.entry("vulnerabilities", Set.of("enabled", "max_critical", "max_high", "max_medium")),
+            Map.entry("cyclomatic_complexity", Set.of("enabled", "max_complexity", "scope", "warn_from")),
+            Map.entry("api_contract", Set.of("enabled", "min_success_rate", "min_test_count",
+                    "breaking_changes")),
+            Map.entry("accessibility", Set.of("enabled", "standard", "max_critical", "pages")),
+            Map.entry("test_results", Set.of("enabled", "min_success_rate", "min_test_count",
+                    "max_skipped", "max_skipped_increase")));
 
     public GateConfigDocument parse(String yaml) {
         YamlLineIndex lines = YamlLineIndex.of(yaml);
@@ -183,7 +185,7 @@ public class GateConfigParser {
             if ("accessibility".equals(entry.getKey())) {
                 validateAccessibility(values, path, lines, errors);
             }
-            if ("api_contract".equals(entry.getKey())) {
+            if ("api_contract".equals(entry.getKey()) || "test_results".equals(entry.getKey())) {
                 validateContract(values, path, lines, errors);
             }
 
@@ -244,7 +246,7 @@ public class GateConfigParser {
     }
 
     /**
-     * M-08 の最小実行件数。
+     * M-08 / M-11 の最小実行件数。
      *
      * <p>0 を許すと、契約テストが 1 件も動かなかった Run が合格になる。
      * 「検証していない」を「すべて成功」と読み違える設定は受け付けない。

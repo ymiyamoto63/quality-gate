@@ -25,6 +25,8 @@ const METRICS = [
   { metricId: 'M-08', name: 'API 契約テスト成功率' },
   { metricId: 'M-09', name: '破壊的変更件数' },
   { metricId: 'M-10', name: 'アクセシビリティ違反' },
+  { metricId: 'M-11', name: 'テスト成功率' },
+  { metricId: 'M-12', name: 'スキップされたテスト数' },
 ]
 
 onMounted(() => store.load(repositoryId.value))

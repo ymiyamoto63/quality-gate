@@ -19,7 +19,11 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JUnit XML から M-08（API 契約テスト成功率）を読む（docs/initial/02-metrics-spec.md M-08）。
+ * JUnit XML から M-08（API 契約テスト成功率）と M-11 / M-12（テスト成功率 / スキップされたテスト数）を読む
+ * （docs/initial/02-metrics-spec.md M-08 / M-11）。
+ *
+ * <p>どちらの指標になるかは成果物の型で決まる。{@code junit-xml} は契約テスト（M-08）、
+ * {@code test-junit-xml} はすべてのテスト（M-11 / M-12）。形式は同じため、読み方も同じにする。
  *
  * <p>Surefire / Failsafe と Vitest の junit reporter の出力を受け付ける。ルートは
  * {@code <testsuites>} でも {@code <testsuite>} でもよい。
@@ -30,21 +34,44 @@ import java.util.Map;
  *
  * <p>送られたテストが契約テストであるかは CI 側の責務とする（どのレポートを送るかで決まる）。
  * ここでは単体テストと契約テストを見分けない。
+ *
+ * <p>M-11 の違反は失敗・エラー・不安定（再実行で成功）なテスト、M-12 の違反はスキップされたテスト。
+ * スキップを M-12 に分けるのは、スキップの増加を失敗とは別の合格ラインで判定するため。
  */
 @Component
 public class JUnitXmlAdapter implements ArtifactAdapter {
 
-    static final String METRIC_ID = "M-08";
+    static final String CONTRACT_METRIC_ID = "M-08";
+    static final String TEST_METRIC_ID = "M-11";
+    static final String SKIPPED_METRIC_ID = "M-12";
 
     private static final int MAX_MESSAGE = 512;
 
     @Override
     public boolean supports(ArtifactType type) {
-        return type == ArtifactType.JUNIT_XML;
+        return type == ArtifactType.JUNIT_XML || type == ArtifactType.TEST_JUNIT_XML;
     }
 
     @Override
     public NormalizedReport parse(InputStream in, ParseContext context) {
+        return parse(in, context, ArtifactType.JUNIT_XML);
+    }
+
+    /** 型を指定して読む。{@link ArtifactAdapter} の既定の呼び出しは M-08（契約テスト）として読む。 */
+    @Override
+    public NormalizedReport parse(InputStream in, ParseContext context, ArtifactType type) {
+        boolean allTests = type == ArtifactType.TEST_JUNIT_XML;
+        String metricId = allTests ? TEST_METRIC_ID : CONTRACT_METRIC_ID;
+        Tally result = read(in, context, allTests);
+        RawMeasurement measurement = RawMeasurement.of(metricId, context.componentName(),
+                result.tally().successRate(), "percent", result.tally().toDetail());
+        return NormalizedReport.of(type, List.of(measurement), result.findings());
+    }
+
+    private record Tally(ContractTally tally, List<RawFinding> findings) {
+    }
+
+    private static Tally read(InputStream in, ParseContext context, boolean allTests) {
         ContractTally tally = ContractTally.EMPTY;
         List<RawFinding> findings = new ArrayList<>();
 
@@ -83,7 +110,8 @@ public class JUnitXmlAdapter implements ArtifactAdapter {
                         Outcome outcome = current.result();
                         tally = tally.plus(outcome.wire);
                         if (outcome != Outcome.PASSED) {
-                            findings.add(current.toFinding(outcome, context.componentName()));
+                            findings.add(current.toFinding(outcome, context.componentName(),
+                                    metricIdOf(outcome, allTests)));
                         }
                         current = null;
                     }
@@ -99,9 +127,15 @@ public class JUnitXmlAdapter implements ArtifactAdapter {
             close(xml);
         }
 
-        RawMeasurement measurement = RawMeasurement.of(METRIC_ID, context.componentName(),
-                tally.successRate(), "percent", tally.toDetail());
-        return NormalizedReport.of(ArtifactType.JUNIT_XML, List.of(measurement), findings);
+        return new Tally(tally, findings);
+    }
+
+    /** 違反を載せる指標。すべてのテストの結果では、スキップだけを M-12 に分ける。 */
+    private static String metricIdOf(Outcome outcome, boolean allTests) {
+        if (!allTests) {
+            return CONTRACT_METRIC_ID;
+        }
+        return outcome == Outcome.SKIPPED ? SKIPPED_METRIC_ID : TEST_METRIC_ID;
     }
 
     private static void requireRoot(String element) {
@@ -190,7 +224,7 @@ public class JUnitXmlAdapter implements ArtifactAdapter {
             };
         }
 
-        RawFinding toFinding(Outcome result, String componentName) {
+        RawFinding toFinding(Outcome result, String componentName, String metricId) {
             String label = className.isEmpty() ? name : className + "." + name;
             String title = switch (result) {
                 case ERRORED -> label + " がエラーで終了しました";
@@ -210,7 +244,7 @@ public class JUnitXmlAdapter implements ArtifactAdapter {
                 detail.put("message", truncate(message.strip()));
             }
             // テストクラス名はファイルパスではない。リンクを組み立てると壊れたリンクになる
-            return new RawFinding(METRIC_ID, result.wire, result.severity, title, null, null,
+            return new RawFinding(metricId, result.wire, result.severity, title, null, null,
                     componentName, className + "#" + name, detail);
         }
 

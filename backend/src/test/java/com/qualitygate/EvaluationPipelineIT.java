@@ -591,6 +591,80 @@ class EvaluationPipelineIT {
     }
 
     @Test
+    void テスト結果はコンポーネントごとに判定しスキップの増加は不合格にする() {
+        String config = """
+                version: 1
+                metrics:
+                  mutation_score:
+                    enabled: false
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
+                    enabled: false
+                  api_contract:
+                    enabled: false
+                  performance:
+                    enabled: false
+                  test_results:
+                    min_success_rate: 100
+                """;
+        Run first = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(first, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, config);
+        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(first, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", null, """
+                <testsuite name="A">
+                  <testcase classname="A" name="a"/>
+                  <testcase classname="A" name="b"><skipped/></testcase>
+                </testsuite>
+                """);
+        attach(first, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", null, """
+                <testsuites><testsuite name="src/a.spec.ts">
+                  <testcase classname="src/a.spec.ts" name="a"/>
+                </testsuite></testsuites>
+                """);
+        assertThat(evaluate(first).getVerdict()).isEqualTo(Verdict.PASS);
+
+        // 2 回目: backend のスキップが 1 件増え、frontend のテストが 1 件失敗した
+        Run second = createRun(Instant.parse("2026-09-23T00:00:00Z"));
+        attach(second, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, config);
+        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(second, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", null, """
+                <testsuite name="A">
+                  <testcase classname="A" name="a"/>
+                  <testcase classname="A" name="b"><skipped/></testcase>
+                  <testcase classname="A" name="c"><skipped/></testcase>
+                </testsuite>
+                """);
+        attach(second, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", null, """
+                <testsuites><testsuite name="src/a.spec.ts">
+                  <testcase classname="src/a.spec.ts" name="a"><failure message="boom"/></testcase>
+                </testsuite></testsuites>
+                """);
+
+        assertThat(evaluate(second).getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(second.getId()))
+                .filteredOn(m -> !m.getMetricId().equals("M-01"))
+                .extracting(Measurement::getMetricId, Measurement::getComponentName,
+                        Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-11", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-11", "frontend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-12", "backend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-12", "frontend", MeasurementStatus.PASS));
+        // 失敗したテストは M-11、スキップしたテストは M-12 の違反として残る。増えたスキップだけが新規
+        assertThat(findings.findByRunId(second.getId()))
+                .filteredOn(f -> f.getMetricId().equals("M-12"))
+                .extracting(f -> f.getState().name())
+                .containsExactlyInAnyOrder("CONTINUING", "NEW");
+        assertThat(findings.findByRunId(second.getId()))
+                .filteredOn(f -> f.getMetricId().equals("M-11"))
+                .singleElement()
+                .satisfies(f -> assertThat(f.getRuleId()).isEqualTo("failed"));
+    }
+
+    @Test
     void 比較元にOpenAPI定義が無ければ破壊的変更は対象外() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
