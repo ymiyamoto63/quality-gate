@@ -13,6 +13,8 @@ public interface MeasurementRepository extends JpaRepository<Measurement, UUID> 
 
     List<Measurement> findByRunId(UUID runId);
 
+    List<Measurement> findByRunIdIn(java.util.Collection<UUID> runIds);
+
     void deleteByRunId(UUID runId);
 
     /**

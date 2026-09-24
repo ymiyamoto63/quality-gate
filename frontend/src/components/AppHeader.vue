@@ -20,6 +20,7 @@ function cycleTheme() {
     <nav aria-label="メインナビゲーション">
       <RouterLink to="/">ダッシュボード</RouterLink>
       <RouterLink to="/waivers">免除</RouterLink>
+      <RouterLink to="/reports">レポート</RouterLink>
       <RouterLink v-if="auth.isAdmin" to="/admin/repositories">リポジトリ管理</RouterLink>
       <RouterLink v-if="auth.isAdmin" to="/admin/users">管理</RouterLink>
     </nav>
@@ -63,6 +64,13 @@ function cycleTheme() {
   font-weight: 700;
   color: var(--text-primary);
   text-decoration: none;
+}
+
+/* 品質レポートを PDF として印刷するとき、ナビゲーションは要らない */
+@media print {
+  .qg-header {
+    display: none;
+  }
 }
 
 nav {

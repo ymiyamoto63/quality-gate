@@ -13,7 +13,7 @@
 | 正規化・判定エンジン | 完了（M-01〜M-10 の全 10 指標） |
 | 設定解決（`.quality-gate.yml` / 画面の設定） | 完了（検証・版管理・Run への紐づけ） |
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
-| API と画面（S-01〜S-09） | 完了 |
+| API と画面（S-01〜S-10） | 完了 |
 | 収集ランナー（対象リポジトリに何も置かない計測。D-16） | 段階 1〜4 を実装（M-01 / M-02 / M-06〜M-10。手動実行と 15 分ごとの定期実行、PR の先頭も計測。M-02 は既定ブランチのみ。M-10 は対象アプリを起動して検査。対象のコードは計測用のコンテナの中で動かす。[収集ランナーで計測する](operations/collector.md)） |
 | 対象の CI からの送信（`quality-gate-action` / CLI） | 完了（GitHub Actions の composite action と、他の CI 向けの CLI `qg-submit`。quality-gate 自身の計測もこれで送る。[CI から送る](operations/ci-submit.md)） |
 
@@ -23,6 +23,7 @@
 - Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
+- 品質レポート（S-10。FR-08-4）— 期間とリポジトリを選んで既定ブランチの判定をまとめ、明細は CSV、PDF はブラウザの印刷で出す
 - README 用のバッジ（`/badges/{owner}/{name}.svg`。認証不要で、既定ブランチの最新の合否だけを返す。FR-08-5）
 - API のレート制限（トークンバケット。Ingest Token・利用者・IP ごと。超過は 429 と `Retry-After`）
 - 可観測性 — JSON 構造化ログ（`QG_LOG_FORMAT`）、相関 ID（`requestId` / `runId` / `jobId` を MDC に載せ、エラー応答の `traceId` と一致）、
@@ -79,6 +80,5 @@
 
 ## 未実装のもの
 
-- 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、PDF / CSV のレポート出力（FR-08-4）、
-  Check Run の出力
+- 次フェーズ以降の要件 — 設定変更の影響を過去 Run で試算するドライラン（FR-02-5）、Check Run の出力
 - 通知は**メールのみ**とした（Slack・PR コメントは運用上不要と判断し削除。D-15 / V014）

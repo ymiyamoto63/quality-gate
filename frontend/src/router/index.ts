@@ -12,6 +12,7 @@ import AdminView from '@/views/AdminView.vue'
 import RunDetailView from '@/views/RunDetailView.vue'
 import FindingListView from '@/views/FindingListView.vue'
 import TrendView from '@/views/TrendView.vue'
+import ReportView from '@/views/ReportView.vue'
 
 /** 画面一覧は docs/initial/08-screen-design.md 1 章と対応する。 */
 const routes: RouteRecordRaw[] = [
@@ -55,6 +56,7 @@ const routes: RouteRecordRaw[] = [
     component: FindingListView,
     meta: { title: '違反一覧' },
   },
+  { path: '/reports', name: 'reports', component: ReportView, meta: { title: '品質レポート' } },
   {
     path: '/waivers',
     name: 'waivers',

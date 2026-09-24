@@ -128,6 +128,8 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/repositories` | リポジトリ一覧 | — |
 | GET | `/api/v1/repositories/{id}` | リポジトリ詳細（S-02） | — |
 | GET | `/api/v1/repositories/{id}/trends` | 指標の時系列（S-05） | — |
+| GET | `/api/v1/reports` | 品質レポート（S-10。FR-08-4）。`from` / `to`（日付）と `repositoryId`（複数可）で絞る | — |
+| GET | `/api/v1/reports/measurements.csv` | 品質レポートの明細（CSV） | — |
 | GET | `/api/v1/runs` | Run 一覧 | — |
 | GET | `/api/v1/runs/{runId}` | Run 詳細（S-03） | — |
 | GET | `/api/v1/runs/{runId}/findings` | Finding 一覧（S-04） | — |
