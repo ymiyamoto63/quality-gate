@@ -5,7 +5,7 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01〜M-14 の全指標**です。
+計測する指標は **M-01〜M-17 の全指標**です（M-15〜M-17 は合否に使わない参考値）。
 M-07（循環的複雑度）は backend と frontend の両方を解析します。
 M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
 
@@ -35,6 +35,8 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
+| `collector/jscpd/` / `collector/lighthouse/` | M-15（jscpd）/ M-16（Lighthouse）の版を固定した `package.json` / `package-lock.json` |
+| `collector/bundle/size.mjs` | M-17 のビルド結果のファイルサイズ（gzip 後を含む）を JSON に書き出すスクリプト（依存パッケージなし） |
 | `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 画面（S-06）に保存する合格ラインの控え |
@@ -51,6 +53,9 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
 | M-08 | `mvn verify` が出す JUnit XML のうち、計測プロファイルの `CONTRACT_TEST_REPORTS` に合うものだけを送る |
+| M-15（参考値） | `DUPLICATION=true` のとき、jscpd で backend の `src/main/java` と frontend の `FRONTEND_COMPLEXITY_SOURCES`（テストと型定義を除く）を解析する |
+| M-16（参考値） | `LIGHTHOUSE_PAGES` の画面を、M-10 と同じく起動した対象アプリに対して Lighthouse で `LIGHTHOUSE_RUNS` 回（既定 3 回）ずつ計測する（`LIGHTHOUSE_PRESET`、既定 desktop）。M-10 と 1 回の起動を共用する |
+| M-17（参考値） | `BUNDLE_SIZE=true` のとき、`vite build` の結果（`FRONTEND_DIST`、既定 `dist`）のファイルサイズを数える。ビルドは M-10 / M-16 と共用する |
 | M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る（M-08 の `junit-xml` とは別に送る） |
 | M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
 | M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
@@ -382,6 +387,9 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
   画面の設定で `secrets` を有効にしないと、シークレットは判定されません（控えの `*.gate.yml` では有効にしています）
 - **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
   使ってよいと判断したパッケージは、違反単位の免除で外します
+- **M-15〜M-17 は参考値**です。合格ラインを持たず、Run の合否にも部分計測にも影響しません（計測に失敗して ERROR でも同じ）。
+  画面の設定で `duplication` / `lighthouse` / `bundle_size` を有効にしたときだけ Run 詳細とトレンドに出ます。
+  M-16 は計測するマシンの性能に左右されるため、同じ収集ランナーでの推移を見てください
 - **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
   画面の設定で `test_results` を有効にしたときだけ判定されます（控えの `*.gate.yml` では有効にしています）。
   M-12 は比較対象の Run からスキップが増えたら FAIL です
@@ -457,6 +465,8 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `measure` で `M-07: ESLint（head）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` のディレクトリが無い、または ESLint が設定を読めなかった（ログに ESLint の出力が出る） |
 | `measure` で `M-07: 構文を読めず、関数を数えられなかったファイルがあります` | quality-gate 側のパーサが読めない構文のファイルがある（そのファイルの関数は M-07 に入らない）。`FRONTEND_COMPLEXITY_EXCLUDE` で外すか、`collector/complexity` のパーサを見直す |
+| `measure` で `M-16: ... の N 回目の計測に失敗しました` | 画面が描画されない（Lighthouse の `NO_FCP` など）、または起動したアプリが応答しない。`LIGHTHOUSE_PAGES` のパスと、M-10 と同じ起動の設定を確かめる |
+| `measure` で `M-15: jscpd（frontend）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` の最初のディレクトリが無い（jscpd は 1 つのディレクトリだけを解析する） |
 | `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
 | PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 1-4 の 2（画面の設定の保存）をしていない。`skippable_metrics` に `mutation_score` と `performance` が必要 |

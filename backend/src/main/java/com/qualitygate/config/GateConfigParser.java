@@ -62,7 +62,11 @@ public class GateConfigParser {
             Map.entry("test_results", Set.of("enabled", "min_success_rate", "min_test_count",
                     "max_skipped", "max_skipped_increase")),
             Map.entry("secrets", Set.of("enabled", "max_secrets")),
-            Map.entry("licenses", Set.of("enabled", "max_forbidden", "max_restricted", "max_unknown")));
+            Map.entry("licenses", Set.of("enabled", "max_forbidden", "max_restricted", "max_unknown")),
+            // 参考値の指標。合格ラインを持たないため、書けるのは enabled だけ
+            Map.entry("duplication", Set.of("enabled")),
+            Map.entry("lighthouse", Set.of("enabled")),
+            Map.entry("bundle_size", Set.of("enabled")));
 
     public GateConfigDocument parse(String yaml) {
         YamlLineIndex lines = YamlLineIndex.of(yaml);

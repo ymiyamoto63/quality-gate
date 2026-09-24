@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-14）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-17。M-15〜M-17 は参考値）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -17,6 +17,7 @@
 #   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
 #   QG_A11Y_TOOL_DIR    M-10 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
 #   QG_COMPLEXITY_TOOL_DIR  M-07（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
+#   QG_JSCPD_TOOL_DIR / QG_LIGHTHOUSE_TOOL_DIR  M-15 の jscpd / M-16 の Lighthouse を取得済みのディレクトリ（同上）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -337,52 +338,132 @@ start_backend() {
   fi
 }
 
-measure_accessibility() {
-  local tool="$WORK/a11y" front="$SRC/$FRONTEND_DIR" port=${A11Y_FRONTEND_PORT:-4173}
-  [ -f "$front/package.json" ] || { fail "M-10: $FRONTEND_DIR/package.json がありません"; return; }
-  group "アクセシビリティ検査（Playwright + axe-core）"
-  if ! (
-    set -e
-    rm -rf "$tool"
-    mkdir -p "$tool"
-    cp "$COLLECTOR_DIR"/a11y/scan.mjs "$tool/"
-    if [ -n "${QG_A11Y_TOOL_DIR:-}" ]; then
-      # コンテナのイメージに Playwright・axe-core・Chromium が入っている
-      ln -s "$QG_A11Y_TOOL_DIR/node_modules" "$tool/node_modules"
-    else
-      cp "$COLLECTOR_DIR"/a11y/{package.json,package-lock.json} "$tool/"
-      cd "$tool"
-      npm ci --no-audit --no-fund
-      [ -n "${A11Y_CHROMIUM:-}" ] || npx playwright install chromium
-    fi
-  ); then
-    fail "M-10: 検査ツールを用意できませんでした"; endgroup; return
+# --- 画面のビルド（M-10 / M-16 / M-17 で共用）。本番と同じビルド結果を使う ---------------------
+FRONTEND_BUILD_OK=0
+build_frontend() {
+  group "フロントエンドのビルド（vite build）"
+  if (cd "$SRC/$FRONTEND_DIR" && npx vite build); then
+    FRONTEND_BUILD_OK=1
   fi
+  endgroup
+}
 
+# --- M-17（バンドルサイズ。参考値）。ビルドした画面のファイルサイズを数える -------------------
+measure_bundle_size() {
+  local dist="$SRC/$FRONTEND_DIR/${FRONTEND_DIST:-dist}"
+  [ "$FRONTEND_BUILD_OK" = 1 ] || { fail "M-17: フロントエンドのビルドに失敗しました"; return; }
+  [ -d "$dist" ] || { fail "M-17: ビルド結果（$FRONTEND_DIR/${FRONTEND_DIST:-dist}）がありません"; return; }
+  node "$COLLECTOR_DIR/bundle/size.mjs" "$dist" "$REPORTS/frontend/bundle-size.json" \
+    || fail "M-17: バンドルサイズを数えられませんでした"
+}
+
+# prepare_tool <collector/ 以下のディレクトリ名> <コンテナのイメージに入っているディレクトリ> <作業ディレクトリ> [写すファイル...]
+# 版を固定したツール（package.json / package-lock.json）を用意する。コンテナではイメージの node_modules を使う
+prepare_tool() {
+  local name=$1 prebuilt=$2 dir=$3 file
+  shift 3
+  (
+    set -e
+    rm -rf "$dir"
+    mkdir -p "$dir"
+    for file in "$@"; do cp "$COLLECTOR_DIR/$name/$file" "$dir/"; done
+    if [ -n "$prebuilt" ]; then
+      ln -s "$prebuilt/node_modules" "$dir/node_modules"
+    else
+      cp "$COLLECTOR_DIR/$name"/{package.json,package-lock.json} "$dir/"
+      cd "$dir"
+      npm ci --no-audit --no-fund
+    fi
+  )
+}
+
+# --- M-10（Playwright + axe-core）/ M-16（Lighthouse。参考値）。対象アプリを起動して画面を検査する ----
+# 対象の e2e（API のモック）は使わず、バックエンドの jar とビルドした画面を実際に起動する（1 回だけ起動して共用する）。
+# 検査のスクリプトとツールの版は quality-gate 側のもの（collector/a11y / collector/lighthouse）
+A11Y_TOOL="$WORK/a11y"
+APP_URL=
+
+prepare_a11y_tool() {
+  prepare_tool a11y "${QG_A11Y_TOOL_DIR:-}" "$A11Y_TOOL" scan.mjs || return 1
+  # コンテナのイメージには Chromium も入っている。外では Playwright が取得する
+  if [ -z "${QG_A11Y_TOOL_DIR:-}" ] && [ -z "${A11Y_CHROMIUM:-}" ]; then
+    (cd "$A11Y_TOOL" && npx playwright install chromium) || return 1
+  fi
+}
+
+# start_app <指標>。バックエンド（A11Y_BACKEND_PORT があれば）と、ビルドした画面（vite preview）を起動する
+start_app() {
+  local metric=$1 front="$SRC/$FRONTEND_DIR" port=${A11Y_FRONTEND_PORT:-4173}
+  [ "$FRONTEND_BUILD_OK" = 1 ] || { fail "$metric: フロントエンドのビルドに失敗しました"; return 1; }
   # バックエンド。measure_backend の verify で出来た実行可能 jar を使う
   if [ -n "${A11Y_BACKEND_PORT:-}" ]; then
-    start_backend M-10 "$A11Y_BACKEND_PORT" "$WORK/a11y-backend.log" "${A11Y_START_TIMEOUT:-120}" \
-      || { endgroup; return; }
+    start_backend "$metric" "$A11Y_BACKEND_PORT" "$WORK/a11y-backend.log" "${A11Y_START_TIMEOUT:-120}" || return 1
   fi
-
-  # フロントエンド。本番と同じビルド結果を vite preview で配る（/api の proxy は vite.config の server.proxy を引き継ぐ）
-  if ! (cd "$front" && npx vite build); then
-    stop_servers
-    fail "M-10: フロントエンドのビルドに失敗しました"; endgroup; return
-  fi
+  # /api の proxy は vite.config の server.proxy を引き継ぐ
   start_server "$WORK/a11y-frontend.log" bash -c \
     "cd \"\$1\" && exec npx vite preview --host 127.0.0.1 --port \"\$2\" --strictPort" _ "$front" "$port"
   if ! wait_http "http://127.0.0.1:${port}/" "${A11Y_START_TIMEOUT:-120}"; then
     tail -n 50 "$WORK/a11y-frontend.log" >&2
     stop_servers
-    fail "M-10: フロントエンドが起動しませんでした"; endgroup; return
+    fail "$metric: フロントエンドが起動しませんでした"; return 1
   fi
+  APP_URL="http://127.0.0.1:${port}"
+}
 
-  A11Y_BASE_URL="http://127.0.0.1:${port}" A11Y_PAGES="$A11Y_PAGES" \
-    A11Y_READY_SELECTOR="${A11Y_READY_SELECTOR:-}" A11Y_OUTPUT="$REPORTS/frontend/axe-results.json" \
-    node "$tool/scan.mjs" || fail "M-10: 検査できなかった画面があります（その画面は ERROR になります）"
+measure_app() {
+  local metrics=()
+  [ -z "${A11Y_PAGES:-}" ] || metrics+=(M-10)
+  [ -z "${LIGHTHOUSE_PAGES:-}" ] || metrics+=(M-16)
+  local label
+  label=$(IFS=/; echo "${metrics[*]}")
+  [ -f "$SRC/$FRONTEND_DIR/package.json" ] || { fail "$label: $FRONTEND_DIR/package.json がありません"; return; }
+  group "画面の検査（${label}）"
+  # Lighthouse も M-10 の Playwright の Chromium を使うため、どちらの場合も用意する
+  if ! prepare_a11y_tool; then
+    fail "$label: 検査ツール（Playwright と Chromium）を用意できませんでした"; endgroup; return
+  fi
+  if start_app "$label"; then
+    [ -z "${A11Y_PAGES:-}" ] || measure_accessibility
+    [ -z "${LIGHTHOUSE_PAGES:-}" ] || measure_lighthouse
+  fi
   stop_servers
   endgroup
+  rm -rf "$A11Y_TOOL"
+}
+
+measure_accessibility() {
+  A11Y_BASE_URL="$APP_URL" A11Y_PAGES="$A11Y_PAGES" \
+    A11Y_READY_SELECTOR="${A11Y_READY_SELECTOR:-}" A11Y_OUTPUT="$REPORTS/frontend/axe-results.json" \
+    node "$A11Y_TOOL/scan.mjs" || fail "M-10: 検査できなかった画面があります（その画面は ERROR になります）"
+}
+
+# 画面ごとに LIGHTHOUSE_RUNS 回（既定 3 回）計測する。中央値は quality-gate が取る（1 回ごとの揺れが大きいため）
+measure_lighthouse() {
+  local tool="$WORK/lighthouse-tool" chrome pages page i n=0 output args=()
+  if ! prepare_tool lighthouse "${QG_LIGHTHOUSE_TOOL_DIR:-}" "$tool"; then
+    fail "M-16: Lighthouse を用意できませんでした"; return
+  fi
+  chrome=${A11Y_CHROMIUM:-$(cd "$A11Y_TOOL" && node --input-type=module \
+    -e "import { chromium } from 'playwright'; console.log(chromium.executablePath())")}
+  [ -x "$chrome" ] || { fail "M-16: Chromium が見つかりません（$chrome）"; return; }
+  # 既定はデスクトップの条件（社内の業務画面を想定）。mobile にするとモバイルの回線・端末の条件になる
+  [ "${LIGHTHOUSE_PRESET:-desktop}" = mobile ] || args+=("--preset=${LIGHTHOUSE_PRESET:-desktop}")
+  mkdir -p "$REPORTS/frontend/lighthouse"
+  read -ra pages <<< "$LIGHTHOUSE_PAGES"
+  for page in "${pages[@]}"; do
+    n=$((n + 1))
+    for ((i = 1; i <= ${LIGHTHOUSE_RUNS:-3}; i++)); do
+      output="$REPORTS/frontend/lighthouse/page${n}-run${i}.json"
+      if ! CHROME_PATH="$chrome" node "$tool/node_modules/lighthouse/cli/index.js" "${APP_URL}${page}" \
+          --quiet --output json --output-path "$output" \
+          --only-categories=performance,accessibility,best-practices,seo \
+          --chrome-flags="--headless=new --no-sandbox" "${args[@]}"; then
+        rm -f "$output"
+        warn "M-16: ${page} の ${i} 回目の計測に失敗しました"
+      fi
+    done
+  done
+  [ -n "$(ls -A "$REPORTS/frontend/lighthouse")" ] || fail "M-16: Lighthouse の結果がありません"
   rm -rf "$tool"
 }
 
@@ -454,6 +535,43 @@ memory_limit() {
     limit=$(awk '/MemTotal/ {print $2 * 1024}' /proc/meminfo)
   fi
   echo "$((limit / 1024 / 1024))MiB"
+}
+
+# --- M-15（jscpd。参考値）。backend と frontend のコードの重複を数える --------------------------
+# run_jscpd <解析するディレクトリ> <出力> <除外（カンマ区切り）>
+run_jscpd() {
+  local target=$1 output=$2 ignore=$3 out="$WORK/jscpd-out"
+  rm -rf "$out"
+  "$JSCPD_TOOL/node_modules/.bin/jscpd" --silent --reporters json --output "$out" \
+    ${ignore:+--ignore "$ignore"} "$target" || return 1
+  [ -s "$out/jscpd-report.json" ] || return 1
+  mv "$out/jscpd-report.json" "$output"
+  rm -rf "$out"
+}
+
+measure_duplication() {
+  local patterns pattern dir ignore=""
+  JSCPD_TOOL="$WORK/jscpd-tool"
+  group "コードの重複（jscpd）"
+  if ! prepare_tool jscpd "${QG_JSCPD_TOOL_DIR:-}" "$JSCPD_TOOL"; then
+    fail "M-15: jscpd を用意できませんでした"; endgroup; return
+  fi
+  if [ -n "${BACKEND_DIR:-}" ]; then
+    run_jscpd "$SRC/$BACKEND_DIR/src/main/java" "$REPORTS/backend/jscpd-report.json" "" \
+      || fail "M-15: jscpd（backend）の実行に失敗しました"
+  fi
+  if [ -n "${FRONTEND_DIR:-}" ]; then
+    # 解析するディレクトリと除外は M-07（frontend）と同じ（テストと型定義は数えない）
+    read -ra patterns <<< "${FRONTEND_COMPLEXITY_EXCLUDE:-**/*.spec.ts **/*.test.ts **/*.d.ts}"
+    for pattern in "${patterns[@]}"; do ignore+="${ignore:+,}$pattern"; done
+    read -ra patterns <<< "${FRONTEND_COMPLEXITY_SOURCES:-src}"
+    # jscpd は 1 回に 1 つのディレクトリを受け取る。複数あれば最初のもの（多くは src）を解析する
+    dir="$SRC/$FRONTEND_DIR/${patterns[0]}"
+    run_jscpd "$dir" "$REPORTS/frontend/jscpd-report.json" "$ignore" \
+      || fail "M-15: jscpd（frontend）の実行に失敗しました"
+  fi
+  rm -rf "$JSCPD_TOOL"
+  endgroup
 }
 
 # --- Trivy / oasdiff。コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす ----
@@ -538,7 +656,16 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend_complexity
 fi
 cleanup_base
-[ -z "${A11Y_PAGES:-}" ] || measure_accessibility
+if [ -n "${FRONTEND_DIR:-}" ]; then
+  if [ -n "${A11Y_PAGES:-}" ] || [ -n "${LIGHTHOUSE_PAGES:-}" ] || [ "${BUNDLE_SIZE:-}" = true ]; then
+    build_frontend
+  fi
+  [ "${BUNDLE_SIZE:-}" != true ] || measure_bundle_size
+fi
+if [ -n "${A11Y_PAGES:-}" ] || [ -n "${LIGHTHOUSE_PAGES:-}" ]; then
+  measure_app
+fi
+[ "${DUPLICATION:-}" != true ] || measure_duplication
 [ -z "${PERF_SCRIPT:-}" ] || measure_performance
 [ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes
 measure_vulnerabilities

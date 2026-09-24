@@ -1,0 +1,9 @@
+{
+  "name": "quality-gate-collector-lighthouse",
+  "private": true,
+  "description": "収集ランナーの M-16（Lighthouse。参考値）。Chromium は M-10 の Playwright のものを使う",
+  "type": "module",
+  "dependencies": {
+    "lighthouse": "13.5.0"
+  }
+}

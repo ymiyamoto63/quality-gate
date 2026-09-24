@@ -77,6 +77,14 @@ metrics:
     enabled: true
     max_forbidden: 0
     # max_restricted: 0            # restricted（GPL など）も不合格にする場合
+  # 参考値の指標（M-15 コード重複率 / M-16 Lighthouse / M-17 バンドルサイズ）。
+  # 合格ラインを持たず、値とトレンドだけを残す（合否・部分計測には影響しない）。書けるのは enabled だけ
+  duplication:
+    enabled: true
+  lighthouse:
+    enabled: true
+  bundle_size:
+    enabled: true
   accessibility:
     enabled: true
     standard: wcag22aa

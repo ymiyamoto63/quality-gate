@@ -86,6 +86,9 @@ function unitSuffix(unit: string | null | undefined): string {
       return ' 件'
     case 'ms':
       return 'ms'
+    // Lighthouse のスコア（0〜100）。「88 score」ではなく「88 点」と読ませる
+    case 'score':
+      return ' 点'
     case null:
     case undefined:
     case '':

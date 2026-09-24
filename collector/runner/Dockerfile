@@ -50,6 +50,13 @@ RUN cd /opt/qg-complexity \
  && npm ci --no-audit --no-fund \
  && rm -rf /root/.npm
 
+# M-15（jscpd）と M-16（Lighthouse。Chromium は上の Playwright のものを使う）。参考値の指標
+COPY jscpd/package.json jscpd/package-lock.json /opt/qg-jscpd/
+COPY lighthouse/package.json lighthouse/package-lock.json /opt/qg-lighthouse/
+RUN cd /opt/qg-jscpd && npm ci --no-audit --no-fund \
+ && cd /opt/qg-lighthouse && npm ci --no-audit --no-fund \
+ && rm -rf /root/.npm
+
 # 計測はランナーの利用者の UID で動かす（作業領域のファイルの持ち主をそろえ、ジョブの最後に消せるようにする）。
 # その UID には名前が無いため、HOME は誰でも書ける場所にし、キャッシュ用のボリュームを重ねる
 RUN mkdir -p /cache/home && chmod 1777 /cache/home
@@ -59,4 +66,6 @@ ENV HOME=/cache/home \
     MAVEN_OPTS=-Duser.home=/cache/home \
     QG_COLLECTOR_IN_CONTAINER=1 \
     QG_A11Y_TOOL_DIR=/opt/qg-a11y \
-    QG_COMPLEXITY_TOOL_DIR=/opt/qg-complexity
+    QG_COMPLEXITY_TOOL_DIR=/opt/qg-complexity \
+    QG_JSCPD_TOOL_DIR=/opt/qg-jscpd \
+    QG_LIGHTHOUSE_TOOL_DIR=/opt/qg-lighthouse

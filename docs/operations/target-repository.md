@@ -176,6 +176,7 @@ Run 作成時に `skippedMetrics` で申告します（申告のない未提出�
 | `junit-xml` / `pact-verification` | M-08 契約テスト成功率 | 契約テストのレポートだけを送る |
 | `oasdiff-json` | M-09 破壊的変更 | 比較元に定義が無いときは `metadata={"baseSpecMissing":true}` |
 | `axe-json` | M-10 アクセシビリティ | `.quality-gate.yml` の `accessibility.pages` の画面がすべて含まれている必要がある |
+| `jscpd-json` / `lighthouse-json` / `bundle-size-json` | M-15〜M-17（参考値） | 合格ラインを持たず、合否に影響しない。`lighthouse-json` は 1 画面 1 回分を 1 ファイルで送る（同じ画面の複数回分は中央値を取る）。`bundle-size-json` の形は `{"files":[{"path","bytes","gzipBytes"}]}` |
 | `test-junit-xml` | M-11 テスト成功率 / M-12 スキップされたテスト数 | すべてのテストの JUnit XML。`component=` を付ける（コンポーネントごとに判定する）。`.quality-gate.yml` の `test_results` で有効にしたときだけ判定する |
 
 ファイルサイズの上限は 1 ファイル 50MB、1 Run あたり合計 200MB です。

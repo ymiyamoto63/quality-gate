@@ -30,6 +30,11 @@
 
 `ERROR` は既定で Run 全体を FAIL にする（fail-closed）。
 
+**参考値の指標**（M-15 / M-16 / M-17）は合格ラインを持たず、判定は常に `REFERENCE` とする。
+値とトレンドだけを残し、Run の合否・部分計測（PARTIAL）・ダッシュボードのカテゴリの状態に影響させない。
+成果物が届かなかった場合も `ERROR` と表示するが、合否には影響させない（参考値の計測の失敗で Run を不合格にしない）。
+基準値が見えてから合格ラインを決めるための、蓄積の期間に使う（[M-15〜M-17](#m-15-コード重複率--m-16-lighthouse-パフォーマンススコア--m-17-バンドルサイズ参考値)）。
+
 ### 0.2 計測の対象範囲（exclusions）
 
 `.quality-gate.yml` の `exclusions` に列挙した glob パターンに一致するファイルは、
@@ -143,6 +148,9 @@ fingerprint にファイルパスを含むのは M-07 だけなので、対象�
 | M-11/12 | JUnit (surefire / failsafe / Vitest junit reporter) | JUnit XML | `test-junit-xml` |
 | M-13 | Trivy（`--scanners secret`）/ gitleaks | SARIF 2.1.0 | `sarif`（メタデータ `scanners` に `secret`） |
 | M-14 | Trivy（`--scanners license`） | SARIF 2.1.0 | `sarif`（メタデータ `scanners` に `license`） |
+| M-15 | jscpd | `jscpd-report.json` | `jscpd-json` |
+| M-16 | Lighthouse | 結果 JSON（`--output json`。1 画面 1 回分） | `lighthouse-json` |
+| M-17 | 収集ランナー（`collector/bundle/size.mjs`） | ファイルごとのサイズの JSON | `bundle-size-json` |
 | — | （設定ファイル） | `.quality-gate.yml` | `quality-gate-config` |
 
 SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツールは SARIF で提出する。
@@ -1128,6 +1136,53 @@ M-13 / M-14 は `.quality-gate.yml` の `metrics.secrets` / `metrics.licenses` �
 | --- | --- |
 | `scanners` に `secret`（`license`）を申告した SARIF が無い | M-13（M-14）は ERROR |
 | 申告どおりに走査して検出 0 件 | M-13 / M-14 とも PASS |
+
+---
+
+## M-15 コード重複率 / M-16 Lighthouse パフォーマンススコア / M-17 バンドルサイズ（参考値）
+
+要件定義の後に追加した**参考値の指標**（0.1）。合格ラインを持たず、判定は常に `REFERENCE`。
+値とトレンドだけを残し、基準値が見えてから合格ラインを決める。`.quality-gate.yml` の
+`metrics.duplication` / `metrics.lighthouse` / `metrics.bundle_size` で有効にする（**既定では無効**。書けるのは `enabled` だけ）。
+
+| 指標 | カテゴリ | 値 | 単位 | 良い向き |
+| --- | --- | --- | --- | --- |
+| M-15 コード重複率 | コード構造 | 重複した行 / 解析した行 × 100（コンポーネントごと） | % | 小さい |
+| M-16 Lighthouse パフォーマンススコア | 性能テスト | 画面ごとの中央値のうち、最も低い画面のパフォーマンススコア | 点（0〜100） | 大きい |
+| M-17 バンドルサイズ（gzip） | 性能テスト | JavaScript と CSS の gzip 後の合計（コンポーネントごと） | KB | 小さい |
+
+### M-15 コード重複率
+
+jscpd（既定の最小トークン数 50）で、backend は `src/main/java`、frontend は M-07 と同じディレクトリ
+（テストと型定義を除く）を解析する。重複率はレポートの `percentage` ではなく**行数から計算し直す**
+（`duplicatedLines / lines × 100`）。同じコンポーネントに複数のレポートが届いたら、割合を平均せず行数で合算する。
+解析した行が 0 行なら値を持たせない（0% ではない）。import の並びのような定型の重複も数えるため、
+値の絶対水準より増減（トレンド）を見る。
+
+### M-16 Lighthouse パフォーマンススコア
+
+M-10 と同じく、対象アプリ（バックエンドの jar とビルドした画面）を起動し、計測プロファイルの `LIGHTHOUSE_PAGES` を
+Lighthouse で計測する（既定はデスクトップの条件。Chromium は M-10 の Playwright のもの）。
+Lighthouse の値は 1 回ごとの揺れが大きいため、**画面ごとに複数回（既定 3 回）の中央値**を取る（M-03 と同じ考え方）。
+値は**最も低い画面**のスコア（平均にすると、1 画面だけ重くなっても値がほとんど動かない）。
+画面ごとのアクセシビリティ・ベストプラクティス・SEO のスコアと、LCP / CLS / TBT / FCP の中央値は内訳に残す。
+画面は URL のパス（`/login` など）で同定する。計測に失敗した結果（`runtimeError`）は形式不正として扱う。
+
+計測するマシンの性能に左右されるため、同じ収集ランナーでの値の推移を見る（別のマシンの値と比べない）。
+
+### M-17 バンドルサイズ
+
+`vite build` の結果（`dist`）のファイルごとのサイズと gzip 後（最大圧縮）のサイズを数え、JavaScript と CSS の
+gzip 後の合計を値とする（ブラウザが実際に転送する量に近いため）。フォントや画像は内訳にだけ残す
+（コードの増加と素材の追加を混ぜないため）。ソースマップは数えない。gzip 後のサイズが大きいファイル（上位 5 件）を
+内訳に残し、判定理由に前回比（%）を添える。
+
+### 境界条件
+
+| 条件 | 扱い |
+| --- | --- |
+| 成果物が未提出・形式不正 | `ERROR` と表示するが、Run の合否には影響しない |
+| 比較対象 Run に値がある | Run 詳細に前回比を出す（良し悪しの向きは上の表） |
 
 ---
 

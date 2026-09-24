@@ -13,7 +13,7 @@ class MetricCatalogTest {
     void 要件定義の指標と追加した指標をすべて持つ() {
         assertThat(MetricCatalog.all()).extracting(MetricDefinition::metricId)
                 .containsExactly("M-01", "M-02", "M-03", "M-04", "M-05",
-                        "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12", "M-13", "M-14");
+                        "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12", "M-13", "M-14", "M-15", "M-16", "M-17");
     }
 
     @Test
@@ -27,6 +27,14 @@ class MetricCatalogTest {
      * 廃止された指標の判定結果を持つ過去の Run でも詳細が開けること。
      * 例外にすると、指標を一つ削っただけで過去の画面がすべて壊れる。
      */
+    @Test
+    void 参考値の指標を見分けられる() {
+        assertThat(MetricCatalog.isReferenceOnly("M-15")).isTrue();
+        assertThat(MetricCatalog.isReferenceOnly("M-17")).isTrue();
+        assertThat(MetricCatalog.isReferenceOnly("M-01")).isFalse();
+        assertThat(MetricCatalog.isReferenceOnly("M-99")).isFalse();
+    }
+
     @Test
     void 未知の指標でも例外にしない() {
         MetricDefinition unknown = MetricCatalog.of("M-99");
