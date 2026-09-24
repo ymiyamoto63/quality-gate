@@ -645,7 +645,11 @@ ESLint は SARIF ではなく JSON（`eslint -f json`）で送る（`sarif` の�
 1. **推奨** — CI が base / head の両方で解析を実行し、2 つの成果物を提出する
    （`artifacts.type: pmd-xml` に `scope: base` / `scope: head` を付与）
 2. quality-gate が保持する過去 Run の複雑度データを流用する
-   （ベースコミットの Run が存在する場合のみ。存在しなければ 1 の提出が必須。**未実装**）
+   （ベースコミットで M-07 を判定済みの Run が存在する場合のみ。存在しなければ 1 の提出が必須）。
+   過去 Run には `warn_from` 以上の関数だけが保存されているため、そこに無い関数は
+   ベースで `warn_from` 未満だったとみなす（`warn_from` ≤ `max_complexity` のとき判定は変わらない）。
+   base スコープの解析結果が提出されていればそちらを優先する。Run 詳細の `baseSource` に
+   `artifact` / `past-run` のどちらを使ったかを出す
 
 いずれも得られない場合、(b) の判定は行わず (a) のみを判定し、
 Run 詳細に「ベース比較不可のため新規追加分のみ判定」と明示する。

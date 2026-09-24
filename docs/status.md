@@ -40,7 +40,8 @@
     計測環境（`environment.name`）ごとに前回比とトレンドの系列を分ける。GitHub ホストランナーの値は参考値。
     シナリオ単位の p95 も判定し、エラー率 5% 超は負荷試験が成立していないとして ERROR（`perf/k6/`）
   - M-06 重大・高 脆弱性件数（SARIF / OSV-Scanner の JSON）
-  - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON / lizard の CSV）
+  - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON / lizard の CSV）— 比較元は base スコープの解析結果、
+    無ければ比較元コミットで判定済みの過去の Run
   - M-08 API 契約テスト成功率（JUnit XML / Pact の検証結果 JSON）— `<testcase>` を数え直し、consumer と provider を
     合算して判定する。実行 0 件は「すべて成功」ではなく ERROR、スキップと再実行での成功は WARN
   - M-09 OpenAPI の破壊的変更件数（oasdiff の JSON）— level 3 を破壊的変更として数え、level 2 は WARN。
