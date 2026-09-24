@@ -119,7 +119,7 @@ public class RunEvaluationService {
         findings.flush();
 
         persistMeasurements(run, results, context);
-        persistFindings(run, results, baseline, active);
+        persistFindings(run, results, baseline, active, input);
 
         Verdict verdict = aggregate(results);
         Completeness completeness = completenessOf(results);
@@ -248,7 +248,7 @@ public class RunEvaluationService {
      * 不変のスナップショットに保ち、比較対象が削除されても表示が壊れないようにするため。
      */
     private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline,
-                                 ActiveWaivers active) {
+                                 ActiveWaivers active, NormalizedInput input) {
         Set<String> baselineFingerprints = baseline
                 .map(b -> Set.copyOf(findings.findActiveFingerprints(b.getId())))
                 .orElse(Set.of());
@@ -257,7 +257,15 @@ public class RunEvaluationService {
         for (MetricResult result : results) {
             for (IdentifiedFinding finding : result.findingsToPersist()) {
                 current.add(finding.fingerprint());
-                FindingState state = stateOf(finding.fingerprint(), baselineFingerprints,
+                // ファイルを移動・リネームしただけの違反は、移動前の fingerprint で比較対象と突き合わせる
+                // （指標仕様書 0.4）。比較対象の移動前の違反は「解消」にしない
+                String previous = input.previousFingerprintOf(finding.fingerprint());
+                boolean moved = previous != null && baselineFingerprints.contains(previous)
+                        && !baselineFingerprints.contains(finding.fingerprint());
+                if (moved) {
+                    current.add(previous);
+                }
+                FindingState state = stateOf(moved ? previous : finding.fingerprint(), baselineFingerprints,
                         baseline.isPresent());
                 Finding entity = toEntity(run, finding, state);
                 active.waiverOf(finding).ifPresent(entity::applyWaiver);
@@ -330,12 +338,6 @@ public class RunEvaluationService {
     }
 
     /**
-     * 比較対象 Run。同一ブランチで、この Run より前に計測された判定済みの Run。
-     *
-     * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
-     * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
-     */
-    /**
      * M-07 の比較元を、比較元コミットで判定済みの過去の Run から求める（指標仕様書 M-07「ベース側の CC 取得」の 2）。
      *
      * <p>比較元の解析結果（scope=base）が送られていて、Run に比較元コミットがあり、そのコミットの Run で M-07 が
@@ -375,7 +377,13 @@ public class RunEvaluationService {
     private static final Set<MeasurementStatus> JUDGED =
             Set.of(MeasurementStatus.PASS, MeasurementStatus.WARN, MeasurementStatus.FAIL);
 
-    private Optional<Run> findBaseline(Run run) {
+    /**
+     * 比較対象 Run。同一ブランチで、この Run より前に計測された判定済みの Run。
+     *
+     * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
+     * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
+     */
+    public Optional<Run> findBaseline(Run run) {
         if (run.getBaselineRunId() != null) {
             Optional<Run> previous = runs.findById(run.getBaselineRunId());
             if (previous.isPresent()) {

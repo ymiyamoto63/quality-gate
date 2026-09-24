@@ -31,6 +31,8 @@
 - 可観測性 — JSON 構造化ログ（`QG_LOG_FORMAT`）、相関 ID（`requestId` / `runId` / `jobId` を MDC に載せ、エラー応答の `traceId` と一致）、
   メトリクス `qg.ingest.*` / `qg.evaluation.duration` / `qg.jobs.*` / `qg.artifacts.bytes` / `qg.notifications` / `qg.rate_limit.rejected`
 - 比較元（`baseCommitSha`）が省略された Run の merge-base を、判定ジョブの中で GitHub API により求める（GitHub App / トークン / 認証なし。失敗しても判定は続ける）
+- ファイルの移動・リネームを判定ジョブの中で GitHub の compare API により求めて Run に保持し、移動しただけの
+  M-07 の違反を新規・解消として扱わない（指標仕様書 0.4）
 - **取り込み → 正規化 → 判定 → 読み取りモデル更新**の一連の流れ
   - M-01 ブランチカバレッジ（JaCoCo XML / lcov / istanbul の coverage-final.json）
   - M-02 ミューテーションスコア（PIT `mutations.xml`）— status を数え直して仕様の式で計算し、

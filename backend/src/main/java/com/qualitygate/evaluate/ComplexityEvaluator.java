@@ -57,7 +57,8 @@ public class ComplexityEvaluator implements MetricEvaluator {
             int complexity = head.getOrDefault(finding.fingerprint(), 0);
             if (complexity > thresholds.maxComplexity()) {
                 exceeding.add(finding);
-                if (baseAvailable && isNewlyExceeding(finding.fingerprint(), complexity, base)) {
+                if (baseAvailable && isNewlyExceeding(finding.fingerprint(),
+                        context.input().previousFingerprintOf(finding.fingerprint()), complexity, base)) {
                     newlyExceeding++;
                 }
             } else if (complexity >= thresholds.complexityWarnFrom()) {
@@ -91,10 +92,16 @@ public class ComplexityEvaluator implements MetricEvaluator {
                 BigDecimal.valueOf(newlyExceeding), "count", threshold, reason, detail, toPersist));
     }
 
-    /** ベースに存在しない（新規追加）、またはベースより CC が増加している。 */
-    private static boolean isNewlyExceeding(String fingerprint, int complexity,
+    /**
+     * ベースに存在しない（新規追加）、またはベースより CC が増加している。
+     * ファイルを移動・リネームした関数は、移動前の fingerprint でもベースを引く（指標仕様書 0.4）。
+     */
+    private static boolean isNewlyExceeding(String fingerprint, String previousFingerprint, int complexity,
                                             Map<String, Integer> base) {
         Integer baseComplexity = base.get(fingerprint);
+        if (baseComplexity == null && previousFingerprint != null) {
+            baseComplexity = base.get(previousFingerprint);
+        }
         return baseComplexity == null || complexity > baseComplexity;
     }
 

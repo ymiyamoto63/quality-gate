@@ -88,7 +88,7 @@ public class DryRunService {
                 continue;
             }
             RunEvaluationService.Simulation simulation = evaluationService.simulate(run.getId(),
-                    normalizer.normalize(records, thresholds.exclusions()), thresholds);
+                    normalizer.normalize(records, thresholds.exclusions(), normalizer.renamesOf(run)), thresholds);
             results.add(new DryRunResponse.RunResult(run.getId(), run.getMeasuredAt(), run.getCommitSha(),
                     run.getVerdict(), simulation.verdict(),
                     changesOf(measurements.findByRunId(run.getId()), simulation.results())));
