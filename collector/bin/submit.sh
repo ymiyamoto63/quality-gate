@@ -119,5 +119,15 @@ if [ -n "${OPENAPI_PATH:-}" ]; then
   fi
 fi
 upload sarif "$REPORTS/trivy.sarif"
+# M-03〜05。1 ファイル = 1 回の実行。計測環境（と異常終了）は measure.sh が書いた .metadata を添える
+if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
+  found=0
+  for summary in "$REPORTS"/perf/k6-summary-*.json; do
+    [ -e "$summary" ] || continue
+    upload k6-summary "$summary" "$BACKEND" '' "$(cat "$summary.metadata")"
+    found=1
+  done
+  [ "$found" -eq 1 ] || warn "成果物がありません（type=k6-summary）: $REPORTS/perf/"
+fi
 
 curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .

@@ -6,12 +6,14 @@
 # like-chatgpt の .quality-gate.yml との違い:
 #   - mutation_score は対象と同じ（全量・60%）。収集ランナーは PR では PIT を実行せずスキップを申告するため、
 #     skippable_metrics に mutation_score が必要
+#   - performance は収集ランナーの負荷試験（collector/targets/ymiyamoto63__like-chatgpt.k6.js）で計測する。
+#     M-02 と同じく PR では実行せずスキップを申告するため、skippable_metrics に performance が必要
 version: 1
 enforcement: report-only
 on_missing_report: fail
 
 execution:
-  skippable_metrics: [mutation_score]   # PR の計測では M-02 をスキップする
+  skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03〜05 をスキップする
   full_measurement_interval_days: 7
   reference_only_environments: [github-hosted]
 
@@ -42,7 +44,11 @@ metrics:
     scope: all                    # 収集ランナーは既定ブランチで全量を実行する
     components: [backend]
   performance:
-    enabled: false
+    enabled: true
+    p95_ms: 500
+    arrival_rate_rps: 50          # k6 のシナリオの到達率の合計と一致させる
+    error_rate_pct: 0.1
+    scenarios: [chat, suggest, monitoring]   # k6 のシナリオ名と一致させる
   vulnerabilities:
     enabled: true
     max_critical: 0
