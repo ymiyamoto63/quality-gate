@@ -240,7 +240,7 @@ public class ConfigQueryService {
                 config.getSourceType(), config.getSourceCommitSha(), config.getCreatedAt());
     }
 
-    private static ConfigResponses.ValidationErrorItem errorOf(ConfigValidationError error) {
+    static ConfigResponses.ValidationErrorItem errorOf(ConfigValidationError error) {
         return new ConfigResponses.ValidationErrorItem(error.line(),
                 error.path() == null ? "" : error.path(), error.message());
     }

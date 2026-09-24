@@ -149,6 +149,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | POST | `/api/v1/repositories/{id}/ingest-tokens` | トークン発行（平文は応答時のみ） | ADMIN |
 | DELETE | `/api/v1/ingest-tokens/{id}` | トークン失効 | ADMIN |
 | PUT | `/api/v1/repositories/{id}/config` | UI からの設定更新 | ADMIN |
+| POST | `/api/v1/repositories/{id}/config/dry-run` | 設定変更のドライラン（FR-02-5）。`rawYaml` と `runs`（直近の Run 数、既定 10・最大 30）を受け、既定ブランチの Run を判定し直した結果を返す。何も保存しない。検証エラーは `422 CONFIG_VALIDATION_FAILED` | ADMIN |
 | POST | `/api/v1/runs/{runId}/reevaluate` | 再評価の実行 | ADMIN |
 | POST | `/api/v1/waivers` | 免除の登録 | ADMIN |
 | DELETE | `/api/v1/waivers/{id}` | 免除の失効 | ADMIN |

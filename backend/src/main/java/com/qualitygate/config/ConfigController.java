@@ -6,6 +6,7 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -20,9 +21,11 @@ import java.util.UUID;
 public class ConfigController {
 
     private final ConfigQueryService service;
+    private final DryRunService dryRunService;
 
-    public ConfigController(ConfigQueryService service) {
+    public ConfigController(ConfigQueryService service, DryRunService dryRunService) {
         this.service = service;
+        this.dryRunService = dryRunService;
     }
 
     @GetMapping
@@ -42,5 +45,14 @@ public class ConfigController {
             @Valid @RequestBody ConfigResponses.UpdateConfigRequest request) {
         service.update(repositoryId, request.rawYaml());
         return service.get(repositoryId);
+    }
+
+    @PostMapping("/dry-run")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Operation(summary = "設定の変更を過去の Run で試算する（ドライラン）",
+            description = "既定ブランチで判定された直近の Run を、保存前の設定で判定し直した結果を返す（FR-02-5）。"
+                    + "何も保存しない。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。")
+    public DryRunResponse dryRun(@PathVariable UUID repositoryId, @Valid @RequestBody DryRunResponse.Request request) {
+        return dryRunService.dryRun(repositoryId, request.rawYaml(), request.runs());
     }
 }
