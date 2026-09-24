@@ -91,8 +91,8 @@ PMD の出した絶対パスに実際に `/<component>/<モジュール相対>` 
 
 `baseCommitSha` は送信側（収集ランナー、または対象の CI）が算出して Ingest API に渡す。
 収集ランナーは clone した履歴から上表のとおり算出する（既定ブランチでは直前のコミット、PR ではマージ先との merge-base）。
-未指定の場合に quality-gate が GitHub App の Contents: Read 権限で merge-base を解決する設計だが、
-GitHub API 連携は未実装であり、現状は解決しない（未指定のまま記録する）。
+未指定の場合は、quality-gate が判定ジョブの中で GitHub API により上表と同じ決め方で求めて記録する
+（GitHub App の Contents / Pull requests: Read、またはトークン。求められなければ未指定のまま判定する）。
 
 ### 0.4 fingerprint
 

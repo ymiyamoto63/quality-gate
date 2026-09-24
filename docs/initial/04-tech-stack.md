@@ -366,7 +366,7 @@ quality-gate 自身を quality-gate の計測対象とする（NFR 10.7、受け
 
 2026-09-23 時点で CI（`.github/workflows/quality-gate.yml`）が実際に成果物を作っているのは次の範囲である。
 M-06 は Trivy のみ（Semgrep・gitleaks は未導入）、M-07 は PMD のみ（ESLint の複雑度は M-07 として読まない）、
-M-08 は backend の `*ApiIT` の JUnit XML のみ。送信処理（`submit` ジョブ）は未実装。
+M-08 は backend の `*ApiIT` の JUnit XML のみ。送信は `submit` ジョブが `quality-gate-action` で行う（[CI から送る](../operations/ci-submit.md)）。
 
 ---
 
