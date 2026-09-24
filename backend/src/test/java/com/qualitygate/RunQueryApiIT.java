@@ -14,7 +14,6 @@ import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
-import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingCriteria;
 import com.qualitygate.domain.repo.FindingRepository;
@@ -27,6 +26,7 @@ import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
+import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
 import com.qualitygate.normalize.ReportNormalizer;
@@ -44,6 +44,10 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -52,7 +56,9 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -69,7 +75,23 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AbstractIntegrationTest
+@Import(RunQueryApiIT.FixedClock.class)
 class RunQueryApiIT {
+
+    /**
+     * 現在時刻を固定する。計測の鮮度（staleMeasurement など）は現在時刻で変わるため、
+     * 固定しないと、書き出す応答例（repository-detail.json）が実行した日によって変わる。
+     * 計測日時（2026-09-22T02:10:00Z）から 7 時間後とし、鮮度は「新しい」になる。
+     */
+    @TestConfiguration(proxyBeanMethods = false)
+    static class FixedClock {
+
+        @Bean
+        @Primary
+        Clock fixedClock() {
+            return Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC);
+        }
+    }
 
     private static final String JACOCO = """
             <?xml version="1.0" encoding="UTF-8"?>

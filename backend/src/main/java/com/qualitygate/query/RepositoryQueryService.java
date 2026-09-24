@@ -16,6 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
@@ -36,13 +37,14 @@ public class RepositoryQueryService {
     private final GateConfigRepository configs;
     private final FreshnessPolicy freshness;
     private final ObjectMapper objectMapper;
+    private final Clock clock;
 
     @SuppressWarnings("java:S107")
     public RepositoryQueryService(MonitoredRepositoryRepository repositories,
                                   RepositoryComponentRepository components,
                                   RepositorySummaryRepository summaries, RunRepository runs,
                                   GateConfigRepository configs, FreshnessPolicy freshness,
-                                  ObjectMapper objectMapper) {
+                                  ObjectMapper objectMapper, Clock clock) {
         this.repositories = repositories;
         this.components = components;
         this.summaries = summaries;
@@ -50,6 +52,7 @@ public class RepositoryQueryService {
         this.configs = configs;
         this.freshness = freshness;
         this.objectMapper = objectMapper;
+        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -70,7 +73,7 @@ public class RepositoryQueryService {
                 .map(RepositoryQueryService::latestOf)
                 .orElse(null);
 
-        Instant now = Instant.now();
+        Instant now = clock.instant();
         Instant lastMeasured = summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null);
         Instant lastFull = summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null);
         int intervalDays = freshness.fullIntervalDays(repositoryId);
