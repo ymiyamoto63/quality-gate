@@ -340,9 +340,14 @@ record RawFinding(
 | `JUnitXmlAdapter` | `junit-xml` | M-08 |
 | `OasdiffJsonAdapter` | `oasdiff-json` | M-09 |
 | `AxeJsonAdapter` | `axe-json` | M-10 |
+| `IstanbulJsonAdapter` | `istanbul-json` | M-01 |
+| `GatlingLogAdapter` | `gatling-log` | M-03 / M-04 / M-05 |
+| `OsvJsonAdapter` | `osv-json` | M-06 |
+| `EslintJsonAdapter` | `eslint-json` | M-07 |
+| `LizardCsvAdapter` | `lizard-csv` | M-07 |
+| `PactVerificationAdapter` | `pact-verification` | M-08 |
 
-`istanbul-json` / `osv-json` / `eslint-json` / `lizard-csv` / `pact-verification` のアダプタは未実装である
-（[02](02-metrics-spec.md) 0.5）。
+形式ごとの読み方は [02](02-metrics-spec.md) 0.5。
 
 `SarifAdapter` は M-06 だけを供給する。SARIF は複雑度も運びうるが、ツール名（`driver.name`）が
 複雑度ツール（PMD / ESLint / lizard）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
