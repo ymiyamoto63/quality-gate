@@ -5,7 +5,7 @@
 | 送り手 | 説明 |
 | --- | --- |
 | 収集ランナー（標準） | quality-gate 側のワークフローが対象を取得・計測して送る（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)） |
-| 対象の CI | 対象リポジトリのワークフローが自分で計測して送る（[CI から直接送る方式](target-repository.md)。quality-gate 自身もこの方式） |
+| 対象の CI | 対象リポジトリのワークフローが自分で計測して送る（[CI から直接送る方式](target-repository.md)） |
 
 取り込みから表示までの流れ:
 
@@ -18,7 +18,7 @@
 5. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 
 > 対象の CI から送るときは、GitHub Actions なら `quality-gate-action`、それ以外なら CLI（`cli/qg-submit`）で
-> 上の 1〜3 を 1 回で行えます（[CI から送る](ci-submit.md)）。quality-gate 自身の計測も `quality-gate-action` で送ります。
+> 上の 1〜3 を 1 回で行えます（[CI から送る](ci-submit.md)）。
 > 収集ランナーは `collector/bin/submit.sh` で送ります。
 
 認証の経路（Ingest Token とセッション Cookie の使い分け）は [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。

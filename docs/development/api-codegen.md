@@ -9,8 +9,7 @@ cd ../frontend && npm run generate:api   # src/api/schema.d.ts を再生成（pr
 git diff --exit-code api/ frontend/src/api/schema.d.ts   # ずれていないか検証
 ```
 
-main への push で動く計測ワークフロー（`quality-gate.yml` の `base` ジョブの「生成物の同期検証」）でも同じ検証を行い、差分があればジョブを失敗させます。
-Pull Request の CI（`ci.yml`）はユニットテストだけを実行し、この検証は行わないため、PR を出す前に手元で確かめてください。
+Pull Request の CI（`ci.yml` の `backend` ジョブの「生成物の同期検証」）でも同じ検証を行い、差分があればジョブを失敗させます。
 
 `frontend/e2e/fixtures/` の応答例も同じ扱いの生成物です。
 結合テスト（`RunQueryApiIT` / `TrendApiIT` / `WaiverApiIT` / `AdminApiIT` / `RepositoryAdminApiIT`）が実物の API から書き出し、

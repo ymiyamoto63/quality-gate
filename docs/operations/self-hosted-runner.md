@@ -1,21 +1,11 @@
 # セルフホストランナー
 
-quality-gate リポジトリの次のワークフローが、**セルフホストランナー**（`runs-on: self-hosted`）で動きます。
+quality-gate リポジトリの**収集ランナー**（`collect.yml` / `collect-target.yml` の `plan` / `fetch` / `measure` / `submit` のすべて）が、
+**セルフホストランナー**（`runs-on: self-hosted`）で動きます。15 分ごとの定期実行と手動実行で対象リポジトリを計測します
+（[収集ランナーで計測する](collector.md)）。ランナー種別の切り替え（D-13）の対象外で、常にセルフホストランナーで動きます。
 
-| ワークフロー | ジョブ | 用途 |
-| --- | --- | --- |
-| `collect.yml` / `collect-target.yml` | `plan` / `fetch` / `measure` / `submit` のすべて | 収集ランナー。対象リポジトリの計測（15 分ごとの定期実行と手動実行。[収集ランナーで計測する](collector.md)） |
-| `quality-gate.yml` | `base` / `mutation`（既定） | quality-gate 自身の計測（main への push と手動実行のみ） |
-
-Pull Request の CI（`ci.yml`）はユニットテストだけを GitHub ホストランナー（`ubuntu-latest`）で実行し、
-セルフホストランナーを使いません。ランナーが止まっていても PR の CI は止まりません。
-
-収集ランナーは常にセルフホストランナーで動きます（D-13 の切り替えの対象外）。
-`quality-gate.yml` の計測ジョブをセルフホストランナーで動かすのは、実行時間の長い PIT を GitHub ホストランナーで回すと
-Actions の無料枠（月 2,000 分）を使い切ってしまうためです。セルフホストランナーの実行時間は無料枠を消費しません。
-quality-gate 自身の性能（M-03〜05）は計測しません（D-17）。
-
-なお `quality-gate.yml` の `setup` と `submit` の 2 ジョブは短時間で終わるため、常に `ubuntu-latest` で動きます。
+Pull Request の CI（`ci.yml`）は GitHub ホストランナー（`ubuntu-latest`）で動き、セルフホストランナーを使いません。
+ランナーが止まっていても PR の CI は止まりません。quality-gate 自身を計測するワークフローはありません（D-18）。
 
 ## 1. マシンの準備
 
@@ -24,10 +14,10 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 | 必要なもの | 使う箇所 |
 | --- | --- |
-| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 結合テストの Testcontainers、oasdiff（`docker run tufin/oasdiff`）、Trivy（収集ランナー） |
+| Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 計測用のコンテナ、oasdiff（`docker run tufin/oasdiff`）、Trivy |
 | git | チェックアウトと merge-base の解決 |
 | curl / unzip / jq | 収集ランナー（`collect.yml`）の PMD の取得と送信（[収集ランナーで計測する](collector.md)） |
-| パスワードなしの `sudo`、または Playwright の依存パッケージの事前導入 | `npx playwright install --with-deps chromium` が apt で OS パッケージを入れる |
+| Chromium の依存パッケージ（計測用のコンテナを使わない `ISOLATION=none` の場合のみ） | M-10 の検査。コンテナで計測する場合はイメージに入っている |
 | github.com / Maven Central / npm レジストリへの外向き通信 | ランナーの接続、JDK・Node.js・依存関係の取得 |
 | 十分なディスク（目安 20GB 以上） | Maven / npm のキャッシュ、Docker イメージ、Playwright のブラウザ |
 
@@ -65,25 +55,13 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 収集ランナーの変数とシークレット（`QG_BASE_URL` / `QG_COLLECTOR_APP_ID` / `QG_COLLECTOR_APP_PRIVATE_KEY` / 対象ごとの Ingest Token）は
 [収集ランナーで計測する](collector.md#1-3-quality-gate-リポジトリの変数とシークレット) を参照してください。
-以下は quality-gate 自身の CI（`quality-gate.yml`）のものです。
 
-**Settings → Secrets and variables → Actions** で次を設定します。
-
-| 種別 | 名前 | 値 | 説明 |
-| --- | --- | --- | --- |
-| Variables | `QG_RUNNER` | `self-hosted`（既定）/ `ubuntu-latest` | 計測ジョブを実行するランナー。未設定なら `self-hosted` |
-| Variables | `QG_RUN_HEAVY_ON_GITHUB` | `false`（既定）/ `true` | GitHub ホストランナーでも PIT を実行するか。セルフホストでは常に実行する |
-| Variables | `QG_BASE_URL` | 例: `https://quality-gate.example.com` | 取り込み先の quality-gate の URL |
-| Secrets | `QG_INGEST_TOKEN` | `qg_<prefix>_<secret>` | quality-gate 自身の Ingest Token（[取り込み](ingest.md)を参照） |
-
-`QG_BASE_URL` と `QG_INGEST_TOKEN` は `submit` ジョブが `quality-gate-action` で送信に使います（[CI から送る](ci-submit.md)）。
-`QG_BASE_URL` が未設定なら送信のステップを飛ばします。
+以前 quality-gate 自身の計測に使っていたリポジトリ変数 `QG_RUNNER` / `QG_RUN_HEAVY_ON_GITHUB` とシークレット `QG_INGEST_TOKEN` は
+使わなくなりました。設定済みなら削除して構いません（`QG_BASE_URL` は収集ランナーが使うため残します）。
 
 ## 4. 動作確認
 
-**Actions → quality-gate → Run workflow** で `runner` に `self-hosted` を選んで実行し、
-`base` / `mutation` がセルフホストランナーで動くことを確かめます。
-収集ランナーの確認は [収集ランナーで計測する](collector.md#2-手動で実行する) の手動実行で行います。
+[収集ランナーで計測する](collector.md#2-手動で実行する) の手動実行で、ジョブがセルフホストランナーで動くことを確かめます。
 
 ## ランナーを止めるとき
 
@@ -94,14 +72,6 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 ランナーを戻せば、次の定期実行で各ブランチ・PR のいまの先頭が計測されます。
 長く止める場合は **Actions → collect → Disable workflow** で定期実行を止めておくと、待機中の実行が溜まりません。
 
-以下は quality-gate 自身の CI（`quality-gate.yml`）の扱いです。
-保守などで止める期間は、リポジトリ変数 `QG_RUNNER` を `ubuntu-latest` に変えてください。
-このとき PIT は実行されず（`QG_RUN_HEAVY_ON_GITHUB` が `false` の場合）、`submit` ジョブがスキップ対象として扱うため、
-Run は部分計測になります（送信処理の実装後）。完全計測が `execution.full_measurement_interval_days`（既定 7 日）を
-超えて途絶えると警告が出るため、復旧したら `self-hosted` に戻します。
-
 > **注意**: セルフホストランナーは、ワークフローを動かせる人なら誰でもそのマシン上で任意のコードを実行できます。
 > 収集ランナーは対象リポジトリのテストコードもこのマシンで実行するため、quality-gate リポジトリは private のままにしてください。
-> リポジトリを公開する場合は、フォークからの Pull Request がセルフホストランナーで動かないよう
-> **Settings → Actions → General** で外部コントリビューターのワークフロー実行に承認を必須にするか、
-> `QG_RUNNER` を `ubuntu-latest` にしてください。
+> リポジトリを公開する場合は、**Settings → Actions → General** で外部コントリビューターのワークフロー実行に承認を必須にしてください。

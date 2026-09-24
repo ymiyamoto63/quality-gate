@@ -1,4 +1,5 @@
-# quality-gate 自身の品質ゲート設定（ドッグフーディング）
+# 対象の CI から直接送る方式の設定例（docs/operations/target-repository.md）
+# quality-gate 自身はこの設定で計測・送信しない（D-18）。合格ラインの書き方の見本として残している
 # 仕様: docs/initial/02-metrics-spec.md
 version: 1
 enforcement: report-only          # report-only | check-run | blocking
@@ -42,7 +43,7 @@ metrics:
     threshold: 60
     scope: changed
     components: [backend]         # PIT は JVM 専用のため backend のみ
-  # quality-gate 自身の性能は計測しない（D-17。社内の少人数向けツールで、負荷試験が性能の保証にならないため）
+  # 性能は計測しない（D-17。社内の少人数向けツールで、負荷試験が性能の保証にならないため）
   performance:
     enabled: false
   vulnerabilities:
@@ -56,7 +57,7 @@ metrics:
     scope: new_and_modified
     warn_from: 11
   # 契約テストは API の応答を検証する結合テスト（*ApiIT）の JUnit XML、
-  # 破壊的変更は merge-base の api/openapi.yml との oasdiff で計測する（CI の base ジョブ）
+  # 破壊的変更は merge-base の api/openapi.yml との oasdiff で計測する
   api_contract:
     enabled: true
     min_success_rate: 100

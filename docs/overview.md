@@ -7,7 +7,7 @@ quality-gate は、指定したリポジトリの品質指標を定量的に計�
 対象リポジトリを取得して行い、その成果物（JaCoCo / lcov / SARIF / PMD / JUnit XML / oasdiff など）を
 Ingest API で送ります。対象リポジトリには設定ファイルもワークフローも置きません（D-16）。
 バックエンドは送られた成果物を取り込んで、正規化・判定・可視化・通知を担当します（テストは実行しません。D-1）。
-対象の CI から Ingest API へ直接送ることもできます（quality-gate 自身の計測はこの方式）。
+対象の CI から Ingest API へ直接送ることもできます。quality-gate 自身は計測せず、Pull Request の CI でテストと検査だけを行います（D-18）。
 
 ## 対象とする品質指標
 
@@ -46,7 +46,7 @@ quality-gate/
 ├ api/openapi.yml   バックエンドから生成（コミットする）
 ├ collector/        収集ランナー（計測スクリプト・対象ごとの計測プロファイル・ツールの版）
 ├ docs/             ドキュメント（initial/ は初期の要件定義・設計）
-├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ quality-gate.yml（自身の CI）
+├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
 ├ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）
-└ .quality-gate.yml 自分自身の品質ゲート設定
+└ .quality-gate.yml CI から直接送る方式の設定例（quality-gate 自身は送らない）
 ```
