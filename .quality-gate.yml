@@ -6,7 +6,7 @@ on_missing_report: fail           # fail | warn
 
 execution:
   # CI がスキップを申告できる指標。ここに無い指標のスキップ申告は ERROR とする
-  skippable_metrics: [mutation_score, performance]
+  skippable_metrics: [mutation_score]
   # 完全計測がこの日数を超えて行われない場合に警告する
   full_measurement_interval_days: 7
   # この環境で計測された性能値は参考値（REFERENCE）とし、判定に用いない
@@ -42,12 +42,9 @@ metrics:
     threshold: 60
     scope: changed
     components: [backend]         # PIT は JVM 専用のため backend のみ
+  # quality-gate 自身の性能は計測しない（D-17。社内の少人数向けツールで、負荷試験が性能の保証にならないため）
   performance:
-    enabled: true
-    p95_ms: 500
-    arrival_rate_rps: 50
-    error_rate_pct: 0.1
-    scenarios: ["dashboard", "run-detail", "ingest"]
+    enabled: false
   vulnerabilities:
     enabled: true
     max_critical: 0
