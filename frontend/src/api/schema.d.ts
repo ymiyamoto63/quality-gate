@@ -109,6 +109,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/reports': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 品質レポートを取得する
+     * @description 期間内に判定された既定ブランチの Run を、リポジトリごとにまとめる。期間を省略すると今日までの 30 日間。リポジトリを省略すると有効なリポジトリすべて
+     */
+    get: operations['report']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/reports/measurements.csv': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 品質レポートの明細を CSV で取得する
+     * @description 1 行が「Run × 指標（コンポーネント・計測条件）」。UTF-8（BOM つき）。条件はレポートと同じ
+     */
+    get: operations['csv']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/repositories': {
     parameters: {
       query?: never
@@ -808,17 +848,13 @@ export interface components {
       tokenPrefix: string
     }
     LatestRun: {
-      /** @enum {string} */
-      completeness?: 'FULL' | 'PARTIAL'
+      commitSha: string
       /** Format: date-time */
-      measuredAt?: string
+      measuredAt: string
       /** Format: uuid */
-      runId?: string
-      /**
-       * @description 判定結果。未判定なら null
-       * @enum {string}
-       */
-      verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
+      runId: string
+      /** @enum {string} */
+      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
     }
     LatestRunSummary: {
       branch: string
@@ -845,6 +881,21 @@ export interface components {
       /** Format: uuid */
       userId?: string
     }
+    MetricRow: {
+      /** @description 最新の値 − 最初の値 */
+      change: number | null
+      componentName: string | null
+      /** @description 期間内で最初の Run の値（同じコンポーネント・条件） */
+      firstValue: number | null
+      metricId: string
+      name: string
+      /** @enum {string} */
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
+      unit: string | null
+      value: number | null
+      /** @description 計測条件（全量 / 変更範囲、計測環境など） */
+      variant: string | null
+    }
     /** @description 通知設定。通知はメールで送る */
     NotificationSettingsResponse: {
       /** @enum {string} */
@@ -867,6 +918,16 @@ export interface components {
        */
       status:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+    }
+    /** @description 品質レポート（FR-08-4） */
+    ReportResponse: {
+      /** Format: date */
+      from: string
+      repositories: components['schemas']['RepositoryReport'][]
+      /** Format: date */
+      to: string
+      /** @description 期間の区切りに使ったタイムゾーン */
+      zone: string
     }
     /** @description 登録・更新したリポジトリ */
     RepositoryAdminResponse: {
@@ -949,6 +1010,30 @@ export interface components {
       fullName: string | null
       /** Format: uuid */
       repositoryId: string
+    }
+    /** @description 1 リポジトリ分 */
+    RepositoryReport: {
+      defaultBranch: string
+      /** Format: int32 */
+      failed: number
+      fullName: string
+      /** @description 期間内で最新の Run */
+      latest: components['schemas']['LatestRun']
+      /** @description 最新の Run の指標と、期間の最初の値からの変化 */
+      metrics: components['schemas']['MetricRow'][]
+      /** @description 合格（警告つきを含む）の割合（%）。Run が無ければ null */
+      passRate: number | null
+      /** Format: int32 */
+      passed: number
+      /** Format: int32 */
+      passedWithWarnings: number
+      /** Format: uuid */
+      repositoryId: string
+      /**
+       * Format: int32
+       * @description 期間内に判定された既定ブランチの Run の数
+       */
+      runs: number
     }
     /** @description データ保持期間（日） */
     RetentionSettings: {
@@ -1457,6 +1542,53 @@ export interface operations {
         content: {
           '*/*': components['schemas']['MeResponse']
         }
+      }
+    }
+  }
+  report: {
+    parameters: {
+      query?: {
+        from?: string
+        to?: string
+        /** @description 対象のリポジトリ（複数指定可） */
+        repositoryId?: string[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ReportResponse']
+        }
+      }
+    }
+  }
+  csv: {
+    parameters: {
+      query?: {
+        from?: string
+        to?: string
+        repositoryId?: string[]
+      }
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }

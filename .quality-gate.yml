@@ -81,6 +81,7 @@ metrics:
       - "/repositories/:id/trends"
       - "/repositories/:id/config"
       - "/waivers"
+      - "/reports"
       - "/admin/users"
       - "/admin/repositories"
 

@@ -9,6 +9,7 @@ import configInvalid from './fixtures/config-invalid.json' with { type: 'json' }
 import waivers from './fixtures/waivers.json' with { type: 'json' }
 import repositories from './fixtures/repositories.json' with { type: 'json' }
 import users from './fixtures/users.json' with { type: 'json' }
+import report from './fixtures/report.json' with { type: 'json' }
 
 /**
  * ログインが要る画面のアクセシビリティ検査（M-10）。
@@ -33,6 +34,7 @@ const RESPONSES: [RegExp, unknown][] = [
   [/^\/api\/v1\/repositories$/, repositories],
   [/^\/api\/v1\/waivers$/, waivers],
   [/^\/api\/v1\/users$/, users],
+  [/^\/api\/v1\/reports$/, report],
 ]
 
 async function stubApi(page: Page, role: Role): Promise<void> {
@@ -90,6 +92,7 @@ const PAGES: Target[] = [
   },
   { path: '/admin/users', name: '利用者管理', expected: 'admin-user', role: 'ADMIN' },
   { path: '/admin/repositories', name: 'リポジトリ管理', expected: 'acme/web-app', role: 'ADMIN' },
+  { path: '/reports', name: '品質レポート', expected: '最新の指標と期間内の変化' },
 ]
 
 for (const target of PAGES) {
