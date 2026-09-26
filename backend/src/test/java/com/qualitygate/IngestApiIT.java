@@ -368,7 +368,7 @@ class IngestApiIT {
     void 種別の違う同名の成果物はそれぞれ残る() throws Exception {
         UUID runId = createRun();
         upload(runId, "sarif", "report.json", "{\"runs\": []}");
-        upload(runId, "jscpd-json", "report.json", "{\"results\": []}");
+        upload(runId, "eslint-json", "report.json", "{\"results\": []}");
 
         assertThat(artifacts.findByRunId(runId)).hasSize(2).allSatisfy(record -> {
             try (var in = artifactStore.open(record.getStorageKey())) {

@@ -126,8 +126,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/repositories` | リポジトリ一覧 | — |
 | GET | `/api/v1/repositories/{id}` | リポジトリ詳細（S-02） | — |
 | GET | `/api/v1/repositories/{id}/trends` | 指標の時系列（S-05） | — |
-| GET | `/api/v1/reports` | 品質レポート（S-10。FR-08-4）。`from` / `to`（日付）と `repositoryId`（複数可）で絞る | — |
-| GET | `/api/v1/reports/measurements.csv` | 品質レポートの明細（CSV） | — |
 | GET | `/api/v1/repositories/{id}/release-report` | リリース判定（S-11。UC-10）。`ref` にタグかコミット SHA（7〜40 桁）を指定する | — |
 | GET | `/api/v1/repositories/{id}/release-report.csv` | リリース判定の CSV（証跡）。出力を監査ログ（`RELEASE_REPORT_EXPORTED`）に残す | — |
 | GET | `/api/v1/runs` | Run 一覧 | — |
@@ -440,7 +438,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 ```
 
 - **計測環境ごとに系列を分ける**（FR-08-2）。系列の分割はサーバが行う
-- `judged: false` の系列（全点が参考値）は、画面では破線で描く（FR-08-6）
 - スキップした点は `value: null` として返す。**0 を返さない**。
   0 を返すと、グラフ上で「性能が極めて良い」ように見えてしまう
 
@@ -619,7 +616,7 @@ API のパスはリポジトリ上のファイルではない。
   ブランチ名は受け付けない（先頭が動くため証跡にならない）。タグを付けて計測した Run が無ければ 404（タグを指定して計測するか、コミット SHA で指定する）
 - 結論 `decision` は `RELEASABLE` / `RELEASABLE_WITH_WARNINGS` / `NOT_RELEASABLE` / `UNDETERMINED`。理由の文 `decisionReason` はサーバが持つ
 - 未計測でも 200 を返す（`decision: UNDETERMINED`、`run: null`）。判定できなかったことも証跡として残せるようにするため
-- `metrics` は不合格・計測エラー・注意を先に、参考値を最後に並べる。`threshold` は表示用の文字列（`≥ 80%`）
+- `metrics` は不合格・計測エラー・注意を先に並べる。`threshold` は表示用の文字列（`≥ 80%`）
 - `guides` は結果に現れた指標の説明（`summary` / `basis` / `basisLabel` / `rationale` / `risk` / `definition`）。文言は `MetricGuide` が持つ
 - CSV は 1 行 1 指標。列名は日本語。未計測なら判定できなかったことを 1 行で残す。ファイル名は `release_<owner>_<repo>[_<tag>]_<短い SHA>.csv`
 

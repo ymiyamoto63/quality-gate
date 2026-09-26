@@ -33,12 +33,7 @@ public final class MetricCatalog {
             new MetricDefinition("M-11", "テスト成功率", MetricCategory.FUNCTIONAL, true),
             new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false),
             new MetricDefinition("M-13", "シークレット検出件数", MetricCategory.SECURITY, false),
-            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false),
-            // 参考値の指標。合格ラインを持たず、値とトレンドだけを残す
-            new MetricDefinition("M-15", "コード重複率", MetricCategory.STRUCTURE, false, true),
-            new MetricDefinition("M-16", "Lighthouse パフォーマンススコア", MetricCategory.PERFORMANCE,
-                    true, true),
-            new MetricDefinition("M-17", "バンドルサイズ（gzip）", MetricCategory.PERFORMANCE, false, true));
+            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 
@@ -59,11 +54,6 @@ public final class MetricCatalog {
      * 未知の指標 ID でも例外にしない。過去の Run が、その後に廃止された指標の
      * 判定結果を持っている場合に、Run 詳細が開けなくなるのを避ける。
      */
-    /** 参考値の指標か（{@link MetricDefinition#referenceOnly()}）。 */
-    public static boolean isReferenceOnly(String metricId) {
-        return of(metricId).referenceOnly();
-    }
-
     public static MetricDefinition of(String metricId) {
         return BY_ID.getOrDefault(metricId,
                 new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true));

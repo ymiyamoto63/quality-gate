@@ -23,15 +23,6 @@ public enum ArtifactType implements WireValued {
     TEST_JUNIT_XML("test-junit-xml", "M-11", "M-12"),
     OASDIFF_JSON("oasdiff-json", "M-09"),
     AXE_JSON("axe-json", "M-10"),
-    /** jscpd の JSON レポート（{@code jscpd-report.json}）。参考値の M-15。 */
-    JSCPD_JSON("jscpd-json", "M-15"),
-    /** Lighthouse の結果 JSON（{@code --output json}。1 画面 1 回分）。参考値の M-16。 */
-    LIGHTHOUSE_JSON("lighthouse-json", "M-16"),
-    /**
-     * ビルドした画面のファイルサイズ（収集ランナーの {@code collector/bundle/size.mjs} の出力）。参考値の M-17。
-     * 形式: {@code {"files": [{"path": "assets/index.js", "bytes": 1234, "gzipBytes": 567}]}}
-     */
-    BUNDLE_SIZE_JSON("bundle-size-json", "M-17"),
 
     /**
      * リポジトリの {@code .quality-gate.yml} そのもの。

@@ -129,21 +129,6 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   fi
 fi
 [ -z "${A11Y_PAGES:-}" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
-# 参考値の指標（M-15〜M-17）。合否には影響しない
-if [ "${DUPLICATION:-}" = true ]; then
-  [ -z "${BACKEND_DIR:-}" ] || upload jscpd-json "$REPORTS/backend/jscpd-report.json" "$BACKEND"
-  [ -z "${FRONTEND_DIR:-}" ] || upload jscpd-json "$REPORTS/frontend/jscpd-report.json" "$FRONTEND"
-fi
-if [ -n "${LIGHTHOUSE_PAGES:-}" ]; then
-  found=0
-  for report in "$REPORTS"/frontend/lighthouse/*.json; do
-    [ -e "$report" ] || continue
-    upload lighthouse-json "$report" "$FRONTEND"
-    found=1
-  done
-  [ "$found" -eq 1 ] || warn "成果物がありません（type=lighthouse-json）: $REPORTS/frontend/lighthouse/"
-fi
-[ "${BUNDLE_SIZE:-}" != true ] || upload bundle-size-json "$REPORTS/frontend/bundle-size.json" "$FRONTEND"
 if [ -n "${OPENAPI_PATH:-}" ]; then
   if [ -e "$REPORTS/oasdiff-base-spec-missing" ]; then
     upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND" '' '{"baseSpecMissing":true}'

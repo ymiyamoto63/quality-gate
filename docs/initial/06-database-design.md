@@ -238,7 +238,7 @@ CREATE TABLE measurements (
     detail          jsonb,                      -- 分母分子などの内訳
     measured_at     timestamptz NOT NULL,       -- runs.measured_at の複製（トレンド検索用）
     CONSTRAINT measurements_status_check CHECK (status IN
-        ('PASS','WARN','FAIL','SKIP','REFERENCE','ERROR','NOT_APPLICABLE'))
+        ('PASS','WARN','FAIL','SKIP','ERROR','NOT_APPLICABLE'))
 );
 
 -- component_name / scenario / variant は NULL を取りうる。UNIQUE 制約では NULL 同士が
@@ -317,7 +317,7 @@ CREATE TABLE repository_summaries (
     latest_measured_at  timestamptz,
     last_full_run_id    uuid        REFERENCES runs(id) ON DELETE SET NULL,
     last_full_measured_at timestamptz,
-    category_status     jsonb,      -- {"機能テスト":"PASS","性能テスト":"REFERENCE",...}
+    category_status     jsonb,      -- {"機能テスト":"PASS","性能テスト":"SKIP",...}
     open_critical_count int         NOT NULL DEFAULT 0,
     open_high_count     int         NOT NULL DEFAULT 0,
     version             bigint      NOT NULL DEFAULT 0,   -- 楽観ロック（9 章）
@@ -398,7 +398,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | `runs.status` | `CREATED` / `UPLOADING` / `FINALIZED` / `PROCESSING` / `EVALUATED` / `FAILED` / `ABANDONED` |
 | `runs.verdict` | `PASS` / `PASS_WITH_WARNINGS` / `FAIL` |
 | `runs.completeness` | `FULL` / `PARTIAL` |
-| `measurements.status` | `PASS` / `WARN` / `FAIL` / `SKIP` / `REFERENCE` / `ERROR` / `NOT_APPLICABLE` |
+| `measurements.status` | `PASS` / `WARN` / `FAIL` / `SKIP` / `ERROR` / `NOT_APPLICABLE` |
 | `findings.state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL` |
 | `findings.severity` | `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO` |
 | `users.role` | `ADMIN` / `VIEWER` |
@@ -509,6 +509,7 @@ DELETE FROM runs
 | `V019__remove_duplicated_and_unused_definitions.sql` | 表示にしか使っていなかった `components` と `measurements.component_id`、廃止した M-08 の計測値・違反・スキップ申告・成果物（`junit-xml`）、保存済みの設定の `components` と `api_contract` の `min_success_rate` / `min_test_count` を削除する（D-25） |
 | `V020__run_tags.sql` | `runs.tags`（計測したコミットを指すタグ）と GIN 索引。リリース判定のタグの解決を GitHub API から Run に移した（D-26） |
 | `V021__drop_job_queue_and_ingest_tokens.sql` | `jobs` と `ingest_tokens` を削除する（判定をその場で行い、Ingest Token を環境変数の 1 つにまとめた。D-27） |
+| `V022__drop_reference_metrics.sql` | 参考値の指標（M-15〜M-17）の計測値・違反・スキップ申告・成果物の行、保存済みの設定の `duplication` / `lighthouse` / `bundle_size`、ステータス `REFERENCE` を削除する（D-28） |
 
 `findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 

@@ -126,21 +126,9 @@ public class RunEvaluationService {
 
         List<MetricResult> results = new ArrayList<>();
         for (String metricId : context.thresholds().enabledMetrics().stream().sorted().toList()) {
-            results.addAll(evaluateMetric(metricId, byMetric.get(metricId), declared, context).stream()
-                    .map(RunEvaluationService::noteReferenceOnly).toList());
+            results.addAll(evaluateMetric(metricId, byMetric.get(metricId), declared, context));
         }
         return results;
-    }
-
-    /** 参考値の指標が計測できなかったときは、合否に影響しないことを理由に添える。 */
-    private static MetricResult noteReferenceOnly(MetricResult result) {
-        if (result.status() != MeasurementStatus.ERROR || !MetricCatalog.isReferenceOnly(result.metricId())) {
-            return result;
-        }
-        return new MetricResult(result.metricId(), result.componentName(), result.status(), result.value(),
-                result.unit(), result.threshold(),
-                result.reason() + "（参考値の指標のため、Run の合否には影響しません）",
-                result.detail(), result.findingsToPersist(), result.variant());
     }
 
     /**
@@ -278,36 +266,27 @@ public class RunEvaluationService {
     }
 
     /**
-     * FAIL・ERROR があれば不合格。SKIP・REFERENCE・NOT_APPLICABLE は集約に影響しない。
-     * 参考値の指標（{@link MetricCatalog#isReferenceOnly}）は、計測できなかった（ERROR）場合も影響しない。
+     * FAIL・ERROR があれば不合格。SKIP・NOT_APPLICABLE は集約に影響しない。
      */
     static Verdict aggregate(List<MetricResult> results) {
-        List<MetricResult> judged = judged(results);
-        boolean failed = judged.stream().anyMatch(r ->
+        boolean failed = results.stream().anyMatch(r ->
                 r.status() == MeasurementStatus.FAIL || r.status() == MeasurementStatus.ERROR);
         if (failed) {
             return Verdict.FAIL;
         }
-        return judged.stream().anyMatch(r -> r.status() == MeasurementStatus.WARN)
+        return results.stream().anyMatch(r -> r.status() == MeasurementStatus.WARN)
                 ? Verdict.PASS_WITH_WARNINGS
                 : Verdict.PASS;
     }
 
-    /** 合否に使う判定結果。参考値の指標を除く。 */
-    private static List<MetricResult> judged(List<MetricResult> results) {
-        return results.stream().filter(r -> !MetricCatalog.isReferenceOnly(r.metricId())).toList();
-    }
-
     /**
-     * SKIP / REFERENCE を 1 つでも含めば部分計測とする。
+     * SKIP を 1 つでも含めば部分計測とする。
      *
      * <p>NOT_APPLICABLE は含めない。ツールの制約で測りようのないものを部分計測に
      * 数えると、どの Run も永遠に完全計測にならず、部分計測の警告が意味を失う。
      */
     static Completeness completenessOf(List<MetricResult> results) {
-        // 参考値の指標は常に REFERENCE のため含めない。含めるとどの Run も部分計測になる
-        boolean partial = judged(results).stream().anyMatch(r ->
-                r.status() == MeasurementStatus.SKIP || r.status() == MeasurementStatus.REFERENCE);
+        boolean partial = results.stream().anyMatch(r -> r.status() == MeasurementStatus.SKIP);
         return partial ? Completeness.PARTIAL : Completeness.FULL;
     }
 
@@ -428,16 +407,10 @@ public class RunEvaluationService {
      */
     static Map<String, String> categoryStatusOf(List<MetricResult> results) {
         Map<MetricCategory, MeasurementStatus> worst = new EnumMap<>(MetricCategory.class);
-        for (MetricResult result : judged(results)) {
+        for (MetricResult result : results) {
             MetricCategory category = MetricCatalog.of(result.metricId()).category();
             worst.merge(category, result.status(),
                     (a, b) -> severityRank(a) >= severityRank(b) ? a : b);
-        }
-        // 参考値の指標だけのカテゴリは参考値と示す。合否に使う指標があるカテゴリの状態は変えない
-        for (MetricResult result : results) {
-            if (MetricCatalog.isReferenceOnly(result.metricId())) {
-                worst.putIfAbsent(MetricCatalog.of(result.metricId()).category(), MeasurementStatus.REFERENCE);
-            }
         }
         // EnumMap の反復順は宣言順、つまり要件定義の指標表と同じ並びになる。
         Map<String, String> asString = new LinkedHashMap<>();
@@ -450,7 +423,6 @@ public class RunEvaluationService {
             case ERROR -> 5;
             case FAIL -> 4;
             case WARN -> 3;
-            case REFERENCE -> 2;
             case SKIP -> 1;
             case PASS -> 0;
             // 対象外はカテゴリの状態を左右しない。合格の指標と並んでいれば合格のまま

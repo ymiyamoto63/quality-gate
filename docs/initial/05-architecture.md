@@ -340,7 +340,7 @@ record RawFinding(
 
 形式ごとの読み方は [02](02-metrics-spec.md) 0.5。
 収集ランナーが送らない形式（istanbul-json / gatling-log / osv-json / lizard-csv / pact-verification）のアダプタは D-19 で削除した。
-その後に追加した指標（M-11〜M-17）のアダプタは [02](02-metrics-spec.md) 0.5 を参照。
+その後に追加した指標（M-11〜M-14）のアダプタは [02](02-metrics-spec.md) 0.5 を参照。
 
 `SarifAdapter` は M-06 だけを供給する。SARIF は複雑度も運びうるが、ツール名（`driver.name`）が
 複雑度ツール（PMD / ESLint など）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
@@ -370,7 +370,7 @@ record EvaluationContext(
 record MetricResult(
     String  metricId,
     String  componentName,
-    MeasurementStatus status,   // PASS / WARN / FAIL / SKIP / REFERENCE / ERROR / NOT_APPLICABLE
+    MeasurementStatus status,   // PASS / WARN / FAIL / SKIP / ERROR / NOT_APPLICABLE
     BigDecimal value,
     String  unit,
     Map<String, Object> threshold,

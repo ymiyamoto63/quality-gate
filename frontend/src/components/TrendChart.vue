@@ -122,7 +122,6 @@ function labelOf(series: PlottedSeries): string {
       </g>
 
       <g v-for="s in chart.series" :key="s.seriesId">
-        <!-- 参考値は破線。判定に使っていないことを線の形でも示す -->
         <path
           v-for="(d, i) in s.segments"
           :key="`${s.seriesId}-${i}`"
@@ -132,7 +131,6 @@ function labelOf(series: PlottedSeries): string {
           stroke-width="2"
           stroke-linecap="round"
           stroke-linejoin="round"
-          :stroke-dasharray="s.judged ? undefined : '6 4'"
         />
 
         <g v-for="point in s.points" :key="point.runId">
@@ -177,18 +175,9 @@ function labelOf(series: PlottedSeries): string {
     <ul v-if="series.length > 1" class="qg-chart__legend">
       <li v-for="s in chart.series" :key="s.seriesId">
         <svg width="24" height="8" aria-hidden="true">
-          <line
-            x1="0"
-            y1="4"
-            x2="24"
-            y2="4"
-            :stroke="colorOf(s)"
-            stroke-width="2"
-            :stroke-dasharray="s.judged ? undefined : '6 4'"
-          />
+          <line x1="0" y1="4" x2="24" y2="4" :stroke="colorOf(s)" stroke-width="2" />
         </svg>
         {{ s.label }}
-        <span v-if="!s.judged">（参考値）</span>
       </li>
     </ul>
 

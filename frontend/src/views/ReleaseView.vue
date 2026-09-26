@@ -35,8 +35,7 @@ const DECISIONS: Record<Decision, { label: string; status: MeasurementStatus }> 
 }
 
 const decision = computed(() => (report.value ? DECISIONS[report.value.decision] : null))
-const judgedRows = computed(() => report.value?.metrics.filter((m) => !m.referenceOnly) ?? [])
-const referenceRows = computed(() => report.value?.metrics.filter((m) => m.referenceOnly) ?? [])
+const judgedRows = computed(() => report.value?.metrics ?? [])
 const summaries = computed(
   () => new Map((report.value?.guides ?? []).map((g) => [g.metricId, g.summary])),
 )
@@ -225,31 +224,6 @@ function print(): void {
                 {{ row.status === 'NOT_APPLICABLE' ? '—' : formatValue(row.value, row.unit) }}
               </td>
               <td data-label="判定"><StatusChip :status="row.status" /></td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-
-      <section v-if="referenceRows.length > 0" aria-labelledby="reference-heading">
-        <h2 id="reference-heading">参考値（合否には使いません）</h2>
-        <table class="qg-table qg-table--stack">
-          <thead>
-            <tr>
-              <th scope="col">指標</th>
-              <th scope="col">何を見るか</th>
-              <th scope="col">結果</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr
-              v-for="row in referenceRows"
-              :key="`${row.metricId}|${row.componentName ?? ''}|${row.scenario ?? ''}`"
-            >
-              <th scope="row" data-label="指標">
-                {{ row.name }}<span class="qg-muted">{{ qualifier(row) }}</span>
-              </th>
-              <td data-label="何を見るか">{{ summaries.get(row.metricId) }}</td>
-              <td data-label="結果">{{ formatValue(row.value, row.unit) }}</td>
             </tr>
           </tbody>
         </table>

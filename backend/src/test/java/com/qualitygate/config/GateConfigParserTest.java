@@ -268,24 +268,18 @@ class GateConfigParserTest {
     }
 
     @Test
-    void 参考値の指標には合格ラインを書けない() {
-        GateConfigDocument document = parser.parse("""
-                version: 1
-                metrics:
-                  duplication:
-                    enabled: true
-                """);
-        assertThat(document.metric("duplication").enabled()).isTrue();
-        assertThat(parser.parse("version: 1").metric("lighthouse").enabled()).isFalse();
-
-        assertThatThrownBy(() -> parser.parse("""
-                version: 1
-                metrics:
-                  bundle_size:
-                    max_kb: 500
-                """))
-                .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("metrics.bundle_size.max_kb");
+    void 廃止した参考値の指標は未知のキーとして拒否する() {
+        for (String metric : java.util.List.of("duplication", "lighthouse", "bundle_size")) {
+            assertThatThrownBy(() -> parser.parse("""
+                    version: 1
+                    metrics:
+                      %s:
+                        enabled: true
+                    """.formatted(metric)))
+                    .as(metric)
+                    .isInstanceOf(ConfigValidationException.class)
+                    .hasMessageContaining("metrics." + metric);
+        }
     }
 
     @Test

@@ -39,9 +39,7 @@ public record MetricGuide(
         /** 広く使われている目安。絶対ではない。 */
         INDUSTRY_PRACTICE("業界の目安"),
         /** このプロジェクトで決めた値。見直しの対象。 */
-        TEAM_DECISION("チーム判断"),
-        /** 合格ラインを持たない参考値。合否には使わない。 */
-        REFERENCE("参考値");
+        TEAM_DECISION("チーム判断");
 
         private final String label;
 
@@ -151,28 +149,7 @@ public record MetricGuide(
                     "禁止ライセンスは、自社のソースコードの公開義務などを負いうるため 0 件とする。",
                     "契約違反や、ソースコードの公開を求められる法的なリスクがある。",
                     "禁止（forbidden）に分類されたライセンスの件数。制限（restricted）は件数の上限で判定する。",
-                    "Trivy（ライセンスの走査）"),
-            new MetricGuide("M-15",
-                    "同じようなコードの重複がどれくらいあるか",
-                    Basis.REFERENCE,
-                    "基準値を見極めるために値と推移だけを記録している。合否には使わない。",
-                    "重複が多いと、修正漏れが起きやすい。",
-                    "コード重複率 = 重複した行 / 解析した行 × 100（jscpd）。",
-                    "jscpd"),
-            new MetricGuide("M-16",
-                    "画面の表示の速さ（Google Lighthouse の点数）",
-                    Basis.REFERENCE,
-                    "基準値を見極めるために値と推移だけを記録している。合否には使わない。",
-                    "点数が低いと、画面の表示が遅く感じられる。",
-                    "Lighthouse のパフォーマンススコア（0〜100 点）。画面ごとの中央値のうち最も低いもの。",
-                    "Lighthouse（Chromium は Playwright のものを使う）"),
-            new MetricGuide("M-17",
-                    "利用者が画面を開くときにダウンロードするプログラムの大きさ",
-                    Basis.REFERENCE,
-                    "基準値を見極めるために値と推移だけを記録している。合否には使わない。",
-                    "大きいほど、通信の遅い環境で画面が開くまで時間がかかる。",
-                    "JavaScript と CSS の gzip 後の合計サイズ（KB）。",
-                    "quality-gate の収集ランナー（collector/bundle/size.mjs。Node.js の zlib で gzip 圧縮して数える）"));
+                    "Trivy（ライセンスの走査）"));
 
     private static final Map<String, MetricGuide> BY_ID = ALL.stream()
             .collect(Collectors.toUnmodifiableMap(MetricGuide::metricId, Function.identity()));
