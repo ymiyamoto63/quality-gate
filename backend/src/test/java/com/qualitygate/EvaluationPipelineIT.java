@@ -184,12 +184,12 @@ class EvaluationPipelineIT {
                         // ベース比較ができないため新規関数数は 0 で合格
                         org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
                         // 破壊的変更は無い
-                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.PASS),
                         // 重大なアクセシビリティ違反は無い
-                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
                         // テストはすべて成功し、スキップも無い
-                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.PASS));
 
         // 初回 Run なので違反はすべて INITIAL。NEW にすると
         // 「この変更が問題を持ち込んだ」という誤った表示になる
@@ -235,7 +235,7 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-09", "M-10", "M-11", "M-12");
+                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-08", "M-09", "M-10", "M-11");
     }
 
     @Test
@@ -431,14 +431,14 @@ class EvaluationPipelineIT {
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-10"))
+                .filteredOn(m -> m.getMetricId().equals("M-09"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL);
                     assertThat(m.getValue()).isEqualByComparingTo("1");
                 });
         assertThat(findings.findByRunId(run.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-10"))
+                .filteredOn(f -> f.getMetricId().equals("M-09"))
                 .singleElement()
                 .satisfies(f -> {
                     assertThat(f.getSeverity()).isEqualTo(Severity.CRITICAL);
@@ -468,7 +468,7 @@ class EvaluationPipelineIT {
         // 検査していない画面まで「違反 0 件」と表示される
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-10"))
+                .filteredOn(m -> m.getMetricId().equals("M-09"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
@@ -496,12 +496,12 @@ class EvaluationPipelineIT {
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-09"))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(m -> assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL));
         // API のパスはファイルではない。GitHub へのリンクを作らない
         assertThat(findings.findByRunId(run.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-09"))
+                .filteredOn(f -> f.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(f -> {
                     assertThat(f.getFilePath()).isNull();
@@ -570,17 +570,17 @@ class EvaluationPipelineIT {
                 .extracting(Measurement::getMetricId, Measurement::getComponentName,
                         Measurement::getStatus)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-11", "backend", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-11", "frontend", MeasurementStatus.FAIL),
-                        org.assertj.core.groups.Tuple.tuple("M-12", "backend", MeasurementStatus.FAIL),
-                        org.assertj.core.groups.Tuple.tuple("M-12", "frontend", MeasurementStatus.PASS));
-        // 失敗したテストは M-11、スキップしたテストは M-12 の違反として残る。増えたスキップだけが新規
+                        org.assertj.core.groups.Tuple.tuple("M-10", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "frontend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-11", "backend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-11", "frontend", MeasurementStatus.PASS));
+        // 失敗したテストは M-10、スキップしたテストは M-11 の違反として残る。増えたスキップだけが新規
         assertThat(findings.findByRunId(second.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-12"))
+                .filteredOn(f -> f.getMetricId().equals("M-11"))
                 .extracting(f -> f.getState().name())
                 .containsExactlyInAnyOrder("CONTINUING", "NEW");
         assertThat(findings.findByRunId(second.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-11"))
+                .filteredOn(f -> f.getMetricId().equals("M-10"))
                 .singleElement()
                 .satisfies(f -> assertThat(f.getRuleId()).isEqualTo("failed"));
     }
@@ -638,18 +638,18 @@ class EvaluationPipelineIT {
 
         Run evaluated = evaluate(run);
 
-        // シークレットは M-06（脆弱性）ではなく M-13 で数える
+        // シークレットは M-06（脆弱性）ではなく M-12 で数える
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
                 .extracting(Measurement::getMetricId, Measurement::getStatus)
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.FAIL),
                         // デュアルライセンスは緩いほう（EPL-2.0）を採る
-                        org.assertj.core.groups.Tuple.tuple("M-14", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.PASS));
         assertThat(findings.findByRunId(run.getId()))
                 .extracting(f -> f.getMetricId())
-                .containsExactly("M-13");
+                .containsExactly("M-12");
     }
 
     @Test
@@ -684,7 +684,7 @@ class EvaluationPipelineIT {
                 .extracting(Measurement::getMetricId, Measurement::getStatus)
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.ERROR));
+                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.ERROR));
     }
 
     @Test
@@ -706,7 +706,7 @@ class EvaluationPipelineIT {
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
         assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.FULL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-09"))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(m -> assertThat(m.getStatus())
                         .isEqualTo(MeasurementStatus.NOT_APPLICABLE));

@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.UUID;
 
-/** リポジトリ管理（S-08）。管理者のみ。参照は RepositoryQueryController が担う。 */
+/** リポジトリ管理（S-07）。管理者のみ。参照は RepositoryQueryController が担う。 */
 @RestController
 @PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "RepositoryAdmin", description = "リポジトリの登録と設定（管理者のみ）")

@@ -111,7 +111,7 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/backend/pmd-base.xml" ]; then
     upload pmd-xml "$REPORTS/backend/pmd-base.xml" "$BACKEND" base
   fi
-  # M-11 / M-12 はすべてのテストの結果（test-junit-xml）
+  # M-10 / M-11 はすべてのテストの結果（test-junit-xml）
   found=0
   for junit in "$REPORTS"/tests/backend/TEST-*.xml; do
     [ -e "$junit" ] || continue

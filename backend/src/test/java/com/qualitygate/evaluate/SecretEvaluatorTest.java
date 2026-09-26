@@ -48,14 +48,14 @@ class SecretEvaluatorTest {
 
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(), thresholdsWith("secrets", config),
-                input(List.of(), findings, List.of(), Set.of("M-13")), Map.of(), false);
+                input(List.of(), findings, List.of(), Set.of("M-12")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);
         return results.getFirst();
     }
 
     private static IdentifiedFinding secret(String rule, String path) {
-        RawFinding finding = new RawFinding("M-13", rule, Severity.CRITICAL, rule, path, 1, null,
+        RawFinding finding = new RawFinding("M-12", rule, Severity.CRITICAL, rule, path, 1, null,
                 rule + "|" + path, Map.of("tool", "trivy"));
         return new IdentifiedFinding("fp-" + rule, finding);
     }

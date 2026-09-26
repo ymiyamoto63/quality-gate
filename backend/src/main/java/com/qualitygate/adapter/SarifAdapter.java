@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * SARIF 2.1.0 から M-06（脆弱性）・M-13（シークレット）・M-14（ライセンス）を読む。
+ * SARIF 2.1.0 から M-06（脆弱性）・M-12（シークレット）・M-13（ライセンス）を読む。
  *
  * <p>SARIF を静的解析系の第一形式としたのは、SARIF で出せるツールをすべて
  * このアダプタ 1 本に集約できるためである。Trivy / Semgrep / gitleaks / OSV などの
@@ -35,8 +35,8 @@ import java.util.regex.Pattern;
  * CVSS が無い検出（SAST・シークレット混入）のみ、ツール固有の値からマッピングする。
  *
  * <p><strong>走査した対象（メタデータの {@code scanners}）が宣言されていれば</strong>、検出を指標に振り分ける。
- * シークレット（Trivy のルールの tags に {@code secret}、または gitleaks などのシークレット専用ツール）は M-13、
- * ライセンス（tags に {@code license}）は M-14、それ以外は M-06。値を与えるのも宣言した対象の指標だけにする
+ * シークレット（Trivy のルールの tags に {@code secret}、または gitleaks などのシークレット専用ツール）は M-12、
+ * ライセンス（tags に {@code license}）は M-13、それ以外は M-06。値を与えるのも宣言した対象の指標だけにする
  * （ライセンスだけを走査した SARIF で、M-06 を「0 件」として合格にしないため）。
  *
  * <p>宣言が無い SARIF は従来どおりすべてを M-06 として読む。シークレットの分離を知らない送り手の
@@ -56,8 +56,8 @@ public class SarifAdapter implements ArtifactAdapter {
     private static final Set<String> SECRET_TOOLS = Set.of("gitleaks", "trufflehog");
 
     static final String VULNERABILITY_METRIC = "M-06";
-    static final String SECRET_METRIC = "M-13";
-    static final String LICENSE_METRIC = "M-14";
+    static final String SECRET_METRIC = "M-12";
+    static final String LICENSE_METRIC = "M-13";
 
     /** 宣言が無い SARIF が値を与える指標（従来どおり）。 */
     private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, "M-07");

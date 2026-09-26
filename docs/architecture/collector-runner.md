@@ -73,11 +73,11 @@
 | M-01（TS） | 作業用の clone に `@vitest/coverage-v8` を入れ、`vitest run --coverage.enabled --coverage.reporter=lcov` |
 | M-02 | PIT のコマンドライン版を、`mvn dependency:build-classpath` で得たクラスパスで実行する。pom を書き換えずに済む（PR 以外） |
 | M-03〜05 | バックエンドの jar を起動し、quality-gate 側の k6 のシナリオで負荷をかける（PR 以外） |
-| M-06 / M-13 / M-14 | `trivy fs`（版固定。脆弱性・シークレット・ライセンス） |
+| M-06 / M-12 / M-13 | `trivy fs`（版固定。脆弱性・シークレット・ライセンス） |
 | M-07 | PMD / ESLint を quality-gate 側の設定で、**head と base の両方**について実行し、`scope=base` も送る |
-| M-09 | 計測プロファイルで指定した OpenAPI 定義を head と base で取り出し、oasdiff で比較する |
-| M-10 | バックエンドの jar と `vite preview` を起動し、quality-gate 側の Playwright + axe-core で計測プロファイルの `A11Y_PAGES` を検査する |
-| M-11 / M-12 | backend の Surefire / Failsafe と frontend の Vitest の JUnit XML |
+| M-08 | 計測プロファイルで指定した OpenAPI 定義を head と base で取り出し、oasdiff で比較する |
+| M-09 | バックエンドの jar と `vite preview` を起動し、quality-gate 側の Playwright + axe-core で計測プロファイルの `A11Y_PAGES` を検査する |
+| M-10 / M-11 | backend の Surefire / Failsafe と frontend の Vitest の JUnit XML |
 
 **計測プロファイル**は、対象ごとに異なる計測上の情報を quality-gate 側で持つファイルです。
 合格ラインではなく「どう測るか」だけを書きます（合格ラインは同じディレクトリの `*.gate.yml`）。
@@ -89,10 +89,10 @@ QG_REPOSITORY=ymiyamoto63/like-chatgpt
 DEFAULT_BRANCH=main
 BACKEND_DIR=backend
 JAVA_VERSION=21
-OPENAPI_PATH=api/openapi.yml                                       # M-09
+OPENAPI_PATH=api/openapi.yml                                       # M-08
 FRONTEND_DIR=frontend
 FRONTEND_COVERAGE_INCLUDE=src/**/*.{ts,vue}
-A11Y_PAGES=/                                                       # M-10
+A11Y_PAGES=/                                                       # M-09
 ```
 
 ### 3.5 実行時の安全対策
@@ -113,6 +113,6 @@ A11Y_PAGES=/                                                       # M-10
 
 | # | 論点 | 決定 |
 | --- | --- | --- |
-| 1 | M-10 の方式 | **対象アプリをランナー上で起動して検査する**（検証環境の URL はコミットと画面が対応しないため使わない）。外部のサービスが要る対象とログインが要る画面は、必要になった時点で拡張する |
+| 1 | M-09 の方式 | **対象アプリをランナー上で起動して検査する**（検証環境の URL はコミットと画面が対応しないため使わない）。外部のサービスが要る対象とログインが要る画面は、必要になった時点で拡張する |
 | 2 | 計測プロファイルの置き場所 | quality-gate リポジトリのファイル。対象が増えたら見直す |
 | 3 | 収集ジョブと性能計測のランナーを分けるか | 同じランナーで直列化する。性能計測は収集ジョブの中で行うため、別のジョブと重なることはない |

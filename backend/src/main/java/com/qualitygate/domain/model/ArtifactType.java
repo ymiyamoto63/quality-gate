@@ -16,13 +16,13 @@ public enum ArtifactType implements WireValued {
     LCOV("lcov", "M-01"),
     PIT_XML("pit-xml", "M-02"),
     K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
-    SARIF("sarif", "M-06", "M-07", "M-13", "M-14"),
+    SARIF("sarif", "M-06", "M-07", "M-12", "M-13"),
     PMD_XML("pmd-xml", "M-07"),
     ESLINT_JSON("eslint-json", "M-07"),
     /** すべてのテストの結果（JUnit XML）。 */
-    TEST_JUNIT_XML("test-junit-xml", "M-11", "M-12"),
-    OASDIFF_JSON("oasdiff-json", "M-09"),
-    AXE_JSON("axe-json", "M-10"),
+    TEST_JUNIT_XML("test-junit-xml", "M-10", "M-11"),
+    OASDIFF_JSON("oasdiff-json", "M-08"),
+    AXE_JSON("axe-json", "M-09"),
 
     /**
      * リポジトリの {@code .quality-gate.yml} そのもの。

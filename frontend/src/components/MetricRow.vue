@@ -27,11 +27,11 @@ const value = computed(() =>
     : formatValue(props.metric.value, props.metric.unit),
 )
 /**
- * 指標そのものの限界。判定結果によらず常に添える（docs/spec/02-metrics-spec.md M-10）。
+ * 指標そのものの限界。判定結果によらず常に添える（docs/spec/02-metrics-spec.md M-09）。
  * 「重大 0 件」を適合の証明と受け取られると、手動での確認が省かれる。
  */
 const NOTES: Record<string, string> = {
-  'M-10':
+  'M-09':
     '自動検査で検出できる WCAG 違反は一部です。重大 0 件は適合の必要条件であって十分条件ではありません。キーボード操作とスクリーンリーダーでの確認は別に必要です。',
 }
 const note = computed(() => NOTES[props.metric.metricId] ?? null)

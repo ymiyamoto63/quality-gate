@@ -6,7 +6,7 @@ import { fileURLToPath } from 'node:url'
  * axe-core の結果を quality-gate に送る形（axe-json）にまとめる。
  *
  * 検査は並列に走るため、1 検査 1 ファイルで書き出し、最後に配列へ束ねる。
- * 束ねたファイルが M-10 の成果物になる（docs/spec/02-metrics-spec.md M-10）。
+ * 束ねたファイルが M-09 の成果物になる（docs/spec/02-metrics-spec.md M-09）。
  */
 const REPORTS_DIR = fileURLToPath(new URL('../../reports/', import.meta.url))
 

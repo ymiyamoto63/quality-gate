@@ -102,7 +102,7 @@ quality-gate/
 | lcov.info | 自前パーサ（行指向の単純な形式のため） |
 
 いずれもストリーミング処理を基本とし、ファイル全体をメモリに展開しない。
-1 ファイル 50MB の上限（FR-03-8）はあくまで最終防衛線であり、
+1 ファイル 50MB の上限（FR-03-6）はあくまで最終防衛線であり、
 実装側でも逐次処理を前提とする。
 
 ---
@@ -121,7 +121,7 @@ quality-gate/
 | API 型・呼び出し | openapi-typescript + openapi-fetch | — | 4 章 |
 | グラフ | インライン SVG（`TrendChart.vue`） | — | 3.1 |
 | 単体テスト | Vitest 5 + @vue/test-utils | — | カバレッジは `@vitest/coverage-v8`。`coverage.include` を指定し、未テストのファイルも分母に含める |
-| E2E / a11y | Playwright + `@axe-core/playwright` | — | M-10 の計測元 |
+| E2E / a11y | Playwright + `@axe-core/playwright` | — | M-09 の計測元 |
 | Lint | ESLint（`eslint-plugin-vue`）+ Prettier | — | quality-gate 自身の静的検査。対象の M-07 は、収集ランナーが版を固定した ESLint の設定（`collector/complexity`）で測る（[02](02-metrics-spec.md) M-07） |
 
 ### 3.1 グラフとアクセシビリティ
@@ -230,7 +230,7 @@ const { data, error } = await api.GET("/api/v1/runs/{runId}", {
 | 生成物をコミットする理由 | |
 | --- | --- |
 | フロントエンドのビルドが、バックエンドの起動に依存しなくなる | `npm run build` 単体で完結する |
-| M-09（OpenAPI 破壊的変更の検出）のベース比較が容易になる | `git show <base>:api/openapi.yml` で過去の仕様を取り出せる |
+| M-08（OpenAPI 破壊的変更の検出）のベース比較が容易になる | `git show <base>:api/openapi.yml` で過去の仕様を取り出せる |
 | 仕様変更がコードレビューの差分に現れる | API の変更が人の目に触れる |
 
 コミットする以上、**更新し忘れが起きうる**。これを CI で機械的に潰す。

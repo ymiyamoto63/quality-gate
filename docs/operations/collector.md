@@ -14,7 +14,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | --- | --- |
 | 手動実行（`workflow_dispatch`）で 1 コミット（ブランチ・コミット・タグ・PR）を計測する | [2. 手動で実行する](#2-手動で実行する) |
 | **M-02（PIT）**を PR 以外の計測で全量実行する | [5. M-02（PIT）](#5-m-02pit) |
-| **M-10（アクセシビリティ）**。対象アプリをランナー上で起動し、画面を axe-core で検査する | [6. M-10（アクセシビリティ）](#6-m-10アクセシビリティ) |
+| **M-09（アクセシビリティ）**。対象アプリをランナー上で起動し、画面を axe-core で検査する | [6. M-09（アクセシビリティ）](#6-m-09アクセシビリティ) |
 | **計測のコンテナ隔離**。対象のビルド・テストのコードはコンテナの中だけで動く | [7. 計測のコンテナ隔離](#7-計測のコンテナ隔離) |
 | **M-03〜05（性能）**。対象のバックエンドをランナー上で起動し、k6 で負荷をかける（PR 以外） | [8. M-03〜05（性能）](#8-m-0305性能) |
 
@@ -27,13 +27,13 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
-| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
+| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-10 / M-11、`frontend-tests.sh` = M-01 TS / M-10 / M-11、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-12、`complexity.sh` = M-07、`breaking-changes.sh` = M-08、`accessibility.sh` = M-09、`licenses.sh` = M-13）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
-| `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
+| `collector/a11y/` | M-09 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
 | `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（DD-13。無ければ送信しない） |
@@ -45,19 +45,19 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | --- | --- |
 | M-01（Java） | `mvn org.jacoco:jacoco-maven-plugin:<版>:prepare-agent verify ...:report`。JaCoCo をコマンドラインから差し込む。単体テストと結合テスト（failsafe）の両方を 1 つの実行データに集める |
 | M-01（TS） | `vitest run` にカバレッジのオプションを渡す。`@vitest/coverage-v8` が対象に無ければ、Vitest と同じ版を作業用の clone にだけ入れる（`npm install --no-save`） |
-| M-06 / M-13 | コミット時点の作業ツリーに依存関係を取得した後で `trivy fs --scanners vuln,secret`（対象の CI と同じ順序）。メタデータ `{"scanners":["vuln","secret"]}` を添えて送り、脆弱性は M-06、シークレットは M-13 で判定される |
-| M-14 | 同じ作業ツリーを `trivy fs --scanners license` で走査する（深刻度で絞らない。デュアルライセンスの緩いほうを選ぶため）。`trivy-license.sarif` をメタデータ `{"scanners":["license"]}` を添えて送る |
+| M-06 / M-12 | コミット時点の作業ツリーに依存関係を取得した後で `trivy fs --scanners vuln,secret`（対象の CI と同じ順序）。メタデータ `{"scanners":["vuln","secret"]}` を添えて送り、脆弱性は M-06、シークレットは M-12 で判定される |
+| M-13 | 同じ作業ツリーを `trivy fs --scanners license` で走査する（深刻度で絞らない。デュアルライセンスの緩いほうを選ぶため）。`trivy-license.sarif` をメタデータ `{"scanners":["license"]}` を添えて送る |
 | M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
-| M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る |
-| M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
+| M-10 / M-11 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る |
+| M-08 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
 | M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
-| M-10 | バックエンドの jar と `vite build` した画面（`vite preview`）を起動し、計測プロファイルの `A11Y_PAGES` をライト・ダークの両方で axe-core により検査する |
+| M-09 | バックエンドの jar と `vite build` した画面（`vite preview`）を起動し、計測プロファイルの `A11Y_PAGES` をライト・ダークの両方で axe-core により検査する |
 
-テストが失敗しても計測は止めません（失敗は M-11 の判定材料として送ります）。
+テストが失敗しても計測は止めません（失敗は M-10 の判定材料として送ります）。
 ビルド自体に失敗した場合など、成果物が出なかった指標は送られず、quality-gate では ERROR になります。
 
-比較元（base）は、新規の違反（M-07）・破壊的変更（M-09）・スキップの増加（M-12）を数える起点です。次の順に決めます。
+比較元（base）は、新規の違反（M-07）・破壊的変更（M-08）・スキップの増加（M-11）を数える起点です。次の順に決めます。
 
 1. 入力 `base`（コミットかタグ）を指定したときは、それ
 2. `commit` に**タグ**を指定したときは、その前のタグ（`git describe --tags`）。前のタグが無ければ直前のコミット。
@@ -71,7 +71,7 @@ quality-gate は、比較元のコミットで判定済みの Run があれば�
 
 | 送るもの | 求め方 | 使い道 |
 | --- | --- | --- |
-| タグ（Run の `tags`） | 計測するコミットを指すタグ（`git tag --points-at`） | リリース判定（S-11）でタグをコミットに解決する |
+| タグ（Run の `tags`） | 計測するコミットを指すタグ（`git tag --points-at`） | リリース判定（S-09）でタグをコミットに解決する |
 | ファイルの移動（成果物 `git-renames`） | 比較元からの `git diff -M` と、first-parent 1,000 コミット分のコミットごとの `git log -M`（`collector/bin/renames.sh`） | 移動しただけのファイルの違反を新規・解消として扱わない（[指標仕様書 0.4](../spec/02-metrics-spec.md)） |
 
 ## 1. 事前の準備
@@ -91,7 +91,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 計測プロファイルで `ISOLATION=none` にした対象は、コンテナを使わずランナー上で直接計測します。
 その場合は、加えて `unzip`、Chromium の動作に必要なライブラリ（`sudo npx playwright install-deps chromium` を一度）、
-空いているポート 8080 / 4173（M-10 と M-03〜05 で対象アプリを起動する）が必要です。
+空いているポート 8080 / 4173（M-09 と M-03〜05 で対象アプリを起動する）が必要です。
 
 ランナーは 1 台なので、収集ジョブは同時には動きません（`max-parallel: 1`）。
 性能計測（M-03〜05）の値が他のジョブに乱されないよう、**このマシンには他のランナーや常駐サービスを置かないでください**（[03](../spec/03-design-decisions.md) DD-11 の「同居させない」）。
@@ -123,7 +123,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 ### 1-4. quality-gate にリポジトリを登録する
 
-1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録する。登録していないリポジトリの Run は受け付けない
+1. **管理 › リポジトリ管理（S-07）** で like-chatgpt を登録する。登録していないリポジトリの Run は受け付けない
 
 合格ラインは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` です。収集ランナーが Run ごとに送り、quality-gate はその内容で判定します（DD-13）。
 画面（S-06）は表示するだけで、編集はできません。変更はプルリクエストで行い、main にマージした後の計測から使われます
@@ -156,7 +156,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 ### リリース判定のために計測する
 
-リリース判定（画面 S-11）は、指定したコミットの**完全計測**の Run で結論を出します。
+リリース判定（画面 S-09）は、指定したコミットの**完全計測**の Run で結論を出します。
 
 1. `commit` にリリースのタグ（例: `v1.2.0`）を入れて実行する。branch と base は空のままでよい
    （比較元は前のタグになる。前のリリースと比べたくないときだけ `base` を指定する）
@@ -177,9 +177,9 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 | M-02 | ミューテーションの総数と検出数（PR 以外）。対象のテストが乱数を固定していないと、同じ方式でも実行ごとに数件ずれる |
 | M-06 | 件数（Trivy の版の違いで差が出うる。差が出たら `versions.env` の版を揃えて確かめる） |
 | M-07 | CC 15 超の関数の数（収集ランナーは base と比べ、新しく増えたもの・悪化したものだけを違反にする） |
-| M-09 | 破壊的変更の件数（または「対象外」） |
-| M-10 | 検査した画面と、重大（critical / serious）の違反の件数。対象の e2e が API をモックしている場合、収集ランナーは実際のバックエンドにつなぐため、API の応答で描画が変わる画面では違反が変わりうる |
-| M-11 / M-12 | テストの件数（成功・失敗・スキップ）。`mvn verify` / `npx vitest run` の出力の件数と一致すること |
+| M-08 | 破壊的変更の件数（または「対象外」） |
+| M-09 | 検査した画面と、重大（critical / serious）の違反の件数。対象の e2e が API をモックしている場合、収集ランナーは実際のバックエンドにつなぐため、API の応答で描画が変わる画面では違反が変わりうる |
+| M-10 / M-11 | テストの件数（成功・失敗・スキップ）。`mvn verify` / `npx vitest run` の出力の件数と一致すること |
 
 参考までに、like-chatgpt の `b581260`（main）を手元で計測した結果は、JaCoCo・lcov・PMD の各数値と
 テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
@@ -210,12 +210,12 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 注意:
 
-- **テストが 1 件でも失敗していると PIT は動きません**（M-02 が ERROR になります）。M-01 と M-11 は失敗したテストがあっても送られます
+- **テストが 1 件でも失敗していると PIT は動きません**（M-02 が ERROR になります）。M-01 と M-10 は失敗したテストがあっても送られます
 - PR 以外の計測のたびに実行します
 - 生き残ったミューテーションの一覧は quality-gate には保存しません（M-02 は違反を作らない）。
   個々に見たいときは、手元で PIT の HTML レポートを出してください
 
-## 6. M-10（アクセシビリティ）
+## 6. M-09（アクセシビリティ）
 
 | 項目 | 内容 |
 | --- | --- |
@@ -231,7 +231,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 | キー | 説明 |
 | --- | --- |
-| `A11Y_PAGES` | 検査する画面のパス（空白区切り）。**空にすると M-10 を計測しない** |
+| `A11Y_PAGES` | 検査する画面のパス（空白区切り）。**空にすると M-09 を計測しない** |
 | `A11Y_READY_SELECTOR` | 描画が済んだと判断できる要素（CSS セレクタ）。空なら通信が落ち着くまで待つだけ |
 | `A11Y_BACKEND_PORT` | バックエンドを起動するポート。対象のフロントエンドの proxy 先に合わせる。**空にするとバックエンドを起動しない**（画面だけで描ける対象） |
 | `A11Y_FRONTEND_PORT` | `vite preview` のポート（既定: 4173） |
@@ -243,7 +243,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
   必要になったら、コンテナでの起動（Docker Compose）を計測プロファイルで指定できるようにします
 - ログインが必要な画面は検査できません（ログインの手順を持たないため）。検査できるのは、ログインせずに表示できる画面だけです
 - 読み込めなかった画面（起動の失敗、応答が 4xx / 5xx、`A11Y_READY_SELECTOR` が現れない）は結果に含めません。
-  `accessibility.pages` との照合で M-10 が ERROR になり、失敗が合格に見えることはありません
+  `accessibility.pages` との照合で M-09 が ERROR になり、失敗が合格に見えることはありません
 - 検査の結果は `reports/frontend/axe-results.json`（`axe-json`、component は frontend）として送ります
 
 ## 7. 計測のコンテナ隔離
@@ -256,7 +256,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 | コンテナに見せるもの | 作業ディレクトリ（取得したソース）と `reports/`（読み書き）、`collector/`（読み取りのみ）、キャッシュ用のボリューム `quality-gate-collector-home`（Maven・npm・PMD・Trivy の DB） |
 | 見せないもの | ランナーのマシンの他のファイル、Docker のソケット、他のジョブの作業領域、GitHub の認証情報（そもそも `measure` ジョブに無い） |
 | 権限 | ランナーの利用者の UID で動かし、`--cap-drop ALL` と `no-new-privileges` で権限を落とす。メモリ（既定 6 GB）とプロセス数に上限を付ける |
-| 通信 | 外向きの通信はできる（Maven Central・npm から依存関係を取るため）。M-10 で起動する対象アプリのポートはコンテナの中に閉じ、ランナーのポートを使わない |
+| 通信 | 外向きの通信はできる（Maven Central・npm から依存関係を取るため）。M-09 で起動する対象アプリのポートはコンテナの中に閉じ、ランナーのポートを使わない |
 | イメージ | `collector/runner/Dockerfile`。JDK は計測プロファイルの `JAVA_VERSION`、Node.js は対象の `.nvmrc` の版で、初回の計測でビルドする。版と Dockerfile が同じなら作り直さない |
 | Trivy / oasdiff | コンテナの中から Docker は使えないため、`versions.env` の版と同じバイナリをイメージに入れて使う |
 
@@ -316,7 +316,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 - **負荷をかける側（k6）とアプリは同じコンテナ（隔離しない場合は同じマシン）で動きます。** 値はこの構成での値で、本番の性能ではありません。
   前回との比較（性能の劣化の検出）に使ってください
-- **データベースなど外部のサービスが要る対象は、今のしくみでは起動できません**（M-10 と同じ）。like-chatgpt はメモリ上の固定データだけで応答し、外部の API も呼びません。
+- **データベースなど外部のサービスが要る対象は、今のしくみでは起動できません**（M-09 と同じ）。like-chatgpt はメモリ上の固定データだけで応答し、外部の API も呼びません。
   外部の有料 API を呼ぶ対象では、スタブに差し替える手段を用意するまで性能を計測しないでください
 - 計測中はランナーが約 18 分ふさがります。その間の PR の計測は待たされます
 
@@ -328,14 +328,14 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 - **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
 - **M-07 には frontend の関数も入ります。** frontend の CC は quality-gate 側の ESLint の設定で数えるため、
   対象の `npm run lint` の `complexity` の警告とは版や設定の違いでずれることがあります
-- **M-13（シークレット）は M-06（脆弱性）とは別に数えます。**
+- **M-12（シークレット）は M-06（脆弱性）とは別に数えます。**
   合格ライン（`*.gate.yml`）で `secrets` を有効にしないと、シークレットは判定されません（like-chatgpt の `*.gate.yml` では有効にしています）
-- **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
+- **M-13（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
   使ってよいと判断したパッケージがあれば、合格ライン（`*.gate.yml`）で扱います
-- **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
+- **M-10 / M-11 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
   既定で有効です（合格ラインの `test_results` で無効にできます）。
-  M-12 は比較対象の Run からスキップが増えたら FAIL です
-- **M-09 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
+  M-11 は比較対象の Run からスキップが増えたら FAIL です
+- **M-08 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
 - 判定には**計測した時点の main の `*.gate.yml`** を使います。再評価ではその Run が送った設定で判定し直します。設定の変更履歴は S-06 の「変更履歴」と Git の履歴で追えます
 
 ## 対象リポジトリの CI からの送信
@@ -396,7 +396,7 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `measure` で `M-07: ESLint（head）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` のディレクトリが無い、または ESLint が設定を読めなかった（ログに ESLint の出力が出る） |
 | `measure` で `M-07: 構文を読めず、関数を数えられなかったファイルがあります` | quality-gate 側のパーサが読めない構文のファイルがある（そのファイルの関数は M-07 に入らない）。`FRONTEND_COMPLEXITY_EXCLUDE` で外すか、`collector/complexity` のパーサを見直す |
-| `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
+| `measure` で `M-10/M-11: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 1-3 の設定漏れ |
 | `submit` の Run 作成が 401 | 収集ランナーの `QG_INGEST_TOKEN` とバックエンドの `QG_INGEST_TOKEN` が一致していない |
 | `submit` の Run 作成が 404 | quality-gate にリポジトリを登録していない（1-4） |
@@ -406,12 +406,12 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 | M-04 が WARN（到達率が設定値の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `arrival_rate_rps` が一致していない |
 | `measure` で `M-03〜05: バックエンドが起動しませんでした` | ポート（`PERF_BACKEND_PORT`）が使われている、または起動に外部のサービスが要る |
 | `measure` で `M-03〜05: k6 を取得できませんでした` | github.com に届かない |
-| `measure` で `M-10: バックエンドが起動しませんでした` / `フロントエンドが起動しませんでした` | ポートが使われている、起動に外部のサービスが要る、または起動が `A11Y_START_TIMEOUT` 秒に収まらない。ログにアプリの出力の末尾が出る |
+| `measure` で `M-09: バックエンドが起動しませんでした` / `フロントエンドが起動しませんでした` | ポートが使われている、起動に外部のサービスが要る、または起動が `A11Y_START_TIMEOUT` 秒に収まらない。ログにアプリの出力の末尾が出る |
 | `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない（1-1） |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
 | `measure` で `Node.js の版を解決できませんでした` | 対象の `.nvmrc` の書き方が解釈できない（`22` / `v22.21.1` / `lts/*` の形に対応）、または nodejs.org に届かない |
-| `measure` で `M-10: 検査ツールを用意できませんでした` | npm レジストリに届かない、または Chromium の取得に失敗した（1-1） |
-| M-10 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と合格ライン（`*.gate.yml`）の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
+| `measure` で `M-09: 検査ツールを用意できませんでした` | npm レジストリに届かない、または Chromium の取得に失敗した（1-1） |
+| M-09 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と合格ライン（`*.gate.yml`）の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
 | Chromium が `error while loading shared libraries` で起動しない | ランナーに Chromium のライブラリが無い。`sudo npx playwright install-deps chromium` を一度実行する |
 | PR の Run の M-02 が ERROR（スキップの申告が受け付けられない） | 合格ライン（`*.gate.yml`）の `execution.skippable_metrics` に `mutation_score` が無い（1-4） |
 | 実行してもジョブが始まらない | ランナーが止まっている（[セルフホストランナーの運用](self-hosted-runner.md)） |

@@ -24,14 +24,14 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: リリース判定（UC-06）
+  name: Release
 - description: 保持期間などのシステム設定（管理者のみ）
   name: Settings
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
 - description: 設定の表示・検証結果・版履歴
   name: Config
-- description: リリース判定（UC-10）
-  name: Release
 - description: リポジトリ単位の参照
   name: Repositories
 - description: リポジトリの登録と設定（管理者のみ）

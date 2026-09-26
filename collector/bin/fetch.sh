@@ -100,7 +100,7 @@ else
   [ "$BASE" != "$COMMIT" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 fi
 
-# コミットを指すタグ。リリース判定（S-11）でタグを指定したとき、quality-gate はこれでコミットを探す
+# コミットを指すタグ。リリース判定（S-09）でタグを指定したとき、quality-gate はこれでコミットを探す
 TAGS=$(git tag --points-at "$COMMIT" | tr '\n' ' ' | sed 's/ *$//')
 
 cat > "$WORK/meta.env" <<EOF

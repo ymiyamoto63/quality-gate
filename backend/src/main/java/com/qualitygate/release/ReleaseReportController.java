@@ -24,13 +24,13 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 /**
- * リリース判定（UC-10 / S-11）。画面用の JSON と、証跡用の CSV を返す。
+ * リリース判定（UC-06 / S-09）。画面用の JSON と、証跡用の CSV を返す。
  *
  * <p>PDF はサーバでは作らず、画面をブラウザの印刷で出す（品質レポートと同じ方針）。
  */
 @RestController
 @RequestMapping("/api/v1/repositories/{repositoryId}")
-@Tag(name = "Release", description = "リリース判定（UC-10）")
+@Tag(name = "Release", description = "リリース判定（UC-06）")
 public class ReleaseReportController {
 
     private final ReleaseReportService service;

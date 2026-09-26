@@ -55,19 +55,19 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     @Query("select r from Run r where r.status in ('CREATED','UPLOADING') and r.createdAt < :before")
     List<Run> findStaleRuns(@Param("before") Instant before);
 
-    /** リリース判定（UC-10）。短い SHA の前方一致で、このリポジトリで計測したコミットを探す。 */
+    /** リリース判定（UC-06）。短い SHA の前方一致で、このリポジトリで計測したコミットを探す。 */
     @Query("select distinct r.commitSha from Run r where r.repositoryId = :repositoryId "
             + "and r.commitSha like :prefix")
     List<String> findCommitShasLike(@Param("repositoryId") UUID repositoryId, @Param("prefix") String prefix);
 
     /**
-     * リリース判定（UC-10）。タグを付けて計測したコミットを探す。タグが付け替えられていれば、最も新しい計測のコミット。
+     * リリース判定（UC-06）。タグを付けて計測したコミットを探す。タグが付け替えられていれば、最も新しい計測のコミット。
      */
     @Query(value = "select r.commit_sha from runs r where r.repository_id = :repositoryId "
             + "and r.tags @> array[cast(:tag as text)] order by r.measured_at desc, r.attempt desc limit 1",
             nativeQuery = true)
     Optional<String> findLatestCommitShaByTag(@Param("repositoryId") UUID repositoryId, @Param("tag") String tag);
 
-    /** リリース判定（UC-10）。同じコミットの Run を新しい順に返す。 */
+    /** リリース判定（UC-06）。同じコミットの Run を新しい順に返す。 */
     List<Run> findByRepositoryIdAndCommitShaOrderByMeasuredAtDescAttemptDesc(UUID repositoryId, String commitSha);
 }

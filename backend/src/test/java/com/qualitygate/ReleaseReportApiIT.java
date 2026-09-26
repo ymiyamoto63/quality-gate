@@ -40,7 +40,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 
-/** リリース判定（UC-10）。本物の判定パイプラインで Run を積んでから読む。 */
+/** リリース判定（UC-06）。本物の判定パイプラインで Run を積んでから読む。 */
 @SpringBootTest
 @AbstractIntegrationTest
 class ReleaseReportApiIT {

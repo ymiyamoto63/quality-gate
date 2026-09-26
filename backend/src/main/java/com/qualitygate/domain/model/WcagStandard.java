@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * M-10 の判定基準とする WCAG の版とレベル（docs/spec/02-metrics-spec.md M-10）。
+ * M-09 の判定基準とする WCAG の版とレベル（docs/spec/02-metrics-spec.md M-09）。
  *
  * <p>{@code tags} は axe-core のルールに付くタグのうち、その基準に含まれるもの。
  * 上位の基準は下位の達成基準をすべて含むため、累積で持つ（2.2 AA は 2.0 A を含む）。

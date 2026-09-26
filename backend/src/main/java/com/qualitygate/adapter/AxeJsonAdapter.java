@@ -26,8 +26,8 @@ import java.util.TreeSet;
 import java.util.regex.Pattern;
 
 /**
- * axe-core の結果 JSON から M-10（アクセシビリティ違反）を読む
- * （docs/spec/02-metrics-spec.md M-10）。
+ * axe-core の結果 JSON から M-09（アクセシビリティ違反）を読む
+ * （docs/spec/02-metrics-spec.md M-09）。
  *
  * <p>受け付けるのは {@code @axe-core/playwright} の {@code analyze()} の戻り値そのもの
  * （1 ページ分のオブジェクト）か、その配列（複数ページ分）。
@@ -39,7 +39,7 @@ import java.util.regex.Pattern;
 @Component
 public class AxeJsonAdapter implements ArtifactAdapter {
 
-    static final String METRIC_ID = "M-10";
+    static final String METRIC_ID = "M-09";
 
     /** 検査できたページと読み込みに失敗したページを区別するための、許容するスキーム。 */
     private static final Set<String> LOADED_SCHEMES = Set.of("http", "https", "file");

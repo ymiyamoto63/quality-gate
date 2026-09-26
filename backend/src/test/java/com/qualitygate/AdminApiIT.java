@@ -163,7 +163,7 @@ class AdminApiIT {
         assertThat(mvc.get().uri("/api/v1/audit-logs").with(as("viewer-user", "VIEWER")))
                 .hasStatus(403);
 
-        // 画面のアクセシビリティ検査（M-10）で使う応答例（FixtureWriter）
+        // 画面のアクセシビリティ検査（M-09）で使う応答例（FixtureWriter）
         FixtureWriter.write("users.json", mvc.get().uri("/api/v1/users")
                 .with(as("admin-user", "ADMIN")).exchange().getResponse().getContentAsString());
     }

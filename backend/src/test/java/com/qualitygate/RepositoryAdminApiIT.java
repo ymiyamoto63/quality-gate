@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import static com.qualitygate.TestSessions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** リポジトリ管理（S-08）・Ingest Token・設定（S-06）の API。 */
+/** リポジトリ管理（S-07）・Ingest Token・設定（S-06）の API。 */
 @SpringBootTest
 @AbstractIntegrationTest
 class RepositoryAdminApiIT {
@@ -161,7 +161,7 @@ class RepositoryAdminApiIT {
                             .contains("mutation_scor");
                 });
 
-        // 画面のアクセシビリティ検査（M-10）で使う応答例（FixtureWriter）
+        // 画面のアクセシビリティ検査（M-09）で使う応答例（FixtureWriter）
         FixtureWriter.write("config-invalid.json", body(config));
         FixtureWriter.write("repositories.json", body(mvc.get().uri("/api/v1/repositories")
                 .with(as("admin-user", "ADMIN")).exchange()));

@@ -16,7 +16,7 @@
 （`QG_BASE_URL` / `QG_SCHEDULE_ZONE` は渡らないため、使うなら `compose.yaml` に足してください。`QG_INGEST_TOKEN` は渡ります）。
 DB 接続先と `QG_ARTIFACT_ROOT` はコンテナ用の値で上書きされます。
 
-保持期間（Run・成果物・監査ログの日数）は環境変数ではなく、管理画面（S-09）から変更します。
+保持期間（Run・成果物・監査ログの日数）は環境変数ではなく、管理画面（S-08）から変更します。
 
 収集ランナーの設定（取り込み先の URL、GitHub App、Ingest Token の写し）はバックエンドではなく、quality-gate リポジトリの
 GitHub Actions の Variables / Secrets に置きます（[収集ランナーで計測する](collector.md#1-3-quality-gate-リポジトリの変数とシークレット)）。

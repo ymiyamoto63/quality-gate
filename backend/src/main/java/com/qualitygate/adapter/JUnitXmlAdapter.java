@@ -19,8 +19,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * JUnit XML から M-11 / M-12（テスト成功率 / スキップされたテスト数）を読む
- * （docs/spec/02-metrics-spec.md M-11）。
+ * JUnit XML から M-10 / M-11（テスト成功率 / スキップされたテスト数）を読む
+ * （docs/spec/02-metrics-spec.md M-10）。
  *
  * <p>Surefire / Failsafe と Vitest の junit reporter の出力を受け付ける。ルートは
  * {@code <testsuites>} でも {@code <testsuite>} でもよい。
@@ -29,14 +29,14 @@ import java.util.Map;
  * <strong>{@code <testcase>} を 1 件ずつ数え直す</strong>。属性はツールによって
  * スキップを含む・含まないが分かれ、再実行（{@code rerunFailingTestsCount}）の扱いも揃わない。
  *
- * <p>M-11 の違反は失敗・エラー・不安定（再実行で成功）なテスト、M-12 の違反はスキップされたテスト。
- * スキップを M-12 に分けるのは、スキップの増加を失敗とは別の合格ラインで判定するため。
+ * <p>M-10 の違反は失敗・エラー・不安定（再実行で成功）なテスト、M-11 の違反はスキップされたテスト。
+ * スキップを M-11 に分けるのは、スキップの増加を失敗とは別の合格ラインで判定するため。
  */
 @Component
 public class JUnitXmlAdapter implements ArtifactAdapter {
 
-    static final String TEST_METRIC_ID = "M-11";
-    static final String SKIPPED_METRIC_ID = "M-12";
+    static final String TEST_METRIC_ID = "M-10";
+    static final String SKIPPED_METRIC_ID = "M-11";
 
     private static final int MAX_MESSAGE = 512;
 
@@ -115,7 +115,7 @@ public class JUnitXmlAdapter implements ArtifactAdapter {
         return new Tally(tally, findings);
     }
 
-    /** 違反を載せる指標。スキップだけを M-12 に分ける。 */
+    /** 違反を載せる指標。スキップだけを M-11 に分ける。 */
     private static String metricIdOf(Outcome outcome) {
         return outcome == Outcome.SKIPPED ? SKIPPED_METRIC_ID : TEST_METRIC_ID;
     }

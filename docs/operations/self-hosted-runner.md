@@ -17,7 +17,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | Docker（ランナーを動かすユーザーを `docker` グループに入れる） | 計測用のコンテナ、oasdiff（`docker run tufin/oasdiff`）、Trivy |
 | git | チェックアウトと merge-base の解決 |
 | curl / unzip / jq | 収集ランナー（`collect.yml`）の PMD の取得と送信（[収集ランナーで計測する](collector.md)） |
-| Chromium の依存パッケージ（計測用のコンテナを使わない `ISOLATION=none` の場合のみ） | M-10 の検査。コンテナで計測する場合はイメージに入っている |
+| Chromium の依存パッケージ（計測用のコンテナを使わない `ISOLATION=none` の場合のみ） | M-09 の検査。コンテナで計測する場合はイメージに入っている |
 | github.com / Maven Central / npm レジストリへの外向き通信 | ランナーの接続、JDK・Node.js・依存関係の取得 |
 | 十分なディスク（目安 20GB 以上） | Maven / npm のキャッシュ、Docker イメージ、Playwright のブラウザ |
 

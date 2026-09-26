@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 監査ログ（S-09）。閲覧は管理者のみ、書き込みの API は持たない（追記はサーバ内部のみ）。 */
+/** 監査ログ（S-08）。閲覧は管理者のみ、書き込みの API は持たない（追記はサーバ内部のみ）。 */
 @RestController
 @RequestMapping("/api/v1/audit-logs")
 @PreAuthorize("hasRole('ADMIN')")

@@ -22,12 +22,12 @@ const METRICS = [
   { metricId: 'M-02', name: 'ミューテーションスコア' },
   { metricId: 'M-06', name: '重大・高 脆弱性件数' },
   { metricId: 'M-07', name: '循環的複雑度 15 超の新規関数数' },
-  { metricId: 'M-09', name: '破壊的変更件数' },
-  { metricId: 'M-10', name: 'アクセシビリティ違反' },
-  { metricId: 'M-11', name: 'テスト成功率' },
-  { metricId: 'M-12', name: 'スキップされたテスト数' },
-  { metricId: 'M-13', name: 'シークレット検出件数' },
-  { metricId: 'M-14', name: 'ライセンス違反件数' },
+  { metricId: 'M-08', name: '破壊的変更件数' },
+  { metricId: 'M-09', name: 'アクセシビリティ違反' },
+  { metricId: 'M-10', name: 'テスト成功率' },
+  { metricId: 'M-11', name: 'スキップされたテスト数' },
+  { metricId: 'M-12', name: 'シークレット検出件数' },
+  { metricId: 'M-13', name: 'ライセンス違反件数' },
 ]
 
 onMounted(() => store.load(repositoryId.value))

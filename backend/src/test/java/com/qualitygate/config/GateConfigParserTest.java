@@ -184,7 +184,7 @@ class GateConfigParserTest {
 
     @Test
     void テスト結果の指標は既定で有効() {
-        // テストの成功は M-11 で既定から見る
+        // テストの成功は M-10 で既定から見る
         assertThat(parser.parse("version: 1").metric("test_results").enabled()).isTrue();
     }
 

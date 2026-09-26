@@ -82,14 +82,14 @@ class LicenseEvaluatorTest {
 
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(), thresholdsWith("licenses", config),
-                input(List.of(), findings, List.of(), Set.of("M-14")), Map.of(), false);
+                input(List.of(), findings, List.of(), Set.of("M-13")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);
         return results.getFirst();
     }
 
     private static IdentifiedFinding license(String pkg, String license, String classification) {
-        RawFinding finding = new RawFinding("M-14", pkg + ":" + license, Severity.INFO,
+        RawFinding finding = new RawFinding("M-13", pkg + ":" + license, Severity.INFO,
                 pkg + " のライセンス " + license, "package-lock.json", null, null, pkg + "|" + license,
                 Map.of("package", pkg, "license", license, "classification", classification));
         return new IdentifiedFinding("fp-" + pkg + license, finding);

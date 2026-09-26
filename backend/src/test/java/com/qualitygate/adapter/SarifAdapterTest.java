@@ -197,9 +197,9 @@ class SarifAdapterTest {
         NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
                 List.of(), java.util.Map.of("scanners", List.of("vuln", "secret", "license"))));
 
-        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-13", "M-14");
+        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-12", "M-13");
         assertThat(report.findings()).extracting(RawFinding::metricId)
-                .containsExactly("M-06", "M-13", "M-14", "M-14");
+                .containsExactly("M-06", "M-12", "M-13", "M-13");
         RawFinding secret = report.findings().get(1);
         assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
         assertThat(secret.filePath()).isEqualTo("config.py");
@@ -218,8 +218,8 @@ class SarifAdapterTest {
         NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
                 List.of(), java.util.Map.of("scanners", List.of("license"))));
 
-        assertThat(report.metricIdsWithData()).containsExactly("M-14");
-        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-14");
+        assertThat(report.metricIdsWithData()).containsExactly("M-13");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-13");
     }
 
     @Test

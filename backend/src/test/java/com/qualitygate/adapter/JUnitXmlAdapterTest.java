@@ -36,7 +36,7 @@ class JUnitXmlAdapterTest {
                 """);
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-11");
+        assertThat(measurement.metricId()).isEqualTo("M-10");
         assertThat(measurement.componentName()).isEqualTo("backend");
         assertThat(measurement.value()).isEqualByComparingTo("100");
         assertThat(measurement.detail())
@@ -169,7 +169,7 @@ class JUnitXmlAdapterTest {
 
         assertThat(report.type()).isEqualTo(ArtifactType.TEST_JUNIT_XML);
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-11");
+        assertThat(measurement.metricId()).isEqualTo("M-10");
         assertThat(measurement.componentName()).isEqualTo("frontend");
         assertThat(measurement.detail())
                 .containsEntry("executed", 3L)
@@ -178,9 +178,9 @@ class JUnitXmlAdapterTest {
                 .containsEntry("flaky", 1L);
         assertThat(report.findings()).extracting(RawFinding::metricId, RawFinding::ruleId)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("M-11", "failed"),
-                        org.assertj.core.groups.Tuple.tuple("M-12", "skipped"),
-                        org.assertj.core.groups.Tuple.tuple("M-11", "flaky"));
+                        org.assertj.core.groups.Tuple.tuple("M-10", "failed"),
+                        org.assertj.core.groups.Tuple.tuple("M-11", "skipped"),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "flaky"));
     }
 
     private NormalizedReport parse(String xml) {

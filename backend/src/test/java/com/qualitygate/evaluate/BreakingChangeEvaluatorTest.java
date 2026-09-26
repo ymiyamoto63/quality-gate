@@ -90,19 +90,19 @@ class BreakingChangeEvaluatorTest {
                                   List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(),
                 thresholdsWith("api_contract", Map.of("breaking_changes", maximum)),
-                input(measurements, findings, List.of(), Set.of("M-09")), Map.of(), false);
+                input(measurements, findings, List.of(), Set.of("M-08")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);
         return results.getFirst();
     }
 
     private static RawMeasurement report(boolean baseMissing) {
-        return RawMeasurement.of("M-09", null, BigDecimal.ZERO, "count",
+        return RawMeasurement.of("M-08", null, BigDecimal.ZERO, "count",
                 Map.of("baseSpecMissing", baseMissing));
     }
 
     private static IdentifiedFinding change(String id, Severity severity) {
-        RawFinding finding = new RawFinding("M-09", id, severity, "GET /api/v1/runs: " + id,
+        RawFinding finding = new RawFinding("M-08", id, severity, "GET /api/v1/runs: " + id,
                 null, null, null, id, Map.of());
         return new IdentifiedFinding("fp-" + id, finding);
     }

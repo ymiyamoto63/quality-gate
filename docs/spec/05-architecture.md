@@ -19,7 +19,7 @@ com.qualitygate
 ├ evaluate/     しきい値適用、指標判定、Run 集約、差分（新規 / 継続 / 解消）算出
 ├ config/       設定ファイル（*.gate.yml）の検証・版管理と、複数モジュールを組み立てる合成点（SecurityConfig など）
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
-├ release/      リリース判定（UC-10）と CSV
+├ release/      リリース判定（UC-06）と CSV
 ├ admin/        管理系の操作 API（利用者・リポジトリ・再評価・監査ログ・保持期間）
 ├ auth/         GitHub ログイン時の許可リスト照合、セッションのロール更新
 ├ maintenance/  日次バッチ（保持期間の削除・滞留した Run の後始末）
@@ -106,7 +106,7 @@ Run は「1 つのコミットに対する 1 回の計測・判定」を表す�
 
 ### 2.3 再試行（attempt）
 
-同一コミットへの再送信は、既存 Run を上書きせず `attempt` を増やした新しい Run として記録する（FR-03-6）。
+同一コミットへの再送信は、既存 Run を上書きせず `attempt` を増やした新しい Run として記録する（FR-03-4）。
 一意キーは `(repository_id, commit_sha, attempt)`。
 ダッシュボードとトレンドは、同一コミットについて**最新 attempt のみ**を採用する。
 
@@ -280,13 +280,13 @@ record RawFinding(
 | `K6SummaryAdapter` | `k6-summary` | M-03 / M-04 / M-05 |
 | `SarifAdapter` | `sarif` | M-06 |
 | `PmdXmlAdapter` | `pmd-xml` | M-07 |
-| `JUnitXmlAdapter` | `test-junit-xml` | M-11 / M-12 |
-| `OasdiffJsonAdapter` | `oasdiff-json` | M-09 |
-| `AxeJsonAdapter` | `axe-json` | M-10 |
+| `JUnitXmlAdapter` | `test-junit-xml` | M-10 / M-11 |
+| `OasdiffJsonAdapter` | `oasdiff-json` | M-08 |
+| `AxeJsonAdapter` | `axe-json` | M-09 |
 | `EslintJsonAdapter` | `eslint-json` | M-07 |
 
 形式ごとの読み方は [02](02-metrics-spec.md) 0.5。
-追加の指標（M-11〜M-14）のアダプタも [02](02-metrics-spec.md) 0.5 を参照。
+追加の指標（M-10〜M-13）のアダプタも [02](02-metrics-spec.md) 0.5 を参照。
 
 `SarifAdapter` は M-06 だけを供給する。SARIF は複雑度も運びうるが、ツール名（`driver.name`）が
 複雑度ツール（PMD / ESLint など）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
@@ -488,7 +488,7 @@ users.recordLogin(user, githubUserId, name, avatarUrl);
 | `users` に未登録 | 拒否。「管理者に登録を依頼してください」と表示する |
 | `users` に登録済み・`ACTIVE` | ログイン成功。GitHub のユーザー ID を初回ログイン時に記録する |
 | `users` に登録済み・`DISABLED` | 拒否 |
-| **`users` が 1 件も無い（初期状態）** | 最初にログインしたユーザーを `ADMIN` / `ACTIVE` として自動登録する（FR-13-5） |
+| **`users` が 1 件も無い（初期状態）** | 最初にログインしたユーザーを `ADMIN` / `ACTIVE` として自動登録する（FR-10-5） |
 
 初期状態の自動登録は、システム構築直後に誰もログインできない状態を避けるためのもの。
 **1 件でもユーザーが存在すれば二度と発動しない**条件にし、

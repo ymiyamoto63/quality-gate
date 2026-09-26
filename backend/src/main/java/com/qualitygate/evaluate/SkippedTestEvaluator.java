@@ -14,9 +14,9 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * M-12 スキップされたテスト数（docs/spec/02-metrics-spec.md M-12）。
+ * M-11 スキップされたテスト数（docs/spec/02-metrics-spec.md M-11）。
  *
- * <p>スキップ（{@code @Disabled} / {@code it.skip} など）は失敗にならないため、成功率（M-11）では
+ * <p>スキップ（{@code @Disabled} / {@code it.skip} など）は失敗にならないため、成功率（M-10）では
  * 見えない。落ちるテストを黙らせる手段として使われると、成功率 100% のまま検証が減っていく。
  * そこで<strong>比較対象 Run からの増加</strong>を判定する。
  * 既存のスキップを一括で不合格にしないのは M-07 と同じ考え方による。
@@ -28,7 +28,7 @@ import java.util.Optional;
  *   <li>それ以外 → PASS（比較対象が無ければ増加は判定せず、件数だけを記録する）</li>
  * </ol>
  *
- * <p>件数はコンポーネントごとに数える（M-11 と同じ）。
+ * <p>件数はコンポーネントごとに数える（M-10 と同じ）。
  */
 @Component
 public class SkippedTestEvaluator implements MetricEvaluator {

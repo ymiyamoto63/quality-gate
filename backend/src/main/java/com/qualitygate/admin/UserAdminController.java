@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.net.URI;
 import java.util.UUID;
 
-/** 許可リスト（S-09 利用者）。管理者のみ。 */
+/** 許可リスト（S-08 利用者）。管理者のみ。 */
 @RestController
 @RequestMapping("/api/v1/users")
 @PreAuthorize("hasRole('ADMIN')")

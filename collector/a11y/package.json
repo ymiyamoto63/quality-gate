@@ -1,7 +1,7 @@
 {
   "name": "quality-gate-collector-a11y",
   "private": true,
-  "description": "収集ランナーの M-10（アクセシビリティ）検査。対象の画面を Playwright で開き、axe-core で検査する",
+  "description": "収集ランナーの M-09（アクセシビリティ）検査。対象の画面を Playwright で開き、axe-core で検査する",
   "type": "module",
   "dependencies": {
     "@axe-core/playwright": "4.13.0",

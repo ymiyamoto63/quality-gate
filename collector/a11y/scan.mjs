@@ -1,4 +1,4 @@
-// 収集ランナーの M-10（アクセシビリティ）検査（docs/operations/collector.md 6 章）。
+// 収集ランナーの M-09（アクセシビリティ）検査（docs/operations/collector.md 6 章）。
 //
 // 起動済みの対象アプリの画面を開き、axe-core で検査して、結果を axe-json（analyze() の戻り値の配列）に書き出す。
 // 画面はライト・ダークの両方で検査する（配色はテーマごとに別の値で、片方の合格は他方を保証しない）。
@@ -16,7 +16,7 @@ import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { AxeBuilder } from '@axe-core/playwright'
 
-// WCAG 2.2 AA（指標仕様書 M-10）。対象の e2e と同じタグにしている
+// WCAG 2.2 AA（指標仕様書 M-09）。対象の e2e と同じタグにしている
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 const COLOR_SCHEMES = ['light', 'dark']
 const TIMEOUT_MS = 30_000

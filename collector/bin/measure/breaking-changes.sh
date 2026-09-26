@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# M-09（oasdiff）: コミットされている OpenAPI 定義を head と base で比べる。
+# M-08（oasdiff）: コミットされている OpenAPI 定義を head と base で比べる。
 # measure.sh が source する（単独では実行しない）。
 
 # コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす
@@ -16,7 +16,7 @@ measure_breaking_changes() {
   rm -f "$REPORTS/oasdiff-base-spec-missing"
   if ! git -C "$SRC" show "$COMMIT_SHA:$OPENAPI_PATH" > "$REPORTS/openapi-head.yml" 2>/dev/null; then
     rm -f "$REPORTS/openapi-head.yml"
-    fail "M-09: head に $OPENAPI_PATH がありません"
+    fail "M-08: head に $OPENAPI_PATH がありません"
     endgroup
     return
   fi
@@ -28,10 +28,10 @@ measure_breaking_changes() {
       [ -s "$REPORTS/oasdiff.json" ] || echo '[]' > "$REPORTS/oasdiff.json"
     else
       rm -f "$REPORTS/oasdiff.json"
-      fail "M-09: oasdiff の実行に失敗しました"
+      fail "M-08: oasdiff の実行に失敗しました"
     fi
   else
-    # 比較元に定義が無い（新規 API）。quality-gate は M-09 を対象外として扱う
+    # 比較元に定義が無い（新規 API）。quality-gate は M-08 を対象外として扱う
     echo '[]' > "$REPORTS/oasdiff.json"
     touch "$REPORTS/oasdiff-base-spec-missing"
   fi

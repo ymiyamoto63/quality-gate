@@ -18,7 +18,7 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 保持期間を過ぎたデータの削除（FR-12-3。毎日 {@link ScheduledMaintenance} から呼ぶ）。
+ * 保持期間を過ぎたデータの削除（FR-09-1。毎日 {@link ScheduledMaintenance} から呼ぶ）。
  *
  * <p>削除は<strong>少量ずつ、短いトランザクションで</strong>行う（1 回あたり最大 10,000 行）。
  * 一括削除は長時間のロックと WAL の急増を招き、その間アプリが止まる

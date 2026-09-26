@@ -1,6 +1,6 @@
 package com.qualitygate.release;
 
-/** リリース判定の結論（UC-10）。 */
+/** リリース判定の結論（UC-06）。 */
 public enum ReleaseDecision {
     /** 完全計測で、すべての指標が合格。 */
     RELEASABLE,

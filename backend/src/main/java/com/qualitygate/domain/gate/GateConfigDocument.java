@@ -74,7 +74,7 @@ public record GateConfigDocument(
         metrics.put("cyclomatic_complexity", new MetricConfig(true, Map.of(
                 "max_complexity", 15, "warn_from", 11)));
         metrics.put("api_contract", new MetricConfig(true, Map.of("breaking_changes", 0)));
-        // テストの成功は M-11 で既定から見る
+        // テストの成功は M-10 で既定から見る
         metrics.put("test_results", new MetricConfig(true, Map.of(
                 "min_success_rate", 100, "min_test_count", 1, "max_skipped_increase", 0)));
         metrics.put("accessibility", new MetricConfig(true, Map.of("max_critical", 0)));

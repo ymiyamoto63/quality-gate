@@ -64,6 +64,6 @@ metrics:
     enabled: true
     standard: wcag22aa
     max_critical: 0
-    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-10 は ERROR
+    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-09 は ERROR
     pages:
       - "/"

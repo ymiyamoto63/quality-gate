@@ -11,7 +11,7 @@ import users from './fixtures/users.json' with { type: 'json' }
 import releaseReport from './fixtures/release-report.json' with { type: 'json' }
 
 /**
- * ログインが要る画面のアクセシビリティ検査（M-10）。
+ * ログインが要る画面のアクセシビリティ検査（M-09）。
  *
  * 応答例は結合テスト（RunQueryApiIT など）が実物の API から書き出したものを使う。
  * 手で書いた例だと、API が変わっても検査は通り続け、実際の画面だけが壊れる。
