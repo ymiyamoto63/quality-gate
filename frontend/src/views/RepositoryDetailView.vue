@@ -203,20 +203,6 @@ function metricLabel(metric: Schemas['RunMetric']): string {
           </tbody>
         </table>
       </section>
-
-      <section
-        v-if="detail.components.length > 0"
-        class="qg-panel"
-        aria-labelledby="components-heading"
-      >
-        <h2 id="components-heading">コンポーネント</h2>
-        <ul>
-          <li v-for="component in detail.components" :key="component.name">
-            {{ component.name }}（{{ component.language }}）:
-            <code>{{ component.pathPatterns.join(', ') }}</code>
-          </li>
-        </ul>
-      </section>
     </template>
   </section>
 </template>

@@ -18,7 +18,7 @@ final class IntegrationCleanup {
         jdbc.execute("""
                 TRUNCATE audit_logs, system_settings, jobs, findings,
                          measurements, artifacts, run_skipped_metrics,
-                         repository_summaries, runs, gate_configs, ingest_tokens, components,
+                         repository_summaries, runs, gate_configs, ingest_tokens,
                          repositories, users CASCADE
                 """);
     }

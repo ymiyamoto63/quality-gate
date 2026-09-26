@@ -60,25 +60,17 @@ class RepositoryAdminApiIT {
                 .hasStatusOk()
                 .bodyJson().extractingPath("$.items[0].fullName").isEqualTo("acme/web-app");
 
-        assertThat(mvc.post().uri("/api/v1/repositories/{id}/components", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"name\":\"backend\",\"language\":\"java\",\"pathPatterns\":[\"backend/**\"]}"))
-                .hasStatus(204);
-
         assertThat(mvc.get().uri("/api/v1/repositories/{id}", repositoryId)
                 .with(as("viewer-user", "VIEWER")))
                 .hasStatusOk()
                 .bodyJson()
                 .satisfies(json -> {
                     json.assertThat().extractingPath("$.repository.defaultBranch").isEqualTo("develop");
-                    json.assertThat().extractingPath("$.components[0].pathPatterns[0]")
-                            .isEqualTo("backend/**");
                     // まだ Run が無い。0 件の判定を捏造しない
                     json.assertThat().extractingPath("$.latestRun").isNull();
                 });
         assertThat(auditLogs.findAll()).extracting(l -> l.getAction())
-                .containsExactlyInAnyOrder("REPOSITORY_CREATED", "COMPONENT_DEFINED");
+                .containsExactly("REPOSITORY_CREATED");
     }
 
     @Test

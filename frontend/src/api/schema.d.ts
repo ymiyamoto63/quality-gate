@@ -188,23 +188,6 @@ export interface paths {
     patch: operations['update_1']
     trace?: never
   }
-  '/api/v1/repositories/{repositoryId}/components': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** コンポーネントを定義する（同名があれば置き換える） */
-    post: operations['defineComponent']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/repositories/{repositoryId}/config': {
     parameters: {
       query?: never
@@ -574,11 +557,6 @@ export interface components {
       items: components['schemas']['AuditLogItem'][]
       nextCursor: string | null
     }
-    ComponentItem: {
-      language: string
-      name: string
-      pathPatterns: string[]
-    }
     ConfigHistoryItem: {
       /** Format: date-time */
       createdAt: string
@@ -623,7 +601,7 @@ export interface components {
     }
     /** @description Run の作成要求。CI が計測開始時に送信する。 */
     CreateRunRequest: {
-      /** @description 差分計測の比較基準。省略時は quality-gate が merge-base を解決する */
+      /** @description 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する */
       baseCommitSha?: string
       branch: string
       ciRunUrl?: string
@@ -680,11 +658,6 @@ export interface components {
     }
     DeadJobList: {
       items: components['schemas']['DeadJobItem'][]
-    }
-    DefineComponentRequest: {
-      language: string
-      name: string
-      pathPatterns: string[]
     }
     FinalizeResponse: {
       detailUrl?: string
@@ -965,7 +938,6 @@ export interface components {
     }
     /** @description リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く */
     RepositoryDetail: {
-      components: components['schemas']['ComponentItem'][]
       /**
        * Format: int32
        * @description 判定に使われている設定の版。既定値なら null
@@ -1597,30 +1569,6 @@ export interface operations {
         content: {
           '*/*': components['schemas']['RepositoryAdminResponse']
         }
-      }
-    }
-  }
-  defineComponent: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['DefineComponentRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
       }
     }
   }

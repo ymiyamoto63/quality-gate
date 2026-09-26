@@ -57,7 +57,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の�
 | --- | --- |
 | [01 要件定義書](docs/initial/01-requirements.md) | 背景・スコープ・機能要件・非機能要件・アーキテクチャ・ロードマップ |
 | [02 指標・判定仕様](docs/initial/02-metrics-spec.md) | 全 10 指標の定義・計算式・入力形式・境界条件 |
-| [03 決定事項と残課題](docs/initial/03-open-questions.md) | 決定事項の記録（D-1〜D-24）と残課題 |
+| [03 決定事項と残課題](docs/initial/03-open-questions.md) | 決定事項の記録（D-1〜D-25）と残課題 |
 | [04 技術スタック](docs/initial/04-tech-stack.md) | 構成・OpenAPI 連携・開発環境・採用しなかった選択肢 |
 | [05 方式設計](docs/initial/05-architecture.md) | 状態遷移・ジョブ・正規化・判定・認証認可・エラー処理 |
 | [06 データベース設計](docs/initial/06-database-design.md) | テーブル定義・インデックス・保持期間・Flyway 規約 |

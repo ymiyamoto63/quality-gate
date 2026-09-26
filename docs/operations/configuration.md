@@ -6,9 +6,9 @@
 | `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。`compose.yaml` の `db` と一致している |
 | `QG_ARTIFACT_ROOT` | `./data/artifacts` | 成果物の保存先（起動したディレクトリからの相対パス） |
 | `QG_BASE_URL` | `http://localhost:8080` | 取り込み API の応答に含める Run 詳細画面の URL の組み立てに使う |
-| `QG_GITHUB_API_ENABLED` | `true` | `baseCommitSha` を省略した Run の比較元（merge-base）を GitHub API で求めるか（FR-05-4）。求められなくても判定は続く（比較元なし）。リリース判定（S-11）でタグをコミットに解決するのにも使う（`false` ならタグは指定できず、コミット SHA で指定する） |
-| `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | 比較元を求めるときの認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents と Pull requests の読み取り権限を付ける。収集ランナーの App と同じものでよい |
-| `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents / Pull requests: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
+| `QG_GITHUB_API_ENABLED` | `true` | GitHub API を呼ぶか。判定ではファイルのリネームを求め（移動しただけの M-07 の違反を新規扱いしない）、リリース判定（S-11）ではタグをコミットに解決する。`false` ならリネームを検出せず、タグは指定できない（コミット SHA で指定する） |
+| `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | GitHub API の認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents の読み取り権限を付ける。収集ランナーの App と同じものでよい |
+| `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
 | `QG_GITHUB_API_URL` | `https://api.github.com` | GitHub Enterprise Server なら `https://<host>/api/v3` |
 | `QG_LOG_FORMAT` | なし（テキスト） | `ecs` / `logstash` / `gelf` で JSON 構造化ログにする。相関 ID（`requestId` / `runId` / `jobId`）が項目として載る。`compose.yaml` の `full` では `ecs` |
 | `QG_SCHEDULE_ZONE` | `Asia/Tokyo` | 日次バッチ（03:00 保持期間の削除・03:10 滞留した Run の後始末）とレポートの期間の区切りのタイムゾーン。各時刻は `quality-gate.schedule.*` の cron 式で変えられる |

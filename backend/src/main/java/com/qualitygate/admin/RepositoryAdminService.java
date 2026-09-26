@@ -1,14 +1,11 @@
 package com.qualitygate.admin;
 
 import com.qualitygate.admin.dto.RepositoryRequests.CreateRepositoryRequest;
-import com.qualitygate.admin.dto.RepositoryRequests.DefineComponentRequest;
 import com.qualitygate.admin.dto.RepositoryRequests.UpdateRepositoryRequest;
 import com.qualitygate.domain.entity.IngestToken;
 import com.qualitygate.domain.entity.MonitoredRepository;
-import com.qualitygate.domain.entity.RepositoryComponent;
 import com.qualitygate.domain.repo.IngestTokenRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.repo.RepositoryComponentRepository;
 import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
 import com.qualitygate.platform.audit.AuditAction;
 import com.qualitygate.platform.audit.AuditLogger;
@@ -19,7 +16,6 @@ import com.qualitygate.platform.security.Actor;
 import com.qualitygate.platform.security.CurrentUser;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
 import java.time.Instant;
@@ -46,22 +42,17 @@ public class RepositoryAdminService {
 
     private final SecureRandom random = new SecureRandom();
     private final MonitoredRepositoryRepository repositories;
-    private final RepositoryComponentRepository components;
     private final IngestTokenRepository tokens;
     private final CurrentUser currentUser;
     private final AuditLogger auditLogger;
-    private final ObjectMapper objectMapper;
 
     public RepositoryAdminService(MonitoredRepositoryRepository repositories,
-                                  RepositoryComponentRepository components,
                                   IngestTokenRepository tokens, CurrentUser currentUser,
-                                  AuditLogger auditLogger, ObjectMapper objectMapper) {
+                                  AuditLogger auditLogger) {
         this.repositories = repositories;
-        this.components = components;
         this.tokens = tokens;
         this.currentUser = currentUser;
         this.auditLogger = auditLogger;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional
@@ -101,27 +92,6 @@ public class RepositoryAdminService {
                     repositoryId, before, after);
         }
         return repository;
-    }
-
-    /** コンポーネントを定義する。同じ名前があれば定義を置き換える。 */
-    @Transactional
-    public RepositoryComponent defineComponent(UUID repositoryId, DefineComponentRequest request) {
-        Actor actor = currentUser.actor();
-        load(repositoryId);
-        String patterns = objectMapper.writeValueAsString(request.pathPatterns());
-        RepositoryComponent component = components
-                .findByRepositoryIdAndName(repositoryId, request.name())
-                .map(existing -> {
-                    existing.redefine(request.language(), patterns);
-                    return existing;
-                })
-                .orElseGet(() -> components.save(new RepositoryComponent(Uuid7.generate(),
-                        repositoryId, request.name(), request.language(), patterns,
-                        (int) components.countByRepositoryId(repositoryId))));
-        auditLogger.record(actor, AuditAction.COMPONENT_DEFINED, TARGET_REPOSITORY, repositoryId,
-                null, Map.of("name", request.name(), "language", request.language(),
-                        "pathPatterns", request.pathPatterns()));
-        return component;
     }
 
     @Transactional(readOnly = true)

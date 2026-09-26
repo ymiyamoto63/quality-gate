@@ -69,7 +69,7 @@ quality-gate:
   job-poll-interval: 1000
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
-  # baseCommitSha が省略された Run の比較元（merge-base）を GitHub API で求める（FR-05-4）。
+  # 判定でのリネーム検出と、リリース判定（S-11）でのタグの解決に GitHub API を使う。
   # 認証は GitHub App（App ID と秘密鍵）かトークン。どちらも無ければ認証なし（public リポジトリのみ）
   github:
     enabled: ${QG_GITHUB_API_ENABLED:true}

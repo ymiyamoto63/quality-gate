@@ -9,18 +9,9 @@
 #   - performance は収集ランナーの負荷試験（collector/targets/ymiyamoto63__like-chatgpt.k6.js）で計測する。
 #     M-02 と同じく PR では実行せずスキップを申告するため、skippable_metrics に performance が必要
 version: 1
-on_missing_report: fail
 
 execution:
   skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03〜05 をスキップする
-
-components:
-  - name: backend
-    language: java
-    paths: ["backend/**"]
-  - name: frontend
-    language: typescript
-    paths: ["frontend/**"]
 
 exclusions:
   - "**/ChatBackendApplication.java"
@@ -32,13 +23,10 @@ metrics:
   branch_coverage:
     enabled: true
     threshold: 75
-    scope: overall
-    per_component: true
-    diff_threshold: 80
+    warn_below: 80                # 75% 以上 80% 未満は注意（WARN）
   mutation_score:
     enabled: true
     threshold: 60
-    scope: all                    # 収集ランナーは PR 以外の計測で全量を実行する
     components: [backend]
   performance:
     enabled: true
@@ -50,16 +38,13 @@ metrics:
     enabled: true
     max_critical: 0
     max_high: 0
-    max_medium: null
   cyclomatic_complexity:
     enabled: true
     max_complexity: 15
-    scope: new_and_modified
     warn_from: 11
+  # 破壊的変更（oasdiff で比較元と OpenAPI 定義を比べる）
   api_contract:
     enabled: true
-    min_success_rate: 100
-    min_test_count: 1
     breaking_changes: 0
   # すべてのテスト（backend の Surefire / Failsafe と frontend の Vitest）の成功率とスキップの増加
   test_results:

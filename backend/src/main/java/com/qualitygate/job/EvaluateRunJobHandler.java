@@ -11,7 +11,6 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
-import com.qualitygate.github.MergeBaseResolver;
 import com.qualitygate.github.RenameResolver;
 import com.qualitygate.normalize.ReportNormalizer;
 import org.slf4j.Logger;
@@ -41,7 +40,6 @@ public class EvaluateRunJobHandler implements JobHandler {
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
     private final ObjectMapper objectMapper;
-    private final MergeBaseResolver mergeBaseResolver;
     private final RenameResolver renameResolver;
 
     public EvaluateRunJobHandler(RunRepository runs, ArtifactRecordRepository artifacts,
@@ -49,9 +47,8 @@ public class EvaluateRunJobHandler implements JobHandler {
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
                                  ObjectMapper objectMapper,
-                                 MergeBaseResolver mergeBaseResolver, RenameResolver renameResolver) {
+                                 RenameResolver renameResolver) {
         this.renameResolver = renameResolver;
-        this.mergeBaseResolver = mergeBaseResolver;
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
@@ -71,13 +68,6 @@ public class EvaluateRunJobHandler implements JobHandler {
         Run run = runs.findById(runId).orElseThrow(
                 // Run が保持期間で削除されている。再実行しても回復しない。
                 () -> new IllegalStateException("Run が存在しません: " + runId));
-
-        // 比較元が省略されていれば GitHub API で求めて記録する（FR-05-4）。
-        // 取り込みの API では呼ばない（外部 API の障害で取り込みを止めない）。失敗しても判定は続ける
-        mergeBaseResolver.resolveFor(run).ifPresent(base -> {
-            run.setBaseCommitSha(base);
-            runs.save(run);
-        });
 
         List<ArtifactRecord> records = artifacts.findByRunId(runId);
         if (job.getType() == JobType.REEVALUATE_RUN

@@ -110,7 +110,7 @@
 | M-02 | PIT のコマンドライン版を、`mvn dependency:build-classpath` で得たクラスパスで実行する。pom を書き換えずに済む | 中 | なし |
 | M-06 | `trivy fs`（版固定のコンテナ） | 低 | なし |
 | M-07 | PMD のコマンドライン版と quality-gate 側のルールセットで、**head と base の両方**を解析し `scope=base` も送る | 低 | **改善**。従来は base を送っていなかったため「新規・悪化した関数」を判定できず、M-07 が FAIL にならない |
-| M-08 | surefire の JUnit XML（既定で出力される）から、計測プロファイルの名前パターン（例: `*ControllerTest`）に合うものだけを送る | 低 | なし |
+| ~~M-08~~ | ~~surefire の JUnit XML（既定で出力される）から、計測プロファイルの名前パターン（例: `*ControllerTest`）に合うものだけを送る~~（M-08 は D-25 で廃止） | 低 | なし |
 | M-09 | 計測プロファイルで指定した OpenAPI 定義（例: `api/openapi.yml`）を head と base で取り出し、oasdiff で比較する | 低 | なし（full clone なので base の取得が確実になる） |
 | M-10 | quality-gate 側の Playwright + axe-core スクリプトで、計測プロファイルの `pages` を巡回する。画面を表示するには対象アプリの起動が必要。対象の e2e テストのように API をモックできないため、バックエンドと DB（コンテナ）を起動してデータを用意するか、共有の検証環境の URL を検査する | **高** | 検査できる画面・状態が変わる可能性がある。ログインが必要な画面の扱いも要検討 |
 | M-03〜05 | quality-gate 側に k6 のシナリオを置き、起動した対象アプリに負荷をかける | 高 | **従来は無効**。収集ランナーで新たに計測する（PR 以外。D-24。[収集ランナーで計測する](../operations/collector.md) 8 章） |
@@ -126,7 +126,6 @@ DEFAULT_BRANCH=main
 INGEST_TOKEN_SECRET=QG_INGEST_TOKEN_LIKE_CHATGPT
 BACKEND_DIR=backend
 JAVA_VERSION=21
-CONTRACT_TEST_REPORTS=surefire-reports/TEST-*ControllerTest.xml   # M-08
 OPENAPI_PATH=api/openapi.yml                                       # M-09
 FRONTEND_DIR=frontend
 FRONTEND_COVERAGE_INCLUDE=src/**/*.{ts,vue}

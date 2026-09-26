@@ -36,7 +36,7 @@ class JUnitXmlAdapterTest {
                 """);
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-08");
+        assertThat(measurement.metricId()).isEqualTo("M-11");
         assertThat(measurement.componentName()).isEqualTo("backend");
         assertThat(measurement.value()).isEqualByComparingTo("100");
         assertThat(measurement.detail())
@@ -165,7 +165,7 @@ class JUnitXmlAdapterTest {
                   </testcase>
                 </testsuite>
                 """.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext("frontend", null, List.of()), ArtifactType.TEST_JUNIT_XML);
+                new ParseContext("frontend", null, List.of()));
 
         assertThat(report.type()).isEqualTo(ArtifactType.TEST_JUNIT_XML);
         RawMeasurement measurement = report.measurements().getFirst();
@@ -181,17 +181,6 @@ class JUnitXmlAdapterTest {
                         org.assertj.core.groups.Tuple.tuple("M-11", "failed"),
                         org.assertj.core.groups.Tuple.tuple("M-12", "skipped"),
                         org.assertj.core.groups.Tuple.tuple("M-11", "flaky"));
-    }
-
-    @Test
-    void 型を指定しなければ契約テストとして読む() {
-        NormalizedReport report = adapter.parse(new ByteArrayInputStream("""
-                <testsuite name="A"><testcase classname="A" name="a"><skipped/></testcase></testsuite>
-                """.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext("backend", null, List.of()), ArtifactType.JUNIT_XML);
-
-        assertThat(report.measurements().getFirst().metricId()).isEqualTo("M-08");
-        assertThat(report.findings()).extracting(RawFinding::metricId).containsExactly("M-08");
     }
 
     private NormalizedReport parse(String xml) {

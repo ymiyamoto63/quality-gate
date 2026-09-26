@@ -2,7 +2,6 @@ package com.qualitygate.admin;
 
 import com.qualitygate.admin.dto.IngestTokenResponses;
 import com.qualitygate.admin.dto.RepositoryRequests.CreateRepositoryRequest;
-import com.qualitygate.admin.dto.RepositoryRequests.DefineComponentRequest;
 import com.qualitygate.admin.dto.RepositoryRequests.IssueTokenRequest;
 import com.qualitygate.admin.dto.RepositoryRequests.UpdateRepositoryRequest;
 import com.qualitygate.domain.entity.MonitoredRepository;
@@ -48,14 +47,6 @@ public class RepositoryAdminController {
     public RepositoryAdminResponse update(@PathVariable UUID repositoryId,
                                           @Valid @RequestBody UpdateRepositoryRequest request) {
         return RepositoryAdminResponse.of(service.update(repositoryId, request));
-    }
-
-    @PostMapping("/api/v1/repositories/{repositoryId}/components")
-    @Operation(summary = "コンポーネントを定義する（同名があれば置き換える）")
-    public ResponseEntity<Void> defineComponent(@PathVariable UUID repositoryId,
-                                                @Valid @RequestBody DefineComponentRequest request) {
-        service.defineComponent(repositoryId, request);
-        return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/api/v1/repositories/{repositoryId}/ingest-tokens")

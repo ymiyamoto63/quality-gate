@@ -28,7 +28,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
-| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-08 / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14、`duplication.sh` = M-15、`lighthouse.sh` = M-16、`bundle-size.sh` = M-17）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
+| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14、`duplication.sh` = M-15、`lighthouse.sh` = M-16、`bundle-size.sh` = M-17）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
@@ -52,16 +52,15 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | M-14 | 同じ作業ツリーを `trivy fs --scanners license` で走査する（深刻度で絞らない。デュアルライセンスの緩いほうを選ぶため）。`trivy-license.sarif` をメタデータ `{"scanners":["license"]}` を添えて送る |
 | M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
-| M-08 | `mvn verify` が出す JUnit XML のうち、計測プロファイルの `CONTRACT_TEST_REPORTS` に合うものだけを送る |
 | M-15（参考値） | `DUPLICATION=true` のとき、jscpd で backend の `src/main/java` と frontend の `FRONTEND_COMPLEXITY_SOURCES`（テストと型定義を除く）を解析する |
 | M-16（参考値） | `LIGHTHOUSE_PAGES` の画面を、M-10 と同じく起動した対象アプリに対して Lighthouse で `LIGHTHOUSE_RUNS` 回（既定 3 回）ずつ計測する（`LIGHTHOUSE_PRESET`、既定 desktop）。M-10 と 1 回の起動を共用する |
 | M-17（参考値） | `BUNDLE_SIZE=true` のとき、`vite build` の結果（`FRONTEND_DIST`、既定 `dist`）のファイルサイズを数える。ビルドは M-10 / M-16 と共用する |
-| M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る（M-08 の `junit-xml` とは別に送る） |
+| M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る |
 | M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
 | M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
 | M-10 | バックエンドの jar と `vite build` した画面（`vite preview`）を起動し、計測プロファイルの `A11Y_PAGES` をライト・ダークの両方で axe-core により検査する |
 
-テストが失敗しても計測は止めません（失敗は M-08・M-11 などの判定材料として送ります）。
+テストが失敗しても計測は止めません（失敗は M-11 の判定材料として送ります）。
 ビルド自体に失敗した場合など、成果物が出なかった指標は送られず、quality-gate では ERROR になります。
 
 比較元（base）は、新規の違反（M-07）・破壊的変更（M-09）・スキップの増加（M-12）を数える起点です。次の順に決めます。
@@ -175,13 +174,12 @@ Ingest API は同一コミットへの再送信を別の Run（attempt を増や
 | M-02 | ミューテーションの総数と検出数（PR 以外）。対象のテストが乱数を固定していないと、同じ方式でも実行ごとに数件ずれる |
 | M-06 | 件数（Trivy の版の違いで差が出うる。差が出たら `versions.env` の版を揃えて確かめる） |
 | M-07 | **一致しないのが正しい**。従来の方式は base を送らないため「ベース比較不可」になり、収集ランナーは base 比較で判定する |
-| M-08 | 契約テストの件数と成功率 |
 | M-09 | 破壊的変更の件数（または「対象外」） |
 | M-10 | 検査した画面と、重大（critical / serious）の違反の件数。対象の e2e は API をモックし、収集ランナーは実際のバックエンドにつなぐため、API の応答で描画が変わる画面では違反が変わりうる |
 | M-11 / M-12 | テストの件数（成功・失敗・スキップ）。`mvn verify` / `npx vitest run` の出力の件数と一致すること |
 
 参考までに、like-chatgpt の `b581260`（main）を手元で計測した結果は、JaCoCo・lcov・PMD の各数値と
-契約テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
+テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
 M-02 はミューテーションの総数（143 件）が like-chatgpt 自身の `mvn -P mutation test` と一致し、検出数は 98〜99 件でした。
 1 件の差は、乱数を使うクラス（`RandomWalkMetricsGenerationAdapter`）のテストの結果が実行ごとに変わるためで、
 like-chatgpt 自身の方式で繰り返しても、検出されるミューテーションが入れ替わります。
@@ -217,7 +215,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 注意:
 
-- **テストが 1 件でも失敗していると PIT は動きません**（M-02 が ERROR になります）。M-01 と M-08 は失敗したテストがあっても送られます
+- **テストが 1 件でも失敗していると PIT は動きません**（M-02 が ERROR になります）。M-01 と M-11 は失敗したテストがあっても送られます
 - PR 以外の計測のたびに実行します
 - 生き残ったミューテーションの一覧は quality-gate には保存しません（M-02 は違反を作らない）。
   個々に見たいときは、手元で PIT の HTML レポートを出してください
@@ -335,8 +333,8 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 - **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
 - **M-07 には frontend の関数も入ります。** frontend の CC は quality-gate 側の ESLint の設定で数えるため、
   対象の `npm run lint` の `complexity` の警告とは版や設定の違いでずれることがあります
-- **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
-  like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
+- **M-08（API 契約テスト成功率）は廃止しました（D-25）。** 以前は `*ControllerTest` の成功率を送っていましたが、
+  M-11 の入力の一部で、同じテストの失敗を 2 回数えていました。計測プロファイルの `CONTRACT_TEST_REPORTS` は不要です
 - **M-13（シークレット）は M-06（脆弱性）から分かれました。** 以前は Trivy が見つけたシークレットも M-06 の件数に入っていました。
   合格ライン（`*.gate.yml`）で `secrets` を有効にしないと、シークレットは判定されません（like-chatgpt の `*.gate.yml` では有効にしています）
 - **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。

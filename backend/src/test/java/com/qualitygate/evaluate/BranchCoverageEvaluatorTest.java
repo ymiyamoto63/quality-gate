@@ -48,6 +48,18 @@ class BranchCoverageEvaluatorTest {
     }
 
     @Test
+    void 注意ラインは設定で変えられる() {
+        GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith("branch_coverage",
+                Map.of("threshold", 75, "warn_below", 90));
+        List<MetricResult> results = evaluator.evaluate(new EvaluationContext(EvaluatorTestSupport.run(),
+                thresholds, input(List.of(coverage("backend", "85")), List.of(), List.of(), Set.of("M-01")),
+                Map.of(), false));
+
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(results.getFirst().reason()).contains("注意水準 90%");
+    }
+
+    @Test
     void 合格していても前回より1ポイント以上落ちれば警告() {
         // 下降が続いていることに気づかないまま、しきい値を割る直前まで放置されるのを防ぐ
         List<MetricResult> results = evaluator.evaluate(context(

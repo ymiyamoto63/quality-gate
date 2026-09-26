@@ -19,13 +19,7 @@ public enum ArtifactType implements WireValued {
     SARIF("sarif", "M-06", "M-07", "M-13", "M-14"),
     PMD_XML("pmd-xml", "M-07"),
     ESLINT_JSON("eslint-json", "M-07"),
-    JUNIT_XML("junit-xml", "M-08"),
-    /**
-     * すべてのテストの結果（JUnit XML）。形式は {@link #JUNIT_XML} と同じで、供給する指標だけが違う。
-     *
-     * <p>契約テスト（M-08）と型を分けるのは、どのレポートを送るかで指標が決まるため。
-     * 同じ型にすると、単体テストの結果が契約テストの成功率に混ざる。
-     */
+    /** すべてのテストの結果（JUnit XML）。 */
     TEST_JUNIT_XML("test-junit-xml", "M-11", "M-12"),
     OASDIFF_JSON("oasdiff-json", "M-09"),
     AXE_JSON("axe-json", "M-10"),

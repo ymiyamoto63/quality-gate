@@ -19,8 +19,6 @@ import java.util.Set;
  * @param maxAccessibilityViolations M-10 の合格ライン（critical + serious の件数）
  * @param accessibilityStandard      M-10 の判定基準
  * @param accessibilityPages         M-10 で検査されているべきページ。空なら限定しない
- * @param contractMinSuccessRate     M-08 の合格ライン（成功率 %）
- * @param contractMinTestCount       M-08 の最小実行件数。下回れば値を確定できない（ERROR）
  * @param maxBreakingChanges         M-09 の合格ライン（破壊的変更の件数）
  * @param performance                M-03 / M-04 / M-05 の合格ライン
  * @param testResults                M-11 / M-12 の合格ライン
@@ -42,8 +40,6 @@ public record GateThresholds(
         int maxAccessibilityViolations,
         WcagStandard accessibilityStandard,
         List<String> accessibilityPages,
-        BigDecimal contractMinSuccessRate,
-        int contractMinTestCount,
         int maxBreakingChanges,
         Performance performance,
         TestResults testResults,
@@ -92,7 +88,6 @@ public record GateThresholds(
     public static final String M_ERROR_RATE = "M-05";
     public static final String M_VULNERABILITIES = "M-06";
     public static final String M_COMPLEXITY = "M-07";
-    public static final String M_API_CONTRACT = "M-08";
     public static final String M_BREAKING_CHANGES = "M-09";
     public static final String M_ACCESSIBILITY = "M-10";
     public static final String M_TEST_SUCCESS = "M-11";
@@ -112,7 +107,7 @@ public record GateThresholds(
     public static final Set<String> IMPLEMENTED_METRICS =
             Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
                     M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
-                    M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY,
+                    M_BREAKING_CHANGES, M_ACCESSIBILITY,
                     M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES,
                     M_DUPLICATION, M_LIGHTHOUSE, M_BUNDLE_SIZE);
 
@@ -123,7 +118,7 @@ public record GateThresholds(
             Map.entry("performance", List.of(M_PERFORMANCE_P95, M_THROUGHPUT, M_ERROR_RATE)),
             Map.entry("vulnerabilities", List.of(M_VULNERABILITIES)),
             Map.entry("cyclomatic_complexity", List.of(M_COMPLEXITY)),
-            Map.entry("api_contract", List.of(M_API_CONTRACT, M_BREAKING_CHANGES)),
+            Map.entry("api_contract", List.of(M_BREAKING_CHANGES)),
             Map.entry("accessibility", List.of(M_ACCESSIBILITY)),
             Map.entry("test_results", List.of(M_TEST_SUCCESS, M_SKIPPED_TESTS)),
             Map.entry("secrets", List.of(M_SECRETS)),
@@ -168,7 +163,7 @@ public record GateThresholds(
                 skippableMetricIdsOf(document),
                 document.exclusions(),
                 threshold,
-                coverage.number("diff_threshold").orElse(threshold.add(new BigDecimal("5"))),
+                coverage.number("warn_below").orElse(threshold.add(new BigDecimal("5"))),
                 vulnerabilities.number("max_critical").orElse(BigDecimal.ZERO).intValue(),
                 vulnerabilities.number("max_high").orElse(BigDecimal.ZERO).intValue(),
                 complexity.number("max_complexity").orElse(BigDecimal.valueOf(15)).intValue(),
@@ -179,9 +174,6 @@ public record GateThresholds(
                 accessibility.text("standard").flatMap(WcagStandard::find)
                         .orElse(WcagStandard.DEFAULT),
                 List.copyOf(accessibility.list("pages")),
-                contract.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
-                // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
-                Math.max(1, contract.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
                 contract.number("breaking_changes").orElse(BigDecimal.ZERO).intValue(),
                 new Performance(p95,
                         p95.multiply(new BigDecimal("0.8")),
@@ -190,7 +182,7 @@ public record GateThresholds(
                         List.copyOf(performance.list("scenarios"))),
                 new TestResults(
                         tests.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
-                        // M-08 と同じく、0 を書かれても 1 件は求める
+                        // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
                         Math.max(1, tests.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
                         tests.number("max_skipped").map(BigDecimal::intValue).orElse(null),
                         tests.number("max_skipped_increase").orElse(BigDecimal.ZERO).intValue()),

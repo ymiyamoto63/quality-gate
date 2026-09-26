@@ -3,7 +3,7 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate 要件定義書 |
-| バージョン | **1.9** |
+| バージョン | **1.10** |
 | 作成日 | 2026-09-21 |
 | 最終更新 | 2026-09-26 |
 | ステータス | **確定**（2026-09-21）。以降の変更は改訂履歴に記録する |
@@ -14,6 +14,7 @@
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 1.10 | 2026-09-26 | 重複した定義と指標を整理する（D-25）。コンポーネントの定義（FR-01-2 の DB と画面、設定ファイルの `components`）を削除し、計測プロファイルだけで決める。M-08 API 契約テスト成功率を廃止し（入力が M-11 と重複していた）、M-11 / M-12 を既定で有効にする。`baseCommitSha` を省略した Run の比較元をバックエンドが GitHub API で求める処理を削除する（FR-05-4）。受け付けるだけで判定に使っていなかった設定項目（`on_missing_report`・各指標の `scope`・`per_component`・`max_medium`）を削除し、M-01 の `diff_threshold`（変更行のカバレッジと説明していたが、実際は全体値の注意ライン）を `warn_below` に改める |
 | 1.9 | 2026-09-26 | リリース判定のための計測（D-24）。タグを指定して計測でき、比較元は前のタグにする。PIT と負荷試験は PR 以外のすべての計測で実行する。S-11 に比較元を示す |
 | 1.8 | 2026-09-26 | リリース判定を追加（D-23）。UC-10 を具体化し、FR-08-7〜FR-08-9 と画面 S-11 を追加。免除の廃止（D-22）に合わせ、免除の一覧は出さない（合格ラインの版と除外パターンを示す） |
 | 1.7 | 2026-09-26 | 免除（5.5 章 FR-10）、メール通知（FR-11）、定期実行（収集ランナーの 15 分ごとの計測と日次再評価）、計測途絶の警告を廃止し、計測は手動実行だけにする（D-22）。FR-03-11 / FR-06-2 / FR-06-3 / FR-12 / G-3 / UC-05〜07 / UC-09 / 3.2 / S-07 などを改訂 |
@@ -58,6 +59,7 @@
 | D-21 | バッジとレート制限 | 削除する。バッジはインターネットから届かない構成（C-7）では GitHub の README に表示できず、レート制限は守る相手（多数の CI・不特定の利用者）がいない |
 | D-23 | リリース判定 | タグかコミットを指定し、そのコミットで判定済みの Run から「リリース可 / 注意あり / 不可 / 判定できない」を出す。使うのは最新の完全計測で、近くのコミットでは代用しない。部分計測で不合格が無ければ判定できないとする。指標ごとに説明と基準の根拠（外部基準 / 業界の目安 / チーム判断）を示し、CSV を証跡として出力する（出力は監査ログに残す） |
 | D-22 | 免除・通知・定期実行 | 廃止する。計測は収集ランナーの手動実行だけとし、結果は画面で確認する。判定から外したいものは合格ライン（`*.gate.yml`）の `exclusions`・指標の `enabled`・しきい値で扱う。日次バッチは保持期間の削除と滞留した Run の後始末だけを残す |
+| D-25 | 重複の整理 | コンポーネントは計測プロファイルだけで決める。M-08 API 契約テスト成功率は M-11 と入力が重複していたため廃止し、テストの成功は M-11、API の互換性は M-09 で見る。比較元は収集ランナーだけが求める |
 
 ### 残る未決事項
 
@@ -131,7 +133,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 | リポジトリの公開設定 | プライベート |
 
 対象が単一のモノレポであるため、backend と frontend の計測結果は 1 つの Run に
-まとまる。契約テスト（M-08）のように両者にまたがる指標を扱ううえで都合がよく、
+まとまる。API の互換性（M-09）のように両者にまたがる指標を扱ううえで都合がよく、
 複数リポジトリの Run を束ねる上位概念（「プロダクト」等）は不要である。
 
 > **GitHub Free の制約**: プライベートリポジトリでの GitHub Actions は
@@ -143,7 +145,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 > 切り替えられる（7.1.1）。
 
 計測ツール（カバレッジ、ミューテーションテスト、負荷試験、脆弱性スキャン、複雑度解析、
-契約テスト、アクセシビリティ検査）は、quality-gate 側の収集ランナーが版を固定して持ち込む（3.2）。
+API の差分検出、アクセシビリティ検査）は、quality-gate 側の収集ランナーが版を固定して持ち込む（3.2）。
 対象リポジトリにツールや設定を追加する必要はない。**テストそのものは対象リポジトリのもの**を実行する。
 
 ### 2.2 スコープ内
@@ -231,7 +233,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 | きっかけ | 手動実行（対象とブランチ・コミット・PR を指定する）。定期実行は v1.7 で廃止した（D-22） |
 | 計測ツール | quality-gate 側で版を固定する（JaCoCo / PMD / oasdiff / Trivy など）。テストは対象のものを実行する |
 | 合格ライン | quality-gate リポジトリの `collector/targets/<owner>__<name>.gate.yml` を Run ごとに送り、その内容で判定する（v1.5。D-20） |
-| 対象ごとの情報 | 計測プロファイル（`collector/targets/<owner>__<name>.env`。ビルドの場所、Java の版、契約テストの名前など） |
+| 対象ごとの情報 | 計測プロファイル（`collector/targets/<owner>__<name>.env`。ビルドの場所、Java の版、テスト結果の場所など） |
 
 3.1 の理由のうち「quality-gate 側に Docker やビルドツールチェーンを持ち込まない」はバックエンドについては保たれるが、
 収集ランナーのマシンには必要になる。そのため収集ランナーは性能計測と同じ専有のセルフホストランナーで直列に動かす（D-7）。
@@ -313,7 +315,7 @@ Phase 2 の Check Run の出力（設定の `enforcement: check-run | blocking`�
 | ID | 要件 | 優先度 |
 | --- | --- | --- |
 | FR-01-1 | GitHub リポジトリを識別子（`owner/repo`）で登録・一覧・無効化できる | 必須 |
-| FR-01-2 | リポジトリに「バックエンド」「フロントエンド」等のコンポーネントを定義し、指標をコンポーネント単位で扱える | 必須 |
+| FR-01-2 | 「バックエンド」「フロントエンド」等のコンポーネント単位で指標を扱える。コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まり、成果物に付いた名前で表示する（v1.10 で DB と画面での定義を廃止。D-25） | 必須 |
 | FR-01-3 | 監視対象ブランチ（既定: `main`）と、PR 計測の対象可否を設定できる | 必須 |
 | FR-01-4 | リポジトリごとに Ingest Token を発行・失効・ローテーションできる。トークンは発行時のみ平文表示し、以後はハッシュのみ保持する | 必須 |
 | FR-02-1 | 合格ライン等の設定をファイルから取り込む（Configuration as Code。v1.5 以降は quality-gate リポジトリの `collector/targets/<owner>__<name>.gate.yml`） | 必須 |
@@ -348,7 +350,7 @@ Phase 2 の Check Run の出力（設定の `enforcement: check-run | blocking`�
 | FR-05-1 | 指標ごとに PASS / WARN / FAIL / SKIP / ERROR を判定する | 必須 |
 | FR-05-2 | Run 全体の判定を、指標判定の集約ルール（6.3）に従って決定する | 必須 |
 | FR-05-3 | 判定結果には、そのしきい値・実測値・差分（前回比）・判定根拠となる個別違反へのリンクを含む | 必須 |
-| FR-05-4 | 「新規関数」「差分カバレッジ」のようにベースとの比較を要する指標のため、比較基準（merge-base のコミット SHA）を Run に記録する | 必須 |
+| FR-05-4 | 「新規関数」「差分カバレッジ」のようにベースとの比較を要する指標のため、比較基準（比較元のコミット SHA。収集ランナーが求めて送る）を Run に記録する | 必須 |
 | FR-05-5 | 手動またはスケジュールで再評価を実行でき、成果物を再送信せずに最新のしきい値・脆弱性情報で判定し直せる | 必須 |
 | FR-05-6 | 申告されたスキップは `SKIP` とし、`execution.skippable_metrics` に含まれない指標のスキップ申告は `ERROR` とする | 必須 |
 | FR-05-7 | ~~`execution.reference_only_environments` に該当する環境で計測された指標は `REFERENCE` とし、値は保持するが判定には用いない~~（v1.4 で廃止。D-19） | — |
@@ -363,7 +365,7 @@ Phase 2 の Check Run の出力（設定の `enforcement: check-run | blocking`�
 | FR-06-3 | 最後に**完全計測**が行われた Run を常時表示する。~~`execution.full_measurement_interval_days`（既定 7 日）を超えて完全計測が途絶えた場合に警告および通知する~~（v1.7 で警告・通知と設定項目を廃止。D-22） | 必須 |
 | FR-06-4 | 部分計測の Run は、未計測の指標名と申告された理由を Run 詳細に併記する | 必須 |
 | FR-07-1 | Run 詳細で、6 カテゴリ × 各指標の実測値・しきい値・判定を表形式で表示する | 必須 |
-| FR-07-2 | 各指標から個別違反（脆弱性、複雑度超過関数、失敗した契約テスト、a11y 違反）の一覧へドリルダウンできる | 必須 |
+| FR-07-2 | 各指標から個別違反（脆弱性、複雑度超過関数、失敗したテスト、a11y 違反）の一覧へドリルダウンできる | 必須 |
 | FR-07-3 | 個別違反から、対象リポジトリの該当ファイル・行への GitHub リンクを開ける | 必須 |
 | FR-07-4 | 前回 Run との比較で「新規に発生した違反」「解消された違反」を区別して表示する | 必須 |
 | FR-07-5 | 取り込んだ元成果物をダウンロードできる（保持期間内） | 推奨 |
@@ -449,11 +451,11 @@ Phase 1 では承認フローを設けず、Admin が登録した時点で免除
 | M-05 | 性能テスト | エラー率（副指標） | 0.1% 以下 | k6 summary JSON |
 | M-06 | セキュリティ | 重大・高 脆弱性件数 | 0 件 | SARIF（Trivy / Dependency-Check / Semgrep / gitleaks） |
 | M-07 | コード構造 | 循環的複雑度 15 超の新規関数数 | 0 件 | PMD / ESLint |
-| M-08 | 契約・互換性 | API 契約テスト成功率 | 100% | JUnit XML |
+| ~~M-08~~ | ~~契約・互換性~~ | ~~API 契約テスト成功率~~（v1.10 で廃止。入力が M-11 と重複していた。D-25） | — | — |
 | M-09 | 契約・互換性 | OpenAPI 破壊的変更件数（副指標） | 0 件 | oasdiff JSON |
 | M-10 | 使いやすさ | アクセシビリティ重大違反件数 | 0 件（impact: critical / serious） | axe-core JSON |
-| M-11 | 機能テスト | テスト成功率（追加。既定は無効） | 100% | JUnit XML（すべてのテスト） |
-| M-12 | 機能テスト | スキップされたテスト数（追加。既定は無効） | 比較対象 Run から増やさない | JUnit XML（すべてのテスト） |
+| M-11 | 機能テスト | テスト成功率（追加） | 100% | JUnit XML（すべてのテスト） |
+| M-12 | 機能テスト | スキップされたテスト数（追加） | 比較対象 Run から増やさない | JUnit XML（すべてのテスト） |
 | M-13 | セキュリティ | シークレット検出件数（追加。既定は無効） | 0 件 | SARIF（Trivy のシークレットの走査 / gitleaks） |
 | M-14 | セキュリティ | ライセンス違反件数（追加。既定は無効） | forbidden 0 件（restricted・分類不明は WARN） | SARIF（Trivy のライセンスの走査） |
 | M-15 | コード構造 | コード重複率（追加。参考値・既定は無効） | 合格ラインなし（トレンドのみ） | jscpd JSON |
@@ -486,9 +488,9 @@ ERROR が 1 つ以上          → Run = FAIL   （既定。fail-closed）
 SKIP / REFERENCE / NOT_APPLICABLE は集約に影響しない（ただし件数を UI に明示）
 ```
 
-`ERROR → FAIL` の既定は **fail-closed**（計測できていないものを合格扱いしない）とする。
-導入移行期間に限り、リポジトリ設定で `on_missing_report: warn` に緩和できるが、
-緩和は期限付き（最長 90 日）とし、ダッシュボードに常時表示する。
+`ERROR → FAIL` は **fail-closed**（計測できていないものを合格扱いしない）とする。
+判定から外したい指標は、設定で `enabled: false` にする（v1.10 で、実装されていなかった
+`on_missing_report: warn` による緩和を削除した。D-25）。
 
 ### 6.3.1 完全計測と部分計測
 
@@ -536,19 +538,10 @@ CI は Run 作成時に、実行しなかった指標を `skippedMetrics` とし
 
 ```yaml
 version: 1
-on_missing_report: fail           # fail | warn（期限付き緩和時のみ warn）
 
 execution:
   # CI がスキップを申告できる指標。ここに無い指標のスキップ申告は ERROR とする
   skippable_metrics: [mutation_score, performance]
-
-components:
-  - name: backend
-    language: java
-    paths: ["backend/**"]
-  - name: frontend
-    language: typescript
-    paths: ["frontend/**"]
 
 exclusions:                       # 全指標共通の計測除外
   - "**/generated/**"
@@ -558,13 +551,11 @@ exclusions:                       # 全指標共通の計測除外
 metrics:
   branch_coverage:
     enabled: true
-    threshold: 75                 # %
-    scope: overall                # overall | diff
-    per_component: true           # コンポーネントごとに判定
+    threshold: 75                 # %。コンポーネントごとに判定する
+    warn_below: 80                # これ未満は注意（WARN）
   mutation_score:
     enabled: true
-    threshold: 60                 # %
-    scope: changed                # all | changed（差分クラスのみ）
+    threshold: 60                 # %。実行範囲（全量か変更クラスか）は収集ランナーが成果物に添える
     components: [backend]         # PIT を用いるため Java のみ。frontend は対象外
   performance:
     enabled: true
@@ -576,16 +567,12 @@ metrics:
     enabled: true
     max_critical: 0
     max_high: 0
-    max_medium: null              # 判定対象外（可視化のみ）
   cyclomatic_complexity:
     enabled: true
     max_complexity: 15
-    scope: new_and_modified       # 新規追加 + 変更で悪化した関数のみ
     warn_from: 11
   api_contract:
     enabled: true
-    min_success_rate: 100         # %
-    min_test_count: 1             # 0 件なら FAIL（空実行の検知）
     breaking_changes: 0
   accessibility:
     enabled: true
@@ -679,7 +666,7 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | 収集ランナーによる対象の clone（3.2） | GitHub App の Contents: Read。対象リポジトリにインストールし、ジョブごとに 1 時間有効のインストールトークンを発行する | 読み取りのみ |
 | ~~収集ランナーによる PR の一覧取得（3.2）~~ | —（v1.7 で定期実行とともに廃止。D-22） | — |
 | リリース判定のタグの解決（FR-08-7） | バックエンドが GitHub API でタグをコミットに解決する（Contents: Read）。コミット SHA で指定すれば GitHub API を使わない | 読み取りのみ |
-| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す。省略された Run はバックエンドが判定ジョブの中で GitHub API により求める（Contents / Pull requests: Read） | 読み取りのみ |
+| `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す（GitHub API は使わない。v1.10 でバックエンドでの解決を廃止） | — |
 | ~~PR サマリコメント（FR-11-4）~~ | —（v1.2 で不採用。D-15） | — |
 | ~~Check Run 出力（Phase 2）~~ | —（v1.4 で削除。D-19） | — |
 
@@ -705,11 +692,10 @@ App を private として登録すれば、所有アカウント自身のリポ�
 | エンティティ | 説明 | 主な属性 |
 | --- | --- | --- |
 | `Repository` | 計測対象リポジトリ | owner, name, defaultBranch, enabled |
-| `Component` | リポジトリ内の構成単位 | repositoryId, name, language, pathPatterns |
 | `GateConfig` | 合格ライン等の設定。版管理される | repositoryId, version, sourceType(file/ui), rawYaml, effectiveFrom |
 | `Run` | 1 回の計測・判定の単位 | repositoryId, commitSha, baseCommitSha, branch, prNumber, status, verdict, gateConfigId, measuredAt |
 | `Artifact` | 取り込んだ元成果物 | runId, type, filename, sizeBytes, storageKey, sha256 |
-| `Measurement` | 指標ごとの実測値と判定 | runId, componentId, metricId, value, threshold, status, previousValue |
+| `Measurement` | 指標ごとの実測値と判定 | runId, componentName, metricId, value, threshold, status, previousValue |
 | `Finding` | 個別違反（脆弱性 / 複雑度超過関数 / 失敗テスト / a11y 違反） | runId, metricId, fingerprint, severity, title, filePath, line, detail(JSON) |
 | ~~`Waiver`~~ | ~~免除~~（v1.7 で廃止。D-22） | — |
 | `IngestToken` | リポジトリ単位の取り込みトークン | repositoryId, tokenHash, createdBy, lastUsedAt, revokedAt |
@@ -734,7 +720,7 @@ App を private として登録すれば、所有アカウント自身のリポ�
 | S-05 | トレンド | 指標を選んで任意期間の推移を比較表示。性能は環境別系列 | 全員 |
 | S-06 | 設定 | 設定ファイル（`*.gate.yml`）の内容表示、検証結果、変更履歴（編集は v1.5 で廃止） | 全員 |
 | S-07 | ~~免除管理~~ | ~~有効な免除の一覧、登録・失効、理由と期限、期限切れ間近の強調~~（v1.7 で廃止。D-22） | — |
-| S-08 | リポジトリ管理 | 登録、コンポーネント定義、Ingest Token 発行・失効 | Admin |
+| S-08 | リポジトリ管理 | 登録、Ingest Token 発行・失効 | Admin |
 | S-09 | 管理 | ログイン許可リスト、ユーザーとロール、保持期間、監査ログ | Admin |
 
 画面要件の共通事項:
@@ -900,7 +886,7 @@ quality-gate/
 | --- | --- | --- | --- |
 | R-1 | 性能計測値が実行環境のノイズで変動し、合否が安定しない | ゲートが信用されなくなる | 専有環境 + ウォームアップ除外 + 3 回実行の中央値採用（M-03） |
 | R-2 | 既存コードの水準が低く、初日から全リポジトリが不合格になる | 導入が頓挫する | 対象リポジトリは既にベースラインが整っているため、絶対値しきい値を当初から適用する。新規リポジトリを追加する際は、登録前にベースラインを計測し、乖離があればしきい値を個別設定する |
-| R-3 | PIT の実行時間で CI が長時間化する | 開発速度の低下 | 変更クラス限定（`scope: changed`）を既定とし、全量は夜間バッチで週次実行 |
+| R-3 | PIT の実行時間で CI が長時間化する | 開発速度の低下 | ~~変更クラス限定（`scope: changed`）を既定とし、全量は夜間バッチで週次実行~~ 収集ランナーは PR の計測では PIT を実行せず、PR 以外の計測で全量を実行する（D-24） |
 | R-4 | 新規 CVE 公開により、コード変更なしで不合格に転じる | 突然の不合格に混乱 | 計測し直したときに判定が変わる。修正版が無い間は合格ライン（`*.gate.yml`）の変更として扱い、理由をコミットに残す（v1.7。D-22） |
 | R-5 | ツールの severity 表記がばらつき「High」の定義が揺れる | 判定の信頼性低下 | CVSS スコアへの正規化マッピングを明文化し、設定として可視化（M-06） |
 | R-6 | 合格ラインの緩和が乱発され、実質的に無効なゲートになる | 形骸化 | 合格ラインは Git で管理し、変更はプルリクエストを通す（D-20）。免除の仕組みは v1.7 で廃止した（D-22） |
@@ -932,7 +918,7 @@ quality-gate/
 
 ### Phase 2 — 指標の拡充
 
-- 指標: **M-02 ミューテーション（backend / PIT）/ M-08・M-09 契約・互換性 / M-10 アクセシビリティ** を追加
+- 指標: **M-02 ミューテーション（backend / PIT）/ M-08・M-09 契約・互換性（M-08 は v1.10 で廃止）/ M-10 アクセシビリティ** を追加
 - FR-08（トレンド）、~~FR-10（免除管理／承認フローなし）、FR-11（通知）、FR-12（日次再評価）~~（v1.7 で廃止。D-22）
 - FR-14（監査ログ）
 
@@ -979,7 +965,7 @@ quality-gate/
 | 用語 | 定義 |
 | --- | --- |
 | Run | 1 つのコミットに対する 1 回の計測・判定の単位 |
-| Finding | 判定の根拠となる個別の違反（脆弱性 1 件、複雑度超過関数 1 つ、失敗した契約テスト 1 件 など） |
+| Finding | 判定の根拠となる個別の違反（脆弱性 1 件、複雑度超過関数 1 つ、失敗したテスト 1 件 など） |
 | fingerprint | Finding を Run をまたいで同一と見なすためのキー。新規 / 継続 / 解消の判定に用いる |
 | ~~Waiver~~ | ~~個別 Finding を期限付きで判定対象から除外する仕組み（免除）~~（v1.7 で廃止。D-22） |
 | ゲート（Gate） | 指標としきい値の集合。合格ラインの定義そのもの |

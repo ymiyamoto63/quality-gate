@@ -24,7 +24,7 @@ public record CreateRunRequest(
         @Pattern(regexp = "^[0-9a-f]{40}$", message = "40 桁の 16 進数で指定してください")
         String commitSha,
 
-        @Schema(description = "差分計測の比較基準。省略時は quality-gate が merge-base を解決する")
+        @Schema(description = "差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する")
         @Pattern(regexp = "^[0-9a-f]{40}$", message = "40 桁の 16 進数で指定してください")
         String baseCommitSha,
 

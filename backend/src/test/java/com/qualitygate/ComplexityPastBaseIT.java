@@ -69,6 +69,7 @@ class ComplexityPastBaseIT {
                 max_complexity: 15
                 warn_from: 11
               api_contract: { enabled: false }
+              test_results: { enabled: false }
               accessibility: { enabled: false }
             """;
 
