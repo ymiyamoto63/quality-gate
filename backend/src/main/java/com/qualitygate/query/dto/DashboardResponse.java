@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-@Schema(description = "ダッシュボード。repository_summaries を読むだけで応答する。")
+@Schema(description = "ダッシュボード。リポジトリごとの最新の判定済み Run と、最後の完全計測。")
 public record DashboardResponse(
         List<RepositoryCard> repositories) {
 

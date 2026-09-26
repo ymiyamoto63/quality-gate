@@ -2,22 +2,17 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Finding;
 import com.qualitygate.domain.entity.Measurement;
-import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.RunSkippedMetric;
-import com.qualitygate.domain.metric.MetricCatalog;
-import com.qualitygate.domain.metric.MetricCategory;
 import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.Verdict;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
-import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.platform.id.Uuid7;
@@ -30,10 +25,8 @@ import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -55,20 +48,17 @@ public class RunEvaluationService {
     private final RunSkippedMetricRepository skippedMetrics;
     private final MeasurementRepository measurements;
     private final FindingRepository findings;
-    private final RepositorySummaryRepository summaries;
     private final List<MetricEvaluator> evaluators;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
     public RunEvaluationService(RunRepository runs, RunSkippedMetricRepository skippedMetrics,
                                 MeasurementRepository measurements, FindingRepository findings,
-                                RepositorySummaryRepository summaries,
                                 List<MetricEvaluator> evaluators, ObjectMapper objectMapper) {
         this.runs = runs;
         this.skippedMetrics = skippedMetrics;
         this.measurements = measurements;
         this.findings = findings;
-        this.summaries = summaries;
         this.evaluators = evaluators;
         this.objectMapper = objectMapper;
     }
@@ -87,9 +77,8 @@ public class RunEvaluationService {
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
         Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
 
-        Map<String, Integer> pastBase = pastBaseComplexity(run, input);
         EvaluationContext context = new EvaluationContext(run, thresholds,
-                input, previousValues, baseline.isPresent(), pastBase);
+                input, previousValues, baseline.isPresent());
         List<MetricResult> results = evaluateAll(context);
 
         // 再評価でも重複しないよう、この Run の既存の判定結果を置き換える
@@ -104,8 +93,6 @@ public class RunEvaluationService {
         Verdict verdict = aggregate(results);
         Completeness completeness = completenessOf(results);
         run.markEvaluated(verdict, completeness, Instant.now());
-
-        updateSummary(run, results, verdict, completeness);
 
         log.info("判定が完了しました runId={} verdict={} completeness={} 指標={}件",
                 runId, verdict, completeness, results.size());
@@ -291,46 +278,6 @@ public class RunEvaluationService {
     }
 
     /**
-     * M-07 の比較元を、比較元コミットで判定済みの過去の Run から求める（指標仕様書 M-07「ベース側の CC 取得」の 2）。
-     *
-     * <p>比較元の解析結果（scope=base）が送られていて、Run に比較元コミットがあり、そのコミットの Run で M-07 が
-     * 判定されている場合だけ使う。過去の Run が保存しているのは注意水準（{@code warn_from}）以上の関数だけだが、
-     * 判定に要るのは「合格ラインを超えた関数が比較元より悪化したか」なので足りる。保存されていない関数は
-     * 比較元で注意水準未満（または存在しない）であり、合格ラインを超えた今の CC より必ず小さい。
-     *
-     * @return fingerprint → CC。使えなければ null（比較元なしとして判定する）
-     */
-    private Map<String, Integer> pastBaseComplexity(Run run, NormalizedInput input) {
-        if (!input.baseFindingsOf(GateThresholds.M_COMPLEXITY).isEmpty() || run.getBaseCommitSha() == null
-                || run.getBaseCommitSha().equals(run.getCommitSha())) {
-            return null;
-        }
-        Optional<Run> baseRun = runs.findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(
-                run.getRepositoryId(), run.getBaseCommitSha(), RunStatus.EVALUATED);
-        boolean judged = baseRun.map(base -> measurements.findByRunId(base.getId()).stream()
-                        .anyMatch(m -> GateThresholds.M_COMPLEXITY.equals(m.getMetricId())
-                                && JUDGED.contains(m.getStatus())))
-                .orElse(false);
-        if (!judged) {
-            return null;
-        }
-        Map<String, Integer> complexity = new HashMap<>();
-        for (Finding finding : findings.findByRunId(baseRun.get().getId())) {
-            if (GateThresholds.M_COMPLEXITY.equals(finding.getMetricId())) {
-                Object value = objectMapper.readValue(finding.getDetail(), Map.class).get("complexity");
-                if (value instanceof Number number) {
-                    complexity.put(finding.getFingerprint(), number.intValue());
-                }
-            }
-        }
-        return complexity;
-    }
-
-    /** M-07 が値をもって判定された状態。ERROR・SKIP などの Run は比較元に使わない。 */
-    private static final Set<MeasurementStatus> JUDGED =
-            Set.of(MeasurementStatus.PASS, MeasurementStatus.WARN, MeasurementStatus.FAIL);
-
-    /**
      * 比較対象 Run。比較元コミット（{@code baseCommitSha}）で判定済みの Run があればそれ、
      * 無ければ同一ブランチで、この Run より前に計測された判定済みの Run。
      *
@@ -341,7 +288,7 @@ public class RunEvaluationService {
      * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
      * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
      */
-    public Optional<Run> findBaseline(Run run) {
+    private Optional<Run> findBaseline(Run run) {
         if (run.getBaselineRunId() != null) {
             Optional<Run> previous = runs.findById(run.getBaselineRunId());
             if (previous.isPresent()) {
@@ -373,74 +320,6 @@ public class RunEvaluationService {
                     measurement.getValue());
         }
         return values;
-    }
-
-    /**
-     * 読み取りモデルを更新する。
-     *
-     * <p>最新の Run より古い Run（過去の Run の再評価、遅れて届いた Run）では
-     * 最新の判定を書き換えない。ダッシュボードが過去の状態に巻き戻って見えるため。
-     */
-    private void updateSummary(Run run, List<MetricResult> results, Verdict verdict,
-                               Completeness completeness) {
-        RepositorySummary summary = summaries.findById(run.getRepositoryId())
-                .orElseGet(() -> summaries.save(new RepositorySummary(run.getRepositoryId())));
-        boolean isLatest = summary.getLatestMeasuredAt() == null
-                || !run.getMeasuredAt().isBefore(summary.getLatestMeasuredAt())
-                || run.getId().equals(summary.getLatestRunId());
-        if (!isLatest) {
-            return;
-        }
-
-        long critical = countBySeverity(results, Severity.CRITICAL);
-        long high = countBySeverity(results, Severity.HIGH);
-
-        summary.update(run.getId(), verdict, completeness, run.getMeasuredAt(),
-                toJson(categoryStatusOf(results)), (int) critical, (int) high);
-        summaries.save(summary);
-    }
-
-    /**
-     * カテゴリ別の状態。カテゴリ内で最も重いステータスを代表にする。
-     * 画面側で分類しないのは、カテゴリの定義がサーバとクライアントの 2 箇所に
-     * 存在する状態を避けるため。
-     */
-    static Map<String, String> categoryStatusOf(List<MetricResult> results) {
-        Map<MetricCategory, MeasurementStatus> worst = new EnumMap<>(MetricCategory.class);
-        for (MetricResult result : results) {
-            MetricCategory category = MetricCatalog.of(result.metricId()).category();
-            worst.merge(category, result.status(),
-                    (a, b) -> severityRank(a) >= severityRank(b) ? a : b);
-        }
-        // EnumMap の反復順は宣言順、つまり要件定義の指標表と同じ並びになる。
-        Map<String, String> asString = new LinkedHashMap<>();
-        worst.forEach((category, status) -> asString.put(category.displayName(), status.name()));
-        return asString;
-    }
-
-    private static int severityRank(MeasurementStatus status) {
-        return switch (status) {
-            case ERROR -> 5;
-            case FAIL -> 4;
-            case WARN -> 3;
-            case SKIP -> 1;
-            case PASS -> 0;
-            // 対象外はカテゴリの状態を左右しない。合格の指標と並んでいれば合格のまま
-            case NOT_APPLICABLE -> -1;
-        };
-    }
-
-    /**
-     * ダッシュボードの「重大 N 件・高 N 件」は脆弱性（M-06）の件数に限る。
-     * アクセシビリティ違反（M-09）も同じ深刻度で保存するため、混ぜると
-     * 未解決の脆弱性が増えたように見える。
-     */
-    private static long countBySeverity(List<MetricResult> results, Severity severity) {
-        return results.stream()
-                .filter(r -> GateThresholds.M_VULNERABILITIES.equals(r.metricId()))
-                .flatMap(r -> r.findingsToPersist().stream())
-                .filter(f -> f.finding().severity() == severity)
-                .count();
     }
 
     private String toJson(Object value) {

@@ -128,7 +128,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/runs/{runId}/findings` | Finding 一覧（S-04） | — |
 | GET | `/api/v1/runs/{runId}/artifacts` | 成果物の一覧 | — |
 | GET | `/api/v1/runs/{runId}/artifacts/{artifactId}/content` | 成果物のダウンロード | — |
-| GET | `/api/v1/repositories/{id}/config` | 現在の設定と版履歴（S-06） | — |
+| GET | `/api/v1/repositories/{id}/config` | 現在の設定と検証結果（S-06） | — |
 
 ### 2.3 操作 API
 
@@ -141,7 +141,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | POST | `/api/v1/users` | 許可リストへの追加 | ADMIN |
 | PATCH | `/api/v1/users/{id}` | ロール変更・無効化 | ADMIN |
 | GET | `/api/v1/audit-logs` | 監査ログ | ADMIN |
-| GET / PUT | `/api/v1/settings/retention` | 保持期間の取得・更新 | ADMIN |
 
 ### 2.4 認証以外の公開エンドポイント
 
@@ -259,7 +258,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 4.1 `GET /api/v1/dashboard`
 
-`repository_summaries`（[06](06-database-design.md) 3.9）を読むだけで応答する。
+リポジトリごとの最新の判定済み Run と最後の完全計測を `runs` から引き、「重大・高」の件数は最新の Run の脆弱性（M-06）の違反から数える。
 
 ```json
 {
@@ -480,10 +479,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
     "rawYaml": "version: 1\n...",
     "parsed": { "metrics": { "branch_coverage": { "threshold": 75 } } }
   },
-  "history": [
-    { "gateConfigId": "018f...", "version": 3, "sourceType": "FILE", "createdAt": "..." },
-    { "gateConfigId": "018e...", "version": 2, "sourceType": "FILE", "createdAt": "..." }
-  ],
   "validation": { "valid": true, "errors": [] }
 }
 ```
@@ -625,7 +620,6 @@ API のパスはリポジトリ上のファイルではない。
 | 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。DD-13）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
 | 違反一覧 | 各違反に `fingerprint` を返す |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` はその場で判定し直し、判定後の `status` と `verdict` を返す。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
-| 保持期間 | Run・成果物・監査ログの日数を扱う |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
 
 ---

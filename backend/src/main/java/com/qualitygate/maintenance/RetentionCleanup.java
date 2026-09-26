@@ -2,8 +2,7 @@ package com.qualitygate.maintenance;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.platform.settings.RetentionSettings;
-import com.qualitygate.platform.settings.SystemSettingsService;
+import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.platform.storage.ArtifactStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -38,22 +37,21 @@ public class RetentionCleanup {
 
     private final ArtifactRecordRepository artifacts;
     private final ArtifactStore artifactStore;
-    private final SystemSettingsService settings;
+    private final QualityGateProperties.Retention retention;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
     public RetentionCleanup(ArtifactRecordRepository artifacts,
-                               ArtifactStore artifactStore, SystemSettingsService settings,
+                               ArtifactStore artifactStore, QualityGateProperties properties,
                                JdbcTemplate jdbc, TransactionTemplate transactions) {
         this.artifacts = artifacts;
         this.artifactStore = artifactStore;
-        this.settings = settings;
+        this.retention = properties.retention();
         this.jdbc = jdbc;
         this.transactions = transactions;
     }
 
     public void run() {
-        RetentionSettings retention = settings.retention();
         Instant now = Instant.now();
 
         int files = deleteArtifactFiles(now.minus(Duration.ofDays(retention.artifactDays())));

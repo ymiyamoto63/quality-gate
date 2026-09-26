@@ -32,8 +32,7 @@
 users ──┐
         │ (created_by / actor)
         ▼
-repositories ──┬──▶ gate_configs
-     │         └──▶ repository_summaries (1:1 読み取りモデル)
+repositories ──▶ gate_configs
      │
      └──▶ runs ──┬──▶ artifacts
                  ├──▶ run_skipped_metrics
@@ -41,7 +40,6 @@ repositories ──┬──▶ gate_configs
                  └──▶ findings
 
 audit_logs      （独立。追記のみ）
-system_settings （独立。保持期間などのシステム設定）
 ```
 
 ---
@@ -113,7 +111,7 @@ CREATE TABLE gate_configs (
 ```
 
 `content_hash` に一意制約を置くことで、**内容が同じ設定は版を増やさない**。
-毎回の Run で新しい版が作られると、変更履歴がノイズで埋まる。
+毎回の Run で新しい版が作られると、同じ合格ラインの版が Run の数だけ増える。
 
 ### 3.4 `runs` — 計測・判定の単位
 
@@ -136,7 +134,6 @@ CREATE TABLE runs (
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
-    renamed_files       jsonb,                   -- ファイルの移動の対応表（新しいパス → 移動前のパス）
     tags                text[]      NOT NULL DEFAULT '{}',  -- 計測したコミットを指すタグ
     created_at          timestamptz NOT NULL DEFAULT now(),
     evaluated_at        timestamptz,
@@ -152,7 +149,6 @@ CREATE TABLE runs (
 
 `tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-09）でタグを
 コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。
-`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求め、再評価でも同じものを使う。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
@@ -272,32 +268,7 @@ CREATE TABLE findings (
 );
 ```
 
-### 3.9 `repository_summaries` — ダッシュボード用の読み取りモデル
-
-```sql
-CREATE TABLE repository_summaries (
-    repository_id       uuid        PRIMARY KEY REFERENCES repositories(id) ON DELETE CASCADE,
-    latest_run_id       uuid        REFERENCES runs(id) ON DELETE SET NULL,
-    latest_verdict      varchar(24),
-    latest_completeness varchar(8),
-    latest_measured_at  timestamptz,
-    last_full_run_id    uuid        REFERENCES runs(id) ON DELETE SET NULL,
-    last_full_measured_at timestamptz,
-    category_status     jsonb,      -- {"機能テスト":"PASS","性能テスト":"SKIP",...}
-    open_critical_count int         NOT NULL DEFAULT 0,
-    open_high_count     int         NOT NULL DEFAULT 0,
-    version             bigint      NOT NULL DEFAULT 0,   -- 楽観ロック（9 章）
-    updated_at          timestamptz NOT NULL DEFAULT now()
-);
-```
-
-判定完了時に更新する。
-ダッシュボードはこの 1 テーブルを読むだけで描画でき、
-Run や Measurement を走査しない（[05](05-architecture.md) 11 章）。
-
-`last_full_measured_at` は最後の完全計測の日時として画面に常に表示する（FR-06-3）。
-
-### 3.10 `audit_logs` — 監査ログ
+### 3.9 `audit_logs` — 監査ログ
 
 ```sql
 CREATE TABLE audit_logs (
@@ -332,20 +303,7 @@ REVOKE UPDATE, DELETE ON audit_logs FROM quality_gate_app;
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が操作したか」が失われないようにするため。
 
-### 3.11 `system_settings` — システム全体の設定
-
-```sql
-CREATE TABLE system_settings (
-    key        varchar(64) PRIMARY KEY,
-    value      jsonb       NOT NULL,
-    updated_by uuid        REFERENCES users(id) ON DELETE SET NULL,
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
-
-### 3.12 Spring Session
+### 3.10 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
@@ -373,7 +331,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 
 | # | クエリ | インデックス |
 | --- | --- | --- |
-| 1 | ダッシュボード（全リポジトリのサマリ） | `repository_summaries` の PK のみ。走査対象が数行のため追加不要 |
+| 1 | ダッシュボード・リポジトリ詳細（リポジトリごとの最新の判定済み Run と最後の完全計測） | `ix_runs_latest ON runs (repository_id, measured_at DESC, attempt DESC) WHERE status = 'EVALUATED'` |
 | 2 | Run 一覧（リポジトリ・ブランチ・新しい順） | `ix_runs_list ON runs (repository_id, branch, measured_at DESC)` |
 | 3 | Run 詳細の指標一覧 | `ix_measurements_run ON measurements (run_id)` |
 | 4 | **トレンド**（リポジトリ × 指標 × 期間） | `ix_measurements_trend ON measurements (repository_id, metric_id, measured_at DESC)` |
@@ -409,8 +367,10 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 
 ## 7. 保持期間と削除
 
-下表の保持期間は既定値である。Run・成果物・監査ログの日数は管理画面（S-08）から変更でき、
-`system_settings` に保存する。
+下表の保持期間は既定値である。Run・成果物・監査ログの日数は環境変数
+（`QG_RETENTION_RUN_DAYS` / `QG_RETENTION_ARTIFACT_DAYS` / `QG_RETENTION_AUDIT_LOG_DAYS`）で変えられる。
+変える頻度がほとんど無いため、画面からは変更しない。誤って短い日数を設定すると大半のデータが消えるため、
+下限（Run 30 日・成果物 1 日・監査ログ 365 日）を下回る値ではアプリが起動しない。
 
 | 対象 | 保持期間 | 削除方法 |
 | --- | --- | --- |
@@ -460,7 +420,6 @@ DELETE FROM runs
 | 関連 | すべて `FetchType.LAZY`。`OneToMany` は原則マッピングせず、リポジトリのクエリで取得する |
 | 一括 INSERT | 判定結果の保存は `measurements` / `findings` とも JDBC バッチ（`hibernate.jdbc.batch_size=100`） |
 | 参照系 | エンティティを返さず、**専用の DTO へ射影**する（`SELECT new ...` またはインタフェース射影） |
-| 更新検知 | `@Version` による楽観ロックは `repository_summaries` にのみ適用 |
 
 `OneToMany` をマッピングしない方針は、N+1 問題と、
 意図しない遅延ロードの発生を構造的に避けるため。

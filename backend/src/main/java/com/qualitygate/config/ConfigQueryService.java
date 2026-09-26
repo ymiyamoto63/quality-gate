@@ -96,10 +96,9 @@ public class ConfigQueryService {
     @Transactional(readOnly = true)
     public ConfigResponses.RepositoryConfig get(UUID repositoryId) {
         requireRepository(repositoryId);
-        List<GateConfig> versions = configs.findByRepositoryIdOrderByVersionDesc(repositoryId);
-        ConfigResponses.ConfigVersion current = versions.isEmpty() ? null : versionOf(versions.getFirst());
+        ConfigResponses.ConfigVersion current = configs.findFirstByRepositoryIdOrderByVersionDesc(repositoryId)
+                .map(this::versionOf).orElse(null);
         return new ConfigResponses.RepositoryConfig(current,
-                versions.stream().map(ConfigQueryService::historyOf).toList(),
                 latestValidation(repositoryId),
                 DEFAULT_YAML);
     }
@@ -156,11 +155,6 @@ public class ConfigQueryService {
         return new ConfigResponses.ConfigVersion(config.getId(), config.getVersion(),
                 config.getSourceType(), config.getSourceCommitSha(), config.getCreatedAt(),
                 config.getRawYaml(), objectMapper.readValue(config.getParsed(), JSON_OBJECT));
-    }
-
-    private static ConfigResponses.ConfigHistoryItem historyOf(GateConfig config) {
-        return new ConfigResponses.ConfigHistoryItem(config.getId(), config.getVersion(),
-                config.getSourceType(), config.getSourceCommitSha(), config.getCreatedAt());
     }
 
     static ConfigResponses.ValidationErrorItem errorOf(ConfigValidationError error) {

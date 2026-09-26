@@ -10,7 +10,7 @@ import { formatDateTime } from '@/api/format'
 type Schemas = components['schemas']
 type User = Schemas['UserResponse']
 type AuditLog = Schemas['AuditLogItem']
-type Tab = 'users' | 'audit' | 'retention'
+type Tab = 'users' | 'audit'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -19,7 +19,6 @@ const ui = useUiStore()
 const TABS: { id: Tab; label: string; routeName: string }[] = [
   { id: 'users', label: '利用者', routeName: 'users' },
   { id: 'audit', label: '監査ログ', routeName: 'audit-logs' },
-  { id: 'retention', label: '保持期間', routeName: 'retention' },
 ]
 const tab = computed<Tab>(() => TABS.find((t) => t.routeName === route.name)?.id ?? 'users')
 const announcement = ref('')
@@ -35,13 +34,7 @@ const logs = ref<AuditLog[]>([])
 const logCursor = ref<string | null>(null)
 const actionFilter = ref('')
 
-// 保持期間
-const retention = ref<Schemas['RetentionSettings'] | null>(null)
-const retentionError = ref<string | null>(null)
-
-// 失敗したジョブ
-
-// 削除した機能（免除・通知設定・設定の編集）の操作も、過去の監査ログを読めるよう残す
+// 削除した機能（免除・通知設定・設定の編集・画面からの保持期間の変更）の操作も、過去の監査ログを読めるよう残す
 const ACTION_LABELS: Record<string, string> = {
   BOOTSTRAP_ADMIN: '初期管理者の登録',
   USER_ADDED: '利用者の追加',
@@ -66,11 +59,8 @@ async function loadTab(): Promise<void> {
   if (tab.value === 'users') {
     const { data } = await api.GET('/api/v1/users')
     users.value = data?.items ?? []
-  } else if (tab.value === 'audit') {
-    await loadLogs(false)
   } else {
-    const { data } = await api.GET('/api/v1/settings/retention')
-    retention.value = data ?? null
+    await loadLogs(false)
   }
 }
 
@@ -132,18 +122,6 @@ function describe(value: Record<string, unknown> | null | undefined): string {
   return Object.entries(value)
     .map(([key, v]) => `${key}: ${typeof v === 'object' ? JSON.stringify(v) : String(v)}`)
     .join(' / ')
-}
-
-async function saveRetention(): Promise<void> {
-  if (!retention.value) return
-  retentionError.value = null
-  const { data, error } = await api.PUT('/api/v1/settings/retention', { body: retention.value })
-  if (error) {
-    retentionError.value = messageOf(error, '保持期間を保存できませんでした')
-    return
-  }
-  retention.value = data
-  announcement.value = '保持期間を保存しました。翌日の保持期間バッチから適用されます。'
 }
 </script>
 
@@ -301,47 +279,6 @@ async function saveRetention(): Promise<void> {
       <button v-if="logCursor" type="button" class="qg-button" @click="loadLogs(true)">
         さらに読み込む
       </button>
-    </template>
-
-    <template v-else-if="tab === 'retention'">
-      <form v-if="retention" class="qg-form qg-panel" @submit.prevent="saveRetention">
-        <p class="qg-muted">
-          保持期間を過ぎたデータは毎日 03:00
-          のバッチで少しずつ削除されます。短くすると古いデータが消えます。
-        </p>
-        <label>
-          Run・指標値・違反（日）
-          <input v-model.number="retention.runDays" type="number" min="30" max="3650" required />
-        </label>
-        <label>
-          成果物のファイル（日）
-          <input
-            v-model.number="retention.artifactDays"
-            type="number"
-            min="1"
-            max="3650"
-            required
-          />
-          <span class="qg-form__hint">過ぎた成果物は再評価できなくなります</span>
-        </label>
-        <label>
-          監査ログ（日）
-          <input
-            v-model.number="retention.auditLogDays"
-            type="number"
-            min="365"
-            max="3650"
-            required
-          />
-          <span class="qg-form__hint"
-            >削除は DB の管理ロールで行います（アプリには削除権限がありません）</span
-          >
-        </label>
-        <p v-if="retentionError" class="qg-form__error" role="alert">{{ retentionError }}</p>
-        <div class="qg-form__actions">
-          <button type="submit" class="qg-button qg-button--primary">保存</button>
-        </div>
-      </form>
     </template>
   </section>
 </template>

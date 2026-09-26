@@ -443,7 +443,7 @@ A. 計測プロファイルと合格ラインを追加し、App をそのリポ�
 | GitHub Actions のアーティファクト | 写し取ったソース（`collector-source`） | 1 日 |
 | GitHub Actions のアーティファクト | 計測結果（`collector-reports`） | 7 日 |
 | ランナーのマシン | 計測用のコンテナのイメージと、キャッシュ（Maven・npm・PMD・Trivy の DB）の Docker ボリューム | 消すまで（ソースそのものは残さない） |
-| quality-gate のアプリ | 成果物ファイル（`data/artifacts/`）と判定結果（PostgreSQL） | 保持期間の設定（管理画面 S-08）に従う |
+| quality-gate のアプリ | 成果物ファイル（`data/artifacts/`）と判定結果（PostgreSQL） | 保持期間の設定（環境変数 `QG_RETENTION_*`）に従う |
 
 **Q. like-chatgpt 側のワークフロー（`.github/workflows/quality-gate.yml`）は消してよいですか？**
 A. 収集ランナーで全指標が問題なく測れることを確かめたら、消しても構いません。消すかどうかは like-chatgpt 側の判断です。

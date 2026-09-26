@@ -33,11 +33,11 @@ class FlywayMigrationIT {
                 "users", "repositories",
                 "gate_configs", "runs", "run_skipped_metrics", "artifacts",
                 "measurements", "findings",
-                "repository_summaries", "audit_logs",
+                "audit_logs",
                 "flyway_schema_history");
         // マイグレーションで削除したテーブルが残っていない
         assertThat(tables).doesNotContain("waivers", "notifications", "notification_settings", "components",
-                "jobs", "ingest_tokens");
+                "jobs", "ingest_tokens", "repository_summaries", "system_settings");
     }
 
     @Test

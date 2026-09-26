@@ -9,7 +9,7 @@
 2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` /
    `git-renames`（ファイルの移動。[指標仕様書 0.4](../spec/02-metrics-spec.md)）など）を
    アップロードする。この時点ではパースせず、`QG_ARTIFACT_ROOT` に保存するだけ
-3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、その場で設定の解決 → 正規化 → 判定 → 読み取りモデル更新を行い、
+3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、その場で設定の解決 → 正規化 → 判定 → 保存を行い、
    判定結果（`status` / `verdict` / `completeness`）を返す（[03](../spec/03-design-decisions.md) DD-15）。判定に失敗した場合も 200 で、`status` が `FAILED` になる
 4. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 

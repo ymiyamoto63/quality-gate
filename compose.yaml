@@ -34,6 +34,10 @@ services:
       QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-}
       # 収集ランナーが取り込み API に送るトークン（収集ランナーの Secrets の QG_INGEST_TOKEN と同じ値）
       QG_INGEST_TOKEN: ${QG_INGEST_TOKEN:-}
+      # データ保持期間（日）。既定は Run 730 / 成果物 90 / 監査ログ 730
+      QG_RETENTION_RUN_DAYS: ${QG_RETENTION_RUN_DAYS:-730}
+      QG_RETENTION_ARTIFACT_DAYS: ${QG_RETENTION_ARTIFACT_DAYS:-90}
+      QG_RETENTION_AUDIT_LOG_DAYS: ${QG_RETENTION_AUDIT_LOG_DAYS:-730}
       # コンテナで動かすときは JSON 構造化ログにする（ログ基盤で requestId / runId を検索できるように）
       QG_LOG_FORMAT: ${QG_LOG_FORMAT:-ecs}
     ports:

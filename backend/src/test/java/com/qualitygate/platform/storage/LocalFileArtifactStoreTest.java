@@ -25,7 +25,7 @@ class LocalFileArtifactStoreTest {
     @BeforeEach
     void setUp() {
         store = new LocalFileArtifactStore(
-                new QualityGateProperties(tempDir, 0, 0, null, null));
+                new QualityGateProperties(tempDir, 0, 0, null, null, null));
     }
 
     @Test

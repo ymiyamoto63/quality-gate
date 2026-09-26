@@ -41,13 +41,7 @@ public class ComplexityEvaluator implements MetricEvaluator {
                 context.input().headFindingsOf(metricId()));
         Map<String, Integer> base = complexityByFingerprint(
                 context.input().baseFindingsOf(metricId()));
-        // 比較元の解析結果が無ければ、比較元コミットで判定済みの過去の Run の値を使う
-        String baseSource = base.isEmpty() ? null : "artifact";
-        if (base.isEmpty() && context.pastBaseComplexity() != null) {
-            base = context.pastBaseComplexity();
-            baseSource = "past-run";
-        }
-        boolean baseAvailable = baseSource != null;
+        boolean baseAvailable = !base.isEmpty();
 
         List<IdentifiedFinding> exceeding = new ArrayList<>();
         List<IdentifiedFinding> warnBand = new ArrayList<>();
@@ -74,10 +68,6 @@ public class ComplexityEvaluator implements MetricEvaluator {
         detail.put("functionsInWarnBand", warnBand.size());
         detail.put("analyzedFunctions", head.size());
         detail.put("baseComparisonAvailable", baseAvailable);
-        if (baseSource != null) {
-            // 比較元をどこから得たか（artifact: 送られた base の解析結果 / past-run: 比較元コミットの過去の Run）
-            detail.put("baseSource", baseSource);
-        }
 
         MeasurementStatus status = statusOf(newlyExceeding, warnBand.size());
         String reason = reasonOf(!baseAvailable, newlyExceeding, exceeding.size(),
@@ -119,7 +109,7 @@ public class ComplexityEvaluator implements MetricEvaluator {
             return exceeding == 0
                     ? "循環的複雑度 %d 超の関数はありません".formatted(max)
                     : ("ベース比較ができないため、既存の複雑度超過 %d 件は新規として計上していません"
-                            + "（比較には base スコープの解析結果か、比較元コミットで判定済みの Run が必要です）").formatted(exceeding);
+                            + "（比較には base スコープの解析結果が必要です）").formatted(exceeding);
         }
         if (newlyExceeding > 0) {
             return "複雑度 %d 超の新規・悪化した関数が %d 件あります".formatted(max, newlyExceeding);

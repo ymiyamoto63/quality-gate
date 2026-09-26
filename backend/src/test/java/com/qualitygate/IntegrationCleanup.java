@@ -19,9 +19,9 @@ final class IntegrationCleanup {
 
     static void deleteAll(JdbcTemplate jdbc) {
         jdbc.execute("""
-                TRUNCATE audit_logs, system_settings, findings,
+                TRUNCATE audit_logs, findings,
                          measurements, artifacts, run_skipped_metrics,
-                         repository_summaries, runs, gate_configs,
+                         runs, gate_configs,
                          repositories, users CASCADE
                 """);
     }

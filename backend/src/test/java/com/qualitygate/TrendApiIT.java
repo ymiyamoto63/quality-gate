@@ -16,7 +16,6 @@ import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
@@ -82,7 +81,6 @@ class TrendApiIT {
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
-    @Autowired RepositorySummaryRepository summaries;
     @Autowired GateConfigRepository gateConfigs;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
@@ -100,7 +98,6 @@ class TrendApiIT {
         measurements.deleteAll();
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
-        summaries.deleteAll();
         runs.deleteAll();
         gateConfigs.deleteAll();
         repositories.deleteAll();

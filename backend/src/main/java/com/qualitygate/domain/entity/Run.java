@@ -75,11 +75,6 @@ public class Run {
     @Column
     private Completeness completeness;
 
-    /** ファイルの移動・リネームの対応表（JSON。新しいパス → 移動前のパス）。求めていなければ null。 */
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "renamed_files", columnDefinition = "jsonb")
-    private String renamedFiles;
-
     /** 計測したコミットを指すタグ（収集ランナーが計測時に求めて送る）。リリース判定でタグをコミットに解決するのに使う。 */
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "tags", columnDefinition = "text[]", nullable = false)
@@ -194,14 +189,6 @@ public class Run {
 
     public void setBaseCommitSha(String baseCommitSha) {
         this.baseCommitSha = baseCommitSha;
-    }
-
-    public String getRenamedFiles() {
-        return renamedFiles;
-    }
-
-    public void setRenamedFiles(String renamedFiles) {
-        this.renamedFiles = renamedFiles;
     }
 
     public List<String> getTags() {
