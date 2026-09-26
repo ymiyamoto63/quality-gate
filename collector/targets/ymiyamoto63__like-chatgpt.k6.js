@@ -1,5 +1,5 @@
 // like-chatgpt の負荷試験（M-03 / M-04 / M-05）。収集ランナーの measure.sh が実行する。
-// 仕様: docs/initial/02-metrics-spec.md M-03、手順: docs/operations/collector.md 8 章
+// 仕様: docs/spec/02-metrics-spec.md M-03、手順: docs/operations/collector.md 8 章
 //
 //   負荷モデル   constant-arrival-rate（到達率を固定し、VU 数は固定しない）
 //   ウォームアップ 60 秒。phase=warmup のタグを付け、集計（phase=measure）から除く

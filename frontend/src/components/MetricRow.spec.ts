@@ -116,7 +116,7 @@ describe('MetricRow', () => {
     // 合格でも出す。「重大 0 件」を適合の証明と受け取らせない
     const text = render(
       metric({
-        metricId: 'M-10',
+        metricId: 'M-09',
         name: 'アクセシビリティ違反',
         componentName: null,
         unit: 'count',

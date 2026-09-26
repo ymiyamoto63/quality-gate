@@ -5,7 +5,7 @@ import org.slf4j.MDC;
 import java.util.Optional;
 
 /**
- * ログの相関 ID（docs/initial/05-architecture.md 10.1）。MDC のキーを 1 か所に置く。
+ * ログの相関 ID（docs/spec/05-architecture.md 10.1）。MDC のキーを 1 か所に置く。
  *
  * <p>{@code requestId} は HTTP の要求ごと（{@link RequestIdFilter}）、{@code runId} は Run を扱う要求と
  * ジョブ（取り込み・判定）で MDC に載せる。JSON 形式のログ（{@code QG_LOG_FORMAT}）では、MDC の値が

@@ -70,7 +70,7 @@ public class IngestService {
     @Transactional
     public Run createRun(CreateRunRequest request) {
         // 送れるのは quality-gate に登録したリポジトリだけ。Ingest Token は収集ランナーの 1 つだけで、
-        // リポジトリごとには分けない（D-27）
+        // リポジトリごとには分けない（DD-20）
         MonitoredRepository repository = repositories
                 .findByOwnerAndName(request.owner(), request.name())
                 .orElseThrow(() -> ApiException.notFound("リポジトリ", request.repository()));
@@ -221,7 +221,7 @@ public class IngestService {
                     .collect(Collectors.joining(" / "));
             if (scope == null || scope.isNull()) {
                 // 変更範囲だけの値と全量の値は比較できない。どちらか分からない値は
-                // 前回比にもトレンドにも置き場所がない（docs/initial/02-metrics-spec.md M-02）
+                // 前回比にもトレンドにも置き場所がない（docs/spec/02-metrics-spec.md M-02）
                 throw new ApiException(ErrorCode.MUTATION_SCOPE_MISSING,
                         "PIT の成果物には metadata の %s（%s）が必要です"
                                 .formatted(MutationScope.METADATA_KEY, allowed));

@@ -1,9 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// M-10（アクセシビリティ）の計測元。axe-core の critical / serious を 0 件に保つ。
+// M-09（アクセシビリティ）の計測元。axe-core の critical / serious を 0 件に保つ。
 export default defineConfig({
   testDir: './e2e',
-  // axe-core の結果（M-10 の成果物）は reports/axe-results.json に書き出す（e2e/axe-report.ts）。
+  // axe-core の結果（M-09 の成果物）は reports/axe-results.json に書き出す（e2e/axe-report.ts）。
   // テストレポートを同じ名前で出すと、axe の結果と取り違えて送ってしまう
   reporter: [['list'], ['json', { outputFile: '../reports/playwright-results.json' }]],
   globalSetup: './e2e/global-setup.ts',

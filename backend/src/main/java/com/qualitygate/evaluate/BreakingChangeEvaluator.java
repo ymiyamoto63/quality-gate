@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * M-09 OpenAPI の破壊的変更件数（docs/initial/02-metrics-spec.md M-09）。
+ * M-08 OpenAPI の破壊的変更件数（docs/spec/02-metrics-spec.md M-08）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>

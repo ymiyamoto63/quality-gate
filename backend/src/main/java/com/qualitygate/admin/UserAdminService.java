@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 許可リスト（利用者）の管理。変更はすべて監査ログに残す（FR-14-1）。 */
+/** 許可リスト（利用者）の管理。変更はすべて監査ログに残す（FR-11-1）。 */
 @Service
 public class UserAdminService {
 

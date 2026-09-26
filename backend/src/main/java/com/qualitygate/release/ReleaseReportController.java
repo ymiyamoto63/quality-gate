@@ -24,13 +24,13 @@ import java.time.ZoneId;
 import java.util.UUID;
 
 /**
- * リリース判定（UC-10 / S-11）。画面用の JSON と、証跡用の CSV を返す。
+ * リリース判定（UC-06 / S-09）。画面用の JSON と、証跡用の CSV を返す。
  *
  * <p>PDF はサーバでは作らず、画面をブラウザの印刷で出す（品質レポートと同じ方針）。
  */
 @RestController
 @RequestMapping("/api/v1/repositories/{repositoryId}")
-@Tag(name = "Release", description = "リリース判定（UC-10）")
+@Tag(name = "Release", description = "リリース判定（UC-06）")
 public class ReleaseReportController {
 
     private final ReleaseReportService service;
@@ -47,7 +47,7 @@ public class ReleaseReportController {
     @GetMapping("/release-report")
     @Operation(summary = "リリース判定を取得する",
             description = "指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。"
-                    + "タグは GitHub API でコミットに解決する。ブランチ名は受け付けない")
+                    + "タグは、そのタグを付けて計測した Run からコミットを探す。ブランチ名は受け付けない")
     public ReleaseReportResponse releaseReport(
             @PathVariable UUID repositoryId,
             @RequestParam @Parameter(description = "タグ名、またはコミット SHA（7〜40 桁）") String ref) {

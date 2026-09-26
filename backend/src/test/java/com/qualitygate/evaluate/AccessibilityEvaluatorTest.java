@@ -106,7 +106,7 @@ class AccessibilityEvaluatorTest {
     @Test
     void 重大な違反が前回より増えれば警告() {
         MetricResult result = evaluate(Map.of("max_critical", 5),
-                Map.of(EvaluationContext.key("M-10", null), BigDecimal.ONE),
+                Map.of(EvaluationContext.key("M-09", null), BigDecimal.ONE),
                 List.of(scan(List.of("/"))), List.of(
                         violation("/", "image-alt", Severity.CRITICAL, "wcag2a"),
                         violation("/", "label", Severity.CRITICAL, "wcag2a")));
@@ -209,7 +209,7 @@ class AccessibilityEvaluatorTest {
 
     private MetricResult evaluate(Map<String, Object> config, Map<String, BigDecimal> previous,
                                   List<RawMeasurement> scans, List<IdentifiedFinding> findings) {
-        NormalizedInput input = input(scans, findings, List.of(), Set.of("M-10"));
+        NormalizedInput input = input(scans, findings, List.of(), Set.of("M-09"));
         EvaluationContext context = new EvaluationContext(run(),
                 thresholdsWith("accessibility", config), input, previous, !previous.isEmpty());
         List<MetricResult> results = evaluator.evaluate(context);
@@ -234,7 +234,7 @@ class AccessibilityEvaluatorTest {
     }
 
     private static RawMeasurement measurement(Map<String, Object> detail) {
-        return RawMeasurement.of("M-10", "frontend", null, "count", detail);
+        return RawMeasurement.of("M-09", "frontend", null, "count", detail);
     }
 
     private static IdentifiedFinding violation(String page, String rule, Severity severity,
@@ -249,7 +249,7 @@ class AccessibilityEvaluatorTest {
         detail.put("selector", selector);
         detail.put("tags", List.of("cat.test", tag));
         String identity = page + "|" + rule + "|" + selector;
-        RawFinding finding = new RawFinding("M-10", rule, severity, rule, null, null,
+        RawFinding finding = new RawFinding("M-09", rule, severity, rule, null, null,
                 "frontend", identity, detail);
         return new IdentifiedFinding("fp-" + identity, finding);
     }

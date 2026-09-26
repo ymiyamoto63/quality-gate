@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
-/** 設定（S-06）。表示のみ。設定は collector/targets/*.gate.yml を Git で管理する（D-20）。 */
+/** 設定（S-06）。表示のみ。設定は collector/targets/*.gate.yml を Git で管理する（DD-13）。 */
 @RestController
 @RequestMapping("/api/v1/repositories/{repositoryId}/config")
 @Tag(name = "Config", description = "設定の表示・検証結果・版履歴")

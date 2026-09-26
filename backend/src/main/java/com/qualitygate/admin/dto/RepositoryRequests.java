@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 
 
-/** リポジトリ管理（S-08）の入力。 */
+/** リポジトリ管理（S-07）の入力。 */
 public final class RepositoryRequests {
 
     private RepositoryRequests() {

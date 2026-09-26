@@ -13,7 +13,7 @@ import java.util.List;
  * 生成される OpenAPI 仕様のメタ情報。
  *
  * <p>ここで生成された {@code api/openapi.yml} が、フロントエンドの型生成
- * （openapi-typescript）と M-09（破壊的変更の検出）の入力になる。
+ * （openapi-typescript）と M-08（破壊的変更の検出）の入力になる。
  */
 @Configuration
 public class OpenApiConfig {

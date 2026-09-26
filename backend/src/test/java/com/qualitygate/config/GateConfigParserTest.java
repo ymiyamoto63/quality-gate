@@ -165,7 +165,7 @@ class GateConfigParserTest {
 
     @Test
     void 収集ランナーの対象の合格ラインを読める() {
-        // collector/targets/*.gate.yml は収集ランナーが Run ごとに送る合格ライン（D-20）。常に妥当であることを保証する
+        // collector/targets/*.gate.yml は収集ランナーが Run ごとに送る合格ライン（DD-13）。常に妥当であることを保証する
         String yaml;
         try {
             yaml = java.nio.file.Files.readString(java.nio.file.Path.of(
@@ -184,13 +184,13 @@ class GateConfigParserTest {
 
     @Test
     void テスト結果の指標は既定で有効() {
-        // 契約テスト（M-08）を廃止した代わりに、テストの成功は M-11 で既定から見る（D-25）
+        // テストの成功は M-10 で既定から見る
         assertThat(parser.parse("version: 1").metric("test_results").enabled()).isTrue();
     }
 
     @Test
     void 判定に使わない項目は未知のキーとして拒否する() {
-        // 受け付けて無視すると、書いた人は効いていると思い込む（D-25 で削除した項目）
+        // 受け付けて無視すると、書いた人は効いていると思い込む
         assertThatThrownBy(() -> parser.parse("""
                 version: 1
                 on_missing_report: warn

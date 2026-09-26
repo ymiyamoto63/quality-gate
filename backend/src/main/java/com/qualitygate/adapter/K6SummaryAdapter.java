@@ -19,7 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * k6 の summary JSON から M-03 / M-04 / M-05 を読む（docs/initial/02-metrics-spec.md M-03）。
+ * k6 の summary JSON から M-03 / M-04 / M-05 を読む（docs/spec/02-metrics-spec.md M-03）。
  *
  * <p>1 ファイルは 1 回の実行を表す。仕様は 3 回実行して中央値を採るため、
  * CI は同じ Run に 3 ファイルを送る。中央値を取るのは評価器の責務である。
@@ -68,7 +68,7 @@ public class K6SummaryAdapter implements ArtifactAdapter {
     public NormalizedReport parse(InputStream in, ParseContext context) {
         String environment = environmentOf(context);
         if (context.metadataFlag("aborted")) {
-            // 部分的な結果で判定しない（docs/initial/02-metrics-spec.md M-03 境界条件）
+            // 部分的な結果で判定しない（docs/spec/02-metrics-spec.md M-03 境界条件）
             throw new ArtifactFormatException(
                     "k6 の実行が異常終了しています（metadata の aborted=true）。部分的な結果では判定しません");
         }
@@ -166,7 +166,7 @@ public class K6SummaryAdapter implements ArtifactAdapter {
     /**
      * 計測区間の指標。{@code {phase:measure}} のタグ付き部分指標があればそちらを使う。
      *
-     * <p>ウォームアップ（60 秒）は集計から除く（docs/initial/02-metrics-spec.md M-03 計測条件）。
+     * <p>ウォームアップ（60 秒）は集計から除く（docs/spec/02-metrics-spec.md M-03 計測条件）。
      * k6 の全体の指標にはウォームアップのリクエストも含まれるため、計測区間のリクエストに
      * {@code phase: measure} のタグを付けてしきい値を定義し、その部分指標を出力させる
      * （perf/k6/quality-gate.js）。タグが無ければ全体の指標を使う。

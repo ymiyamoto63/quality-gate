@@ -13,7 +13,7 @@ import java.util.Map;
  * 2 箇所に持つと、指標を足したときに片方だけ直して「その他」に落ちる。
  *
  * <p>カテゴリ分類をサーバに置くのは、画面がカテゴリ表として描かれるため
- * （docs/initial/07-api-design.md 4.2）。平坦な配列を返して画面側で分類すると、
+ * （docs/spec/07-api-design.md 4.2）。平坦な配列を返して画面側で分類すると、
  * 分類規則がサーバとクライアントに二重化する。
  */
 public final class MetricCatalog {
@@ -27,13 +27,13 @@ public final class MetricCatalog {
             new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false),
             new MetricDefinition("M-07", "循環的複雑度 15 超の新規関数数",
                     MetricCategory.STRUCTURE, false),
-            new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false),
-            new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false),
+            new MetricDefinition("M-08", "破壊的変更件数", MetricCategory.CONTRACT, false),
+            new MetricDefinition("M-09", "アクセシビリティ違反", MetricCategory.USABILITY, false),
             // 要件定義の後に追加した指標。カテゴリは既存の表に合わせる
-            new MetricDefinition("M-11", "テスト成功率", MetricCategory.FUNCTIONAL, true),
-            new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false),
-            new MetricDefinition("M-13", "シークレット検出件数", MetricCategory.SECURITY, false),
-            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false));
+            new MetricDefinition("M-10", "テスト成功率", MetricCategory.FUNCTIONAL, true),
+            new MetricDefinition("M-11", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false),
+            new MetricDefinition("M-12", "シークレット検出件数", MetricCategory.SECURITY, false),
+            new MetricDefinition("M-13", "ライセンス違反件数", MetricCategory.SECURITY, false));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 

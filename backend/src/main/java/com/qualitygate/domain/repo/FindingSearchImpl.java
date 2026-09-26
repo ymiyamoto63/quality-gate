@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * {@link FindingSearch} の実装。
  *
- * <p>並び順は「状態 → 深刻度」で固定する（docs/initial/08-screen-design.md 4.4）。
+ * <p>並び順は「状態 → 深刻度」で固定する（docs/spec/08-screen-design.md 4.4）。
  * 列挙の宣言順や文字列としての順序はこの並びと一致しないため、
  * CASE で明示的に順位を与える。順位を列として持たないのは、順位の定義が
  * 表示の都合であり、保存された値の意味ではないためである。

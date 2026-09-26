@@ -10,7 +10,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * 画面のアクセシビリティ検査（M-10）で使う応答例を書き出す。
+ * 画面のアクセシビリティ検査（M-09）で使う応答例を書き出す。
  *
  * <p>実物の API から生成する。手で書いた例を置くと、API が変わっても検査は
  * 通り続け、実際の画面だけが壊れる（{@code api/openapi.yml} と同じ扱い）。

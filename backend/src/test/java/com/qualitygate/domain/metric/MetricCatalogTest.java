@@ -13,14 +13,14 @@ class MetricCatalogTest {
     void 要件定義の指標と追加した指標をすべて持つ() {
         assertThat(MetricCatalog.all()).extracting(MetricDefinition::metricId)
                 .containsExactly("M-01", "M-02", "M-03", "M-04", "M-05",
-                        "M-06", "M-07", "M-09", "M-10", "M-11", "M-12", "M-13", "M-14");
+                        "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12", "M-13");
     }
 
     @Test
     void 指標からカテゴリを引ける() {
         assertThat(MetricCatalog.of("M-01").category()).isEqualTo(MetricCategory.FUNCTIONAL);
         assertThat(MetricCatalog.of("M-04").category()).isEqualTo(MetricCategory.PERFORMANCE);
-        assertThat(MetricCatalog.of("M-09").category()).isEqualTo(MetricCategory.CONTRACT);
+        assertThat(MetricCatalog.of("M-08").category()).isEqualTo(MetricCategory.CONTRACT);
     }
 
     /**
@@ -39,10 +39,10 @@ class MetricCatalogTest {
     @Test
     void 指標の並びは要件定義の表と同じ順になる() {
         List<String> shuffled = new java.util.ArrayList<>(
-                List.of("M-07", "M-01", "M-10", "M-06"));
+                List.of("M-07", "M-01", "M-09", "M-06"));
         shuffled.sort(MetricCatalog::compareByCatalogOrder);
 
-        assertThat(shuffled).containsExactly("M-01", "M-06", "M-07", "M-10");
+        assertThat(shuffled).containsExactly("M-01", "M-06", "M-07", "M-09");
     }
 
     @Test

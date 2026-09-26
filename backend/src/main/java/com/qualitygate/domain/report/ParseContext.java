@@ -22,7 +22,7 @@ public record ParseContext(String componentName, String scope, List<String> excl
     public static final String SCOPE_BASE = "base";
 
     /**
-     * M-09 の成果物のメタデータで、比較元（ベースコミット）に OpenAPI 定義が
+     * M-08 の成果物のメタデータで、比較元（ベースコミット）に OpenAPI 定義が
      * 無かったことを表すキー（真偽値）。新規 API では破壊的変更を数えようがない。
      */
     public static final String BASE_SPEC_MISSING = "baseSpecMissing";
@@ -68,7 +68,7 @@ public record ParseContext(String componentName, String scope, List<String> excl
     /**
      * 計測除外に一致するか。
      *
-     * <p>除外はすべての指標で共通に適用する（docs/initial/02-metrics-spec.md 0.2）。
+     * <p>除外はすべての指標で共通に適用する（docs/spec/02-metrics-spec.md 0.2）。
      */
     public boolean isExcluded(String path) {
         if (path == null || exclusions == null || exclusions.isEmpty()) {

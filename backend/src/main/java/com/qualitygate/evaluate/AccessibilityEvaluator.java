@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * M-10 アクセシビリティ違反（docs/initial/02-metrics-spec.md M-10）。
+ * M-09 アクセシビリティ違反（docs/spec/02-metrics-spec.md M-09）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>

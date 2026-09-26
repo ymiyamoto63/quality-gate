@@ -23,7 +23,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 可観測性（docs/initial/05-architecture.md 10 章）: 相関 ID。
+ * 可観測性（docs/spec/05-architecture.md 10 章）: 相関 ID。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AbstractIntegrationTest

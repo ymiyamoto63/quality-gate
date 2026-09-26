@@ -6,7 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * テストの結果別件数と、M-11 の計算式（docs/initial/02-metrics-spec.md M-11）。
+ * テストの結果別件数と、M-10 の計算式（docs/spec/02-metrics-spec.md M-10）。
  *
  * <p>式をここに 1 つだけ置く。アダプタ（1 ファイル分の参考値）と評価器
  * （複数ファイルを合算した判定値）が同じ式を使わないと、画面の値と判定が食い違う。

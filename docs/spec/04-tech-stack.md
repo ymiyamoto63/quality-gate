@@ -1,11 +1,6 @@
 # quality-gate 技術スタック
 
-| 項目 | 内容 |
-| --- | --- |
-| ドキュメント名 | quality-gate 技術スタック |
-| バージョン | **1.1（確定）** |
-| 最終更新 | 2026-09-21 |
-| ステータス | **確定**。[要件定義書](01-requirements.md) v1.1 の付属仕様。雛形の実装で検証済み |
+本書は quality-gate の採用技術・版・構成を定める（[要件定義書](01-requirements.md) 11 章の詳細）。
 
 ---
 
@@ -58,9 +53,11 @@ quality-gate/
 │  └ vite.config.ts
 ├ api/
 │  └ openapi.yml                        バックエンドから生成（コミットする）
+├ collector/                            収集ランナー（計測スクリプト・計測プロファイル・合格ライン・ツールの版）
+├ .github/workflows/                    collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
 ├ docs/
 ├ compose.yaml
-└ .quality-gate.yml                     CI から直接送る方式の設定例（D-18）
+└ Dockerfile                            アプリのイメージ（SPA を同梱した jar）
 ```
 
 ---
@@ -69,7 +66,7 @@ quality-gate/
 
 | 分類 | 採用技術 | 版 | 備考 |
 | --- | --- | --- | --- |
-| 言語 | Java | **25 LTS** | 雛形は Temurin 25.0.4.1 で検証済み |
+| 言語 | Java | **25 LTS** | Temurin 25 で動作を確認している |
 | フレームワーク | Spring Boot | 4.1.1 | |
 | ビルドツール | Maven | 3.9 以上 | Maven Wrapper（`mvnw`）をリポジトリに同梱し、開発機と CI でバージョンを揃える |
 | Web 層 | Spring MVC + 仮想スレッド | — | `spring.threads.virtual.enabled=true`。取り込みは I/O 中心のため、リアクティブの複雑さを負わずに並行性を得る |
@@ -105,7 +102,7 @@ quality-gate/
 | lcov.info | 自前パーサ（行指向の単純な形式のため） |
 
 いずれもストリーミング処理を基本とし、ファイル全体をメモリに展開しない。
-1 ファイル 50MB の上限（FR-03-8）はあくまで最終防衛線であり、
+1 ファイル 50MB の上限（FR-03-6）はあくまで最終防衛線であり、
 実装側でも逐次処理を前提とする。
 
 ---
@@ -122,20 +119,18 @@ quality-gate/
 | 状態管理 | Pinia | 4.x | |
 | ルーティング | Vue Router | 5.x | |
 | API 型・呼び出し | openapi-typescript + openapi-fetch | — | 4 章 |
-| グラフ | インライン SVG（`TrendChart.vue`） | — | 当初は PrimeVue `Chart`（Chart.js）を想定。3.1 で変更 |
+| グラフ | インライン SVG（`TrendChart.vue`） | — | 3.1 |
 | 単体テスト | Vitest 5 + @vue/test-utils | — | カバレッジは `@vitest/coverage-v8`。`coverage.include` を指定し、未テストのファイルも分母に含める |
-| E2E / a11y | Playwright + `@axe-core/playwright` | — | M-10 の計測元 |
-| Lint | ESLint（`eslint-plugin-vue`、`complexity` ルール）+ Prettier | — | `complexity` は M-07 の計測元とする想定。現時点で ESLint の結果は M-07 に取り込んでいない（[02](02-metrics-spec.md) M-07） |
+| E2E / a11y | Playwright + `@axe-core/playwright` | — | M-09 の計測元 |
+| Lint | ESLint（`eslint-plugin-vue`）+ Prettier | — | quality-gate 自身の静的検査。対象の M-07 は、収集ランナーが版を固定した ESLint の設定（`collector/complexity`）で測る（[02](02-metrics-spec.md) M-07） |
 
 ### 3.1 グラフとアクセシビリティ
 
-**トレンドグラフは Chart.js ではなくインライン SVG で描く（実装時に変更）。**
+**トレンドグラフは canvas のライブラリ（Chart.js など）ではなくインライン SVG で描く。**
 
-当初は Chart.js を採る前提だったが、canvas は**描画内容がスクリーンリーダーから
-読めない**ため、表形式の代替表現と `role="img"` + 要約 `aria-label` を
-併設することが前提になっていた。これは canvas を選んだことによる回避策である。
-
-SVG で描けば、その回避策そのものが不要になる。
+canvas は**描画内容がスクリーンリーダーから読めない**ため、読み上げのための回避策
+（表形式の代替表現と `role="img"` + 要約 `aria-label`）が必須になる。
+SVG で描けば、その回避策そのものが要らない。
 
 | 観点 | canvas（Chart.js） | インライン SVG |
 | --- | --- | --- |
@@ -148,7 +143,7 @@ SVG で描けば、その回避策そのものが不要になる。
 系列数が 1〜3 本・点が数十個という本アプリのデータ密度では、ライブラリが
 提供する機能（ズーム、大量点の間引き、複合軸）を必要としない。
 
-**表形式の代替表現は引き続き併設する。** 読み上げのためではなく、
+**表形式の代替表現も併設する。** 読み上げのためではなく、
 値をそのまま読みたい・コピーしたいという要求に応えるためである。
 
 データ密度が上がって SVG の手書きが割に合わなくなった場合は ECharts への
@@ -235,7 +230,7 @@ const { data, error } = await api.GET("/api/v1/runs/{runId}", {
 | 生成物をコミットする理由 | |
 | --- | --- |
 | フロントエンドのビルドが、バックエンドの起動に依存しなくなる | `npm run build` 単体で完結する |
-| M-09（OpenAPI 破壊的変更の検出）のベース比較が容易になる | `git show <base>:api/openapi.yml` で過去の仕様を取り出せる |
+| M-08（OpenAPI 破壊的変更の検出）のベース比較が容易になる | `git show <base>:api/openapi.yml` で過去の仕様を取り出せる |
 | 仕様変更がコードレビューの差分に現れる | API の変更が人の目に触れる |
 
 コミットする以上、**更新し忘れが起きうる**。これを CI で機械的に潰す。
@@ -321,13 +316,12 @@ volumes: { pgdata: }
 
 ### 5.2 成果物ストレージ：ローカルファイルシステム
 
-当初の想定では S3 互換ストレージ（MinIO）としていたが、
-**ローカルファイルシステム（バインドマウント）に変更する**。
+成果物は**ローカルファイルシステム（バインドマウント）**に保存する。
 
 | | 理由 |
 | --- | --- |
 | 規模 | 対象 1 リポジトリ・成果物 10GB 程度（NFR 10.2）。オブジェクトストレージの必要性がない |
-| 構成 | MinIO コンテナと、その認証情報・バケット初期化の管理が不要になる |
+| 構成 | オブジェクトストレージのコンテナと、その認証情報・バケット初期化の管理が要らない |
 | 可搬性 | バックアップは `data/` ディレクトリごとコピーすれば済む |
 
 ただし、保存先を直接触るコードを散らさず、**`ArtifactStore` インタフェース**を介する。
@@ -350,7 +344,7 @@ volumes: { pgdata: }
 
 ## 6. 品質ツールの自己適用
 
-quality-gate 自身は quality-gate で計測しない（D-18。2026-09-24 に A-7 を取り下げた）。
+quality-gate 自身は quality-gate で計測しない（[03](03-design-decisions.md) DD-5）。
 代わりに Pull Request の CI（`.github/workflows/ci.yml`）で次を実行し、失敗すればマージしない。
 
 | 検査 | ツール | 基準 |
@@ -379,7 +373,7 @@ PIT・PMD・oasdiff は自身には適用しない。自身の指標を画面で
 
 ## 8. 採用しなかった選択肢
 
-判断の経緯を残す。将来スタックを見直す際、同じ検討を繰り返さないため。
+将来スタックを見直す際に同じ検討を繰り返さないよう、採らなかった選択肢と理由を示す。
 
 | 検討した選択肢 | 採用しなかった理由 |
 | --- | --- |
@@ -400,19 +394,18 @@ PIT・PMD・oasdiff は自身には適用しない。自身の指標を画面で
 
 | # | リスク | 影響 | 対応 |
 | --- | --- | --- | --- |
-| T-1 | **PIT が Java 25 に未対応、または不具合がある** | M-02 が計測できない | 導入初日に PIT を単体で検証する。動作しない場合は、Maven Toolchains で **PIT の実行時のみ Java 21 を使う**。それでも解決しない場合、D-13 のスキップ申告により M-02 を `SKIP` として運用し、対応版を待つ（fail-closed を壊さずに待機できる） |
-| T-2 | Java 25 に対応していないライブラリがある | ビルド不能 | 依存は Spring Boot の BOM に揃え、BOM 外の依存を最小限にする。初期構築時に全依存の動作を確認する |
+| T-1 | **PIT が対象の Java の版に対応していない、または不具合がある** | M-02 が計測できない | Java や PIT の版を上げるときは PIT を単体で検証する。動作しない場合は、Maven Toolchains で **PIT の実行時だけ前の LTS を使う**。それでも解決しない場合、スキップの申告（[03](03-design-decisions.md) DD-8）で M-02 を `SKIP` として運用し、対応版を待つ（fail-closed を壊さずに待機できる） |
+| T-2 | Java 25 に対応していないライブラリがある | ビルド不能 | 依存は Spring Boot の BOM に揃え、BOM 外の依存を最小限にする |
 | T-3 | 生成物（`openapi.yml` / `schema.d.ts`）の更新漏れ | フロントが古い契約で動く | CI で再生成して差分を検出し、失敗させる（4.3） |
-| T-4 | Chart.js のグラフがスクリーンリーダーで読めない | NFR 10.6 未達 | グラフをインライン SVG で描くことで解消（3.1）。表形式の代替表現も併設する |
+| T-4 | canvas のグラフがスクリーンリーダーで読めない | NFR 10.6 未達 | グラフをインライン SVG で描く（3.1）。表形式の代替表現も併設する |
 | T-5 | WSL2 で `/mnt/c` 配下に配置され、開発が遅い | 開発効率の低下 | README に配置場所を明記し、セットアップ手順の最初に記載する（5.3） |
 | T-6 | Testcontainers が CI 環境で起動できない | 結合テストが動かない | GitHub ホストランナーは Docker を利用できる。セルフホストランナーでは Docker の利用可否を構築時に確認する |
 
 ---
 
-## 10. 雛形の実装で判明した点
+## 10. 実装上の注意
 
-技術スタックを実際に組み立てた際に、設計時点の想定と違っていた点を記録する。
-同じ調査を繰り返さないため、および次に依存を上げるときの手がかりとして残す。
+この技術スタックで実装するときに気づきにくい点と、その対応を示す。依存を上げるときの手がかりにもなる。
 
 ### 10.1 Spring Boot 4 に固有の差異
 
@@ -424,8 +417,7 @@ PIT・PMD・oasdiff は自身には適用しない。自身の指標を画面で
 | 4 | Testcontainers 2.x で `PostgreSQLContainer` が `org.testcontainers.postgresql` へ移動し、**非ジェネリック**になっている。BOM の成果物名も `testcontainers-postgresql` / `testcontainers-junit-jupiter` に変わっている | 型引数を付けずに使う |
 
 2 は特に気づきにくい。**アプリは正常に起動し、テーブルを参照する処理に到達して初めて失敗する**。
-そのため、全マイグレーションを空の DB に適用する結合テスト（`FlywayMigrationIT`）を
-最初から用意しておくこと。雛形ではこのテストが問題を検出した。
+そのため、全マイグレーションを空の DB に適用する結合テスト（`FlywayMigrationIT`）で検出する。
 
 ### 10.2 SPA のフォールバック
 
@@ -451,38 +443,21 @@ SPA のパスまで認証必須にすると、`/runs/xxx` を直接開いたと�
 
 未ログインでもシェルは返り、`/api/v1/me` の 401 を受けてフロント側が `/login` へ誘導する。
 
-### 10.4 パッケージ構成の修正
+### 10.4 複数のモジュールを組み立てる設定の置き場所
 
 `SecurityConfig` は `auth` と `ingest` の両モジュールを組み立てるため、
 共通基盤である `platform` に置くと「platform が業務モジュールを知らない」という
-依存規則に違反する。**ArchUnit のテストがこれを検出した**ため、
-合成点として `com.qualitygate.config` を新設して移した。
+依存規則に違反する。こうした合成点は `com.qualitygate.config` に置く。
+依存規則は ArchUnit のテスト（`ModuleDependencyTest`）で検証しているため、置き場所の誤りはテストで検出される。
 
-規則をテストにしておくと、こうした置き場所の誤りが設計違反として即座に表面化する。
-
-### 10.5 検証済みの構成
-
-雛形で以下が動作することを確認済み。
-
-| 項目 | 結果 |
-| --- | --- |
-| `mvn verify`（backend） | 単体 22 件・結合 11 件がすべて成功 |
-| Flyway マイグレーション | V001〜V007 が空の PostgreSQL 17 に適用される |
-| OpenAPI 生成 | 結合テストから `api/openapi.yml` を書き出せる |
-| 型生成 | `openapi-typescript` が `schema.d.ts`（409 行）を生成する |
-| フロントビルド | `vue-tsc` + `vite build` が通る |
-| jar への同梱 | `BOOT-INF/classes/static/` に SPA が入る |
-| 起動 | Docker Compose の PostgreSQL に対して 8 秒で起動する |
-| 同一オリジン配信 | `/runs/abc` が index.html を返し、`/api/**` は 401 を返す |
-
-### 10.6 参照 API の実装で判明した点
+### 10.5 参照 API の実装上の注意
 
 #### springdoc は入れ子レコードのスキーマ名を単純名で付ける
 
 別の応答に同じ名前の入れ子レコードがあると、**片方の定義がもう片方を静かに上書きする**。
-`RunListResponse.Item` と `FindingListResponse.Item` で実際に発生し、生成された
-TypeScript の型では違反一覧の要素が Run 一覧の要素になっていた。仕様は生成でき、
-型も生成でき、中身だけが別物になるため、コンパイルエラーにもならない。
+たとえば `RunListResponse.Item` と `FindingListResponse.Item` があると、生成された
+TypeScript の型では違反一覧の要素が Run 一覧の要素になる。仕様も型も生成でき、
+中身だけが別物になるため、コンパイルエラーにもならない。
 
 対処として入れ子レコードには応答をまたいで一意な名前を付け
 （`RunSummary` / `FindingItem` など）、`OpenApiExportIT` で

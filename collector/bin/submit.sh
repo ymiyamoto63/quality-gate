@@ -13,7 +13,7 @@
 #   QG_TRIGGERED_BY  既定: collector（対象リポジトリの CI から送った Run と区別する）
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
-# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（D-20）。
+# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（DD-13）。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -111,7 +111,7 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/backend/pmd-base.xml" ]; then
     upload pmd-xml "$REPORTS/backend/pmd-base.xml" "$BACKEND" base
   fi
-  # M-11 / M-12 はすべてのテストの結果（test-junit-xml）
+  # M-10 / M-11 はすべてのテストの結果（test-junit-xml）
   found=0
   for junit in "$REPORTS"/tests/backend/TEST-*.xml; do
     [ -e "$junit" ] || continue

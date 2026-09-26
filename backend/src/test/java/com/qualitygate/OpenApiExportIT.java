@@ -27,7 +27,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 専用の迂回路を用意せずに済む。
  *
  * <p>出力した {@code api/openapi.yml} は、フロントエンドの型生成と
- * M-09（破壊的変更の検出）の入力になる。CI では再生成して差分が無いことを検証する。
+ * M-08（破壊的変更の検出）の入力になる。CI では再生成して差分が無いことを検証する。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AbstractIntegrationTest

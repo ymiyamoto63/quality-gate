@@ -28,7 +28,7 @@ RUN arch=$(dpkg --print-architecture | sed 's/amd64/x64/') \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${arch}.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1 --exclude='*.md' --exclude=LICENSE
 
-# M-06 / M-09 のツール。コンテナの中から Docker は使えないため、同じ版のバイナリを入れる
+# M-06 / M-08 のツール。コンテナの中から Docker は使えないため、同じ版のバイナリを入れる
 RUN arch=$(dpkg --print-architecture) \
  && trivy_arch=$([ "$arch" = arm64 ] && echo ARM64 || echo 64bit) \
  && curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${trivy_arch}.tar.gz" \
@@ -36,7 +36,7 @@ RUN arch=$(dpkg --print-architecture) \
  && curl -fsSL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_${arch}.tar.gz" \
     | tar -xz -C /usr/local/bin oasdiff
 
-# M-10 の検査ツールと Chromium（とその動作に必要なライブラリ）
+# M-09 の検査ツールと Chromium（とその動作に必要なライブラリ）
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright
 COPY a11y/package.json a11y/package-lock.json /opt/qg-a11y/
 RUN cd /opt/qg-a11y \

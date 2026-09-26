@@ -24,14 +24,14 @@ tags:
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
+- description: リリース判定（UC-06）
+  name: Release
 - description: 保持期間などのシステム設定（管理者のみ）
   name: Settings
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
 - description: 設定の表示・検証結果・版履歴
   name: Config
-- description: リリース判定（UC-10）
-  name: Release
 - description: リポジトリ単位の参照
   name: Repositories
 - description: リポジトリの登録と設定（管理者のみ）
@@ -213,7 +213,8 @@ paths:
       - Config
   /api/v1/repositories/{repositoryId}/release-report:
     get:
-      description: 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは GitHub API でコミットに解決する。ブランチ名は受け付けない
+      description: 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは、そのタグを付けて計測した Run
+        からコミットを探す。ブランチ名は受け付けない
       operationId: releaseReport
       parameters:
       - in: path

@@ -13,8 +13,8 @@
              │  frontend/src を HMR で配信  │           │  ├ REST API (/api/v1/**)      │
              └─────────────────────────────┘           │  ├ OAuth ログイン（GitHub App）│
                                                        │  ├ 同梱 SPA (classpath:/static)│
-   収集ランナー / CI ──── Ingest API ────────────────▶ │  └ JobWorker（判定ジョブ）     │
-    Bearer qg_xxx_yyy    POST /api/v1/runs/...         └──────┬──────────────┬─────────┘
+   収集ランナー ──────── Ingest API ────────────────▶ │  └ 判定・日次バッチ          │
+    Bearer <QG_INGEST_TOKEN>  POST /api/v1/runs/...    └──────┬──────────────┬─────────┘
                                                               │ JDBC         │ ファイル
                                                               ▼              ▼
                                                      PostgreSQL 17     data/artifacts/
@@ -25,7 +25,7 @@
 
 プロセスとして必要なのは **PostgreSQL と Spring Boot の 2 つだけ**です。
 Vite の dev server は開発の利便性（HMR）のためのもので、本番には存在しません。
-ジョブキューも DB 上に実装しているため、Redis やメッセージブローカーは不要です。
+判定は取り込みの確定の中でその場で行い、日次バッチは `@Scheduled` で動くため、Redis やメッセージブローカーは不要です。
 
 ## 起動方法の 3 パターン
 
@@ -39,7 +39,7 @@ Vite の dev server は開発の利便性（HMR）のためのもので、本番
 Node.js を取得してフロントもビルドする）、JRE だけの実行イメージで起動します。
 DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` は `db` のヘルスチェックが
 通ってから起動します。`app` に渡る環境変数は `compose.yaml` に列挙したもの
-（DB 接続・成果物の保存先・GitHub App の認証情報・ログの形式）だけで、
+（DB 接続・成果物の保存先・ログイン用 GitHub App の認証情報・Ingest Token・ログの形式）だけで、
 値はリポジトリ直下の `.env` から Docker Compose が変数展開して渡します。
 成果物は `./data/artifacts` にマウントされます。
 

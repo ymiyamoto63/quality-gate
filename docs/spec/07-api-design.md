@@ -1,11 +1,6 @@
 # quality-gate API 設計
 
-| 項目 | 内容 |
-| --- | --- |
-| ドキュメント名 | quality-gate API 設計（基本設計） |
-| バージョン | 1.0 |
-| 最終更新 | 2026-09-23 |
-| 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
+前提は [要件定義書](01-requirements.md)・[方式設計](05-architecture.md)・[DB 設計](06-database-design.md)。
 
 本書で定義した API から `api/openapi.yml` が生成され、
 それを入力にフロントエンドの型と呼び出しコードが生成される（[04](04-tech-stack.md) 4 章）。
@@ -26,7 +21,7 @@
 | ID | UUID（文字列） |
 | 命名 | パスは複数形のケバブケース、プロパティは `camelCase` |
 | 数値 | 割合・時間などの判定対象値は**文字列ではなく数値**で返す。丸めはサーバ側で行い、表示桁数もサーバが決める |
-| バージョニング | パスに `v1` を含む。破壊的変更は `v2` を追加する（[02](02-metrics-spec.md) M-09） |
+| バージョニング | パスに `v1` を含む。破壊的変更は `v2` を追加する（[02](02-metrics-spec.md) M-08） |
 
 ### 1.2 認証
 
@@ -109,7 +104,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 凡例: 認可の `—` は認証のみで可（`VIEWER` 以上）。
 
-### 2.1 Ingest API（収集ランナー / CI → quality-gate）
+### 2.1 Ingest API（収集ランナー → quality-gate）
 
 | メソッド | パス | 用途 | 認可 |
 | --- | --- | --- | --- |
@@ -126,7 +121,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/repositories` | リポジトリ一覧 | — |
 | GET | `/api/v1/repositories/{id}` | リポジトリ詳細（S-02） | — |
 | GET | `/api/v1/repositories/{id}/trends` | 指標の時系列（S-05） | — |
-| GET | `/api/v1/repositories/{id}/release-report` | リリース判定（S-11。UC-10）。`ref` にタグかコミット SHA（7〜40 桁）を指定する | — |
+| GET | `/api/v1/repositories/{id}/release-report` | リリース判定（S-09。UC-06）。`ref` にタグかコミット SHA（7〜40 桁）を指定する | — |
 | GET | `/api/v1/repositories/{id}/release-report.csv` | リリース判定の CSV（証跡）。出力を監査ログ（`RELEASE_REPORT_EXPORTED`）に残す | — |
 | GET | `/api/v1/runs` | Run 一覧 | — |
 | GET | `/api/v1/runs/{runId}` | Run 詳細（S-03） | — |
@@ -189,7 +184,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `measuredAt` | ○ | |
-| `tags` | | 計測したコミットを指すタグ。収集ランナーが clone した履歴から求めて送る（`git tag --points-at`）。リリース判定でタグをコミットに解決するのに使う（D-26）。git のタグ名に使えない文字を含めば 400 |
+| `tags` | | 計測したコミットを指すタグ。収集ランナーが clone した履歴から求めて送る（`git tag --points-at`）。リリース判定でタグをコミットに解決するのに使う（[03](03-design-decisions.md) DD-10）。git のタグ名に使えない文字を含めば 400 |
 | `skippedMetrics` | | 省略時は「全指標を計測した」とみなす |
 
 **応答（201）**
@@ -203,7 +198,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 }
 ```
 
-`detailUrl` を返すのは、CI のログに Run 詳細への直リンクを出せるようにするため。
+`detailUrl` を返すのは、収集ランナーのログに Run 詳細への直リンクを出せるようにするため。
 不合格を知ったときに、その場から詳細へ飛べる。
 
 ### 3.2 `POST /api/v1/runs/{runId}/artifacts`
@@ -239,7 +234,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 3.3 `POST /api/v1/runs/{runId}/finalize`
 
-リクエストボディなし。取り込みを確定し、**その場で**設定の解決・正規化・判定を行って結果を返す（D-27）。
+リクエストボディなし。取り込みを確定し、**その場で**設定の解決・正規化・判定を行って結果を返す（DD-15）。
 
 **応答（200）**
 
@@ -257,7 +252,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 - 判定に失敗しても 200 を返し、`status` を `FAILED`、`errorCode` に理由のコード（`CONFIG_VALIDATION_FAILED` /
   `EVALUATION_FAILED`）を入れる。確定は取り消さない。理由の詳細は Run 詳細（S-03）に表示する
 - 収集ランナー（`submit.sh`）は `status` が `FAILED` ならワークフローを失敗にする。判定結果の `FAIL` では失敗にしない
-- 以前の判定ジョブのキューと、CI がポーリングするための `GET /api/v1/runs/{runId}/status` は D-27 で削除した
 
 ---
 
@@ -265,7 +259,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 4.1 `GET /api/v1/dashboard`
 
-`repository_summaries`（[06](06-database-design.md) 3.14）を読むだけで応答する。
+`repository_summaries`（[06](06-database-design.md) 3.9）を読むだけで応答する。
 
 ```json
 {
@@ -299,9 +293,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 }
 ```
 
-`freshness` は最終計測と最後の完全計測の日時だけを返す（FR-06-2 / FR-06-3）。
-計測途絶・完全計測途絶の判定（`staleMeasurement` / `staleFullMeasurement`）と `alerts`、
-免除の件数（`activeWaiverCount`）は D-22 で削除した。
+`freshness` は最終計測と最後の完全計測の日時を返す（FR-06-2 / FR-06-3）。
 
 ### 4.2 `GET /api/v1/runs/{runId}`
 
@@ -450,7 +442,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | コンポーネント | 常に分ける。backend と frontend のカバレッジを 1 本の線にしても意味がない |
 | 計測条件（`variant`） | 値に計測条件が添えられている場合に分ける。M-02 の実行範囲（変更範囲 / 全量）と、性能の計測環境（`environment.name`）。範囲や環境が切り替わるたびに品質が乱高下して見えるのを防ぐ |
 
-ランナー種別（self-hosted / github-hosted）の軸は、計測を収集ランナーに絞ったため削除した（D-19）。
 系列名は「backend（変更範囲）」のように条件を括弧内に並べる。
 
 **計測条件を持たない点は、同じコンポーネントの条件つき系列に配る。** 成果物の未提出などに
@@ -516,7 +507,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ---
 
-## 4.6 実装で確定した仕様
+### 4.6 詳細仕様
 
 本書と実装がずれた場合の正は実装（springdoc の出力）である（冒頭の前提）。
 参照 API の実装にあたって確定した点を記す。
@@ -526,7 +517,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 入れ子の型には**応答をまたいで一意な名前**を付ける（`RunSummary` / `FindingItem` など）。
 springdoc はスキーマ名に Java の単純名を使うため、別の応答に同じ名前の入れ子型があると
 片方の定義がもう片方を静かに上書きし、生成されるクライアント型が別物になる
-（[04](04-tech-stack.md) 10.6）。
+（[04](04-tech-stack.md) 10.5）。
 
 ### 必須と null の宣言
 
@@ -579,40 +570,40 @@ Run 詳細の指標行は、計測条件の生の値（`variant`: `changed` / `a
 `SKIP`（今回は測らなかった）とは別物であり、画面も「未計測」ではなく「対象外」と表示する。
 `value` は常に `null`。合否・部分計測・カテゴリの状態のいずれにも影響しない。
 
-### アクセシビリティ（M-10）の指標行と違反
+### アクセシビリティ（M-09）の指標行と違反
 
-M-10 の `threshold` は他の指標と同じ `operator` / `value`（critical + serious の許容件数）に加え、
+M-09 の `threshold` は他の指標と同じ `operator` / `value`（critical + serious の許容件数）に加え、
 判定基準の `standard`（`wcag22aa` など）を持つ。`detail` は基準内の `critical` / `serious` /
 `moderate` / `minor` の件数、基準外の `outOfStandard`、判断を保留した要素数 `needsReview`、
 検査した画面 `pages`、読み込みに失敗した画面 `failedPages` を返す。
 
-M-10 の違反は `filePath` / `line` / `sourceUrl` が `null` である。リポジトリ上のファイルではなく
+M-09 の違反は `filePath` / `line` / `sourceUrl` が `null` である。リポジトリ上のファイルではなく
 画面の要素を指すため、GitHub へのリンクを組み立てると壊れたリンクになる。位置は `detail` の
 `page`（`/runs/:id`）と `selector`（CSS セレクタ）で示し、`impact`・`tags`・`helpUrl`・
 `html`（先頭 512 文字）・`failureSummary` を添える。
 
-### テスト（M-11 / M-12）と互換性（M-09）の指標行と違反
+### テスト（M-10 / M-11）と互換性（M-08）の指標行と違反
 
-M-11 の `detail` は実行件数 `executed` と結果別の `passed` / `failed` / `errored` / `skipped` / `flaky`
+M-10 の `detail` は実行件数 `executed` と結果別の `passed` / `failed` / `errored` / `skipped` / `flaky`
 （再実行で成功）を返す。`value` は成功率で、切り捨てで丸める（失敗があるのに `100` と表示しない）。
-M-11 / M-12 の違反はテスト 1 件ごとに 1 件で、`ruleId` が `failed` / `errored` / `flaky`（M-11）と
-`skipped`（M-12）になる。`detail` に `testClass`・`testName`・`outcome`、あれば `failureType` と
-`message`（先頭 512 文字）を添える。M-08 API 契約テスト成功率は v1.10 で廃止した（D-25）。
+M-10 / M-11 の違反はテスト 1 件ごとに 1 件で、`ruleId` が `failed` / `errored` / `flaky`（M-10）と
+`skipped`（M-11）になる。`detail` に `testClass`・`testName`・`outcome`、あれば `failureType` と
+`message`（先頭 512 文字）を添える。
 
-M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破壊的になりうる変更 `warnings`（level 2）、
+M-08 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破壊的になりうる変更 `warnings`（level 2）、
 非破壊的な変更 `informational`（level 1）の件数を返す。違反になるのは level 3 と 2 だけで、
 `ruleId` は oasdiff の変更 ID（`api-path-removed-without-deprecation` など）、`detail` に
 `level`（`error` / `warning`）・`operation`・`apiPath`・`operationId`・`section`・`source` を添える。
 比較元に OpenAPI 定義が無い Run では `status` が `NOT_APPLICABLE` になる。
 
-M-11 / M-12 / M-09 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
+M-10 / M-11 / M-08 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
 API のパスはリポジトリ上のファイルではない。
 
 ### リリース判定（`release-report`）
 
 - `ref` が 16 進数 7〜40 桁ならコミット SHA とみなし、計測済みの Run から前方一致で探す（複数のコミットに一致すれば 400）。
   それ以外はタグ名とみなし、そのタグを付けて計測した Run（`POST /api/v1/runs` の `tags`）のコミットに解決する。
-  タグが付け替えられていれば、最も新しい計測のコミット。GitHub API は使わない（D-26）。
+  タグが付け替えられていれば、最も新しい計測のコミット。GitHub API は使わない（DD-10）。
   ブランチ名は受け付けない（先頭が動くため証跡にならない）。タグを付けて計測した Run が無ければ 404（タグを指定して計測するか、コミット SHA で指定する）
 - 結論 `decision` は `RELEASABLE` / `RELEASABLE_WITH_WARNINGS` / `NOT_RELEASABLE` / `UNDETERMINED`。理由の文 `decisionReason` はサーバが持つ
 - 未計測でも 200 を返す（`decision: UNDETERMINED`、`run: null`）。判定できなかったことも証跡として残せるようにするため
@@ -631,8 +622,8 @@ API のパスはリポジトリ上のファイルではない。
 | ロールの反映 | セッションのロールを信じず、リクエストのたびに `users` の現在値で置き換える。降格・無効化は次のリクエストから効く |
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
-| 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。D-20）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
-| 違反一覧 | 各違反に `fingerprint` を返す（免除と、その登録に使っていた `repositoryId` / `waiver` は D-22 で削除） |
+| 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。DD-13）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
+| 違反一覧 | 各違反に `fingerprint` を返す |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` はその場で判定し直し、判定後の `status` と `verdict` を返す。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
 | 保持期間 | Run・成果物・監査ログの日数を扱う |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
@@ -641,15 +632,7 @@ API のパスはリポジトリ上のファイルではない。
 
 ## 5. 操作 API の詳細
 
-### 5.1 ~~`POST /api/v1/waivers`~~（D-22 で削除）
-
-免除の登録・一覧・失効の API は、免除の廃止とともに削除した。
-
-### 5.2 ~~`POST /api/v1/repositories/{id}/ingest-tokens`~~（D-27 で削除）
-
-Ingest Token の発行・一覧・失効の API は、トークンを環境変数 `QG_INGEST_TOKEN` の 1 つにまとめたため削除した。
-
-### 5.3 `POST /api/v1/runs/{runId}/reevaluate`
+### 5.1 `POST /api/v1/runs/{runId}/reevaluate`
 
 **応答（200）**
 
@@ -662,7 +645,7 @@ Ingest Token の発行・一覧・失効の API は、トークンを環境変�
 成果物が保持期間を過ぎて削除されている場合は 409 `ARTIFACTS_DELETED` を返す。
 再評価は保存済みの成果物を読み直すため、実体が無いと実行できない。
 
-### 5.4 `POST /api/v1/users`
+### 5.2 `POST /api/v1/users`
 
 ```json
 { "githubLogin": "someone", "role": "VIEWER" }
@@ -689,7 +672,7 @@ Ingest Token の発行・一覧・失効の API は、トークンを環境変�
 | 監査ログの閲覧 | — | ○ | — |
 
 Ingest Token は**書き込み専用**であり、参照 API を一切呼べない。
-CI に置かれる認証情報であるため、漏洩時の影響を
+収集ランナーの Secrets に置かれる認証情報であるため、漏洩時の影響を
 「偽の計測結果を送れる」に限定し、蓄積データの読み出しには使えないようにする。
 
 ---
@@ -719,26 +702,19 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `ARTIFACT_FORMAT_INVALID` | 422 | パースに失敗 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
-| `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
+| `CONFIG_VALIDATION_FAILED` | 422 | 合格ライン（`*.gate.yml`）の検証エラー（Run の処理失敗の理由としても使う） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 
 ---
 
-## 8. レート制限
-
-設けない（D-21）。取り込み元はトークンで認証した収集ランナー 1 台、参照するのは許可リストの少人数で、
-上限に届く使い方が無いため。
-
----
-
-## 9. OpenAPI 仕様の生成と検証
+## 8. OpenAPI 仕様の生成と検証
 
 | 項目 | 方針 |
 | --- | --- |
 | 生成 | springdoc がコントローラと DTO から生成（[04](04-tech-stack.md) 4.1） |
 | 出力先 | `api/openapi.yml`（リポジトリにコミット） |
 | 同期検証 | CI で再生成し `git diff --exit-code` が通ることを確認（[04](04-tech-stack.md) 4.3） |
-| 互換性検証 | `oasdiff` でベースとの破壊的変更を検出（M-09） |
+| 互換性検証 | `oasdiff` でベースとの破壊的変更を検出（M-08） |
 | 記述の補強 | `@Schema(description = ...)` を DTO に付与。生成された仕様がフロントエンドの唯一の参照先になるため、説明を実装側に書く |
 
 ### DTO 設計の原則

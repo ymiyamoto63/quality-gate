@@ -45,7 +45,7 @@ const reevaluateMessage = ref('')
 const reevaluating = ref(false)
 
 /**
- * 再評価はその場で判定し直す（D-27）。終わったら表示を読み直す。
+ * 再評価はその場で判定し直す（DD-15）。終わったら表示を読み直す。
  * 権限の無い利用者にもボタンは見せ、無効化して理由を示す（docs/08 5 章）。
  */
 async function reevaluate(): Promise<void> {
@@ -155,7 +155,7 @@ function formatBytes(bytes: number): string {
 
       <!--
         処理失敗（FAILED）は判定結果 FAIL とは別物なので、判定表を出さずに
-        何が起きたかと次の行動を示す（docs/initial/08-screen-design.md 3.3）。
+        何が起きたかと次の行動を示す（docs/spec/08-screen-design.md 3.3）。
       -->
       <div v-if="detail.failure" class="qg-failure" role="alert">
         <h2>{{ detail.failure.title }}</h2>

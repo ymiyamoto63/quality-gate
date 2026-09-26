@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * リリース判定（UC-10 / S-11）。指定したタグ・コミットの時点の、全指標の合否と説明。
+ * リリース判定（UC-06 / S-09）。指定したタグ・コミットの時点の、全指標の合否と説明。
  *
  * <p>{@code @NotNull} と {@code nullable} の付け方は RunDetailResponse と同じ（必ず返す項目を仕様に明示する）。
  */

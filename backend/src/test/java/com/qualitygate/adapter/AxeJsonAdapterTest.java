@@ -29,7 +29,7 @@ class AxeJsonAdapterTest {
         NormalizedReport report = adapter.parse(resource("/axe/axe-results.json"), CONTEXT);
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-10");
+        assertThat(measurement.metricId()).isEqualTo("M-09");
         assertThat(measurement.componentName()).isEqualTo("frontend");
         assertThat(measurement.value()).isNull();
         assertThat(measurement.detail())

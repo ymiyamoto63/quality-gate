@@ -27,7 +27,7 @@ public final class PageCursor {
      * 位置指定のカーソル。
      *
      * <p>Run は時系列に増え続けるため、オフセットではページ送りの途中で
-     * 新しい Run が入ると重複・欠落が起きる（docs/initial/07-api-design.md 1.4）。
+     * 新しい Run が入ると重複・欠落が起きる（docs/spec/07-api-design.md 1.4）。
      * 並び順の鍵（{@code measuredAt}, {@code id}）そのものを持たせる。
      */
     public static String ofKeyset(Instant measuredAt, UUID id) {

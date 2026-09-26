@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * M-04 スループット（docs/initial/02-metrics-spec.md M-03「スループットの扱い」）。
+ * M-04 スループット（docs/spec/02-metrics-spec.md M-03「スループットの扱い」）。
  *
  * <p>スループットは達成値を競う指標ではなく、<strong>応答時間を測るための負荷条件</strong>である。
  * 負荷を結果変数にすると、負荷が低いほど応答時間が良く見えてしまう。

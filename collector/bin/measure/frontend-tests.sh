@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# M-01（TypeScript。Vitest + v8 カバレッジ）/ M-11・M-12（Vitest の junit reporter）: フロントエンドのテスト。
+# M-01（TypeScript。Vitest + v8 カバレッジ）/ M-10・M-11（Vitest の junit reporter）: フロントエンドのテスト。
 # measure.sh が source する（単独では実行しない）。
 
 measure_frontend() {
@@ -22,12 +22,12 @@ measure_frontend() {
     for pattern in "${patterns[@]}"; do args+=("--coverage.include=$pattern"); done
     read -ra patterns <<< "${FRONTEND_COVERAGE_EXCLUDE:-}"
     for pattern in "${patterns[@]}"; do args+=("--coverage.exclude=$pattern"); done
-    # テストの結果は JUnit XML でも出す（M-11 / M-12）。画面のログ用に default の reporter も残す
+    # テストの結果は JUnit XML でも出す（M-10 / M-11）。画面のログ用に default の reporter も残す
     args+=(--reporter=default --reporter=junit "--outputFile.junit=$REPORTS/tests/frontend/junit.xml")
     # テストの失敗では止めない（カバレッジは reportOnFailure で出る）
     npx vitest run "${args[@]}" || echo "::warning::フロントエンドのテストに失敗があります"
-  ) || fail "フロントエンドの計測に失敗しました（M-01 TS / M-11 / M-12 は送られません）"
+  ) || fail "フロントエンドの計測に失敗しました（M-01 TS / M-10 / M-11 は送られません）"
   endgroup
   [ -s "$REPORTS/frontend-coverage/lcov.info" ] || fail "M-01: lcov.info がありません"
-  [ -s "$REPORTS/tests/frontend/junit.xml" ] || fail "M-11/M-12: フロントエンドのテストの結果（junit.xml）がありません"
+  [ -s "$REPORTS/tests/frontend/junit.xml" ] || fail "M-10/M-11: フロントエンドのテストの結果（junit.xml）がありません"
 }

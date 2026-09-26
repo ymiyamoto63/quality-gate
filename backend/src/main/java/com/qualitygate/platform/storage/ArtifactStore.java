@@ -7,7 +7,7 @@ import java.io.InputStream;
  *
  * <p>実装はローカルファイルシステム（{@link LocalFileArtifactStore}）。
  * 対象 1 リポジトリ・10GB 規模ではオブジェクトストレージは過剰であるため
- * （docs/initial/04-tech-stack.md 5.2）。将来 S3 互換へ移す場合は実装の追加のみで済む。
+ * （docs/spec/04-tech-stack.md 5.2）。将来 S3 互換へ移す場合は実装の追加のみで済む。
  */
 public interface ArtifactStore {
 
@@ -25,7 +25,7 @@ public interface ArtifactStore {
 
     /**
      * 指定時刻より前に書き込まれた保存キーを列挙する。孤児ファイル
-     * （DB に記録の無いファイル）の回収に使う（docs/initial/05-architecture.md 3.3）。
+     * （DB に記録の無いファイル）の回収に使う（docs/spec/05-architecture.md 3.3）。
      */
     java.util.List<String> listKeysWrittenBefore(java.time.Instant before, int limit);
 

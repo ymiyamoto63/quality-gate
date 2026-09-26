@@ -12,7 +12,7 @@ import { writeAxeResult } from './axe-report'
 export const COLOR_SCHEMES = ['light', 'dark'] as const
 
 /**
- * M-10 の判定対象となる違反が 0 件であることを検査する。
+ * M-09 の判定対象となる違反が 0 件であることを検査する。
  *
  * impact が critical / serious のものに絞る。serious にはキーボード操作不能や
  * コントラスト不足といった、実際に利用を妨げる違反が含まれる。

@@ -46,7 +46,7 @@ class OasdiffJsonAdapterTest {
                 """, Map.of());
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-09");
+        assertThat(measurement.metricId()).isEqualTo("M-08");
         assertThat(measurement.value()).isEqualByComparingTo("1");
         assertThat(measurement.detail())
                 .containsEntry("breaking", 1L)

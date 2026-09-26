@@ -13,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** システム設定（S-09 保持期間）。管理者のみ。 */
+/** システム設定（S-08 保持期間）。管理者のみ。 */
 @RestController
 @RequestMapping("/api/v1/settings")
 @PreAuthorize("hasRole('ADMIN')")

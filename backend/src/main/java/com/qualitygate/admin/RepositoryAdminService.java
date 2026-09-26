@@ -19,8 +19,8 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * リポジトリの登録と設定の変更（S-08 / FR-01）。
- * 変更はすべて監査ログに残す（FR-14-1）。
+ * リポジトリの登録と設定の変更（S-07 / FR-01）。
+ * 変更はすべて監査ログに残す（FR-11-1）。
  */
 @Service
 public class RepositoryAdminService {

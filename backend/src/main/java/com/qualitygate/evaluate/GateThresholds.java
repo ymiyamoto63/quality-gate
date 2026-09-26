@@ -16,14 +16,14 @@ import java.util.Set;
  * @param skippableMetrics  スキップ申告を受理してよい指標（指標 ID）
  * @param exclusions        計測除外の glob パターン
  * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
- * @param maxAccessibilityViolations M-10 の合格ライン（critical + serious の件数）
- * @param accessibilityStandard      M-10 の判定基準
- * @param accessibilityPages         M-10 で検査されているべきページ。空なら限定しない
- * @param maxBreakingChanges         M-09 の合格ライン（破壊的変更の件数）
+ * @param maxAccessibilityViolations M-09 の合格ライン（critical + serious の件数）
+ * @param accessibilityStandard      M-09 の判定基準
+ * @param accessibilityPages         M-09 で検査されているべきページ。空なら限定しない
+ * @param maxBreakingChanges         M-08 の合格ライン（破壊的変更の件数）
  * @param performance                M-03 / M-04 / M-05 の合格ライン
- * @param testResults                M-11 / M-12 の合格ライン
- * @param maxSecrets                 M-13 の合格ライン（シークレットの件数）
- * @param licenses                   M-14 の合格ライン
+ * @param testResults                M-10 / M-11 の合格ライン
+ * @param maxSecrets                 M-12 の合格ライン（シークレットの件数）
+ * @param licenses                   M-13 の合格ライン
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -47,7 +47,7 @@ public record GateThresholds(
         Licenses licenses) {
 
     /**
-     * ライセンスの合格ライン（docs/initial/02-metrics-spec.md M-14）。件数はパッケージの数。
+     * ライセンスの合格ライン（docs/spec/02-metrics-spec.md M-13）。件数はパッケージの数。
      *
      * @param maxForbidden  分類が forbidden のパッケージの上限
      * @param maxRestricted 分類が restricted のパッケージの上限。null なら件数では問わない（WARN にとどめる）
@@ -57,7 +57,7 @@ public record GateThresholds(
     }
 
     /**
-     * 性能指標の合格ライン（docs/initial/02-metrics-spec.md M-03）。
+     * 性能指標の合格ライン（docs/spec/02-metrics-spec.md M-03）。
      *
      * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
      * @param p95WarnMs      これを超えたら WARN（既定は合格ラインの 80%）
@@ -70,12 +70,12 @@ public record GateThresholds(
     }
 
     /**
-     * テスト結果の合格ライン（docs/initial/02-metrics-spec.md M-11 / M-12）。
+     * テスト結果の合格ライン（docs/spec/02-metrics-spec.md M-10 / M-11）。
      *
-     * @param minSuccessRate     M-11 の合格ライン（成功率 %）
-     * @param minTestCount       M-11 の最小実行件数。下回れば値を確定できない（ERROR）
-     * @param maxSkipped         M-12 のスキップ件数の上限。null なら件数そのものは問わない
-     * @param maxSkippedIncrease M-12 の比較対象 Run からの増加の上限（件）
+     * @param minSuccessRate     M-10 の合格ライン（成功率 %）
+     * @param minTestCount       M-10 の最小実行件数。下回れば値を確定できない（ERROR）
+     * @param maxSkipped         M-11 のスキップ件数の上限。null なら件数そのものは問わない
+     * @param maxSkippedIncrease M-11 の比較対象 Run からの増加の上限（件）
      */
     public record TestResults(BigDecimal minSuccessRate, int minTestCount, Integer maxSkipped,
                               int maxSkippedIncrease) {
@@ -88,12 +88,12 @@ public record GateThresholds(
     public static final String M_ERROR_RATE = "M-05";
     public static final String M_VULNERABILITIES = "M-06";
     public static final String M_COMPLEXITY = "M-07";
-    public static final String M_BREAKING_CHANGES = "M-09";
-    public static final String M_ACCESSIBILITY = "M-10";
-    public static final String M_TEST_SUCCESS = "M-11";
-    public static final String M_SKIPPED_TESTS = "M-12";
-    public static final String M_SECRETS = "M-13";
-    public static final String M_LICENSES = "M-14";
+    public static final String M_BREAKING_CHANGES = "M-08";
+    public static final String M_ACCESSIBILITY = "M-09";
+    public static final String M_TEST_SUCCESS = "M-10";
+    public static final String M_SKIPPED_TESTS = "M-11";
+    public static final String M_SECRETS = "M-12";
+    public static final String M_LICENSES = "M-13";
 
     /**
      * 判定器を実装済みの指標。

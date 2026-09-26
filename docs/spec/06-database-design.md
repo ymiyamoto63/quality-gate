@@ -1,12 +1,7 @@
 # quality-gate データベース設計
 
-| 項目 | 内容 |
-| --- | --- |
-| ドキュメント名 | quality-gate データベース設計（基本設計） |
-| バージョン | 1.0 |
-| 最終更新 | 2026-09-21 |
-| DBMS | PostgreSQL 17 |
-| 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) |
+本書は quality-gate のテーブル定義と、その設計の理由を定める（DBMS は PostgreSQL 17）。
+前提は [要件定義書](01-requirements.md) と [方式設計](05-architecture.md)。
 
 ---
 
@@ -96,21 +91,9 @@ CREATE TABLE repositories (
 );
 ```
 
-PR を計測する設定（`measure_pull_requests`）は、どこからも読まれていなかったため V018 で削除した。
 PR を計測するかは、収集ランナーの手動実行で PR 番号を指定するかどうかで決まる。
 
-### 3.3 `components` — リポジトリ内の構成単位（V019 で削除）
-
-画面に表示するだけで判定に使っていなかったため、V019 でテーブルごと削除した（D-25）。
-コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まり、成果物に付いた名前
-（`measurements.component_name` / `findings.component_name`）で扱う。
-
-### 3.4 `ingest_tokens` — 取り込み用トークン（V021 で削除）
-
-送り手が収集ランナーだけになったため、Ingest Token はリポジトリごとに発行せず、バックエンドの環境変数
-`QG_INGEST_TOKEN` の 1 つにまとめた。V021 でテーブルごと削除した（D-27）。発行・失効の記録は監査ログに残っている。
-
-### 3.5 `gate_configs` — 合格ラインの設定（版管理）
+### 3.3 `gate_configs` — 合格ラインの設定（版管理）
 
 ```sql
 CREATE TABLE gate_configs (
@@ -132,7 +115,7 @@ CREATE TABLE gate_configs (
 `content_hash` に一意制約を置くことで、**内容が同じ設定は版を増やさない**。
 毎回の Run で新しい版が作られると、変更履歴がノイズで埋まる。
 
-### 3.6 `runs` — 計測・判定の単位
+### 3.4 `runs` — 計測・判定の単位
 
 ```sql
 CREATE TABLE runs (
@@ -153,8 +136,8 @@ CREATE TABLE runs (
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
-    renamed_files       jsonb,                   -- ファイルの移動の対応表（新しいパス → 移動前のパス。V015）
-    tags                text[]      NOT NULL DEFAULT '{}',  -- 計測したコミットを指すタグ（V020）
+    renamed_files       jsonb,                   -- ファイルの移動の対応表（新しいパス → 移動前のパス）
+    tags                text[]      NOT NULL DEFAULT '{}',  -- 計測したコミットを指すタグ
     created_at          timestamptz NOT NULL DEFAULT now(),
     evaluated_at        timestamptz,
     CONSTRAINT runs_attempt_key UNIQUE (repository_id, commit_sha, attempt),
@@ -167,16 +150,14 @@ CREATE TABLE runs (
 );
 ```
 
-ランナー種別の列（`runner_type`）は、計測を収集ランナーに絞ったため V016 で削除した（D-19）。
-
-`tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-11）でタグを
-コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。V020 より前の Run は空（D-26）。
-`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求める（以前は GitHub の compare API で求めていた）。
+`tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-09）でタグを
+コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。
+`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求め、再評価でも同じものを使う。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
 
-### 3.7 `run_skipped_metrics` — スキップ申告
+### 3.5 `run_skipped_metrics` — スキップ申告
 
 ```sql
 CREATE TABLE run_skipped_metrics (
@@ -192,7 +173,7 @@ CREATE TABLE run_skipped_metrics (
 当該指標は `ERROR` になる。申告の事実自体は記録に残し、
 なぜ ERROR になったのかを Run 詳細で説明できるようにする。
 
-### 3.8 `artifacts` — 取り込んだ成果物
+### 3.6 `artifacts` — 取り込んだ成果物
 
 ```sql
 CREATE TABLE artifacts (
@@ -218,7 +199,7 @@ CREATE TABLE artifacts (
 `deleted_at` はファイル実体を消したことを表す。**メタデータは残す**ため、
 「このとき何を取り込んだか」は保持期間を過ぎても追える。
 
-### 3.9 `measurements` — 指標ごとの実測値と判定
+### 3.7 `measurements` — 指標ごとの実測値と判定
 
 ```sql
 CREATE TABLE measurements (
@@ -226,10 +207,10 @@ CREATE TABLE measurements (
     run_id          uuid        NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
     metric_id       varchar(8)  NOT NULL,
-    component_name  varchar(64),                -- 'backend' / 'frontend'（V008 で追加）
+    component_name  varchar(64),                -- 'backend' / 'frontend'
     scenario        varchar(64),                -- M-03 のシナリオ単位判定用
-    variant         varchar(16),                -- 計測条件。M-02 の実行範囲 changed / all（V010 で追加）
-    status          varchar(16) NOT NULL,       -- NOT_APPLICABLE を入れるため V010 で 12 → 16
+    variant         varchar(64),                -- 計測条件。M-02 の実行範囲 changed / all、性能指標の計測環境名
+    status          varchar(16) NOT NULL,
     value           numeric(12,4),
     unit            varchar(16),
     threshold       jsonb,                      -- {"operator":">=","value":75}
@@ -255,7 +236,7 @@ CREATE UNIQUE INDEX ux_measurements_key ON measurements
 `detail`（jsonb）に入れず列にするのは、トレンド検索で系列の軸として使うためである。
 
 `component_name` を持たせるのは、表示とトレンドの絞り込みで常に必要になるためである。
-設計時に置いた `components` への外部キー（`component_id`）は一度も値が入らず、V019 で削除した。
+コンポーネントは計測プロファイルで決まり、成果物に付いた名前をそのまま入れる（[03](03-design-decisions.md) DD-9）。
 
 一意性を UNIQUE 制約ではなく式インデックスで担保するのは、
 **SQL の UNIQUE 制約が NULL 同士を重複と見なさない**ためである。
@@ -267,7 +248,7 @@ CREATE UNIQUE INDEX ux_measurements_key ON measurements
 毎回 `runs` と結合すると要件を満たしにくい。
 更新されない値の複製であり、不整合が生じる余地がない箇所に限って許容する。
 
-### 3.10 `findings` — 個別の違反
+### 3.8 `findings` — 個別の違反
 
 ```sql
 CREATE TABLE findings (
@@ -291,22 +272,7 @@ CREATE TABLE findings (
 );
 ```
 
-V017 で `waiver_id`（免除の紐付け）を削除した（D-22）。
-
-### 3.11 `waivers` — 免除（V017 で削除）
-
-免除（D-12）を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.12 `notifications` — 通知の送信履歴（V017 で削除）
-
-メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.13 `jobs` — ジョブキュー（V021 で削除）
-
-判定は取り込みの確定と再評価の中でその場で行い、日次バッチは定期実行で直接動かすようにしたため、
-V021 でテーブルごと削除した（D-27）。
-
-### 3.14 `repository_summaries` — ダッシュボード用の読み取りモデル
+### 3.9 `repository_summaries` — ダッシュボード用の読み取りモデル
 
 ```sql
 CREATE TABLE repository_summaries (
@@ -331,7 +297,7 @@ Run や Measurement を走査しない（[05](05-architecture.md) 11 章）。
 
 `last_full_measured_at` は最後の完全計測の日時として画面に常に表示する（FR-06-3）。
 
-### 3.15 `audit_logs` — 監査ログ
+### 3.10 `audit_logs` — 監査ログ
 
 ```sql
 CREATE TABLE audit_logs (
@@ -357,7 +323,7 @@ CREATE INDEX ix_audit_logs_target   ON audit_logs (target_type, target_id);
 REVOKE UPDATE, DELETE ON audit_logs FROM quality_gate_app;
 ```
 
-V006 はロール `quality_gate_app` が存在する場合だけこれを実行する。開発環境（所有者ロールで接続）では剥奪されない。
+マイグレーションは、ロール `quality_gate_app` が存在する場合だけこれを実行する。開発環境（所有者ロールで接続）では剥奪されない。
 
 保持期間の削除は、別の管理ロールで実行するバッチが行う。アプリの日次バッチも削除を試みるが、
 権限が剥奪された環境では警告を残して何もしない。
@@ -366,11 +332,7 @@ V006 はロール `quality_gate_app` が存在する場合だけこれを実行�
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が操作したか」が失われないようにするため。
 
-### 3.16 `notification_settings` — リポジトリごとの通知設定（V017 で削除）
-
-メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.17 `system_settings` — システム全体の設定
+### 3.11 `system_settings` — システム全体の設定
 
 ```sql
 CREATE TABLE system_settings (
@@ -383,7 +345,7 @@ CREATE TABLE system_settings (
 
 保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
 
-### 3.18 Spring Session
+### 3.12 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
@@ -447,7 +409,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 
 ## 7. 保持期間と削除
 
-下表の保持期間は既定値である。Run・成果物・監査ログの日数は管理画面（S-09）から変更でき、
+下表の保持期間は既定値である。Run・成果物・監査ログの日数は管理画面（S-08）から変更でき、
 `system_settings` に保存する。
 
 | 対象 | 保持期間 | 削除方法 |
@@ -484,34 +446,7 @@ DELETE FROM runs
 | テストデータ | マイグレーションに含めない。`V900__` 台の開発用プロファイル限定スクリプトに分ける |
 | 検証 | Testcontainers で全マイグレーションを空の DB に適用するテストを持つ |
 
-### 初期マイグレーションの構成
-
-| ファイル | 内容 |
-| --- | --- |
-| `V001__create_users_and_repositories.sql` | `users` / `repositories` / `components` / `ingest_tokens` |
-| `V002__create_gate_configs.sql` | `gate_configs` |
-| `V003__create_runs_and_artifacts.sql` | `runs` / `run_skipped_metrics` / `artifacts` |
-| `V004__create_measurements_findings_waivers.sql` | `measurements` / `findings` / `waivers` |
-| `V005__create_jobs_and_notifications.sql` | `jobs` / `notifications` |
-| `V006__create_summaries_and_audit.sql` | `repository_summaries` / `audit_logs` と権限設定 |
-| `V007__create_spring_session.sql` | Spring Session JDBC のテーブル |
-| `V008__add_measurement_component_name.sql` | `measurements.component_name` の追加と一意インデックスの置き換え |
-| `V009__skipped_metric_acceptance_at_evaluation.sql` | `run_skipped_metrics.accepted` を NULL 許容にし、受理の可否を判定時に決める |
-| `V010__measurement_variant_and_not_applicable.sql` | `measurements.variant` の追加、一意インデックスの置き換え、`NOT_APPLICABLE` の追加と `status` の拡幅 |
-| `V011__widen_measurement_variant.sql` | `measurements.variant` を 64 文字に拡幅（性能指標の計測環境名を入れるため） |
-| `V012__create_notification_and_system_settings.sql` | `notification_settings`（リポジトリごとの通知条件と宛先）・`system_settings`（保持期間など）の追加、`notifications.dedup_key`（Run を持たない通知の重複抑止） |
-| `V013__waiver_title_and_run_status.sql` | `waivers.title`（登録時点の違反の見出し）、`runs.previous_verdict`（再評価の直前の判定。通知の遷移判定に使う） |
-| `V014__email_only_notifications.sql` | 通知をメールのみにしたため、V012 の Slack・PR コメントの列を削除（D-15） |
-| `V015__run_renamed_files.sql` | `runs.renamed_files`（ファイルの移動・リネームの対応表） |
-| `V016__collector_only_ingest.sql` | 取り込み経路を収集ランナーに絞ったため、`runs.runner_type` と Check Run のジョブ、設定の削除したキーを取り除く（D-19） |
-| `V017__drop_waivers_and_notifications.sql` | 免除と通知を廃止したため、`waivers` / `notifications` / `notification_settings`・`findings.waiver_id`・`repository_summaries.active_waiver_count`・`runs.previous_verdict` と、処理する側の無いジョブ、保存済みの設定の `notifications` / `full_measurement_interval_days` を削除する（D-22） |
-| `V018__drop_repository_measure_pull_requests.sql` | どこからも読まれていなかった `repositories.measure_pull_requests`（PR を計測する設定）を削除する |
-| `V019__remove_duplicated_and_unused_definitions.sql` | 表示にしか使っていなかった `components` と `measurements.component_id`、廃止した M-08 の計測値・違反・スキップ申告・成果物（`junit-xml`）、保存済みの設定の `components` と `api_contract` の `min_success_rate` / `min_test_count` を削除する（D-25） |
-| `V020__run_tags.sql` | `runs.tags`（計測したコミットを指すタグ）と GIN 索引。リリース判定のタグの解決を GitHub API から Run に移した（D-26） |
-| `V021__drop_job_queue_and_ingest_tokens.sql` | `jobs` と `ingest_tokens` を削除する（判定をその場で行い、Ingest Token を環境変数の 1 つにまとめた。D-27） |
-| `V022__drop_reference_metrics.sql` | 参考値の指標（M-15〜M-17）の計測値・違反・スキップ申告・成果物の行、保存済みの設定の `duplication` / `lighthouse` / `bundle_size`、ステータス `REFERENCE` を削除する（D-28） |
-
-`findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
+スキーマの現在の形は本書 3 章に示す。個々のマイグレーションファイルは変更の単位であり、本書では一覧にしない。
 
 ---
 

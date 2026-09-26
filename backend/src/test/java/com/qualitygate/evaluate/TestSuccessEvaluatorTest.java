@@ -97,18 +97,18 @@ class TestSuccessEvaluatorTest {
         values.putAll(config);
         EvaluationContext context = new EvaluationContext(run(),
                 thresholdsWith("test_results", values),
-                input(measurements, findings, List.of(), Set.of("M-11", "M-12")), Map.of(), false);
+                input(measurements, findings, List.of(), Set.of("M-10", "M-11")), Map.of(), false);
         return evaluator.evaluate(context);
     }
 
     static RawMeasurement report(String component, long passed, long failed,
                                  long errored, long skipped, long flaky) {
         TestTally tally = new TestTally(passed, failed, errored, skipped, flaky);
-        return RawMeasurement.of("M-11", component, tally.successRate(), "percent", tally.toDetail());
+        return RawMeasurement.of("M-10", component, tally.successRate(), "percent", tally.toDetail());
     }
 
     private static IdentifiedFinding failure(String component, String className, String name) {
-        RawFinding finding = new RawFinding("M-11", "failed", Severity.HIGH,
+        RawFinding finding = new RawFinding("M-10", "failed", Severity.HIGH,
                 className + "." + name + " が失敗しました", null, null, component,
                 className + "#" + name, Map.of("outcome", "failed"));
         return new IdentifiedFinding("fp-" + name, finding);

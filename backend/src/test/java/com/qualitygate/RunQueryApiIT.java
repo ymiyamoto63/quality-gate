@@ -524,16 +524,16 @@ class RunQueryApiIT {
                     json.extractingPath("$.items[0].sourceUrl").asString()
                             .startsWith("https://github.com/ymiyamoto63/quality-gate/blob/");
                     // 画面の違反にはリポジトリ上のファイルが無い。GitHub への壊れたリンクを作らない
-                    json.extractingPath("$.items[?(@.metricId == 'M-10')].sourceUrl")
+                    json.extractingPath("$.items[?(@.metricId == 'M-09')].sourceUrl")
                             .asArray().containsExactly((Object) null);
-                    json.extractingPath("$.items[?(@.metricId == 'M-10')].detail.page")
+                    json.extractingPath("$.items[?(@.metricId == 'M-09')].detail.page")
                             .asArray().containsExactly("/runs/:id");
                 });
 
         storeFixtures(tester, run);
     }
 
-    /** 画面のアクセシビリティ検査（M-10）で使う応答例を書き出す（{@link FixtureWriter}）。 */
+    /** 画面のアクセシビリティ検査（M-09）で使う応答例を書き出す（{@link FixtureWriter}）。 */
     private static void storeFixtures(MockMvcTester tester, Run run) throws Exception {
         FixtureWriter.write("run-detail.json",
                 tester.get().uri("/api/v1/runs/{id}", run.getId())
@@ -603,7 +603,7 @@ class RunQueryApiIT {
     /**
      * 画面の検査用に、backend と frontend の両方を計測した Run を作る。
      * M-02 は設定で backend に限るため、frontend は対象外として並ぶ。
-     * 違反一覧の画面がアクセシビリティ違反も描けるよう、M-10 の違反を 1 件含める。
+     * 違反一覧の画面がアクセシビリティ違反も描けるよう、M-09 の違反を 1 件含める。
      */
     private Run evaluatedWithFrontend(Instant measuredAt) {
         Run run = createRun(measuredAt);

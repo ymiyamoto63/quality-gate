@@ -8,7 +8,7 @@ import com.tngtech.archunit.lang.ArchRule;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
 /**
- * モジュール間の依存規則（docs/initial/05-architecture.md 1 章）を機械的に検証する。
+ * モジュール間の依存規則（docs/spec/05-architecture.md 1 章）を機械的に検証する。
  *
  * <p>規則が文書にしか存在しないと、半年後には守られていない。
  */

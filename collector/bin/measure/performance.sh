@@ -4,7 +4,7 @@
 
 # シナリオ（collector/targets/）とツールの版（versions.env の K6_VERSION）は quality-gate 側のもの。
 # 1 回に ウォームアップ + 計測 の時間がかかるため、PR 以外の計測で PERF_RUNS 回（既定 3 回）実行する。
-# 中央値は quality-gate が取る（docs/initial/02-metrics-spec.md M-03）
+# 中央値は quality-gate が取る（docs/spec/02-metrics-spec.md M-03）
 k6_bin() {
   local home="$CACHE/k6-${K6_VERSION}" arch
   if [ ! -x "$home/k6" ]; then

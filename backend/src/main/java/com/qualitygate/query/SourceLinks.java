@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>URL 形式をサーバ側に置くのは、ホスティング先が変わったときに
  * フロントエンドとバックエンドの両方を直さずに済むようにするため
- * （docs/initial/07-api-design.md 4.3）。
+ * （docs/spec/07-api-design.md 4.3）。
  */
 final class SourceLinks {
 

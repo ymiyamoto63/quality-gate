@@ -20,8 +20,8 @@ import java.util.Locale;
 import java.util.Map;
 
 /**
- * oasdiff の JSON 出力から M-09（OpenAPI の破壊的変更件数）を読む
- * （docs/initial/02-metrics-spec.md M-09）。
+ * oasdiff の JSON 出力から M-08（OpenAPI の破壊的変更件数）を読む
+ * （docs/spec/02-metrics-spec.md M-08）。
  *
  * <p>受け付けるのは {@code oasdiff breaking <base> <head> --format json} の出力
  * （変更の配列）。{@code []} と {@code null} は 0 件として読む。
@@ -39,7 +39,7 @@ import java.util.Map;
 @Component
 public class OasdiffJsonAdapter implements ArtifactAdapter {
 
-    static final String METRIC_ID = "M-09";
+    static final String METRIC_ID = "M-08";
 
     private final ObjectMapper objectMapper;
 

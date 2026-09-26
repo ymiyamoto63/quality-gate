@@ -1,6 +1,6 @@
 # like-chatgpt の合格ライン（収集ランナー用）
 #
-# 収集ランナー（collector/bin/submit.sh）が Run ごとにこのファイルを送り、quality-gate はこの内容で判定する（D-20）。
+# 収集ランナー（collector/bin/submit.sh）が Run ごとにこのファイルを送り、quality-gate はこの内容で判定する（DD-13）。
 # 変更は main にマージした後の計測から効く。画面（S-06）は表示するだけで、編集はできない。
 #
 # like-chatgpt の .quality-gate.yml との違い:
@@ -64,6 +64,6 @@ metrics:
     enabled: true
     standard: wcag22aa
     max_critical: 0
-    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-10 は ERROR
+    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-09 は ERROR
     pages:
       - "/"
