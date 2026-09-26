@@ -93,6 +93,7 @@ public record ReleaseReportResponse(
             @NotNull @Schema(description = "根拠の種類の表示名（外部基準 など）") String basisLabel,
             @NotNull @Schema(description = "既定の合格ラインにした理由") String rationale,
             @NotNull @Schema(description = "不合格のまま出すと何が起きるか") String risk,
-            @NotNull @Schema(description = "技術的な定義") String definition) {
+            @NotNull @Schema(description = "技術的な定義") String definition,
+            @NotNull @Schema(description = "計測に使うライブラリ・ソフトウェア") String tools) {
     }
 }

@@ -27,7 +27,7 @@ final class ReleaseReportCsv {
     static final List<String> HEADER = List.of("リポジトリ", "指定", "コミット", "リリース判定", "判定の理由",
             "Run ID", "計測日時", "計測範囲", "比較元コミット", "合格ラインの版", "除外パターン", "指標ID", "指標", "カテゴリ",
             "コンポーネント", "計測条件", "値", "しきい値", "判定", "判定の詳細", "何を見る指標か", "根拠の種類",
-            "基準の根拠", "出力日時", "出力者");
+            "基準の根拠", "計測ツール", "出力日時", "出力者");
 
     private ReleaseReportCsv() {
     }
@@ -65,7 +65,7 @@ final class ReleaseReportCsv {
         if (report.metrics().isEmpty()) {
             // 未計測でも、判定できなかったことを証跡として 1 行残す
             List<String> row = new ArrayList<>(common);
-            row.addAll(List.of("", "", "", "", "", "", "", "", "", "", "", "", exported, exportedBy));
+            row.addAll(List.of("", "", "", "", "", "", "", "", "", "", "", "", "", exported, exportedBy));
             writeRow(out, row);
         }
         for (ReleaseReportResponse.ReleaseMetric metric : report.metrics()) {
@@ -75,7 +75,8 @@ final class ReleaseReportCsv {
                     text(metric.componentName()), condition(metric), value(metric), text(metric.threshold()),
                     statusLabel(metric.status()), text(metric.reason()),
                     guide == null ? "" : guide.summary(), guide == null ? "" : guide.basisLabel(),
-                    guide == null ? "" : guide.rationale(), exported, exportedBy));
+                    guide == null ? "" : guide.rationale(), guide == null ? "" : guide.tools(),
+                    exported, exportedBy));
             writeRow(out, row);
         }
         out.flush();

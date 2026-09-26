@@ -237,7 +237,7 @@ public class ReleaseReportService {
             MetricGuide guide = MetricGuide.of(metricId);
             return new ReleaseReportResponse.ReleaseGuide(metricId, MetricCatalog.of(metricId).name(), guide.summary(),
                     guide.basis().name(), guide.basis().label(), guide.rationale(), guide.risk(),
-                    guide.definition());
+                    guide.definition(), guide.tools());
         }).toList();
     }
 
