@@ -10,9 +10,7 @@ import java.util.UUID;
 
 @Schema(description = "ダッシュボード。repository_summaries を読むだけで応答する。")
 public record DashboardResponse(
-        List<RepositoryCard> repositories,
-        @Schema(description = "計測途絶などの警告。画面側で判定させず、サーバが返す")
-        List<Alert> alerts) {
+        List<RepositoryCard> repositories) {
 
     public record RepositoryCard(
             UUID repositoryId,
@@ -20,7 +18,6 @@ public record DashboardResponse(
             LatestRun latestRun,
             int openCriticalCount,
             int openHighCount,
-            int activeWaiverCount,
             Freshness freshness) {
     }
 
@@ -32,14 +29,9 @@ public record DashboardResponse(
             Instant measuredAt) {
     }
 
-    @Schema(description = "データの鮮度。基準日数は設定値のため、判定結果をサーバが返す。")
+    @Schema(description = "最後の計測と最後の完全計測の日時")
     public record Freshness(
             Instant lastMeasuredAt,
-            Instant lastFullMeasuredAt,
-            boolean staleMeasurement,
-            boolean staleFullMeasurement) {
-    }
-
-    public record Alert(String code, UUID repositoryId, String message) {
+            Instant lastFullMeasuredAt) {
     }
 }

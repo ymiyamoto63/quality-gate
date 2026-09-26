@@ -91,9 +91,6 @@ class FindingSearchImpl implements FindingSearch {
             conditions.add("f.severity in :severities");
             parameters.put("severities", criteria.severities());
         }
-        if (criteria.waived() != null) {
-            conditions.add(criteria.waived() ? "f.waiverId is not null" : "f.waiverId is null");
-        }
     }
 
     private static void bind(TypedQuery<?> query, Map<String, Object> parameters) {

@@ -47,7 +47,7 @@ public class RepositorySummary {
     @Column(name = "last_full_run_id")
     private UUID lastFullRunId;
 
-    /** 完全計測の鮮度監視（FR-06-3）の判定元。 */
+    /** 最後の完全計測（FR-06-3）。画面に常時表示する。 */
     @Column(name = "last_full_measured_at")
     private Instant lastFullMeasuredAt;
 
@@ -60,9 +60,6 @@ public class RepositorySummary {
 
     @Column(name = "open_high_count", nullable = false)
     private int openHighCount;
-
-    @Column(name = "active_waiver_count", nullable = false)
-    private int activeWaiverCount;
 
     @Version
     @Column(nullable = false)
@@ -82,12 +79,11 @@ public class RepositorySummary {
      * 判定完了時に読み取りモデルを更新する。
      *
      * <p>完全計測（FULL）のときだけ {@code lastFull*} を進める。部分計測で上書きすると、
-     * 「最後に全指標を測ったのはいつか」が失われ、鮮度監視が機能しなくなる。
+     * 「最後に全指標を測ったのはいつか」が失われる。
      */
     @SuppressWarnings("java:S107")
     public void update(UUID runId, Verdict verdict, Completeness completeness, Instant measuredAt,
-                       String categoryStatus, int openCriticalCount, int openHighCount,
-                       int activeWaiverCount) {
+                       String categoryStatus, int openCriticalCount, int openHighCount) {
         this.latestRunId = runId;
         this.latestVerdict = verdict;
         this.latestCompleteness = completeness;
@@ -95,18 +91,11 @@ public class RepositorySummary {
         this.categoryStatus = categoryStatus;
         this.openCriticalCount = openCriticalCount;
         this.openHighCount = openHighCount;
-        this.activeWaiverCount = activeWaiverCount;
         this.updatedAt = Instant.now();
         if (completeness == Completeness.FULL) {
             this.lastFullRunId = runId;
             this.lastFullMeasuredAt = measuredAt;
         }
-    }
-
-    /** 免除の件数だけを現在値にする（過去の Run の再評価や免除の登録・失効時）。 */
-    public void updateWaiverCount(int activeWaiverCount) {
-        this.activeWaiverCount = activeWaiverCount;
-        this.updatedAt = Instant.now();
     }
 
     public UUID getRepositoryId() {
@@ -147,9 +136,5 @@ public class RepositorySummary {
 
     public int getOpenHighCount() {
         return openHighCount;
-    }
-
-    public int getActiveWaiverCount() {
-        return activeWaiverCount;
     }
 }

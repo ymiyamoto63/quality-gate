@@ -36,10 +36,9 @@ public class GateConfigParser {
 
     private static final Set<String> ROOT_KEYS = Set.of(
             "version", "on_missing_report", "execution",
-            "components", "exclusions", "metrics", "notifications");
+            "components", "exclusions", "metrics");
 
-    private static final Set<String> EXECUTION_KEYS = Set.of(
-            "skippable_metrics", "full_measurement_interval_days");
+    private static final Set<String> EXECUTION_KEYS = Set.of("skippable_metrics");
 
     private static final Set<String> ON_MISSING_REPORT_VALUES = Set.of("fail", "warn");
 
@@ -152,9 +151,7 @@ public class GateConfigParser {
             }
         }
 
-        int interval = intOf(execution.get("full_measurement_interval_days"),
-                fallback.fullMeasurementIntervalDays());
-        return new GateConfigDocument.Execution(skippable, interval);
+        return new GateConfigDocument.Execution(skippable);
     }
 
     private Map<String, GateConfigDocument.MetricConfig> metricsOf(
@@ -365,10 +362,6 @@ public class GateConfigParser {
             return List.of();
         }
         return list.stream().filter(java.util.Objects::nonNull).map(String::valueOf).toList();
-    }
-
-    private static int intOf(Object value, int fallback) {
-        return value instanceof Number number ? number.intValue() : fallback;
     }
 
     private static List<String> sorted(Set<String> values) {

@@ -46,7 +46,7 @@ class ModuleDependencyTest {
     static final ArchRule 共通基盤は業務ロジックを知らない = noClasses()
             .that().resideInAPackage("..platform..")
             .should().dependOnClassesThat()
-            .resideInAnyPackage("..ingest..", "..query..", "..normalize..", "..evaluate..", "..waiver..")
+            .resideInAnyPackage("..ingest..", "..query..", "..normalize..", "..evaluate..")
             .because("共通基盤が業務ロジックを知らない状態を保つ");
 
     @ArchTest

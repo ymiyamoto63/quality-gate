@@ -1,9 +1,10 @@
 package com.qualitygate.platform.audit;
 
 /**
- * 監査ログに記録する操作（FR-14-1 / FR-10-5）。
+ * 監査ログに記録する操作（FR-14-1）。
  *
  * <p>文字列として保存する。列挙の序数で持つと、値の追加で既存の記録の意味が変わる。
+ * 削除した機能の操作（免除の WAIVER_* や NOTIFICATION_SETTINGS_UPDATED）も、過去の記録にはそのまま残る。
  */
 public enum AuditAction {
     /** 利用者が 1 人もいない状態で、最初のログイン利用者を管理者にした（FR-13-5）。 */
@@ -16,10 +17,6 @@ public enum AuditAction {
     COMPONENT_DEFINED,
     INGEST_TOKEN_ISSUED,
     INGEST_TOKEN_REVOKED,
-    WAIVER_CREATED,
-    WAIVER_REVOKED,
-    WAIVER_EXPIRED,
     RUN_REEVALUATION_REQUESTED,
-    NOTIFICATION_SETTINGS_UPDATED,
     RETENTION_SETTINGS_UPDATED
 }

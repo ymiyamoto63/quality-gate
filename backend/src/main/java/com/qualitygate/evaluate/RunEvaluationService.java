@@ -20,7 +20,6 @@ import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
-import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -57,21 +56,19 @@ public class RunEvaluationService {
     private final MeasurementRepository measurements;
     private final FindingRepository findings;
     private final RepositorySummaryRepository summaries;
-    private final WaiverRepository waivers;
     private final List<MetricEvaluator> evaluators;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
     public RunEvaluationService(RunRepository runs, RunSkippedMetricRepository skippedMetrics,
                                 MeasurementRepository measurements, FindingRepository findings,
-                                RepositorySummaryRepository summaries, WaiverRepository waivers,
+                                RepositorySummaryRepository summaries,
                                 List<MetricEvaluator> evaluators, ObjectMapper objectMapper) {
         this.runs = runs;
         this.skippedMetrics = skippedMetrics;
         this.measurements = measurements;
         this.findings = findings;
         this.summaries = summaries;
-        this.waivers = waivers;
         this.evaluators = evaluators;
         this.objectMapper = objectMapper;
     }
@@ -90,22 +87,10 @@ public class RunEvaluationService {
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
         Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
 
-        // 免除は判定の直前に適用する（docs/initial/05-architecture.md 3.2 の 5）。
-        // 判定時点で有効なものだけを使うため、期限切れは自動的に再びカウントされる
-        Instant now = Instant.now();
-        ActiveWaivers active = ActiveWaivers.of(waivers.findEffective(run.getRepositoryId(), now));
         Map<String, Integer> pastBase = pastBaseComplexity(run, input);
         EvaluationContext context = new EvaluationContext(run, thresholds,
-                active.removeFrom(input), previousValues, baseline.isPresent(), pastBase);
+                input, previousValues, baseline.isPresent(), pastBase);
         List<MetricResult> results = evaluateAll(context);
-        if (active.coversFindings()) {
-            // 免除した違反も一覧に残す（免除は解決ではない）。何が違反かは評価器が決めるため、
-            // 免除を適用しない入力でも判定し、その違反を免除の印つきで保存する
-            List<MetricResult> unwaived = evaluateAll(new EvaluationContext(run, thresholds,
-                    input, previousValues, baseline.isPresent(), pastBase));
-            results = active.restoreWaivedFindings(results, unwaived);
-        }
-        results = active.applyMetricWaivers(results);
 
         // 再評価でも重複しないよう、この Run の既存の判定結果を置き換える
         measurements.deleteByRunId(runId);
@@ -114,13 +99,13 @@ public class RunEvaluationService {
         findings.flush();
 
         persistMeasurements(run, results, context);
-        persistFindings(run, results, baseline, active, input);
+        persistFindings(run, results, baseline, input);
 
         Verdict verdict = aggregate(results);
         Completeness completeness = completenessOf(results);
         run.markEvaluated(verdict, completeness, Instant.now());
 
-        updateSummary(run, results, verdict, completeness, now, active);
+        updateSummary(run, results, verdict, completeness);
 
         log.info("判定が完了しました runId={} verdict={} completeness={} 指標={}件",
                 runId, verdict, completeness, results.size());
@@ -229,7 +214,7 @@ public class RunEvaluationService {
      * 不変のスナップショットに保ち、比較対象が削除されても表示が壊れないようにするため。
      */
     private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline,
-                                 ActiveWaivers active, NormalizedInput input) {
+                                 NormalizedInput input) {
         Set<String> baselineFingerprints = baseline
                 .map(b -> Set.copyOf(findings.findActiveFingerprints(b.getId())))
                 .orElse(Set.of());
@@ -248,9 +233,7 @@ public class RunEvaluationService {
                 }
                 FindingState state = stateOf(moved ? previous : finding.fingerprint(), baselineFingerprints,
                         baseline.isPresent());
-                Finding entity = toEntity(run, finding, state);
-                active.waiverOf(finding).ifPresent(entity::applyWaiver);
-                findings.save(entity);
+                findings.save(toEntity(run, finding, state));
             }
         }
 
@@ -405,28 +388,23 @@ public class RunEvaluationService {
      *
      * <p>最新の Run より古い Run（過去の Run の再評価、遅れて届いた Run）では
      * 最新の判定を書き換えない。ダッシュボードが過去の状態に巻き戻って見えるため。
-     * 免除の件数だけは常に現在値に更新する。
      */
     private void updateSummary(Run run, List<MetricResult> results, Verdict verdict,
-                               Completeness completeness, Instant now, ActiveWaivers active) {
+                               Completeness completeness) {
         RepositorySummary summary = summaries.findById(run.getRepositoryId())
                 .orElseGet(() -> summaries.save(new RepositorySummary(run.getRepositoryId())));
-        int activeWaivers = (int) waivers.countEffective(run.getRepositoryId(), now);
-
         boolean isLatest = summary.getLatestMeasuredAt() == null
                 || !run.getMeasuredAt().isBefore(summary.getLatestMeasuredAt())
                 || run.getId().equals(summary.getLatestRunId());
         if (!isLatest) {
-            summary.updateWaiverCount(activeWaivers);
-            summaries.save(summary);
             return;
         }
 
-        long critical = countBySeverity(results, Severity.CRITICAL, active);
-        long high = countBySeverity(results, Severity.HIGH, active);
+        long critical = countBySeverity(results, Severity.CRITICAL);
+        long high = countBySeverity(results, Severity.HIGH);
 
         summary.update(run.getId(), verdict, completeness, run.getMeasuredAt(),
-                toJson(categoryStatusOf(results)), (int) critical, (int) high, activeWaivers);
+                toJson(categoryStatusOf(results)), (int) critical, (int) high);
         summaries.save(summary);
     }
 
@@ -472,14 +450,11 @@ public class RunEvaluationService {
      * アクセシビリティ違反（M-10）も同じ深刻度で保存するため、混ぜると
      * 未解決の脆弱性が増えたように見える。
      */
-    private static long countBySeverity(List<MetricResult> results, Severity severity,
-                                        ActiveWaivers active) {
-        // 免除中の違反は「未解決」に数えない。判定と同じ件数をダッシュボードに出す
+    private static long countBySeverity(List<MetricResult> results, Severity severity) {
         return results.stream()
                 .filter(r -> GateThresholds.M_VULNERABILITIES.equals(r.metricId()))
                 .flatMap(r -> r.findingsToPersist().stream())
                 .filter(f -> f.finding().severity() == severity)
-                .filter(f -> active.waiverOf(f).isEmpty())
                 .count();
     }
 

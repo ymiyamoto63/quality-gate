@@ -6,7 +6,6 @@ import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import RepositoryDetailView from '@/views/RepositoryDetailView.vue'
 import ConfigView from '@/views/ConfigView.vue'
-import WaiversView from '@/views/WaiversView.vue'
 import AdminRepositoriesView from '@/views/AdminRepositoriesView.vue'
 import AdminView from '@/views/AdminView.vue'
 import RunDetailView from '@/views/RunDetailView.vue'
@@ -57,12 +56,6 @@ const routes: RouteRecordRaw[] = [
     meta: { title: '違反一覧' },
   },
   { path: '/reports', name: 'reports', component: ReportView, meta: { title: '品質レポート' } },
-  {
-    path: '/waivers',
-    name: 'waivers',
-    component: WaiversView,
-    meta: { title: '免除管理' },
-  },
   {
     path: '/admin/repositories',
     name: 'admin-repositories',

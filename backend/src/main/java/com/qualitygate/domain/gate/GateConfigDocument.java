@@ -27,8 +27,7 @@ public record GateConfigDocument(
      *        申告は SKIP ではなく ERROR になる
      */
     public record Execution(
-            Set<String> skippableMetrics,
-            int fullMeasurementIntervalDays) {
+            Set<String> skippableMetrics) {
     }
 
     /**
@@ -90,7 +89,7 @@ public record GateConfigDocument(
         metrics.put("bundle_size", new MetricConfig(false, Map.of()));
 
         return new GateConfigDocument(1, "fail",
-                new Execution(Set.of("mutation_score", "performance"), 7),
+                new Execution(Set.of("mutation_score", "performance")),
                 List.of(), metrics);
     }
 }

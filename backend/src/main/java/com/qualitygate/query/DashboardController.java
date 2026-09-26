@@ -3,10 +3,7 @@ package com.qualitygate.query;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.metric.MetricCatalog;
-import com.qualitygate.domain.model.WaiverScope;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
-import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.query.dto.DashboardResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -15,10 +12,6 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.time.Clock;
-import java.time.Duration;
-import java.time.Instant;
-import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
@@ -30,18 +23,11 @@ public class DashboardController {
 
     private final MonitoredRepositoryRepository repositories;
     private final RepositorySummaryRepository summaries;
-    private final FreshnessPolicy freshness;
-    private final WaiverRepository waivers;
-    private final Clock clock;
 
     public DashboardController(MonitoredRepositoryRepository repositories,
-                               RepositorySummaryRepository summaries, FreshnessPolicy freshness,
-                               WaiverRepository waivers, Clock clock) {
-        this.clock = clock;
+                               RepositorySummaryRepository summaries) {
         this.repositories = repositories;
         this.summaries = summaries;
-        this.freshness = freshness;
-        this.waivers = waivers;
     }
 
     @GetMapping
@@ -49,48 +35,17 @@ public class DashboardController {
             description = "不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。")
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
-        Instant now = clock.instant();
-        List<DashboardResponse.Alert> alerts = new ArrayList<>();
-
         List<DashboardResponse.RepositoryCard> cards =
                 repositories.findByEnabledTrueOrderByOwnerAscNameAsc().stream()
-                        .map(repo -> toCard(repo, now, alerts))
+                        .map(this::toCard)
                         .sorted(Comparator.comparingInt(DashboardController::severityOrder))
                         .toList();
 
-        return new DashboardResponse(cards, alerts);
+        return new DashboardResponse(cards);
     }
 
-    private DashboardResponse.RepositoryCard toCard(MonitoredRepository repo, Instant now,
-                                                    List<DashboardResponse.Alert> alerts) {
+    private DashboardResponse.RepositoryCard toCard(MonitoredRepository repo) {
         Optional<RepositorySummary> summary = summaries.findById(repo.getId());
-
-        Instant lastMeasured = summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null);
-        Instant lastFull = summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null);
-
-        int intervalDays = freshness.fullIntervalDays(repo.getId());
-        boolean staleMeasurement = FreshnessPolicy.isStale(lastMeasured, now,
-                FreshnessPolicy.STALE_MEASUREMENT);
-        boolean staleFull = FreshnessPolicy.isStale(lastFull, now, Duration.ofDays(intervalDays));
-
-        if (staleMeasurement) {
-            alerts.add(new DashboardResponse.Alert("MEASUREMENT_STALE", repo.getId(),
-                    "%s の計測が %d 時間以上届いていません".formatted(repo.fullName(),
-                            FreshnessPolicy.STALE_MEASUREMENT.toHours())));
-        }
-        // 指標そのものの免除は、設定している間ずっと警告する（FR-10-6）。
-        // 指標全体を見ないことにしている状態を、日常の画面から消さない
-        waivers.findEffective(repo.getId(), now).stream()
-                .filter(w -> w.getScope() == WaiverScope.METRIC)
-                .forEach(w -> alerts.add(new DashboardResponse.Alert("METRIC_WAIVED", repo.getId(),
-                        "%s の %s（%s）は指標全体が免除されています（%s まで）".formatted(
-                                repo.fullName(), w.getMetricId(),
-                                MetricCatalog.of(w.getMetricId()).name(),
-                                w.getExpiresAt().atOffset(java.time.ZoneOffset.UTC).toLocalDate()))));
-        if (staleFull) {
-            alerts.add(new DashboardResponse.Alert("FULL_MEASUREMENT_STALE", repo.getId(),
-                    "%s の完全計測が %d 日以上行われていません".formatted(repo.fullName(), intervalDays)));
-        }
 
         DashboardResponse.LatestRun latestRun = summary
                 .filter(s -> s.getLatestRunId() != null)
@@ -102,8 +57,9 @@ public class DashboardController {
                 repo.getId(), repo.fullName(), latestRun,
                 summary.map(RepositorySummary::getOpenCriticalCount).orElse(0),
                 summary.map(RepositorySummary::getOpenHighCount).orElse(0),
-                summary.map(RepositorySummary::getActiveWaiverCount).orElse(0),
-                new DashboardResponse.Freshness(lastMeasured, lastFull, staleMeasurement, staleFull));
+                new DashboardResponse.Freshness(
+                        summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null),
+                        summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null)));
     }
 
     /** 不合格 → 注意 → 合格 → 未判定 の順に並べる。 */

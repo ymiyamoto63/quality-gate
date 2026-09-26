@@ -24,7 +24,6 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ GitHub ログイン名の利用者が既に登録されています"),
     ADMIN_REQUIRED(HttpStatus.CONFLICT, "管理者が 1 人以上必要です"),
     REPOSITORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じリポジトリが既に登録されています"),
-    WAIVER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ対象に有効な免除が既に存在します"),
     RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
     ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),
     ARTIFACT_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "成果物のサイズが上限を超えています"),
@@ -34,7 +33,6 @@ public enum ErrorCode {
     PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "性能計測のメタデータが不足しています"),
     MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "ミューテーションテストの実行範囲が指定されていません"),
     CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "設定ファイルの内容が不正です"),
-    WAIVER_EXPIRY_TOO_FAR(HttpStatus.UNPROCESSABLE_ENTITY, "免除の期限が上限を超えています"),
     GITHUB_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "GitHub API に接続できません"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 

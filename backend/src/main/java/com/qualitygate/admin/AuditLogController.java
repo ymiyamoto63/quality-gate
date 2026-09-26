@@ -56,7 +56,7 @@ public class AuditLogController {
             @Parameter(description = "省略時は現在時刻")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-            @Parameter(description = "操作種別（WAIVER_CREATED など）")
+            @Parameter(description = "操作種別（REPOSITORY_UPDATED など）")
             @RequestParam(required = false) String action,
             @RequestParam(required = false, defaultValue = "0") int limit,
             @RequestParam(required = false) String cursor) {

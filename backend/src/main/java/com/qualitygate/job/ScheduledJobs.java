@@ -11,7 +11,7 @@ import java.time.ZoneId;
 import java.util.Map;
 
 /**
- * 日次バッチの起動（docs/initial/05-architecture.md 4.2）。
+ * 日次バッチの起動（docs/initial/05-architecture.md 4.2）。保持期間の削除と、滞留した Run の後始末だけを行う。
  *
  * <p>ここではジョブを積むだけで、処理はジョブキューのワーカーが行う。
  * 鍵に日付を含めるため、プロセスを複数動かしても同じ日のジョブは 1 つにまとまる。
@@ -34,18 +34,6 @@ public class ScheduledJobs {
         this.zone = ZoneId.of(zone);
     }
 
-    @Scheduled(cron = "${quality-gate.schedule.daily-reevaluation:0 0 2 * * *}",
-            zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
-    public void dailyReevaluation() {
-        enqueue(JobType.DAILY_REEVALUATION);
-    }
-
-    @Scheduled(cron = "${quality-gate.schedule.expire-waivers:0 10 2 * * *}",
-            zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
-    public void expireWaivers() {
-        enqueue(JobType.EXPIRE_WAIVERS);
-    }
-
     @Scheduled(cron = "${quality-gate.schedule.cleanup-retention:0 0 3 * * *}",
             zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
     public void cleanupRetention() {
@@ -56,12 +44,6 @@ public class ScheduledJobs {
             zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
     public void abandonStaleRuns() {
         enqueue(JobType.ABANDON_STALE_RUNS);
-    }
-
-    @Scheduled(cron = "${quality-gate.schedule.check-freshness:0 0 9 * * *}",
-            zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
-    public void checkFreshness() {
-        enqueue(JobType.CHECK_FRESHNESS);
     }
 
     private void enqueue(JobType type) {

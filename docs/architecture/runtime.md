@@ -39,7 +39,7 @@ Vite の dev server は開発の利便性（HMR）のためのもので、本番
 Node.js を取得してフロントもビルドする）、JRE だけの実行イメージで起動します。
 DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` は `db` のヘルスチェックが
 通ってから起動します。`app` に渡る環境変数は `compose.yaml` に列挙したもの
-（DB 接続・成果物の保存先・GitHub App の認証情報・`QG_SMTP_HOST` / `QG_SMTP_PORT` / `QG_MAIL_FROM`）だけで、
+（DB 接続・成果物の保存先・GitHub App の認証情報・ログの形式）だけで、
 値はリポジトリ直下の `.env` から Docker Compose が変数展開して渡します。
 成果物は `./data/artifacts` にマウントされます。
 

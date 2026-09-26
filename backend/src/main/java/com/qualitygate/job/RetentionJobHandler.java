@@ -74,10 +74,6 @@ public class RetentionJobHandler implements JobHandler {
                 DELETE FROM runs WHERE id IN (
                     SELECT id FROM runs WHERE measured_at < ? ORDER BY measured_at LIMIT ?)
                 """, now.minus(Duration.ofDays(retention.runDays())));
-        int notifications = deleteInBatches("""
-                DELETE FROM notifications WHERE id IN (
-                    SELECT id FROM notifications WHERE sent_at < ? LIMIT ?)
-                """, now.minus(Duration.ofDays(retention.notificationDays())));
         int succeededJobs = 0;
         for (int round = 0; round < MAX_ROUNDS; round++) {
             Integer deleted = transactions.execute(status ->
@@ -90,8 +86,8 @@ public class RetentionJobHandler implements JobHandler {
         int orphans = deleteOrphanFiles(now.minus(ORPHAN_GRACE));
         int auditLogs = deleteAuditLogs(now.minus(Duration.ofDays(retention.auditLogDays())));
 
-        log.info("保持期間の削除が完了しました 成果物={} Run={} 通知={} ジョブ={} 孤児ファイル={} 監査ログ={}",
-                files, runs, notifications, succeededJobs, orphans, auditLogs);
+        log.info("保持期間の削除が完了しました 成果物={} Run={} ジョブ={} 孤児ファイル={} 監査ログ={}",
+                files, runs, succeededJobs, orphans, auditLogs);
     }
 
     /** 成果物のファイル実体を消し、メタデータには削除した事実を残す。 */

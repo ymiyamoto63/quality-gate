@@ -76,8 +76,6 @@ class RepositoryAdminApiIT {
                             .isEqualTo("backend/**");
                     // まだ Run が無い。0 件の判定を捏造しない
                     json.assertThat().extractingPath("$.latestRun").isNull();
-                    json.assertThat().extractingPath("$.freshness.fullMeasurementIntervalDays")
-                            .isEqualTo(7);
                 });
         assertThat(auditLogs.findAll()).extracting(l -> l.getAction())
                 .containsExactlyInAnyOrder("REPOSITORY_CREATED", "COMPONENT_DEFINED");

@@ -17,9 +17,7 @@ public record RetentionSettings(
         @NotNull @Min(1) @Max(3650)
         @Schema(description = "成果物のファイル実体。既定 90 日") Integer artifactDays,
         @NotNull @Min(365) @Max(3650)
-        @Schema(description = "監査ログ。既定 730 日。削除は管理ロールのバッチが行う") Integer auditLogDays,
-        @NotNull @Min(30) @Max(3650)
-        @Schema(description = "通知の送信履歴。既定 365 日") Integer notificationDays) {
+        @Schema(description = "監査ログ。既定 730 日。削除は管理ロールのバッチが行う") Integer auditLogDays) {
 
-    public static final RetentionSettings DEFAULTS = new RetentionSettings(730, 90, 730, 365);
+    public static final RetentionSettings DEFAULTS = new RetentionSettings(730, 90, 730);
 }

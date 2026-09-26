@@ -9,7 +9,6 @@ import { formatDateTime } from '@/api/format'
 type Schemas = components['schemas']
 type Repository = Schemas['RepositoryItem']
 type Token = Schemas['TokenSummary']
-type NotificationSettings = Schemas['NotificationSettingsResponse']
 
 const ui = useUiStore()
 
@@ -18,7 +17,6 @@ const errorMessage = ref<string | null>(null)
 const repositories = ref<Repository[]>([])
 const selected = ref<Repository | null>(null)
 const tokens = ref<Token[]>([])
-const notification = ref<NotificationSettings | null>(null)
 const announcement = ref('')
 
 // 登録フォーム
@@ -31,10 +29,6 @@ const createError = ref<string | null>(null)
 const componentName = ref('')
 const componentLanguage = ref('java')
 const componentPaths = ref('')
-
-// 通知設定
-const condition = ref<NotificationSettings['condition']>('TRANSITION')
-const recipients = ref('')
 
 // 発行したトークン（一度だけ表示する）
 const issuedToken = ref<string | null>(null)
@@ -77,17 +71,11 @@ async function create(): Promise<void> {
 async function select(repository: Repository | null): Promise<void> {
   selected.value = repository
   tokens.value = []
-  notification.value = null
   if (!repository) return
-  const path = { params: { path: { repositoryId: repository.repositoryId } } }
-  const [tokenList, settings] = await Promise.all([
-    api.GET('/api/v1/repositories/{repositoryId}/ingest-tokens', path),
-    api.GET('/api/v1/repositories/{repositoryId}/notification-settings', path),
-  ])
-  tokens.value = tokenList.data?.items ?? []
-  notification.value = settings.data ?? null
-  condition.value = settings.data?.condition ?? 'TRANSITION'
-  recipients.value = (settings.data?.emailRecipients ?? []).join('\n')
+  const { data } = await api.GET('/api/v1/repositories/{repositoryId}/ingest-tokens', {
+    params: { path: { repositoryId: repository.repositoryId } },
+  })
+  tokens.value = data?.items ?? []
 }
 
 async function toggleEnabled(repository: Repository): Promise<void> {
@@ -190,29 +178,6 @@ async function defineComponent(): Promise<void> {
   componentName.value = ''
   componentPaths.value = ''
 }
-
-async function saveNotification(): Promise<void> {
-  if (!selected.value) return
-  const { data, error } = await api.PUT(
-    '/api/v1/repositories/{repositoryId}/notification-settings',
-    {
-      params: { path: { repositoryId: selected.value.repositoryId } },
-      body: {
-        condition: condition.value,
-        emailRecipients: recipients.value
-          .split(/[\n,]/)
-          .map((r) => r.trim())
-          .filter(Boolean),
-      },
-    },
-  )
-  if (error) {
-    ui.notify('error', messageOf(error, '通知設定を保存できませんでした'))
-    return
-  }
-  notification.value = data
-  announcement.value = '通知設定を保存しました'
-}
 </script>
 
 <template>
@@ -275,7 +240,7 @@ async function saveNotification(): Promise<void> {
           <td data-label="状態">{{ repository.enabled ? '有効' : '無効' }}</td>
           <td data-label="操作" class="qg-actions">
             <button type="button" class="qg-button" @click="select(repository)">
-              トークン・通知を管理
+              トークン・コンポーネントを管理
             </button>
             <button type="button" class="qg-button" @click="toggleEnabled(repository)">
               {{ repository.enabled ? '無効化' : '有効化' }}
@@ -328,34 +293,6 @@ async function saveNotification(): Promise<void> {
             </tr>
           </tbody>
         </table>
-      </section>
-
-      <section class="qg-panel" aria-labelledby="notify-heading">
-        <h3 id="notify-heading">メール通知</h3>
-        <p v-if="notification && !notification.emailAvailable" class="qg-form__error">
-          サーバに SMTP が設定されていないため、メールは送られません（QG_SMTP_HOST）。
-        </p>
-        <form class="qg-form" @submit.prevent="saveNotification">
-          <label>
-            通知条件
-            <select v-model="condition">
-              <option value="TRANSITION">合格から不合格に変わったとき（既定）</option>
-              <option value="FAIL_ONLY">不合格のたび</option>
-              <option value="EVERY_RUN">判定のたび</option>
-              <option value="DISABLED">通知しない</option>
-            </select>
-          </label>
-          <label>
-            宛先（1 行に 1 件）
-            <textarea v-model="recipients" rows="3" autocomplete="off" />
-            <span class="qg-form__hint">
-              監視対象ブランチの判定、免除の期限接近、計測の途絶を知らせます
-            </span>
-          </label>
-          <div class="qg-form__actions">
-            <button type="submit" class="qg-button qg-button--primary">通知設定を保存</button>
-          </div>
-        </form>
       </section>
 
       <section class="qg-panel" aria-labelledby="components-heading">

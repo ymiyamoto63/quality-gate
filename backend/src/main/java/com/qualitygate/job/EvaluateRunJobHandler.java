@@ -41,7 +41,6 @@ public class EvaluateRunJobHandler implements JobHandler {
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
     private final ObjectMapper objectMapper;
-    private final JobEnqueuer enqueuer;
     private final MergeBaseResolver mergeBaseResolver;
     private final RenameResolver renameResolver;
 
@@ -49,10 +48,9 @@ public class EvaluateRunJobHandler implements JobHandler {
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
-                                 ObjectMapper objectMapper, JobEnqueuer enqueuer,
+                                 ObjectMapper objectMapper,
                                  MergeBaseResolver mergeBaseResolver, RenameResolver renameResolver) {
         this.renameResolver = renameResolver;
-        this.enqueuer = enqueuer;
         this.mergeBaseResolver = mergeBaseResolver;
         this.runs = runs;
         this.artifacts = artifacts;
@@ -108,14 +106,8 @@ public class EvaluateRunJobHandler implements JobHandler {
                 records.size(), input.metricsWithData(),
                 input.headFindings().size(), input.parseErrors().keySet());
 
-        Run evaluated = evaluationService.evaluate(runId, input, thresholds,
+        evaluationService.evaluate(runId, input, thresholds,
                 config.isDefault() ? null : config.gateConfig().getId());
-
-        // 通知は別のジョブにする。通知先の障害で判定が巻き戻らないように。
-        // 鍵に判定時刻を含め、再評価のたびに通知の要否を判断し直す
-        String evaluationKey = runId + ":" + evaluated.getEvaluatedAt().toEpochMilli();
-        enqueuer.enqueue(JobType.SEND_NOTIFICATION, evaluationKey,
-                java.util.Map.of("runId", runId.toString(), "evaluationKey", evaluationKey));
     }
 
     /**

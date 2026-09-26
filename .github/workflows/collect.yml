@@ -1,18 +1,13 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 起動のしかた:
-#   - 定期実行（段階 2）: 15 分ごとに、計測プロファイルで SCHEDULE=true にした対象の
-#     既定ブランチと PR の先頭のうち、未計測のコミットを探して計測する（collector/bin/detect.sh）
-#   - 手動実行: 対象とブランチ（またはコミット・PR）を指定して計測する。計測済みでも計測し直す
+# 起動は手動実行だけ（定期実行は D-22 で廃止）。対象とブランチ（またはコミット・PR）を指定して計測する。
 #
 # 1 コミットの計測は collect-target.yml（fetch → measure → submit）が行う。
 # 必要な設定は collect-target.yml の先頭を参照。
 name: collect
 
 on:
-  schedule:
-    - cron: '*/15 * * * *'
   workflow_dispatch:
     inputs:
       repository:
@@ -35,79 +30,15 @@ on:
 permissions:
   contents: read
 
-# 定期実行は 1 つずつ動かす。前回がまだ動いている間に次の回が来ても、待機は 1 つだけ残り、
-# 前回の計測済みの記録を見てから候補を選ぶため、同じコミットを二重に計測しない。
-# 手動実行は定期実行と独立させる（待機中の手動実行が定期実行に置き換えられないように）
-concurrency:
-  group: ${{ github.event_name == 'schedule' && 'collect-schedule' || format('collect-manual-{0}', github.run_id) }}
-  cancel-in-progress: false
-
 jobs:
-  plan:
-    runs-on: self-hosted
-    timeout-minutes: 5
-    outputs:
-      targets: ${{ steps.plan.outputs.targets }}
-      count: ${{ steps.plan.outputs.count }}
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-
-      # 定期実行では、App がインストールされている対象（この owner のもの）の先頭コミットと PR を読む
-      - name: 読み取り用トークンの発行
-        id: app-token
-        if: github.event_name == 'schedule' && vars.QG_COLLECTOR_APP_ID != ''
-        uses: actions/create-github-app-token@v2
-        with:
-          app-id: ${{ vars.QG_COLLECTOR_APP_ID }}
-          private-key: ${{ secrets.QG_COLLECTOR_APP_PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
-
-      - name: 計測する対象を決める
-        id: plan
-        env:
-          EVENT: ${{ github.event_name }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          QG_OWNER: ${{ github.repository_owner }}
-          QG_COLLECTOR_MAX_PER_RUN: ${{ vars.QG_COLLECTOR_MAX_PER_RUN || '5' }}
-          IN_REPOSITORY: ${{ inputs.repository }}
-          IN_BRANCH: ${{ inputs.branch }}
-          IN_COMMIT: ${{ inputs.commit }}
-          IN_PR: ${{ inputs.pull_request }}
-          IN_BASE_BRANCH: ${{ inputs.base_branch }}
-        run: |
-          if [ "$EVENT" = "schedule" ]; then
-            TARGETS=$(./collector/bin/detect.sh)
-          else
-            source collector/bin/lib.sh
-            load_profile "$IN_REPOSITORY"   # 計測プロファイルが無ければここで止める
-            TARGETS=$(jq -cn --arg r "$IN_REPOSITORY" --arg b "$IN_BRANCH" --arg c "$IN_COMMIT" \
-              --arg p "$IN_PR" --arg bb "$IN_BASE_BRANCH" \
-              '[{repository: $r, branch: $b, commit: $c, pull_request: $p, base_branch: $bb}]')
-          fi
-          # 画面に出す名前（例: like-chatgpt main@b581260 / like-chatgpt #14@c643edd）
-          TARGETS=$(jq -c 'map(. + {label: ((.repository | split("/")[1]) + " "
-            + (if .pull_request != "" then "#" + .pull_request else (if .branch != "" then .branch else "default" end) end)
-            + (if .commit != "" then "@" + .commit[0:7] else "" end))})' <<< "$TARGETS")
-          echo "計測する対象: $TARGETS"
-          echo "targets=$TARGETS" >> "$GITHUB_OUTPUT"
-          echo "count=$(jq length <<< "$TARGETS")" >> "$GITHUB_OUTPUT"
-
   collect:
-    needs: plan
-    if: needs.plan.outputs.count != '0'
-    name: ${{ matrix.target.label }}
-    strategy:
-      fail-fast: false
-      max-parallel: 1          # セルフホストランナーは 1 台。性能計測と重ねない（D-7）
-      matrix:
-        target: ${{ fromJSON(needs.plan.outputs.targets) }}
+    # 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14）
+    name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.branch || 'default' }}
     uses: ./.github/workflows/collect-target.yml
     with:
-      repository: ${{ matrix.target.repository }}
-      branch: ${{ matrix.target.branch }}
-      commit: ${{ matrix.target.commit }}
-      pull_request: ${{ matrix.target.pull_request }}
-      base_branch: ${{ matrix.target.base_branch }}
+      repository: ${{ inputs.repository }}
+      branch: ${{ inputs.branch }}
+      commit: ${{ inputs.commit }}
+      pull_request: ${{ inputs.pull_request }}
+      base_branch: ${{ inputs.base_branch }}
     secrets: inherit

@@ -11,15 +11,12 @@ import java.util.UUID;
  *
  * <p>空集合は「絞り込まない」を意味する。null と空集合を区別しないのは、
  * フィルタを全部外した状態と指定しない状態を画面上で区別できないためである。
- *
- * @param waived 免除中のみ（true）／免除でないもののみ（false）／両方（null）
  */
 public record FindingCriteria(
         UUID runId,
         Set<String> metricIds,
         Set<FindingState> states,
-        Set<Severity> severities,
-        Boolean waived) {
+        Set<Severity> severities) {
 
     public FindingCriteria {
         metricIds = metricIds == null ? Set.of() : Set.copyOf(metricIds);

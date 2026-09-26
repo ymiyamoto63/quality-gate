@@ -19,7 +19,7 @@ import java.util.UUID;
  * 本番では DB ロールからも UPDATE / DELETE を剥奪する（V006）。
  *
  * <p>{@code actorLogin} を非正規化して持つのは、利用者を削除しても
- * 「誰が免除を登録したか」が失われないようにするため。
+ * 「誰が操作したか」が失われないようにするため。
  */
 @Entity
 @Immutable

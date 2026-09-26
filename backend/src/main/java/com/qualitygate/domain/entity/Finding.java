@@ -64,9 +64,6 @@ public class Finding {
     @Column(columnDefinition = "jsonb")
     private String detail;
 
-    @Column(name = "waiver_id")
-    private UUID waiverId;
-
     protected Finding() {
     }
 
@@ -134,18 +131,5 @@ public class Finding {
 
     public String getDetail() {
         return detail;
-    }
-
-    public UUID getWaiverId() {
-        return waiverId;
-    }
-
-    /** 免除に紐づいた違反は判定の件数から除外されるが、行としては残す。 */
-    public void applyWaiver(UUID waiverId) {
-        this.waiverId = waiverId;
-    }
-
-    public boolean isWaived() {
-        return waiverId != null;
     }
 }

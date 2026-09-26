@@ -6,7 +6,6 @@ import trend from './fixtures/trend.json' with { type: 'json' }
 import repositoryDetail from './fixtures/repository-detail.json' with { type: 'json' }
 import runs from './fixtures/runs.json' with { type: 'json' }
 import configInvalid from './fixtures/config-invalid.json' with { type: 'json' }
-import waivers from './fixtures/waivers.json' with { type: 'json' }
 import repositories from './fixtures/repositories.json' with { type: 'json' }
 import users from './fixtures/users.json' with { type: 'json' }
 import report from './fixtures/report.json' with { type: 'json' }
@@ -32,7 +31,6 @@ const RESPONSES: [RegExp, unknown][] = [
   [/^\/api\/v1\/repositories\/[^/]+\/config$/, configInvalid],
   [/^\/api\/v1\/repositories\/[^/]+$/, repositoryDetail],
   [/^\/api\/v1\/repositories$/, repositories],
-  [/^\/api\/v1\/waivers$/, waivers],
   [/^\/api\/v1\/users$/, users],
   [/^\/api\/v1\/reports$/, report],
 ]
@@ -79,16 +77,6 @@ const PAGES: Target[] = [
     path: `/repositories/${REPOSITORY_ID}/config`,
     name: '設定（検証エラー）',
     expected: "'mutation_score' の誤り",
-  },
-  {
-    path: '/waivers',
-    name: '免除管理（登録ダイアログ）',
-    expected: '有効 1 件',
-    role: 'ADMIN',
-    prepare: async (page) => {
-      await page.getByRole('button', { name: '指標全体を免除…' }).click()
-      await expect(page.getByRole('dialog')).toBeVisible()
-    },
   },
   { path: '/admin/users', name: '利用者管理', expected: 'admin-user', role: 'ADMIN' },
   { path: '/admin/repositories', name: 'リポジトリ管理', expected: 'acme/web-app', role: 'ADMIN' },
