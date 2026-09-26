@@ -293,7 +293,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.SARIF, "broken.sarif", null, null, "{\"not\":\"sarif\"}");
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
 
-        Run evaluated = evaluate(run);
+        evaluate(run);
 
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getMetricId().equals("M-06"))

@@ -3,6 +3,8 @@
   収集ランナーが M-02（PIT）の実行に使うツール一式の取得用。ビルドはしない。
   collector/bin/measure.sh が dependency:build-classpath でクラスパスだけを得る。
   版は collector/versions.env から -D で渡す（対象リポジトリの PIT の設定は使わない）。
+  properties の値は IDE で依存を解決できるようにするための既定値で、実行時は -D の値で上書きされる。
+  pitest 系は collector/versions.env と、junit-platform は backend と同じ版にしておく。
 
   junit-platform-launcher は pitest-junit5-plugin が必要とするが、対象の依存には通常含まれない
   （surefire が実行時に補うため）。対象の JUnit Platform と同じ版を measure.sh が求めて渡す。
@@ -17,9 +19,9 @@
   <packaging>pom</packaging>
 
   <properties>
-    <pitest.version>REQUIRED</pitest.version>
-    <pitest-junit5.version>REQUIRED</pitest-junit5.version>
-    <junit-platform.version>REQUIRED</junit-platform.version>
+    <pitest.version>1.20.4</pitest.version>
+    <pitest-junit5.version>1.2.3</pitest-junit5.version>
+    <junit-platform.version>6.0.3</junit-platform.version>
   </properties>
 
   <dependencies>
