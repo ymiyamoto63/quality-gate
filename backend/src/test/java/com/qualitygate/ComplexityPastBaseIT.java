@@ -10,7 +10,6 @@ import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -175,7 +174,7 @@ class ComplexityPastBaseIT {
 
     private Measurement evaluate(String commit, String baseCommit, String file, Map<String, Integer> complexity,
                                  String renamedFiles) {
-        Run run = new Run(Uuid7.generate(), repositoryId, commit, "main", RunnerType.SELF_HOSTED, "it",
+        Run run = new Run(Uuid7.generate(), repositoryId, commit, "main", "it",
                 Instant.parse(baseCommit == null ? "2026-09-20T00:00:00Z" : "2026-09-21T00:00:00Z"), 1);
         run.setBaseCommitSha(baseCommit);
         run.setRenamedFiles(renamedFiles);

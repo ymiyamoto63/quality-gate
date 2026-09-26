@@ -261,7 +261,7 @@ class RepositoryAdminApiIT {
     private void evaluatedRun(String repositoryId, String sha, String measuredAt, java.util.UUID configId) {
         var run = new com.qualitygate.domain.entity.Run(Uuid7.generate(),
                 java.util.UUID.fromString(repositoryId), sha.repeat(40), "main",
-                com.qualitygate.domain.model.RunnerType.SELF_HOSTED, "collector",
+                "collector",
                 java.time.Instant.parse(measuredAt), 1);
         run.applyGateConfig(configId);
         run.markEvaluated(com.qualitygate.domain.model.Verdict.PASS,
@@ -280,7 +280,7 @@ class RepositoryAdminApiIT {
                 + "  mutation_scor:\n    threshold: 60\n";
         var run = new com.qualitygate.domain.entity.Run(Uuid7.generate(),
                 java.util.UUID.fromString(repositoryId), "c".repeat(40), "develop",
-                com.qualitygate.domain.model.RunnerType.SELF_HOSTED, "ci",
+                "ci",
                 java.time.Instant.parse("2026-09-22T00:00:00Z"), 1);
         run.markFailed("CONFIG_VALIDATION_FAILED", "設定の検証に失敗しました");
         runs.save(run);
@@ -326,7 +326,7 @@ class RepositoryAdminApiIT {
                 .content("""
                         {"repository": "acme/web-app",
                          "commitSha": "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0",
-                         "branch": "develop", "runnerType": "self-hosted",
+                         "branch": "develop",
                          "triggeredBy": "github-actions", "measuredAt": "2026-09-21T02:10:00Z"}
                         """)
                 .exchange();

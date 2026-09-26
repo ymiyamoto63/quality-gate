@@ -15,7 +15,6 @@ class GateConfigParserTest {
     void 指定した値を読み取り未指定は既定値で埋める() {
         GateConfigDocument document = parser.parse("""
                 version: 1
-                enforcement: report-only
                 metrics:
                   branch_coverage:
                     threshold: 80
@@ -109,9 +108,9 @@ class GateConfigParserTest {
 
     @Test
     void 列挙値の誤りは選択肢を示して拒否する() {
-        assertThatThrownBy(() -> parser.parse("version: 1\nenforcement: blocked\n"))
+        assertThatThrownBy(() -> parser.parse("version: 1\non_missing_report: skip\n"))
                 .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("blocking");
+                .hasMessageContaining("warn");
     }
 
     @Test
@@ -169,8 +168,8 @@ class GateConfigParserTest {
         // 後勝ちで黙らせると、消したはずの設定が効き続ける
         assertThatThrownBy(() -> parser.parse("""
                 version: 1
-                enforcement: report-only
-                enforcement: blocking
+                on_missing_report: fail
+                on_missing_report: warn
                 """))
                 .isInstanceOf(ConfigValidationException.class)
                 .hasMessageContaining("YAML として解析できません");
@@ -181,27 +180,6 @@ class GateConfigParserTest {
         assertThatThrownBy(() -> parser.parse("\n"))
                 .isInstanceOf(ConfigValidationException.class)
                 .hasMessageContaining("空です");
-    }
-
-    @Test
-    void 実際のquality_gate_ymlを読める() {
-        // リポジトリ直下の .quality-gate.yml が常に妥当であることを保証する
-        String yaml;
-        try {
-            yaml = java.nio.file.Files.readString(
-                    java.nio.file.Path.of("..", ".quality-gate.yml"));
-        } catch (java.io.IOException e) {
-            throw new AssertionError("リポジトリの .quality-gate.yml を読めません", e);
-        }
-
-        GateConfigDocument document = parser.parse(yaml);
-
-        assertThat(document.version()).isEqualTo(1);
-        assertThat(document.execution().skippableMetrics())
-                .containsExactly("mutation_score");
-        // quality-gate 自身の性能は計測しない（D-17）
-        assertThat(document.metrics().get("performance").enabled()).isFalse();
-        assertThat(document.exclusions()).isNotEmpty();
     }
 
     @Test

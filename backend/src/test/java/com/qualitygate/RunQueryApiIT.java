@@ -9,7 +9,6 @@ import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
@@ -531,7 +530,6 @@ class RunQueryApiIT {
                             .isEqualTo("2026-09-22T02:10:00Z");
                     // 列挙は名前のまま。画面は表示語彙をこの値から引く
                     json.extractingPath("$.verdict").isEqualTo("FAIL");
-                    json.extractingPath("$.runnerType").isEqualTo("self-hosted");
                     // 判定対象の値は文字列ではなく数値で返す
                     json.extractingPath("$.categories[0].metrics[0].value").asNumber()
                             .isEqualTo(90.0);
@@ -672,7 +670,7 @@ class RunQueryApiIT {
     private Run createRun(Instant measuredAt) {
         String commitSha = String.format("%040x", Math.abs(measuredAt.hashCode()));
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main",
-                RunnerType.SELF_HOSTED, "github-actions", measuredAt,
+                "github-actions", measuredAt,
                 runs.findMaxAttempt(repositoryId, commitSha) + 1);
         run.finalizeIngest();
         Run saved = runs.save(run);

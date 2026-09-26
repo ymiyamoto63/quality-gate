@@ -12,7 +12,6 @@ import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
@@ -212,31 +211,6 @@ class EvaluationPipelineIT {
         assertThat(summary.getCategoryStatus()).contains("セキュリティ").contains("FAIL");
     }
 
-    /**
-     * GitHub ホストランナーの性能値は計算資源を共有しているため判定に耐えない。
-     * 値は残すが参考値とし、合否に影響させず、部分計測として扱う。
-     */
-    @Test
-    void GitHubホストランナーで計測した性能値は参考値になる() {
-        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"), RunnerType.GITHUB_HOSTED);
-        attachAllMetrics(run);
-        attachPit(run, "changed");
-
-        Run evaluated = evaluate(run);
-
-        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
-        assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.PARTIAL);
-        assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-03"))
-                .singleElement()
-                .satisfies(m -> {
-                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.REFERENCE);
-                    assertThat(m.getValue()).isEqualByComparingTo("302");
-                    // 計測環境が系列を分ける軸になる
-                    assertThat(m.getVariant()).isEqualTo("perf-staging");
-                });
-    }
-
     @Test
     void 性能は同じ計測環境の前回値とだけ比べる() {
         Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
@@ -283,7 +257,7 @@ class EvaluationPipelineIT {
                   skippable_metrics: [cyclomatic_complexity]
                 """);
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07",
-                "GitHub ホストランナーのため実行しない"));
+                "PR の計測では実行しない"));
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
@@ -989,13 +963,9 @@ class EvaluationPipelineIT {
     }
 
     private Run createRun(Instant measuredAt) {
-        return createRun(measuredAt, RunnerType.SELF_HOSTED);
-    }
-
-    private Run createRun(Instant measuredAt, RunnerType runnerType) {
         int attempt = runs.findMaxAttempt(repositoryId, commitOf(measuredAt)) + 1;
         Run run = new Run(Uuid7.generate(), repositoryId, commitOf(measuredAt), "main",
-                runnerType, "github-actions", measuredAt, attempt);
+                "github-actions", measuredAt, attempt);
         run.finalizeIngest();
         Run saved = runs.save(run);
         attachPerformance(saved);

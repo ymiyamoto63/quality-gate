@@ -8,7 +8,6 @@ import com.qualitygate.domain.entity.RunSkippedMetric;
 import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -121,9 +120,9 @@ class TrendApiIT {
 
     @Test
     void カバレッジの推移を古い順に返す() {
-        evaluated(Instant.parse("2026-09-20T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 16);
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 19);
+        evaluated(Instant.parse("2026-09-20T00:00:00Z"), "main", 17);
+        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", 16);
+        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", 19);
 
         TrendResponse trend = trend("M-01");
 
@@ -150,7 +149,7 @@ class TrendApiIT {
      */
     @Test
     void 未計測は値なしの点として返す() {
-        evaluated(Instant.parse("2026-09-20T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
+        evaluated(Instant.parse("2026-09-20T00:00:00Z"), "main", 17);
         skipped(Instant.parse("2026-09-21T00:00:00Z"));
 
         TrendResponse trend = trend("M-01");
@@ -207,23 +206,10 @@ class TrendApiIT {
                 .containsExactly(0, 1);
     }
 
-    /**
-     * 環境に左右されない指標をランナー種別で割らない。
-     * 割ると、同じ条件で比較できる計測が無意味に 2 本の線になる。
-     */
-    @Test
-    void 環境に左右されない指標はランナー種別で分けない() {
-        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", RunnerType.GITHUB_HOSTED, 17);
-
-        assertThat(trend("M-01").series()).singleElement()
-                .satisfies(series -> assertThat(series.points()).hasSize(2));
-    }
-
     @Test
     void 別ブランチのRunは混ざらない() {
-        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "feature/x", RunnerType.SELF_HOSTED, 17);
+        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", 17);
+        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "feature/x", 17);
 
         assertThat(trend("M-01").series().getFirst().points()).hasSize(1);
         assertThat(trendOf("M-01", "feature/x").series().getFirst().points()).hasSize(1);
@@ -271,7 +257,7 @@ class TrendApiIT {
     /** 既定ブランチはリポジトリの設定に従う。画面が "main" を決め打ちしない。 */
     @Test
     void ブランチ省略時はリポジトリの既定ブランチを使う() {
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
+        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", 17);
 
         assertThat(trend("M-01").branch()).isEqualTo("main");
     }
@@ -282,9 +268,8 @@ class TrendApiIT {
      */
     @Test
     void 判定できていないRunは含めない() {
-        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        Run failed = createRun(Instant.parse("2026-09-22T00:00:00Z"), "main",
-                RunnerType.SELF_HOSTED);
+        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", 17);
+        Run failed = createRun(Instant.parse("2026-09-22T00:00:00Z"), "main");
         failed.markFailed("CONFIG_VALIDATION_FAILED", "設定が不正");
         runs.save(failed);
 
@@ -293,8 +278,8 @@ class TrendApiIT {
 
     @Test
     void 期間外のRunは含めない() {
-        evaluated(Instant.parse("2026-06-01T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
+        evaluated(Instant.parse("2026-06-01T00:00:00Z"), "main", 17);
+        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", 17);
 
         TrendResponse recent = trendService.trend(repositoryId, "M-01", "main",
                 Instant.parse("2026-09-01T00:00:00Z"), Instant.parse("2026-09-30T00:00:00Z"));
@@ -320,8 +305,8 @@ class TrendApiIT {
 
     @Test
     void しきい値が変わっていなければ変更なしとする() {
-        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 17);
-        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", RunnerType.SELF_HOSTED, 16);
+        evaluated(Instant.parse("2026-09-21T00:00:00Z"), "main", 17);
+        evaluated(Instant.parse("2026-09-22T00:00:00Z"), "main", 16);
 
         assertThat(trend("M-01").thresholdChanged()).isFalse();
     }
@@ -414,8 +399,8 @@ class TrendApiIT {
                 """.formatted(20 - covered, covered);
     }
 
-    private void evaluated(Instant measuredAt, String branch, RunnerType runnerType, int covered) {
-        Run run = createRun(measuredAt, branch, runnerType);
+    private void evaluated(Instant measuredAt, String branch, int covered) {
+        Run run = createRun(measuredAt, branch);
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco(covered));
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
@@ -423,7 +408,7 @@ class TrendApiIT {
     }
 
     private void evaluatedWithThreshold(Instant measuredAt, int threshold) {
-        Run run = createRun(measuredAt, "main", RunnerType.SELF_HOSTED);
+        Run run = createRun(measuredAt, "main");
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
@@ -444,7 +429,7 @@ class TrendApiIT {
     }
 
     private void twoComponents(Instant measuredAt, int covered) {
-        Run run = createRun(measuredAt, "main", RunnerType.SELF_HOSTED);
+        Run run = createRun(measuredAt, "main");
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco(covered));
         attach(run, ArtifactType.LCOV, "lcov.info", "frontend", """
                 TN:
@@ -463,7 +448,7 @@ class TrendApiIT {
      * 実行範囲を複数渡すと、範囲の違う成果物が混在した Run になる。
      */
     private void mutation(Instant measuredAt, int killed, String... scopes) {
-        Run run = createRun(measuredAt, "main", RunnerType.SELF_HOSTED);
+        Run run = createRun(measuredAt, "main");
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
@@ -494,7 +479,7 @@ class TrendApiIT {
     }
 
     private void skipped(Instant measuredAt) {
-        Run run = createRun(measuredAt, "main", RunnerType.GITHUB_HOSTED);
+        Run run = createRun(measuredAt, "main");
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 execution:
@@ -506,7 +491,7 @@ class TrendApiIT {
                     enabled: false
                 """);
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-01",
-                "GitHub ホストランナーのため実行しない"));
+                "PR の計測では実行しない"));
         evaluate(run);
     }
 
@@ -519,11 +504,11 @@ class TrendApiIT {
                 config.isDefault() ? null : config.gateConfig().getId());
     }
 
-    private Run createRun(Instant measuredAt, String branch, RunnerType runnerType) {
+    private Run createRun(Instant measuredAt, String branch) {
         String commitSha = String.format("%040x",
-                Math.abs((measuredAt.toString() + branch + runnerType).hashCode()));
+                Math.abs((measuredAt.toString() + branch).hashCode()));
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, branch,
-                runnerType, "github-actions", measuredAt,
+                "github-actions", measuredAt,
                 runs.findMaxAttempt(repositoryId, commitSha) + 1);
         run.finalizeIngest();
         return runs.save(run);

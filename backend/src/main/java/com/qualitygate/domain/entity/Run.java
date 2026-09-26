@@ -2,7 +2,6 @@ package com.qualitygate.domain.entity;
 
 import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Verdict;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -46,9 +45,6 @@ public class Run {
 
     @Column(nullable = false)
     private int attempt = 1;
-
-    @Column(name = "runner_type", nullable = false)
-    private RunnerType runnerType;
 
     @Column(name = "triggered_by", nullable = false)
     private String triggeredBy;
@@ -103,12 +99,11 @@ public class Run {
     }
 
     public Run(UUID id, UUID repositoryId, String commitSha, String branch,
-               RunnerType runnerType, String triggeredBy, Instant measuredAt, int attempt) {
+               String triggeredBy, Instant measuredAt, int attempt) {
         this.id = id;
         this.repositoryId = repositoryId;
         this.commitSha = commitSha;
         this.branch = branch;
-        this.runnerType = runnerType;
         this.triggeredBy = triggeredBy;
         this.measuredAt = measuredAt;
         this.attempt = attempt;
@@ -222,10 +217,6 @@ public class Run {
 
     public int getAttempt() {
         return attempt;
-    }
-
-    public RunnerType getRunnerType() {
-        return runnerType;
     }
 
     public String getCiRunUrl() {

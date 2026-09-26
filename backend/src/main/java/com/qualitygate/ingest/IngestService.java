@@ -94,7 +94,7 @@ public class IngestService {
         int attempt = runs.findMaxAttempt(repository.getId(), request.commitSha()) + 1;
 
         Run run = new Run(Uuid7.generate(), repository.getId(), request.commitSha(),
-                request.branch(), request.runnerType(), request.triggeredBy(),
+                request.branch(), request.triggeredBy(),
                 request.measuredAt(), attempt);
         run.setBaseCommitSha(request.baseCommitSha());
         run.setPullRequestNumber(request.pullRequestNumber());
@@ -102,8 +102,8 @@ public class IngestService {
         runs.save(run);
 
         recordSkippedMetrics(run.getId(), request.skippedMetricsOrEmpty());
-        log.info("Run を作成しました runId={} repository={} commit={} attempt={} runner={}",
-                run.getId(), request.repository(), request.commitSha(), attempt, request.runnerType());
+        log.info("Run を作成しました runId={} repository={} commit={} attempt={}",
+                run.getId(), request.repository(), request.commitSha(), attempt);
         return run;
     }
 

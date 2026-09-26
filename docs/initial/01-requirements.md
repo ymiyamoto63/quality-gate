@@ -14,6 +14,7 @@
 
 | 版 | 日付 | 内容 |
 | --- | --- | --- |
+| 1.4 | 2026-09-26 | 取り込み経路を収集ランナーに絞る（D-19）。対象の CI から送るための `quality-gate-action` と CLI、ランナー種別の切り替え（D-13）と `reference_only_environments`、Check Run の出力（`enforcement`）、収集ランナーが送らない成果物の形式（istanbul-json / gatling-log / osv-json / lizard-csv / pact-verification）を削除。FR-03-4 / FR-03-5 / FR-03-10 / FR-05-7 を廃止し、3.2 / 3.3 / 6.5 / 7.1 / 7.3 などを改訂 |
 | 1.3 | 2026-09-23 | 計測の実行場所を quality-gate 側の収集ランナーに変更（D-16。D-1 を改訂）。対象リポジトリに設定ファイル・ワークフロー・計測用の依存関係を置かずに計測する。1.3 / 1.4 / 2.1 / 2.3 / 5.2 / 7.1.1 / 7.3 / 12〜15 章を改訂し、3.2 を追加 |
 | 1.2 | 2026-09-23 | 通知チャネルをメールのみに変更（D-15）。FR-11-3 を改訂し、FR-11-4（PR コメント）を不採用とする |
 | 1.1 | 2026-09-21 | 技術スタックを確定（Maven / Java 25 LTS / SPA は Spring Boot 同梱の同一オリジン / openapi-typescript + openapi-fetch）。詳細を [04-tech-stack.md](04-tech-stack.md) に分離し、11 章を要約に改める。成果物ストレージを MinIO からローカルファイルシステムへ変更 |
@@ -43,10 +44,11 @@
 | D-10 | 対象リポジトリ | モノレポ 1 リポジトリ |
 | D-11 | 認証 | GitHub OAuth（個人アカウント / Free）。許可リストで入口を制御 |
 | D-12 | ロールと免除 | Phase 1 は Admin / Viewer の 2 ロール。免除は登録で即時有効、承認フローなし |
-| D-13 | ランナー種別 | セルフホスト / GitHub ホストを切り替え可能。GitHub ホスト時は PIT / k6 のスキップを選択でき、スキップは申告制 |
+| D-13 | ランナー種別 | ~~セルフホスト / GitHub ホストを切り替え可能~~（D-19 で廃止）。スキップの申告制は残す |
 | D-14 | 技術スタックの詳細 | Maven / Java 25 LTS / SPA は Spring Boot 同梱（同一オリジン）/ openapi-typescript + openapi-fetch。成果物はローカルファイルシステムに保存 |
 | D-15 | 通知チャネル | メールのみ（Slack と PR コメントは不採用） |
 | D-16 | 計測の実行場所 | quality-gate 側の収集ランナーが対象リポジトリを取得・計測して送る。対象リポジトリには何も置かない（3.2） |
+| D-19 | 取り込み経路 | 収集ランナーに絞る。対象の CI から送るための補助（action / CLI）、ランナー種別の切り替え、Check Run の出力を削除する |
 
 ### 残る未決事項
 
@@ -147,7 +149,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 
 ### 2.3 スコープ外（将来検討）
 
-- PR の必須チェック化によるマージブロック（enforcement モード）
+- PR の必須チェック化によるマージブロック
 - 複数組織を収容するマルチテナント / 課金
 - GitHub 以外のホスティング（GitLab、Bitbucket）対応
 - 手動アクセシビリティ検査結果の取り込み
@@ -224,7 +226,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 
 3.1 の理由のうち「quality-gate 側に Docker やビルドツールチェーンを持ち込まない」はバックエンドについては保たれるが、
 収集ランナーのマシンには必要になる。そのため収集ランナーは性能計測と同じ専有のセルフホストランナーで直列に動かす（D-7）。
-対象の CI から Ingest API へ送る 3.1 の方式も引き続き受け付ける。
+v1.4 で取り込み経路を収集ランナーに絞り、対象の CI から送るための補助（`quality-gate-action` / CLI）を削除した（D-19）。
 
 移行は指標ごとに段階的に行う。進め方と現状は [収集ランナー方式](../architecture/collector-runner.md) を参照。
 
@@ -237,17 +239,14 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 段階的に次の順で強度を上げる想定とする。
 
 1. **Phase 1（本要件の範囲）** — 計測・可視化・通知のみ。合否は「情報」として提示
-2. **Phase 2** — GitHub Check Run を `neutral` で出力し、PR 上でも合否が見える状態にする（`enforcement: check-run`。実装済み）
+2. **Phase 2** — GitHub Check Run を出力し、PR 上でも合否が見える状態にする
 3. **Phase 3（スコープ外）** — 必須チェック化し、不合格でマージ不可にする
 
-判定ロジックと合否そのものは Phase 1 から本番同等に動かす。Phase 3 で追加されるのは
-「ブロックするかどうか」の一点だけであり、そのための設定項目
-（`enforcement: report-only | check-run | blocking`）は Phase 1 から持つ。
+判定ロジックと合否そのものは Phase 1 から本番同等に動かす。
 
-`check-run` / `blocking` の Run は、判定の後に別のジョブで Check Run（名前は `quality-gate`）を出す。
-`check-run` は合否に関わらず `neutral`、`blocking` は合格を `success`・不合格を `failure` にする。
-`blocking` でも quality-gate 自身はマージを止めない。止めるかどうかは、対象リポジトリのブランチ保護で
-`quality-gate` を必須チェックにするかで決まる（Phase 3。GitHub Free の private リポジトリでは使えない。Q-14）。
+Phase 2 の Check Run の出力（設定の `enforcement: check-run | blocking`）は一度実装したが、
+使っている対象が無く（`report-only` のみ）、D-4 の方針ではマージを止めないため、v1.4 で削除した（D-19）。
+必要になった時点で、判定の後に別のジョブで出す形で足し直す。
 
 ---
 
@@ -321,14 +320,14 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 | FR-03-1 | Ingest API で Run を開始し、複数の成果物ファイルを添付し、確定（finalize）できる | 必須 |
 | FR-03-2 | Run には コミット SHA、ブランチ、PR 番号、実行者、CI 実行 URL、計測日時を必須メタデータとして付与する | 必須 |
 | FR-03-3 | 性能計測の成果物には 計測環境（ランナー種別、CPU/メモリ、対象環境名、データ量）を必須メタデータとして付与する | 必須 |
-| FR-03-4 | GitHub Actions 用の composite action（`quality-gate-action`）と、ランナー種別を切り替えられるワークフローのサンプル（7.1.1）を提供する。v1.3 で計測は収集ランナー（3.2）が行うことにしたため、対象の CI から送る場合の補助に位置づけを改める | 推奨 |
-| FR-03-5 | CLI（単一バイナリ / jar）を提供し、Actions 以外の CI からも送信できる | 推奨 |
+| FR-03-4 | ~~GitHub Actions 用の composite action（`quality-gate-action`）と、ランナー種別を切り替えられるワークフローのサンプル（7.1.1）を提供する~~（v1.4 で廃止。D-19） | — |
+| FR-03-5 | ~~CLI（単一バイナリ / jar）を提供し、Actions 以外の CI からも送信できる~~（v1.4 で廃止。D-19） | — |
 | FR-03-11 | 収集ランナー（3.2）を提供する。対象リポジトリを変更せずに、既定ブランチと PR の先頭コミットを定期的に取得・計測して Ingest API に送る | 必須 |
 | FR-03-6 | 同一コミット SHA に対する再送信は、既存 Run を上書きせず新しい試行として記録する | 必須 |
 | FR-03-7 | 取り込み失敗（形式不正、サイズ超過、トークン不正）は理由を構造化して返し、CI 側のログで原因が分かる | 必須 |
 | FR-03-8 | 1 ファイルあたり 50MB、1 Run あたり 200MB を上限とし、超過時は明示的にエラーとする | 必須 |
 | FR-03-9 | Run 作成時に、CI が実行しなかった指標を `skippedMetrics`（指標 ID と理由）として申告できる | 必須 |
-| FR-03-10 | Run 作成時に、実行したランナー種別（`self-hosted` / `github-hosted`）を必須メタデータとして受け取る | 必須 |
+| FR-03-10 | ~~Run 作成時に、実行したランナー種別（`self-hosted` / `github-hosted`）を必須メタデータとして受け取る~~（v1.4 で廃止。D-19） | — |
 
 ### 5.3 正規化と判定
 
@@ -343,7 +342,7 @@ quality-gate は、指定したリポジトリについて以下を実現する�
 | FR-05-4 | 「新規関数」「差分カバレッジ」のようにベースとの比較を要する指標のため、比較基準（merge-base のコミット SHA）を Run に記録する | 必須 |
 | FR-05-5 | 手動またはスケジュールで再評価を実行でき、成果物を再送信せずに最新のしきい値・脆弱性情報で判定し直せる | 必須 |
 | FR-05-6 | 申告されたスキップは `SKIP` とし、`execution.skippable_metrics` に含まれない指標のスキップ申告は `ERROR` とする | 必須 |
-| FR-05-7 | `execution.reference_only_environments` に該当する環境で計測された指標は `REFERENCE` とし、値は保持するが判定には用いない | 必須 |
+| FR-05-7 | ~~`execution.reference_only_environments` に該当する環境で計測された指標は `REFERENCE` とし、値は保持するが判定には用いない~~（v1.4 で廃止。D-19） | — |
 | FR-05-8 | `SKIP` / `REFERENCE` を含む Run を**部分計測**として記録し、完全計測と区別する（6.3.1） | 必須 |
 
 ### 5.4 可視化
@@ -427,14 +426,14 @@ Phase 1 では承認フローを設けず、Admin が登録した時点で免除
 
 | ID | カテゴリ | 指標 | 合格ライン | 主な入力 |
 | --- | --- | --- | --- | --- |
-| M-01 | 機能テスト | ブランチカバレッジ | 75% 以上（backend / frontend 各々） | JaCoCo XML、Vitest lcov/istanbul |
+| M-01 | 機能テスト | ブランチカバレッジ | 75% 以上（backend / frontend 各々） | JaCoCo XML、Vitest lcov |
 | M-02 | 機能テスト | ミューテーションスコア | 60% 以上（**backend のみ**） | PIT XML |
 | M-03 | 性能テスト | 応答時間 p95 | 500ms 以内 | k6 summary JSON |
 | M-04 | 性能テスト | スループット | 到達率 50 req/s を**負荷条件として固定**（6.5 / [M-03](02-metrics-spec.md) 参照） | k6 summary JSON |
 | M-05 | 性能テスト | エラー率（副指標） | 0.1% 以下 | k6 summary JSON |
 | M-06 | セキュリティ | 重大・高 脆弱性件数 | 0 件 | SARIF（Trivy / Dependency-Check / Semgrep / gitleaks） |
-| M-07 | コード構造 | 循環的複雑度 15 超の新規関数数 | 0 件 | PMD / ESLint / lizard |
-| M-08 | 契約・互換性 | API 契約テスト成功率 | 100% | JUnit XML、Pact verification JSON |
+| M-07 | コード構造 | 循環的複雑度 15 超の新規関数数 | 0 件 | PMD / ESLint |
+| M-08 | 契約・互換性 | API 契約テスト成功率 | 100% | JUnit XML |
 | M-09 | 契約・互換性 | OpenAPI 破壊的変更件数（副指標） | 0 件 | oasdiff JSON |
 | M-10 | 使いやすさ | アクセシビリティ重大違反件数 | 0 件（impact: critical / serious） | axe-core JSON |
 | M-11 | 機能テスト | テスト成功率（追加。既定は無効） | 100% | JUnit XML（すべてのテスト） |
@@ -453,7 +452,7 @@ Phase 1 では承認フローを設けず、Admin が登録した時点で免除
 | WARN | 合格ラインは満たすが、注意水準（既定: 合格ラインから 5% 以内、または前回比で悪化）に該当 |
 | FAIL | 実測値が合格ラインを満たさない |
 | SKIP | 計測していない。次のいずれか。(a) 設定で `enabled: false` としている (b) CI が**スキップを申告**した（6.5） |
-| REFERENCE | 値は取得したが、計測条件が統制外のため**判定に用いない**（参考値）。性能指標を GitHub ホストランナーで計測した場合など |
+| REFERENCE | 値は取得したが**判定に用いない**（参考値）。参考値の指標（M-15〜M-17）と、指標単位で免除した指標 |
 | ERROR | 提出されるはずの成果物が未提出、または形式不正で値を確定できない |
 | NOT_APPLICABLE | ツールの制約により、そのコンポーネントでは**測りようがない**（対象外）。M-02 の frontend（PIT は JVM 専用）など |
 
@@ -521,7 +520,6 @@ CI は Run 作成時に、実行しなかった指標を `skippedMetrics` とし
 
 ```yaml
 version: 1
-enforcement: report-only          # report-only | check-run | blocking（Phase 3）
 on_missing_report: fail           # fail | warn（期限付き緩和時のみ warn）
 
 execution:
@@ -529,8 +527,6 @@ execution:
   skippable_metrics: [mutation_score, performance]
   # 完全計測がこの日数を超えて行われない場合に警告する
   full_measurement_interval_days: 7
-  # この環境で計測された性能値は参考値（REFERENCE）とし、判定に用いない
-  reference_only_environments: [github-hosted]
 
 components:
   - name: backend
@@ -612,20 +608,19 @@ Run 開始時の必須メタデータ:
   "baseCommitSha": "9f8e7d6c5b4a...",
   "branch": "feature/order-api",
   "pullRequestNumber": 1234,
-  "triggeredBy": "github-actions",
-  "ciRunUrl": "https://github.com/example-org/example-app/actions/runs/123456",
+  "triggeredBy": "collector",
+  "ciRunUrl": "https://github.com/example-org/quality-gate/actions/runs/123456",
   "measuredAt": "2026-09-21T02:10:00Z",
-  "runnerType": "github-hosted",
   "skippedMetrics": [
-    { "metricId": "M-02", "reason": "GitHub ホストランナーのため PIT を実行しない" },
-    { "metricId": "M-03", "reason": "GitHub ホストランナーのため k6 を実行しない" },
-    { "metricId": "M-04", "reason": "GitHub ホストランナーのため k6 を実行しない" },
-    { "metricId": "M-05", "reason": "GitHub ホストランナーのため k6 を実行しない" }
+    { "metricId": "M-02", "reason": "PR の計測では PIT を実行しない" },
+    { "metricId": "M-03", "reason": "PR の計測では k6 を実行しない" },
+    { "metricId": "M-04", "reason": "PR の計測では k6 を実行しない" },
+    { "metricId": "M-05", "reason": "PR の計測では k6 を実行しない" }
   ]
 }
 ```
 
-`runnerType` は必須。`skippedMetrics` は省略可能で、省略時は「すべての指標を計測した」
+`skippedMetrics` は省略可能で、省略時は「すべての指標を計測した」
 ことを意味する。申告された指標が `execution.skippable_metrics` に含まれない場合、
 その指標は `SKIP` ではなく `ERROR` となる（FR-05-6）。
 
@@ -646,75 +641,14 @@ Run 開始時の必須メタデータ:
 }
 ```
 
-#### 7.1.1 GitHub Actions ワークフローの構成
+#### 7.1.1 GitHub Actions ワークフローの構成（v1.4 で廃止。D-19）
 
-> v1.3 以降、対象リポジトリの計測は収集ランナー（3.2）が行う。本節は対象の CI から直接送る場合の構成である。
-> 収集ランナーは常にセルフホストランナーで動くため、ここで述べる切り替えの対象外とする（D-13）。
+対象の CI から直接送るためのサンプルワークフロー（ランナー種別と PIT / k6 の実行可否の切り替え）は、
+取り込み経路を収集ランナー（3.2）に絞ったため廃止した。収集ランナーは既定ブランチでだけ PIT と k6 を実行し、
+PR などの計測では `skippedMetrics` を申告して送る。
 
-ランナー種別と、重いジョブ（PIT / k6）の実行可否を**ワークフロー側で切り替えられる**構成とする。
-提供するサンプルワークフローは次の形を取る。
-
-```yaml
-# .github/workflows/quality-gate.yml
-on:
-  push:
-    branches: [main]
-  pull_request:
-  workflow_dispatch:
-    inputs:
-      runner:
-        description: 実行するランナー
-        type: choice
-        options: [self-hosted, ubuntu-latest]
-        default: self-hosted
-      run_heavy_jobs:
-        description: GitHub ホストランナーでも PIT / k6 を実行する
-        type: boolean
-        default: false
-
-env:
-  # 定期実行・PR では リポジトリ変数 QG_RUNNER を既定値として使う
-  RUNNER: ${{ inputs.runner || vars.QG_RUNNER || 'self-hosted' }}
-  RUN_HEAVY: ${{ inputs.run_heavy_jobs || vars.QG_RUN_HEAVY_ON_GITHUB || 'false' }}
-
-jobs:
-  # 軽量ジョブ: 常に実行する
-  base:
-    runs-on: ${{ needs.setup.outputs.runner }}
-    # ビルド、JUnit、Vitest、JaCoCo、Trivy、Semgrep、gitleaks、PMD、ESLint、
-    # 契約テスト、axe-core
-
-  # 重量ジョブ: ランナー種別と設定で実行可否が決まる
-  mutation:
-    # セルフホストなら常に実行。GitHub ホストなら RUN_HEAVY が true のときだけ
-    if: env.RUNNER == 'self-hosted' || env.RUN_HEAVY == 'true'
-    runs-on: ${{ env.RUNNER }}
-    # PIT
-
-  performance:
-    if: env.RUNNER == 'self-hosted' || env.RUN_HEAVY == 'true'
-    runs-on: ${{ env.RUNNER }}
-    # k6
-
-  submit:
-    needs: [base, mutation, performance]
-    if: always()
-    # 実行されなかったジョブに対応する指標を skippedMetrics として申告したうえで送信
-```
-
-切り替えの手段は 2 通りとする。
-
-| 手段 | 用途 |
-| --- | --- |
-| リポジトリ変数（`QG_RUNNER`、`QG_RUN_HEAVY_ON_GITHUB`） | 常用の既定値。セルフホストランナーが停止している期間などに変更する |
-| `workflow_dispatch` の入力 | その回限りの上書き。手動で一度だけ全量を回したい場合など |
-
-quality-gate 自身はこの構成で計測しない（D-18）。自身の Pull Request では `.github/workflows/ci.yml` が
+quality-gate 自身は計測しない（D-18）。自身の Pull Request では `.github/workflows/ci.yml` が
 ユニットテスト・結合テスト・生成物の同期検証・アクセシビリティ検査・脆弱性スキャンを GitHub ホストランナーで実行する。
-
-**重要**: `submit` ジョブは `if: always()` とし、重量ジョブが実行されなかった場合でも
-**必ず実行して `skippedMetrics` を申告する**こと。送信自体を行わないと、
-quality-gate から見れば Run が存在せず、スキップと計測失敗の区別がつかない。
 
 ### 7.2 参照 API（UI / 外部 → quality-gate）
 
@@ -736,9 +670,9 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | 収集ランナーによる PR の一覧取得（3.2） | GitHub App の Pull requests: Read | 読み取りのみ |
 | `baseCommitSha` の解決（merge-base） | 収集ランナーが clone した履歴から算出して渡す。省略された Run はバックエンドが判定ジョブの中で GitHub API により求める（Contents / Pull requests: Read） | 読み取りのみ |
 | ~~PR サマリコメント（FR-11-4）~~ | —（v1.2 で不採用。D-15） | — |
-| Check Run 出力（Phase 2） | GitHub App の Checks: Read and write。`enforcement: check-run` / `blocking` のときだけ使い、トークンは Checks の書き込みだけに絞って発行する | 書き込み（Checks のみ） |
+| ~~Check Run 出力（Phase 2）~~ | —（v1.4 で削除。D-19） | — |
 
-GitHub App の権限は上記に限定する。Checks 以外の書き込み権限とワークフローの起動権限は付与しない。
+GitHub App の権限は上記に限定する。書き込み権限とワークフローの起動権限は付与しない。
 App の秘密鍵は quality-gate リポジトリの Actions Secrets に置き、収集ランナーの取得ジョブだけが使う（バックエンドには置かない）。
 
 GitHub App の登録・インストールは**個人アカウント（GitHub Free）で追加費用なく可能**である。
@@ -940,7 +874,7 @@ quality-gate/
 | C-7 | 単一テナント（社内専用）構成。インターネット公開は行わない |
 | C-8 | GitHub は個人アカウント（Free）を使用する。Organization を持たないため、ログイン可否は quality-gate 内の許可リストで制御する（FR-13-4） |
 | C-9 | プライベートリポジトリの GitHub Actions は月 2,000 分の無料枠。重いジョブ（PIT、k6）は既定でセルフホストランナーで実行し、無料枠を消費しない構成とする。ランナー種別と重量ジョブの実行可否はワークフローで切り替えられる（7.1.1） |
-| C-10 | GitHub ホストランナーでの性能計測は計測条件が統制できないため、値は取得しても**判定には用いない**（`REFERENCE`）。性能指標の合否判定には専有ランナーでの計測が必要 |
+| C-10 | 性能の合否判定には計測条件を統制できる専有ランナーでの計測が必要。性能は専有のセルフホストランナーで動く収集ランナーだけが計測する（D-19） |
 | C-11 | GitHub Free ではプライベートリポジトリの保護ブランチが利用できない。将来マージブロック（Phase 4）へ進む場合は GitHub Pro 以上への変更が必要（[03](03-open-questions.md) Q-14） |
 | C-12 | 本フェーズではマージブロックを行わない。不合格の是正は運用ルールに依存する |
 | C-13 | SPA は Spring Boot に同梱して同一オリジンで配信する。フロントエンドのみを独立してデプロイすることはしない |
@@ -965,7 +899,7 @@ quality-gate/
 | R-8 | 許可リストの設定漏れにより、意図しない GitHub ユーザーがログインできてしまう | 情報漏洩 | 既定を「拒否」とし、許可リストに存在しないユーザーは認証成功後も一律拒否する。追加操作は監査ログに記録する |
 | R-9 | GitHub Actions の無料枠（月 2,000 分）を超過し、計測が止まる | 計測の途絶 | 重いジョブを既定でセルフホストランナーへ寄せる。加えて、48 時間計測が途絶えた場合にダッシュボードへ警告を出す（FR-06-2）ことで、無料枠切れに気づける |
 | R-10 | 重量ジョブのスキップが常態化し、M-02 と M-03〜05 が事実上廃止される | 指標の形骸化 | スキップを申告制とし、部分計測を完全計測と区別して表示する。完全計測が 7 日途絶えたら警告・通知する（FR-06-3）。スキップ可能な指標は設定で限定する（6.4） |
-| R-11 | セルフホストランナーの停止に気づかず、計測が止まる | 計測の途絶 | ランナー種別をリポジトリ変数で切り替えられるようにし、停止時は GitHub ホストへ退避できる。退避中は部分計測として可視化される |
+| R-11 | セルフホストランナーの停止に気づかず、計測が止まる | 計測の途絶 | 計測途絶の検知（FR-06-3）で通知する。停止中は計測されず、ダッシュボードに鮮度の警告が出る |
 | R-12 | frontend のミューテーションスコアを計測しないため、Vue 側のテストの実効性が検証されない | フロント側のテスト品質が見えない | frontend は M-01 ブランチカバレッジで担保し、必要に応じて Phase 4 で Stryker の導入を検討する |
 | R-13 | 「新規関数」の同定がリファクタリング（移動・リネーム）で誤検知する | 開発者の不信 | git の rename 検出を用い、誤検知を免除ではなく判定ロジックの修正で潰す（M-07） |
 | R-14 | 収集ランナー（3.2）がセルフホストランナーでしか動かないため、ランナーの停止中は計測が止まる | 計測の途絶 | 計測途絶の警告（FR-06-2）で気づけるようにする。未計測の先頭コミットは復旧後の定期実行で計測される |
@@ -996,7 +930,7 @@ quality-gate/
 ### Phase 3 — 性能指標と運用強化
 
 - 指標: **M-03・M-04・M-05 性能**（専有計測環境は確保済み。実装順の都合で本フェーズに配置しており、前倒しは可能）
-- GitHub Check Run 出力（`enforcement: check-run`）
+- ~~GitHub Check Run 出力（`enforcement: check-run`）~~（v1.4 で削除。D-19）
 - FR-08-4（レポート出力）、FR-02-5（しきい値変更の影響シミュレーション）
 
 ### Phase 4 — スコープ外（将来）
@@ -1024,9 +958,9 @@ quality-gate/
 | A-7 | ~~quality-gate 自身を quality-gate で計測し、性能（M-03〜05）を除く全指標が合格する~~ 取り下げ（D-18）。自身の Pull Request の CI（`ci.yml`）が成功する |
 | A-8 | quality-gate の主要 9 画面について、axe-core の critical / serious 違反が 0 件である |
 | A-9 | 監査対象操作がすべて監査ログに記録され、Admin が検索・確認できる |
-| A-10 | GitHub ホストランナーで PIT / k6 をスキップして送信した Run が、ERROR ではなく `SKIP` として記録され、部分計測と表示される |
+| A-10 | PIT / k6 をスキップして送信した Run（収集ランナーの PR の計測）が、ERROR ではなく `SKIP` として記録され、部分計測と表示される |
 | A-11 | `execution.skippable_metrics` に含まれない指標のスキップを申告すると `ERROR` となり、Run が FAIL になる |
-| A-12 | GitHub ホストランナーで計測した性能値が `REFERENCE` として記録され、判定に影響せず、トレンド上で専有ランナーの系列と分離される |
+| A-12 | ~~GitHub ホストランナーで計測した性能値が `REFERENCE` として記録され、判定に影響せず、トレンド上で専有ランナーの系列と分離される~~（v1.4 で廃止。D-19） |
 | A-13 | 完全計測が 7 日間行われない状態で、ダッシュボードに警告が表示され通知が送られる |
 
 ---

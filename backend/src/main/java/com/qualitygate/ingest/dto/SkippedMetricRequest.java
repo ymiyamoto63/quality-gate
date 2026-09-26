@@ -13,7 +13,7 @@ public record SkippedMetricRequest(
         String metricId,
 
         @Schema(description = "なぜ計測しなかったか。Run 詳細にそのまま表示される",
-                example = "GitHub ホストランナーのため PIT を実行しない")
+                example = "PR の計測では PIT を実行しない")
         @NotBlank
         String reason) {
 }

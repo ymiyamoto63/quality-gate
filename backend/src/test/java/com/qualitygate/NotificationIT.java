@@ -8,7 +8,6 @@ import com.qualitygate.domain.entity.Waiver;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.JobStatus;
 import com.qualitygate.domain.model.JobType;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.WaiverReasonCategory;
@@ -219,7 +218,7 @@ class NotificationIT {
     private Run evaluate(String branch, Integer pullRequest, String sarif) {
         Instant measuredAt = Instant.now().minus(Duration.ofHours(10)).plusSeconds(commit);
         Run run = new Run(Uuid7.generate(), repositoryId, "%040x".formatted(++commit), branch,
-                RunnerType.SELF_HOSTED, "github-actions", measuredAt, 1);
+                "github-actions", measuredAt, 1);
         run.setPullRequestNumber(pullRequest);
         run.finalizeIngest();
         runs.save(run);

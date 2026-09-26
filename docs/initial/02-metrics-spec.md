@@ -25,7 +25,7 @@
 | WARN | 合格ラインは満たすが注意水準に該当（指標ごとに定義） |
 | FAIL | 実測値が合格ラインを満たさない |
 | SKIP | 計測対象外。`enabled: false` による設定上の除外、または CI からのスキップ申告 |
-| REFERENCE | 値は取得したが、計測条件が統制外のため判定に用いない（参考値） |
+| REFERENCE | 値は取得したが判定に用いない（参考値）。参考値の指標（M-15〜M-17）と、指標単位で免除した指標 |
 | ERROR | 提出されるはずの成果物が未提出 / 形式不正 / 必須メタデータ欠落で値を確定できない |
 
 `ERROR` は既定で Run 全体を FAIL にする（fail-closed）。
@@ -131,18 +131,13 @@ fingerprint にファイルパスを含むのは M-07 だけなので、対象�
 | 指標 | ツール | フォーマット | `artifacts.type` |
 | --- | --- | --- | --- |
 | M-01 | JaCoCo | XML レポート | `jacoco-xml` |
-| M-01 | Vitest (v8 / istanbul) | lcov.info | `lcov` |
-| M-01 | Vitest (istanbul) | coverage-final.json | `istanbul-json` |
+| M-01 | Vitest (v8) | lcov.info | `lcov` |
 | M-02 | PIT (pitest) | mutations.xml | `pit-xml` |
 | M-03/04/05 | k6 | summary export JSON | `k6-summary` |
-| M-03/04/05 | Gatling | simulation.log | `gatling-log` |
 | M-06 | Trivy / Semgrep / gitleaks / Dependency-Check | SARIF 2.1.0 | `sarif` |
-| M-06 | OSV-Scanner | osv JSON | `osv-json` |
 | M-07 | PMD | XML | `pmd-xml` |
 | M-07 | ESLint | JSON | `eslint-json` |
-| M-07 | lizard | CSV / XML | `lizard-csv` |
 | M-08 | JUnit (surefire / failsafe / Vitest junit reporter) | JUnit XML | `junit-xml` |
-| M-08 | Pact | verification result JSON | `pact-verification` |
 | M-09 | oasdiff | breaking changes JSON | `oasdiff-json` |
 | M-10 | axe-core (@axe-core/playwright) | axe results JSON | `axe-json` |
 | M-11/12 | JUnit (surefire / failsafe / Vitest junit reporter) | JUnit XML | `test-junit-xml` |
@@ -155,20 +150,16 @@ fingerprint にファイルパスを含むのは M-07 だけなので、対象�
 
 SARIF 2.1.0 を静的解析系の第一形式とする。SARIF で出せるツールは SARIF で提出する。
 これによりアダプタ実装が 1 本に集約でき、ツールの差し替えコストが下がる。
-ただし `sarif` は M-06 にだけ使う。複雑度を報告するツール（PMD / ESLint / lizard）の SARIF は、
+ただし `sarif` は M-06 にだけ使う。複雑度を報告するツール（PMD / ESLint など）の SARIF は、
 M-06 の件数に混入させないため読み飛ばす。
 
-上の形式はすべてアダプタを実装済みである。形式ごとの読み方の要点:
+上の形式はすべてアダプタを実装済みである。収集ランナーが送らない形式（istanbul-json / gatling-log / osv-json /
+lizard-csv / pact-verification）のアダプタは D-19 で削除した。形式ごとの読み方の要点:
 
 | `type` | 読み方 |
 | --- | --- |
-| `istanbul-json` | 各ファイルの `b`（分岐 ID → 経路ごとの実行回数）の経路を 1 本ずつ数え、1 回以上実行された経路を「実行された分岐」とする（lcov の BRF / BRH と同じ数え方） |
-| `gatling-log` | **テキスト形式**の simulation.log の `REQUEST` 行から、応答時間（終了 − 開始）の p95（最近順位法）、到達率（件数 ÷ 最初の開始から最後の終了まで）、失敗率（`KO` の割合）を求める。グループ名をシナリオ名とする。`environment.warmupSeconds` があれば最初のリクエストからその秒数の間に始まったリクエストを除く。Gatling 3.8 以降の既定のバイナリ形式は読めない（理由つきで ERROR） |
-| `osv-json` | `osv-scanner --format json` の出力。パッケージごとに `groups`（同じ脆弱性の別名の束）を 1 件とする。深刻度は `groups[].max_severity`（CVSS）、無ければ `database_specific.severity` の表記。ルール ID は CVE があれば CVE（Trivy の SARIF と名寄せが揃う） |
 | `eslint-json` | `eslint -f json` の出力のうち `complexity` ルールの報告だけを読む。全関数の CC を得るため、ルールは上限 0（`["error", 0]`）で動かす。関数名の無い関数はファイル内の出現順で区別する。収集ランナーは対象の ESLint の設定を使わず、quality-gate 側で版を固定した設定（`collector/complexity`）で head と base の両方を解析する |
 | `test-junit-xml` | `junit-xml` と同じ形式・同じ数え方（`<testcase>` を 1 件ずつ数え直す）。供給する指標だけが違い、M-11 / M-12 になる。契約テスト（M-08）と型を分けるのは、単体テストの結果を契約テストの成功率に混ぜないため |
-| `lizard-csv` | `lizard --csv` の出力（関数ごとに 1 行）。関数の同定子は引数まで含む `long_name` |
-| `pact-verification` | Pact Broker に送る検証結果（`testResults[]`）か、pact-jvm の JSON レポート（`execution[].interactions[]`）。インタラクション 1 件を契約テスト 1 件と数える |
 
 ---
 
@@ -197,8 +188,7 @@ M-06 の件数に混入させないため読み飛ばす。
 集計はレポートのルート `<report>` 直下の BRANCH counter を用いる。
 `exclusions` 適用時は、除外対象クラスの counter を差し引いてから再計算する。
 
-**TypeScript / Vue（Vitest）** — `lcov.info` の `BRF`（found）/ `BRH`（hit）、
-または `coverage-final.json`（istanbul）の `b` / `branchMap`。
+**TypeScript / Vue（Vitest）** — `lcov.info` の `BRF`（found）/ `BRH`（hit）。
 
 > Vitest の coverage provider は `v8` と `istanbul` で分岐の数え方が異なる。
 > 同一リポジトリ内で provider を統一すること。provider は計測メタデータとして提出し、
@@ -298,10 +288,9 @@ frontend（Vue 3 / TypeScript）のミューテーションスコアは計測し
 | `MEMORY_ERROR` / `RUN_ERROR` | 分母から除外 |
 | `NON_VIABLE` | 分母から除外（生成されたミューテーションがコンパイル不能） |
 
-### ランナー種別の影響
+### ランナーの影響
 
-PIT の結果はマシン性能に概ね依存しないため、セルフホストランナーと
-GitHub ホストランナーのどちらで実行しても**同じ基準で判定する**。
+PIT の結果はマシン性能に概ね依存しないため、どのランナーで実行しても**同じ基準で判定する**。
 
 ただし 1 点だけ注意がある。遅いランナーでは `TIMED_OUT` となるミューテーションが増え、
 計算式上これは `Killed` 側に加算されるため、**スコアが実態より高く出る**。
@@ -427,22 +416,18 @@ PIT の HTML レポートで確認する。
 これらは Ingest API の `environment` メタデータ（要件定義書 7.1 「Ingest API」）として提出する。
 欠落した場合は ERROR とする。
 
-### ランナー種別の影響（重要）
+### 実行環境（重要）
 
 上記の統制項目のうち「実行環境」は、性能指標にとって決定的である。
-GitHub ホストランナーは他の利用者と計算資源を共有しており、
-実行ごとに性能が変動するため、**絶対値しきい値（p95 500ms）による判定に耐えない**。
+計算資源を共有するランナー（GitHub ホストランナーなど）は実行ごとに性能が変動するため、
+**絶対値しきい値（p95 500ms）による判定に耐えない**。性能は専有のセルフホストランナーで動く
+収集ランナーだけが計測する（D-7 / D-16）。
 
-| ランナー | 扱い |
-| --- | --- |
-| セルフホスト（専有） | 通常どおり判定する（`PASS` / `WARN` / `FAIL`） |
-| GitHub ホスト | 値は記録するが**判定には用いない**（`REFERENCE` = 参考値） |
+計測環境の名前（`environment.name`）ごとにトレンドの系列を分け、別の環境の値と同じ線で結ばない。
+混ぜると、環境差による変動がアプリケーションの性能変化に見えてしまうためである。
 
-GitHub ホストランナーで計測した値は、判定系列とは別のトレンド系列に描画し、
-専有ランナーの値と同じ線で結ばない。両者を混ぜると、環境差による変動が
-アプリケーションの性能変化に見えてしまうためである。
-
-この扱いは `.quality-gate.yml` の `execution.reference_only_environments` で制御する。
+> 当初は GitHub ホストランナーでの計測値を参考値（`REFERENCE`）とする仕組み
+> （`execution.reference_only_environments`）を持っていたが、計測を収集ランナーに絞ったため削除した（D-19）。
 
 ### しきい値
 
@@ -481,7 +466,6 @@ WARN を付与する。この状態では p95 が実態より楽観的に出る�
 | --- | --- |
 | `environment` メタデータの欠落 | ERROR |
 | CI がスキップを申告した | `SKIP`（ERROR にはしない） |
-| GitHub ホストランナーでの計測 | `REFERENCE`（値は記録するが判定しない） |
 | 3 回実行のうち 1 回でも異常終了 | ERROR（部分的な結果で判定しない） |
 | 3 回の p95 の変動係数が 20% を超える | WARN を付与（計測環境が不安定である旨を明示） |
 | エラー率が 5% を超える | 性能値を判定に用いず ERROR（負荷試験自体が成立していない） |
@@ -498,9 +482,6 @@ quality-gate は同じコンポーネント・同じ計測環境に届いた値�
 `422 PERFORMANCE_METADATA_MISSING`。名前は計測条件（`variant`）として値に添え、
 前回比は同じ環境の値とだけ取り、トレンドも環境ごとに別系列にする。名前が変われば比較値は出ない。
 これが「計測環境の構成が前回から変化」の扱いになる（構成を変えたら環境名も変える運用とする）。
-
-**Gatling（`gatling-log`）も同じ扱いにする。** 1 ファイル = 1 回の実行で、`environment.name` が必須。
-ウォームアップは `environment.warmupSeconds` で除く。
 
 **ウォームアップの除外は k6 側のタグで行う。** 計測区間のリクエストに `phase: measure` のタグを付け、
 `http_req_duration{phase:measure}` などにしきい値を定義して部分指標を出力させる。
@@ -519,9 +500,7 @@ quality-gate は同じコンポーネント・同じ計測環境に届いた値�
 
 1. エラー率（中央値）が 5% 超 → 3 指標とも ERROR（値は持たせない）
 2. M-03: 設定の `scenarios` のうち summary に無いシナリオがある → ERROR
-3. 統制外の環境で計測 → REFERENCE。`execution.reference_only_environments` にはランナー種別
-   （`github-hosted`）と計測環境の名前のどちらも書ける
-4. しきい値による判定
+3. しきい値による判定
    - M-03: 全体またはいずれかのシナリオが `p95_ms` 超で FAIL。3 回の変動係数が 20% 超、
      または全体・シナリオが注意水準（`p95_ms` の 80%）超で WARN
    - M-04: FAIL は出さない。到達率の 95% 未満で WARN
@@ -662,7 +641,7 @@ CC が高い関数はテストが困難で、欠陥が混入しやすい。
 > `switch` の各 `case` を数えるか等）。**同一リポジトリでは同一ツールを使い続ける**こと。
 > ツールを変更した場合はトレンド上で系列を分ける。
 
-M-07 として読めるのは PMD の XML（`pmd-xml`）、ESLint の JSON（`eslint-json`）、lizard の CSV（`lizard-csv`）である。
+M-07 として読めるのは PMD の XML（`pmd-xml`）と ESLint の JSON（`eslint-json`）である。
 ESLint は SARIF ではなく JSON（`eslint -f json`）で送る（`sarif` の複雑度は M-06 に混ぜないため読み飛ばす）。
 
 **収集ランナーのフロントエンド。** 収集ランナーは backend（PMD）に加えて frontend も ESLint で解析する。
@@ -785,8 +764,7 @@ OpenAPI 定義（springdoc が生成）を単一の真実とし、
 出力を受け付ける。ルートは `<testsuites>` でも `<testsuite>` でもよく、同じ Run に複数送ってよい。
 **どのテストが契約テストかは、CI がどのレポートを送るかで決まる。** quality-gate は単体テストと
 契約テストを見分けない。単体テスト全体のレポートを送ると、M-08 は単体テストの成功率になる。
-`pact-verification` は Pact の provider verification の結果 JSON を読み、インタラクション 1 件を 1 件と数える
-（`junit-xml` と同じ式で成功率を出す）。Pact の provider verification を JUnit 5 で動かして `junit-xml` として送ってもよい。
+Pact の provider verification を使う場合は、JUnit 5 で動かして `junit-xml` として送る。
 
 **テストの数え方。** `<testsuite>` の `tests` / `failures` 属性は使わず、`<testcase>` を 1 件ずつ数え直す。
 属性の数え方（スキップを含むか、再実行をどう数えるか）がツールごとに揃わないためである。

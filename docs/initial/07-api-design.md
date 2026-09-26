@@ -57,7 +57,7 @@ Ingest API は Cookie を用いないため CSRF の対象外とし、当該パ�
   "timestamp": "2026-09-21T02:10:05Z",
   "traceId": "3f8a1c...",
   "violations": [
-    { "field": "runnerType", "message": "self-hosted / github-hosted のいずれかを指定してください" }
+    { "field": "commitSha", "message": "40 桁の 16 進数で指定してください" }
   ]
 }
 ```
@@ -193,13 +193,12 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
   "baseCommitSha": "9f8e7d6c5b4a39281706f5e4d3c2b1a09f8e7d6c",
   "branch": "feature/order-api",
   "pullRequestNumber": 1234,
-  "runnerType": "github-hosted",
-  "triggeredBy": "github-actions",
+  "triggeredBy": "collector",
   "ciRunUrl": "https://github.com/ymiyamoto63/quality-gate/actions/runs/123456",
   "measuredAt": "2026-09-21T02:10:00Z",
   "skippedMetrics": [
-    { "metricId": "M-02", "reason": "GitHub ホストランナーのため PIT を実行しない" },
-    { "metricId": "M-03", "reason": "GitHub ホストランナーのため k6 を実行しない" }
+    { "metricId": "M-02", "reason": "PR の計測では PIT を実行しない" },
+    { "metricId": "M-03", "reason": "PR の計測では k6 を実行しない" }
   ]
 }
 ```
@@ -211,7 +210,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `baseCommitSha` | | 省略時は quality-gate が判定ジョブの中で GitHub API により求めて記録する（PR はマージ先との merge-base、既定ブランチは直前のコミット、それ以外は既定ブランチとの merge-base）。求められなければ未指定のまま判定する（`QG_GITHUB_*`、[設定値](../operations/configuration.md)） |
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
-| `runnerType` | ○ | `self-hosted` / `github-hosted` |
 | `measuredAt` | ○ | |
 | `skippedMetrics` | | 省略時は「全指標を計測した」とみなす |
 
@@ -354,7 +352,6 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
   "baselineRunId": "018f8b02-...",
   "branch": "main",
   "pullRequestNumber": null,
-  "runnerType": "github-hosted",
   "status": "EVALUATED",
   "verdict": "FAIL",
   "completeness": "PARTIAL",
@@ -386,7 +383,7 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
           "component": "backend",
           "status": "SKIP",
           "value": null,
-          "skipReason": "GitHub ホストランナーのため PIT を実行しない",
+          "skipReason": "PR の計測では PIT を実行しない",
           "skipAccepted": true
         }
       ]
@@ -466,27 +463,21 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
   "threshold": { "operator": "<=", "value": 500 },
   "series": [
     {
-      "seriesId": "self-hosted/perf-staging",
-      "label": "専有ランナー（perf-staging）",
+      "seriesId": "all/perf-staging",
+      "label": "perf-staging",
       "judged": true,
       "points": [
         { "runId": "018f...", "measuredAt": "2026-09-14T02:11:00Z", "value": 412.5, "status": "PASS" },
         { "runId": "018f...", "measuredAt": "2026-09-16T02:11:00Z", "value": null,  "status": "SKIP" },
         { "runId": "018f...", "measuredAt": "2026-09-18T02:11:00Z", "value": 468.1, "status": "WARN" }
       ]
-    },
-    {
-      "seriesId": "github-hosted",
-      "label": "GitHub ホストランナー（参考値）",
-      "judged": false,
-      "points": [ ... ]
     }
   ]
 }
 ```
 
 - **計測環境ごとに系列を分ける**（FR-08-2）。系列の分割はサーバが行う
-- `judged: false` の系列は参考値であり、画面では破線で描く（FR-08-6）
+- `judged: false` の系列（全点が参考値）は、画面では破線で描く（FR-08-6）
 - スキップした点は `value: null` として返す。**0 を返さない**。
   0 を返すと、グラフ上で「性能が極めて良い」ように見えてしまう
 
@@ -497,11 +488,10 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
 | 軸 | 適用 |
 | --- | --- |
 | コンポーネント | 常に分ける。backend と frontend のカバレッジを 1 本の線にしても意味がない |
-| 計測環境（ランナー種別） | 値が環境に左右される指標（性能）でのみ分ける。カバレッジまで割ると、同じ条件の計測が無意味に 2 本になる |
-| 計測条件（`variant`） | 値に計測条件が添えられている場合に分ける。M-02 の実行範囲（変更範囲 / 全量）。範囲が切り替わるたびに品質が乱高下して見えるのを防ぐ |
+| 計測条件（`variant`） | 値に計測条件が添えられている場合に分ける。M-02 の実行範囲（変更範囲 / 全量）と、性能の計測環境（`environment.name`）。範囲や環境が切り替わるたびに品質が乱高下して見えるのを防ぐ |
 
-計測環境で分けるかどうかは指標の性質であり、`MetricCatalog` に持たせている。
-系列名は「backend（変更範囲）」「backend（全量・専有ランナー）」のように条件を括弧内に並べる。
+ランナー種別（self-hosted / github-hosted）の軸は、計測を収集ランナーに絞ったため削除した（D-19）。
+系列名は「backend（変更範囲）」のように条件を括弧内に並べる。
 
 **計測条件を持たない点は、同じコンポーネントの条件つき系列に配る。** 成果物の未提出などに
 よる計測エラーは実行範囲が分からない。これを別系列にすると、下のコンポーネントを持たない点と
@@ -835,7 +825,7 @@ CI の不具合で同じジョブが無限に再実行されるような事故�
 - 枠はプロセスのメモリに持つ（単一ホストでの運用が前提。Q-10）。再起動すると枠は戻る
 - 上限は `quality-gate.rate-limit.*`、無効にするなら `QG_RATE_LIMIT_ENABLED=false`。
   超過の回数はメトリクス `qg.rate_limit.rejected`（`category` タグ）で数える
-- CLI（`qg-submit`）は 429 を受けると `Retry-After` に従って 3 回まで再試行する（curl の `--retry`）
+- 収集ランナー（`collector/bin/submit.sh`）は 429 を受けると `Retry-After` に従って 3 回まで再試行する（curl の `--retry`）
 
 ---
 

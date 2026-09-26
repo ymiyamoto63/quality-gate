@@ -96,7 +96,7 @@ class ObservabilityIT {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "ymiyamoto63/quality-gate",
                         "commitSha", "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "branch", "main",
-                        "runnerType", "self-hosted", "triggeredBy", "it", "measuredAt", "2026-09-24T00:00:00Z"))
+                        "triggeredBy", "it", "measuredAt", "2026-09-24T00:00:00Z"))
                 .retrieve().toEntity(Map.class);
         String runId = (String) run.getBody().get("runId");
         client.post().uri("/api/v1/runs/" + runId + "/finalize")

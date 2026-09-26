@@ -131,14 +131,6 @@ public class EvaluateRunJobHandler implements JobHandler {
         String evaluationKey = runId + ":" + evaluated.getEvaluatedAt().toEpochMilli();
         enqueuer.enqueue(JobType.SEND_NOTIFICATION, evaluationKey,
                 java.util.Map.of("runId", runId.toString(), "evaluationKey", evaluationKey));
-
-        // PR 上で合否を見えるようにする（Phase 2。enforcement: check-run / blocking）。
-        // 判定とは別のジョブにし、GitHub の障害で判定が巻き戻らないようにする
-        String enforcement = config.document().enforcement();
-        if ("check-run".equals(enforcement) || "blocking".equals(enforcement)) {
-            enqueuer.enqueue(JobType.PUBLISH_CHECK_RUN, evaluationKey,
-                    java.util.Map.of("runId", runId.toString(), "enforcement", enforcement));
-        }
     }
 
     /**

@@ -1,7 +1,6 @@
 package com.qualitygate.domain.entity;
 
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.RunnerType;
 import jakarta.persistence.AttributeConverter;
 import jakarta.persistence.Converter;
 
@@ -14,19 +13,6 @@ import jakarta.persistence.Converter;
 public final class EnumConverters {
 
     private EnumConverters() {
-    }
-
-    @Converter(autoApply = true)
-    public static class RunnerTypeConverter implements AttributeConverter<RunnerType, String> {
-        @Override
-        public String convertToDatabaseColumn(RunnerType attribute) {
-            return attribute == null ? null : attribute.wire();
-        }
-
-        @Override
-        public RunnerType convertToEntityAttribute(String dbData) {
-            return dbData == null ? null : RunnerType.fromWire(dbData);
-        }
     }
 
     @Converter(autoApply = true)

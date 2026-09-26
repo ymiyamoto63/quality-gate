@@ -11,5 +11,4 @@ dev server は起動していなければ自動で立ち上がります（起動
 Pull Request の CI（`ci.yml` の `accessibility` ジョブ）でも実行し、critical / serious の違反があれば失敗させます。
 
 axe-core の結果はリポジトリ直下の `reports/axe-results.json` に書き出されます（CI では失敗したときに成果物として残す）。同じ場所の `playwright-results.json` はテストレポートで、
-axe の結果ではありません。検査する画面を足したら `.quality-gate.yml` の
-`accessibility.pages` にも足してください。
+axe の結果ではありません。

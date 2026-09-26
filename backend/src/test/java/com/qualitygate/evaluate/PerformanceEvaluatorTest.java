@@ -2,7 +2,6 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.report.PerformanceSample;
 import com.qualitygate.domain.report.RawMeasurement;
 import com.qualitygate.platform.id.Uuid7;
@@ -27,8 +26,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void 三回の中央値で判定する() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED,
-                sample("300", 50, 0, "300"), sample("350", 50, 0, "300"),
+        MetricResult result = p95(sample("300", 50, 0, "300"), sample("350", 50, 0, "300"),
                 sample("900", 50, 0, "300"));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);  // 変動が大きい
@@ -39,8 +37,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void 安定して合格ライン以内なら合格() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED,
-                sample("300", 50, 0, "250"), sample("310", 50, 0, "250"),
+        MetricResult result = p95(sample("300", 50, 0, "250"), sample("310", 50, 0, "250"),
                 sample("305", 50, 0, "250"));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
@@ -50,8 +47,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void シナリオ単位で合格ラインを超えれば不合格() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED,
-                sample("300", 50, 0, "600"), sample("300", 50, 0, "610"),
+        MetricResult result = p95(sample("300", 50, 0, "600"), sample("300", 50, 0, "610"),
                 sample("300", 50, 0, "620"));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
@@ -60,8 +56,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void 注意水準を超えれば注意() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED,
-                sample("450", 50, 0, "100"), sample("450", 50, 0, "100"),
+        MetricResult result = p95(sample("450", 50, 0, "100"), sample("450", 50, 0, "100"),
                 sample("450", 50, 0, "100"));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
@@ -70,7 +65,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void 設定したシナリオが無ければERROR() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED, sample("300", 50, 0, null));
+        MetricResult result = p95(sample("300", 50, 0, null));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(result.value()).isNull();
@@ -78,18 +73,8 @@ class PerformanceEvaluatorTest {
     }
 
     @Test
-    void GitHubホストランナーの値は参考値() {
-        MetricResult result = p95(RunnerType.GITHUB_HOSTED,
-                sample("900", 50, 0, "900"), sample("900", 50, 0, "900"),
-                sample("900", 50, 0, "900"));
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.REFERENCE);
-        assertThat(result.value()).isEqualByComparingTo("900");
-    }
-
-    @Test
-    void エラー率が5パーセントを超えれば参考値でもERROR() {
-        MetricResult result = p95(RunnerType.GITHUB_HOSTED,
+    void エラー率が5パーセントを超えればERROR() {
+        MetricResult result = p95(
                 sample("300", 50, 600, "300"), sample("300", 50, 600, "300"),
                 sample("300", 50, 600, "300"));
 
@@ -99,7 +84,7 @@ class PerformanceEvaluatorTest {
 
     @Test
     void 実行回数が足りなければ合格ではなく注意() {
-        MetricResult result = p95(RunnerType.SELF_HOSTED, sample("300", 50, 0, "300"));
+        MetricResult result = p95(sample("300", 50, 0, "300"));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
         assertThat(result.reason()).contains("実行回数が 1 回");
@@ -107,14 +92,11 @@ class PerformanceEvaluatorTest {
 
     @Test
     void エラー率は合格ラインの半分を超えると注意() {
-        MetricResult pass = evaluate(new ErrorRateEvaluator(), RunnerType.SELF_HOSTED,
-                sample("300", 50, 5, "300"), sample("300", 50, 5, "300"),
+        MetricResult pass = evaluate(new ErrorRateEvaluator(), sample("300", 50, 5, "300"), sample("300", 50, 5, "300"),
                 sample("300", 50, 5, "300"));
-        MetricResult warn = evaluate(new ErrorRateEvaluator(), RunnerType.SELF_HOSTED,
-                sample("300", 50, 8, "300"), sample("300", 50, 8, "300"),
+        MetricResult warn = evaluate(new ErrorRateEvaluator(), sample("300", 50, 8, "300"), sample("300", 50, 8, "300"),
                 sample("300", 50, 8, "300"));
-        MetricResult fail = evaluate(new ErrorRateEvaluator(), RunnerType.SELF_HOSTED,
-                sample("300", 50, 20, "300"), sample("300", 50, 20, "300"),
+        MetricResult fail = evaluate(new ErrorRateEvaluator(), sample("300", 50, 20, "300"), sample("300", 50, 20, "300"),
                 sample("300", 50, 20, "300"));
 
         // 10,000 件中 5 件 = 0.05%、8 件 = 0.08%、20 件 = 0.2%
@@ -125,11 +107,9 @@ class PerformanceEvaluatorTest {
 
     @Test
     void スループットは不合格にせず到達率の95パーセント未満で注意() {
-        MetricResult ok = evaluate(new ThroughputEvaluator(), RunnerType.SELF_HOSTED,
-                sample("300", 50, 0, "300"), sample("300", 49, 0, "300"),
+        MetricResult ok = evaluate(new ThroughputEvaluator(), sample("300", 50, 0, "300"), sample("300", 49, 0, "300"),
                 sample("300", 50, 0, "300"));
-        MetricResult slow = evaluate(new ThroughputEvaluator(), RunnerType.SELF_HOSTED,
-                sample("300", 30, 0, "300"), sample("300", 30, 0, "300"),
+        MetricResult slow = evaluate(new ThroughputEvaluator(), sample("300", 30, 0, "300"), sample("300", 30, 0, "300"),
                 sample("300", 30, 0, "300"));
 
         assertThat(ok.status()).isEqualTo(MeasurementStatus.PASS);
@@ -137,12 +117,11 @@ class PerformanceEvaluatorTest {
         assertThat(slow.threshold()).containsEntry("arrivalRateRps", new BigDecimal("50"));
     }
 
-    private static MetricResult p95(RunnerType runner, PerformanceSample... samples) {
-        return evaluate(new ResponseTimeEvaluator(), runner, samples);
+    private static MetricResult p95(PerformanceSample... samples) {
+        return evaluate(new ResponseTimeEvaluator(), samples);
     }
 
-    private static MetricResult evaluate(PerformanceEvaluator evaluator, RunnerType runner,
-                                         PerformanceSample... samples) {
+    private static MetricResult evaluate(PerformanceEvaluator evaluator, PerformanceSample... samples) {
         List<RawMeasurement> measurements = new ArrayList<>();
         for (PerformanceSample sample : samples) {
             BigDecimal value = switch (evaluator.metricId()) {
@@ -154,7 +133,7 @@ class PerformanceEvaluatorTest {
                     sample.toDetail()).withVariant(sample.environmentName()));
         }
         Run run = new Run(Uuid7.generate(), Uuid7.generate(),
-                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main", runner, "ci",
+                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main", "ci",
                 Instant.parse("2026-09-22T00:00:00Z"), 1);
         EvaluationContext context = new EvaluationContext(run,
                 thresholdsWith("performance", PERFORMANCE),

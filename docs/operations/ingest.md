@@ -1,11 +1,7 @@
 # 取り込み（Ingest API）と判定ジョブ
 
-計測結果は Ingest API で quality-gate に送ります。送り手は次の 2 つで、どちらも同じ API を使います。
-
-| 送り手 | 説明 |
-| --- | --- |
-| 収集ランナー（標準） | quality-gate 側のワークフローが対象を取得・計測して送る（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)） |
-| 対象の CI | 対象リポジトリのワークフローが自分で計測して送る（[CI から直接送る方式](target-repository.md)） |
+計測結果は Ingest API で quality-gate に送ります。送り手は収集ランナーです
+（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)）。対象の CI から送るための補助は D-19 で削除しました。
 
 取り込みから表示までの流れ:
 
@@ -16,10 +12,6 @@
 4. 同じプロセス内の `JobWorker` がキューを 1 秒間隔でポーリングし（`FOR UPDATE SKIP LOCKED`）、
    正規化 → 判定 → 読み取りモデル更新を行う
 5. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
-
-> 対象の CI から送るときは、GitHub Actions なら `quality-gate-action`、それ以外なら CLI（`cli/qg-submit`）で
-> 上の 1〜3 を 1 回で行えます（[CI から送る](ci-submit.md)）。
-> 収集ランナーは `collector/bin/submit.sh` で送ります。
 
 認証の経路（Ingest Token とセッション Cookie の使い分け）は [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。
 
@@ -50,11 +42,9 @@ SQL
 RUN_ID=$(curl -s -X POST http://localhost:8080/api/v1/runs \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"repository\":\"ymiyamoto63/quality-gate\",\"commitSha\":\"$(git rev-parse HEAD)\",
-       \"branch\":\"main\",\"runnerType\":\"self-hosted\",\"triggeredBy\":\"local\",
+       \"branch\":\"main\",\"triggeredBy\":\"local\",
        \"measuredAt\":\"$(date -u +%FT%TZ)\"}" | sed -E 's/.*"runId":"([^"]+)".*/\1/')
 
-curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=quality-gate-config" \
-  -H "Authorization: Bearer $TOKEN" -F file=@.quality-gate.yml
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=jacoco-xml&component=backend" \
   -H "Authorization: Bearer $TOKEN" -F file=@backend/target/site/jacoco/jacoco.xml
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/finalize" -H "Authorization: Bearer $TOKEN"

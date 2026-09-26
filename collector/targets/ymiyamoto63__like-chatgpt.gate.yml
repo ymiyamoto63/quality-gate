@@ -9,13 +9,11 @@
 #   - performance は収集ランナーの負荷試験（collector/targets/ymiyamoto63__like-chatgpt.k6.js）で計測する。
 #     M-02 と同じく PR では実行せずスキップを申告するため、skippable_metrics に performance が必要
 version: 1
-enforcement: report-only
 on_missing_report: fail
 
 execution:
   skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03〜05 をスキップする
   full_measurement_interval_days: 7
-  reference_only_environments: [github-hosted]
 
 components:
   - name: backend

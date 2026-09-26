@@ -97,11 +97,10 @@ class IngestApiIT {
                         "repository", REPOSITORY,
                         "commitSha", COMMIT,
                         "branch", "main",
-                        "runnerType", "github-hosted",
                         "triggeredBy", "github-actions",
                         "measuredAt", "2026-09-21T02:10:00Z",
                         "skippedMetrics", java.util.List.of(
-                                Map.of("metricId", "M-02", "reason", "GitHub ホストランナーのため PIT を実行しない"),
+                                Map.of("metricId", "M-02", "reason", "PR の計測では PIT を実行しない"),
                                 Map.of("metricId", "M-06", "reason", "理由なくスキップを申告した場合"))))
                 .retrieve().toEntity(Map.class);
 
@@ -167,7 +166,7 @@ class IngestApiIT {
                 .uri("/api/v1/runs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "runnerType", "self-hosted", "triggeredBy", "ci",
+                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toBodilessEntity();
 
@@ -184,7 +183,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
-                        "runnerType", "self-hosted", "triggeredBy", "ci",
+                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(Map.class);
 
@@ -348,7 +347,7 @@ class IngestApiIT {
     void 種別の違う同名の成果物はそれぞれ残る() throws Exception {
         UUID runId = createRun();
         upload(runId, "sarif", "report.json", "{\"runs\": []}");
-        upload(runId, "osv-json", "report.json", "{\"results\": []}");
+        upload(runId, "jscpd-json", "report.json", "{\"results\": []}");
 
         assertThat(artifacts.findByRunId(runId)).hasSize(2).allSatisfy(record -> {
             try (var in = artifactStore.open(record.getStorageKey())) {
@@ -387,7 +386,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "runnerType", "self-hosted", "triggeredBy", "ci",
+                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(Map.class);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
