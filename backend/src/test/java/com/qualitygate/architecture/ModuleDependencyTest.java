@@ -39,7 +39,7 @@ class ModuleDependencyTest {
             .that().resideInAPackage("..query..")
             .should().dependOnClassesThat()
             .resideInAnyPackage("..ingest..", "..normalize..", "..evaluate..")
-            .because("参照系は専用の読み取りモデルを持ち、書き込み側の都合に引きずられない")
+            .because("参照系は保存済みの判定結果を読むだけで、書き込み側の都合に引きずられない")
             .allowEmptyShould(true);
 
     @ArchTest

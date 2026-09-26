@@ -1,6 +1,7 @@
 package com.qualitygate.domain.repo;
 
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.RunStatus;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
@@ -28,7 +29,13 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     Optional<Run> findFirstByRepositoryIdAndBranchAndStatusAndMeasuredAtLessThanOrderByMeasuredAtDesc(
             UUID repositoryId, String branch, RunStatus status, Instant measuredAt);
 
-    Optional<Run> findFirstByRepositoryIdAndStatusOrderByMeasuredAtDesc(UUID repositoryId, RunStatus status);
+    /** 最新の判定済み Run（ダッシュボード・リポジトリ詳細）。 */
+    Optional<Run> findFirstByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(UUID repositoryId,
+                                                                                  RunStatus status);
+
+    /** 最後の完全計測（FR-06-3）。 */
+    Optional<Run> findFirstByRepositoryIdAndStatusAndCompletenessOrderByMeasuredAtDescAttemptDesc(
+            UUID repositoryId, RunStatus status, Completeness completeness);
 
     /** 同じコミットで判定済みの Run のうち、最後の試行。 */
     Optional<Run> findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(UUID repositoryId, String commitSha,

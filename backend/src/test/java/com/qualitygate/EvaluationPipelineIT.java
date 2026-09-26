@@ -20,8 +20,9 @@ import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
+import com.qualitygate.query.DashboardController;
+import com.qualitygate.query.dto.DashboardResponse;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -124,7 +125,7 @@ class EvaluationPipelineIT {
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
-    @Autowired RepositorySummaryRepository summaries;
+    @Autowired DashboardController dashboard;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
@@ -140,7 +141,6 @@ class EvaluationPipelineIT {
         measurements.deleteAll();
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
-        summaries.deleteAll();
         runs.deleteAll();
         gateConfigs.deleteAll();
         repositories.deleteAll();
@@ -197,12 +197,11 @@ class EvaluationPipelineIT {
                 .isNotEmpty()
                 .allSatisfy(f -> assertThat(f.getState()).isEqualTo(FindingState.INITIAL));
 
-        var summary = summaries.findById(repositoryId).orElseThrow();
-        assertThat(summary.getLatestVerdict()).isEqualTo(Verdict.FAIL);
-        assertThat(summary.getOpenHighCount()).isEqualTo(1);
+        var card = dashboardCard();
+        assertThat(card.latestRun().verdict()).isEqualTo(Verdict.FAIL);
+        assertThat(card.openHighCount()).isEqualTo(1);
         // 完全計測なので最後の完全計測も進む
-        assertThat(summary.getLastFullMeasuredAt()).isEqualTo(run.getMeasuredAt());
-        assertThat(summary.getCategoryStatus()).contains("セキュリティ").contains("FAIL");
+        assertThat(card.freshness().lastFullMeasuredAt()).isEqualTo(run.getMeasuredAt());
     }
 
     @Test
@@ -262,8 +261,7 @@ class EvaluationPipelineIT {
         assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.PARTIAL);
 
         // 部分計測では最後の完全計測を進めない。進めると鮮度監視が機能しなくなる。
-        assertThat(summaries.findById(repositoryId).orElseThrow()
-                .getLastFullMeasuredAt()).isNull();
+        assertThat(dashboardCard().freshness().lastFullMeasuredAt()).isNull();
     }
 
     @Test
@@ -445,9 +443,7 @@ class EvaluationPipelineIT {
                     assertThat(f.getFilePath()).isNull();
                 });
         // ダッシュボードの「重大 N 件」は脆弱性の件数。アクセシビリティ違反を混ぜない
-        var summary = summaries.findById(repositoryId).orElseThrow();
-        assertThat(summary.getOpenCriticalCount()).isZero();
-        assertThat(summary.getCategoryStatus()).contains("使いやすさ");
+        assertThat(dashboardCard().openCriticalCount()).isZero();
     }
 
     @Test
@@ -508,7 +504,7 @@ class EvaluationPipelineIT {
                     assertThat(f.getSeverity()).isEqualTo(Severity.HIGH);
                 });
         // 破壊的変更はダッシュボードの脆弱性件数に数えない
-        assertThat(summaries.findById(repositoryId).orElseThrow().getOpenHighCount()).isZero();
+        assertThat(dashboardCard().openHighCount()).isZero();
     }
 
     @Test
@@ -961,5 +957,9 @@ class EvaluationPipelineIT {
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
                 component, scope, metadata));
+    }
+
+    private DashboardResponse.RepositoryCard dashboardCard() {
+        return dashboard.dashboard().repositories().getFirst();
     }
 }

@@ -3,7 +3,6 @@ package com.qualitygate.normalize;
 import com.qualitygate.adapter.ArtifactAdapter;
 import com.qualitygate.adapter.ArtifactFormatException;
 import com.qualitygate.domain.entity.ArtifactRecord;
-import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -94,17 +93,6 @@ public class ReportNormalizer {
         return new NormalizedInput(measurements, head, List.copyOf(baseFindings.values()),
                 Set.copyOf(metricsWithData), Map.copyOf(parseErrors), RenamedFingerprints.of(head, renames));
     }
-
-    /** Run に保持したファイルの移動・リネームの対応表（新しいパス → 移動前のパス）。求めていなければ空。 */
-    public Map<String, String> renamesOf(Run run) {
-        if (run.getRenamedFiles() == null) {
-            return Map.of();
-        }
-        return Map.copyOf(objectMapper.readValue(run.getRenamedFiles(), STRING_MAP));
-    }
-
-    private static final TypeReference<Map<String, String>> STRING_MAP = new TypeReference<>() {
-    };
 
     /**
      * fingerprint をキーに名寄せする。複数のツールが同じ問題を報告しても 1 件にまとまる

@@ -477,7 +477,7 @@ OAuth App を別に用意する必要はない（GitHub App は user-to-server �
 | --- | --- | --- |
 | ユーザーログイン（FR-10-1） | GitHub App の user-to-server 認可フロー | ユーザー識別（`read:user`相当）のみ |
 | 収集ランナーによる対象の clone | GitHub App の Contents: Read。対象リポジトリにインストールし、ジョブごとに 1 時間有効のインストールトークンを発行する | 読み取りのみ |
-| 比較元（`baseCommitSha`）・タグ・ファイルの移動 | 収集ランナーが clone した履歴から求めて送る（`git merge-base` / `git tag --points-at` / `git diff -M`・`git log -M`） | — |
+| 比較元（`baseCommitSha`）・タグ・ファイルの移動 | 収集ランナーが clone した履歴から求めて送る（`git merge-base` / `git tag --points-at` / `git diff -M`） | — |
 
 GitHub App の権限は上記に限定する。書き込み権限とワークフローの起動権限は付与しない。
 App の秘密鍵は quality-gate リポジトリの Actions Secrets に置き、収集ランナーの取得ジョブだけが使う（バックエンドには置かない）。

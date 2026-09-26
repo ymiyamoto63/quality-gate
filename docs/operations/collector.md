@@ -72,7 +72,7 @@ quality-gate は、比較元のコミットで判定済みの Run があれば�
 | 送るもの | 求め方 | 使い道 |
 | --- | --- | --- |
 | タグ（Run の `tags`） | 計測するコミットを指すタグ（`git tag --points-at`） | リリース判定（S-09）でタグをコミットに解決する |
-| ファイルの移動（成果物 `git-renames`） | 比較元からの `git diff -M` と、first-parent 1,000 コミット分のコミットごとの `git log -M`（`collector/bin/renames.sh`） | 移動しただけのファイルの違反を新規・解消として扱わない（[指標仕様書 0.4](../spec/02-metrics-spec.md)） |
+| ファイルの移動（成果物 `git-renames`） | 比較元からの `git diff -M`（`collector/bin/renames.sh`） | 移動しただけのファイルの違反を新規・解消として扱わない（[指標仕様書 0.4](../spec/02-metrics-spec.md)） |
 
 ## 1. 事前の準備
 

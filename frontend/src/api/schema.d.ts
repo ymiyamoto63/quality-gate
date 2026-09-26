@@ -512,7 +512,7 @@ export interface components {
        */
       role?: 'ADMIN' | 'VIEWER' | null
     }
-    /** @description ダッシュボード。repository_summaries を読むだけで応答する。 */
+    /** @description ダッシュボード。リポジトリごとの最新の判定済み Run と、最後の完全計測。 */
     DashboardResponse: {
       repositories?: components['schemas']['RepositoryCard'][]
     }

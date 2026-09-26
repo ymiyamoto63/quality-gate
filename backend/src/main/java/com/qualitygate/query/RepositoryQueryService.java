@@ -1,36 +1,32 @@
 package com.qualitygate.query;
 
 import com.qualitygate.domain.entity.MonitoredRepository;
-import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.model.Completeness;
+import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.platform.error.ApiException;
 import com.qualitygate.query.dto.RepositoryResponses;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-/** リポジトリの一覧と詳細（S-02）。判定はせず、読み取りモデルを組み替えるだけ。 */
+/** リポジトリの一覧と詳細（S-02）。判定はせず、保存済みの判定済み Run を引くだけ。 */
 @Service
 public class RepositoryQueryService {
 
     private final MonitoredRepositoryRepository repositories;
-    private final RepositorySummaryRepository summaries;
     private final RunRepository runs;
     private final GateConfigRepository configs;
 
     public RepositoryQueryService(MonitoredRepositoryRepository repositories,
-                                  RepositorySummaryRepository summaries, RunRepository runs,
-                                  GateConfigRepository configs) {
+                                  RunRepository runs, GateConfigRepository configs) {
         this.repositories = repositories;
-        this.summaries = summaries;
         this.runs = runs;
         this.configs = configs;
     }
@@ -45,22 +41,17 @@ public class RepositoryQueryService {
     public RepositoryResponses.RepositoryDetail detail(UUID repositoryId) {
         MonitoredRepository repository = repositories.findById(repositoryId)
                 .orElseThrow(() -> ApiException.notFound("リポジトリ", repositoryId));
-        Optional<RepositorySummary> summary = summaries.findById(repositoryId);
-
-        RepositoryResponses.LatestRunSummary latest = summary
-                .map(RepositorySummary::getLatestRunId)
-                .flatMap(runs::findById)
-                .map(RepositoryQueryService::latestOf)
-                .orElse(null);
-
-        Instant lastMeasured = summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null);
-        Instant lastFull = summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null);
+        Optional<Run> latest = runs.findFirstByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(
+                repositoryId, RunStatus.EVALUATED);
+        Optional<Run> lastFull = runs.findFirstByRepositoryIdAndStatusAndCompletenessOrderByMeasuredAtDescAttemptDesc(
+                repositoryId, RunStatus.EVALUATED, Completeness.FULL);
 
         return new RepositoryResponses.RepositoryDetail(
                 itemOf(repository),
-                latest,
-                summary.map(RepositorySummary::getLastFullRunId).orElse(null),
-                new RepositoryResponses.RepositoryFreshness(lastMeasured, lastFull),
+                latest.map(RepositoryQueryService::latestOf).orElse(null),
+                lastFull.map(Run::getId).orElse(null),
+                new RepositoryResponses.RepositoryFreshness(latest.map(Run::getMeasuredAt).orElse(null),
+                        lastFull.map(Run::getMeasuredAt).orElse(null)),
                 configs.findFirstByRepositoryIdOrderByVersionDesc(repositoryId)
                         .map(c -> c.getVersion()).orElse(null));
     }

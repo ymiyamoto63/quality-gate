@@ -32,8 +32,7 @@
 users ──┐
         │ (created_by / actor)
         ▼
-repositories ──┬──▶ gate_configs
-     │         └──▶ repository_summaries (1:1 読み取りモデル)
+repositories ──▶ gate_configs
      │
      └──▶ runs ──┬──▶ artifacts
                  ├──▶ run_skipped_metrics
@@ -136,7 +135,6 @@ CREATE TABLE runs (
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
-    renamed_files       jsonb,                   -- ファイルの移動の対応表（新しいパス → 移動前のパス）
     tags                text[]      NOT NULL DEFAULT '{}',  -- 計測したコミットを指すタグ
     created_at          timestamptz NOT NULL DEFAULT now(),
     evaluated_at        timestamptz,
@@ -152,7 +150,6 @@ CREATE TABLE runs (
 
 `tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-09）でタグを
 コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。
-`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求め、再評価でも同じものを使う。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
@@ -272,32 +269,7 @@ CREATE TABLE findings (
 );
 ```
 
-### 3.9 `repository_summaries` — ダッシュボード用の読み取りモデル
-
-```sql
-CREATE TABLE repository_summaries (
-    repository_id       uuid        PRIMARY KEY REFERENCES repositories(id) ON DELETE CASCADE,
-    latest_run_id       uuid        REFERENCES runs(id) ON DELETE SET NULL,
-    latest_verdict      varchar(24),
-    latest_completeness varchar(8),
-    latest_measured_at  timestamptz,
-    last_full_run_id    uuid        REFERENCES runs(id) ON DELETE SET NULL,
-    last_full_measured_at timestamptz,
-    category_status     jsonb,      -- {"機能テスト":"PASS","性能テスト":"SKIP",...}
-    open_critical_count int         NOT NULL DEFAULT 0,
-    open_high_count     int         NOT NULL DEFAULT 0,
-    version             bigint      NOT NULL DEFAULT 0,   -- 楽観ロック（9 章）
-    updated_at          timestamptz NOT NULL DEFAULT now()
-);
-```
-
-判定完了時に更新する。
-ダッシュボードはこの 1 テーブルを読むだけで描画でき、
-Run や Measurement を走査しない（[05](05-architecture.md) 11 章）。
-
-`last_full_measured_at` は最後の完全計測の日時として画面に常に表示する（FR-06-3）。
-
-### 3.10 `audit_logs` — 監査ログ
+### 3.9 `audit_logs` — 監査ログ
 
 ```sql
 CREATE TABLE audit_logs (
@@ -332,7 +304,7 @@ REVOKE UPDATE, DELETE ON audit_logs FROM quality_gate_app;
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が操作したか」が失われないようにするため。
 
-### 3.11 `system_settings` — システム全体の設定
+### 3.10 `system_settings` — システム全体の設定
 
 ```sql
 CREATE TABLE system_settings (
@@ -345,7 +317,7 @@ CREATE TABLE system_settings (
 
 保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
 
-### 3.12 Spring Session
+### 3.11 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
@@ -373,7 +345,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 
 | # | クエリ | インデックス |
 | --- | --- | --- |
-| 1 | ダッシュボード（全リポジトリのサマリ） | `repository_summaries` の PK のみ。走査対象が数行のため追加不要 |
+| 1 | ダッシュボード・リポジトリ詳細（リポジトリごとの最新の判定済み Run と最後の完全計測） | `ix_runs_latest ON runs (repository_id, measured_at DESC, attempt DESC) WHERE status = 'EVALUATED'` |
 | 2 | Run 一覧（リポジトリ・ブランチ・新しい順） | `ix_runs_list ON runs (repository_id, branch, measured_at DESC)` |
 | 3 | Run 詳細の指標一覧 | `ix_measurements_run ON measurements (run_id)` |
 | 4 | **トレンド**（リポジトリ × 指標 × 期間） | `ix_measurements_trend ON measurements (repository_id, metric_id, measured_at DESC)` |
@@ -460,7 +432,6 @@ DELETE FROM runs
 | 関連 | すべて `FetchType.LAZY`。`OneToMany` は原則マッピングせず、リポジトリのクエリで取得する |
 | 一括 INSERT | 判定結果の保存は `measurements` / `findings` とも JDBC バッチ（`hibernate.jdbc.batch_size=100`） |
 | 参照系 | エンティティを返さず、**専用の DTO へ射影**する（`SELECT new ...` またはインタフェース射影） |
-| 更新検知 | `@Version` による楽観ロックは `repository_summaries` にのみ適用 |
 
 `OneToMany` をマッピングしない方針は、N+1 問題と、
 意図しない遅延ロードの発生を構造的に避けるため。

@@ -9,18 +9,15 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
-import com.qualitygate.normalize.RenameHistory;
+import com.qualitygate.normalize.BaseRenames;
 import com.qualitygate.normalize.ReportNormalizer;
 import com.qualitygate.platform.observability.CorrelationIds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.MDC;
 import org.springframework.stereotype.Component;
-import tools.jackson.databind.ObjectMapper;
 
-import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -45,22 +42,19 @@ public class RunEvaluationPipeline {
     private final GateConfigService gateConfigService;
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
-    private final ObjectMapper objectMapper;
-    private final RenameHistory renameHistory;
+    private final BaseRenames baseRenames;
 
     public RunEvaluationPipeline(RunRepository runs, ArtifactRecordRepository artifacts,
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
-                                 ObjectMapper objectMapper,
-                                 RenameHistory renameHistory) {
+                                 BaseRenames baseRenames) {
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
         this.normalizer = normalizer;
         this.evaluationService = evaluationService;
-        this.objectMapper = objectMapper;
-        this.renameHistory = renameHistory;
+        this.baseRenames = baseRenames;
     }
 
     /** @return 判定後の Run（判定済み、または処理失敗） */
@@ -90,8 +84,8 @@ public class RunEvaluationPipeline {
         GateConfigService.Resolved config = gateConfigService.resolve(run, records);
         GateThresholds thresholds = GateThresholds.from(config.document());
 
-        recordRenames(run, records);
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions(), normalizer.renamesOf(run));
+        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions(),
+                baseRenames.resolve(run, records));
 
         log.info("正規化が完了しました runId={} 設定={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
                 runId, config.isDefault() ? "既定値" : "v" + config.gateConfig().getVersion(),
@@ -100,31 +94,6 @@ public class RunEvaluationPipeline {
 
         evaluationService.evaluate(runId, input, thresholds,
                 config.isDefault() ? null : config.gateConfig().getId());
-    }
-
-    /**
-     * ファイルの移動・リネームの対応表を、収集ランナーが送った移動の記録から求めて Run に保持する（指標仕様書 0.4）。
-     *
-     * <p>比較元コミット（M-07 の比較元）と比較対象 Run のコミット（違反の新規 / 継続の判定）の両方から求める。
-     * 一度求めたら再評価でも同じものを使う（判定を再現できるように）。失敗しても判定は続ける
-     */
-    private void recordRenames(Run run, List<ArtifactRecord> records) {
-        if (run.getRenamedFiles() != null) {
-            return;
-        }
-        Set<String> from = new LinkedHashSet<>();
-        if (run.getBaseCommitSha() != null) {
-            from.add(run.getBaseCommitSha());
-        }
-        evaluationService.findBaseline(run).map(Run::getCommitSha).ifPresent(from::add);
-        from.remove(run.getCommitSha());
-        if (from.isEmpty()) {
-            return;
-        }
-        renameHistory.resolve(records, from).ifPresent(renames -> {
-            run.setRenamedFiles(objectMapper.writeValueAsString(renames));
-            runs.save(run);
-        });
     }
 
     /** 判定のトランザクションはロールバック済み。処理失敗の記録だけを別に保存する。 */

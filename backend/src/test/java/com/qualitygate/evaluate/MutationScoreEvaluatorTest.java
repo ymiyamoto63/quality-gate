@@ -201,8 +201,6 @@ class MutationScoreEvaluatorTest {
                 .isEqualTo(com.qualitygate.domain.model.Verdict.PASS);
         assertThat(RunEvaluationService.completenessOf(results))
                 .isEqualTo(com.qualitygate.domain.model.Completeness.FULL);
-        assertThat(RunEvaluationService.categoryStatusOf(results))
-                .containsEntry("機能テスト", "PASS");
     }
 
     private List<MetricResult> evaluate(Set<String> components, RawMeasurement... measurements) {

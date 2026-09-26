@@ -973,7 +973,7 @@ components:
       - githubLogin
     DashboardResponse:
       type: object
-      description: ダッシュボード。repository_summaries を読むだけで応答する。
+      description: ダッシュボード。リポジトリごとの最新の判定済み Run と、最後の完全計測。
       properties:
         repositories:
           type: array

@@ -259,7 +259,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 4.1 `GET /api/v1/dashboard`
 
-`repository_summaries`（[06](06-database-design.md) 3.9）を読むだけで応答する。
+リポジトリごとの最新の判定済み Run と最後の完全計測を `runs` から引き、「重大・高」の件数は最新の Run の脆弱性（M-06）の違反から数える。
 
 ```json
 {
