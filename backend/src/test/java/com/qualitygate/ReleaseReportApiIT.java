@@ -120,7 +120,7 @@ class ReleaseReportApiIT {
 
     @Test
     void 完全計測ですべて合格ならリリース可() throws Exception {
-        // 短い SHA でも、計測済みのコミットなら GitHub API を使わずに解決する
+        // 短い SHA は、計測済みのコミットから完全な SHA にする
         var response = mvc.get()
                 .uri("/api/v1/repositories/{id}/release-report?ref=1111111", repositoryId).exchange();
 
@@ -200,10 +200,22 @@ class ReleaseReportApiIT {
     }
 
     @Test
+    void タグは計測時に送られたタグからコミットに解決する() {
+        assertThat(mvc.get().uri("/api/v1/repositories/{id}/release-report?ref={ref}", repositoryId, "release/2026-09")
+                .exchange()).hasStatusOk().bodyJson().satisfies(content -> {
+                    var json = content.assertThat();
+                    json.extractingPath("$.ref").isEqualTo("release/2026-09");
+                    json.extractingPath("$.refType").isEqualTo("TAG");
+                    json.extractingPath("$.commitSha").isEqualTo(FAILING);
+                    json.extractingPath("$.decision").isEqualTo("NOT_RELEASABLE");
+                });
+    }
+
+    @Test
     void 指定の誤りは理由つきで拒否する() {
-        // テストでは GitHub API を無効にしているため、タグは解決できない
-        assertThat(mvc.get().uri("/api/v1/repositories/{id}/release-report?ref=v1.2.0", repositoryId).exchange())
-                .hasStatus(502);
+        // タグを付けて計測したコミットが無い
+        assertThat(mvc.get().uri("/api/v1/repositories/{id}/release-report?ref=v9.9.9", repositoryId).exchange())
+                .hasStatus(404).bodyText().contains("タグ v9.9.9 を付けたコミットの計測がありません");
         assertThat(mvc.get().uri("/api/v1/repositories/{id}/release-report?ref=a b", repositoryId).exchange())
                 .hasStatus(400);
         assertThat(mvc.get().uri("/api/v1/repositories/{id}/release-report?ref=1111111", UUID.randomUUID())
@@ -257,6 +269,8 @@ class ReleaseReportApiIT {
             run.setBaseCommitSha("0".repeat(40));
         } else if (FAILING.equals(commitSha)) {
             run.setBaseCommitSha(PASSING);
+            // 収集ランナーが送る、計測したコミットを指すタグ
+            run.setTags(List.of("v1.2.0", "release/2026-09"));
         }
         run.finalizeIngest();
         runs.save(run);

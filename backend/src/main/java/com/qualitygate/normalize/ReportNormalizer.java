@@ -68,8 +68,8 @@ public class ReportNormalizer {
         Map<String, String> parseErrors = new HashMap<>();
 
         for (ArtifactRecord artifact : artifacts) {
-            if (artifact.getType().isConfiguration()) {
-                // 設定ファイルは指標を運ばない（設定の解決で読む）。解析の失敗として WARN を残さない
+            if (!artifact.getType().carriesMetrics()) {
+                // 設定ファイルと移動の記録は指標を運ばない（別に読む）。解析の失敗として WARN を残さない
                 continue;
             }
             ParseContext context = new ParseContext(artifact.getComponentName(),

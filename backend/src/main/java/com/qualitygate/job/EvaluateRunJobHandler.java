@@ -11,7 +11,7 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
-import com.qualitygate.github.RenameResolver;
+import com.qualitygate.normalize.RenameHistory;
 import com.qualitygate.normalize.ReportNormalizer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,15 +40,15 @@ public class EvaluateRunJobHandler implements JobHandler {
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
     private final ObjectMapper objectMapper;
-    private final RenameResolver renameResolver;
+    private final RenameHistory renameHistory;
 
     public EvaluateRunJobHandler(RunRepository runs, ArtifactRecordRepository artifacts,
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
                                  ObjectMapper objectMapper,
-                                 RenameResolver renameResolver) {
-        this.renameResolver = renameResolver;
+                                 RenameHistory renameHistory) {
+        this.renameHistory = renameHistory;
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
@@ -88,7 +88,7 @@ public class EvaluateRunJobHandler implements JobHandler {
         }
         GateThresholds thresholds = GateThresholds.from(config.document());
 
-        recordRenames(run);
+        recordRenames(run, records);
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions(), normalizer.renamesOf(run));
 
         log.info("正規化が完了しました runId={} 設定={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
@@ -101,12 +101,12 @@ public class EvaluateRunJobHandler implements JobHandler {
     }
 
     /**
-     * ファイルの移動・リネームの対応表を GitHub API で求めて Run に保持する（指標仕様書 0.4）。
+     * ファイルの移動・リネームの対応表を、収集ランナーが送った移動の記録から求めて Run に保持する（指標仕様書 0.4）。
      *
      * <p>比較元コミット（M-07 の比較元）と比較対象 Run のコミット（違反の新規 / 継続の判定）の両方から求める。
      * 一度求めたら再評価でも同じものを使う（判定を再現できるように）。失敗しても判定は続ける
      */
-    private void recordRenames(Run run) {
+    private void recordRenames(Run run, List<ArtifactRecord> records) {
         if (run.getRenamedFiles() != null) {
             return;
         }
@@ -119,7 +119,7 @@ public class EvaluateRunJobHandler implements JobHandler {
         if (from.isEmpty()) {
             return;
         }
-        renameResolver.resolveFor(run, from).ifPresent(renames -> {
+        renameHistory.resolve(records, from).ifPresent(renames -> {
             run.setRenamedFiles(objectMapper.writeValueAsString(renames));
             runs.save(run);
         });

@@ -13,6 +13,8 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -77,6 +79,11 @@ public class Run {
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "renamed_files", columnDefinition = "jsonb")
     private String renamedFiles;
+
+    /** 計測したコミットを指すタグ（収集ランナーが計測時に求めて送る）。リリース判定でタグをコミットに解決するのに使う。 */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "tags", columnDefinition = "text[]", nullable = false)
+    private List<String> tags = new ArrayList<>();
 
     @Column(name = "error_code")
     private String errorCode;
@@ -190,6 +197,14 @@ public class Run {
 
     public void setRenamedFiles(String renamedFiles) {
         this.renamedFiles = renamedFiles;
+    }
+
+    public List<String> getTags() {
+        return List.copyOf(tags);
+    }
+
+    public void setTags(List<String> tags) {
+        this.tags = new ArrayList<>(tags);
     }
 
     public String getBranch() {

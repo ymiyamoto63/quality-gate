@@ -5,6 +5,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -41,9 +42,21 @@ public record CreateRunRequest(
         @NotNull
         Instant measuredAt,
 
+        @Schema(description = "計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。"
+                + "リリース判定でタグをコミットに解決するのに使う")
+        @Size(max = 100)
+        List<@Size(max = 255) @Pattern(regexp = TAG, message = "タグ名として使えない文字を含んでいます") String> tags,
+
         @Schema(description = "CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う")
         @Valid
         List<SkippedMetricRequest> skippedMetrics) {
+
+    /** git のタグ名に使えない文字（空白・制御文字・{@code ~^:?*[\}）と {@code ..}、先頭と末尾の {@code /} を拒否する。 */
+    static final String TAG = "^(?!/)(?!.*\\.\\.)(?!.*/$)[^\\s\\p{Cntrl}~^:?*\\[\\\\]+$";
+
+    public List<String> tagsOrEmpty() {
+        return tags == null ? List.of() : List.copyOf(tags);
+    }
 
     public List<SkippedMetricRequest> skippedMetricsOrEmpty() {
         return skippedMetrics == null ? List.of() : skippedMetrics;

@@ -99,6 +99,7 @@ public class IngestService {
         run.setBaseCommitSha(request.baseCommitSha());
         run.setPullRequestNumber(request.pullRequestNumber());
         run.setCiRunUrl(request.ciRunUrl());
+        run.setTags(request.tagsOrEmpty());
         runs.save(run);
 
         recordSkippedMetrics(run.getId(), request.skippedMetricsOrEmpty());

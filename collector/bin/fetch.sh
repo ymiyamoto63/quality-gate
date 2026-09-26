@@ -15,7 +15,8 @@
 #
 # 出力:
 #   <作業ディレクトリ>/src       対象リポジトリ（全履歴。base の解析に必要）
-#   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / PR_NUMBER
+#   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / PR_NUMBER / TAGS（コミットを指すタグ。空白区切り）
+#   <作業ディレクトリ>/renames.json  ファイルの移動・リネーム（renames.sh の出力）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -99,11 +100,16 @@ else
   [ "$BASE" != "$COMMIT" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 fi
 
+# コミットを指すタグ。リリース判定（S-11）でタグを指定したとき、quality-gate はこれでコミットを探す
+TAGS=$(git tag --points-at "$COMMIT" | tr '\n' ' ' | sed 's/ *$//')
+
 cat > "$WORK/meta.env" <<EOF
 QG_REPOSITORY=$REPOSITORY
 COMMIT_SHA=$COMMIT
 BRANCH=$BRANCH
 BASE_SHA=$BASE
 PR_NUMBER=$PR_NUMBER
+TAGS="$TAGS"
 EOF
+"$COLLECTOR_DIR/bin/renames.sh" "$WORK/src" "$COMMIT" "$BASE" > "$WORK/renames.json"
 log "計測するコミット: $COMMIT${TAG:+（$TAG）}（比較元: ${BASE:-なし}${BASE_LABEL:+（$BASE_LABEL）}）"

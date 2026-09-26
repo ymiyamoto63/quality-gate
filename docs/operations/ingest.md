@@ -6,7 +6,8 @@
 取り込みから表示までの流れ:
 
 1. 送り手が `POST /api/v1/runs` で Run を作成する（`repository` はトークンの発行元と一致する必要がある）
-2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` など）を
+2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` /
+   `git-renames`（ファイルの移動。[指標仕様書 0.4](../initial/02-metrics-spec.md)）など）を
    アップロードする。この時点ではパースせず、`QG_ARTIFACT_ROOT` に保存するだけ
 3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、判定ジョブが DB のジョブキューに積まれ、すぐに `202` が返る
 4. 同じプロセス内の `JobWorker` がキューを 1 秒間隔でポーリングし（`FOR UPDATE SKIP LOCKED`）、
