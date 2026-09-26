@@ -108,8 +108,23 @@ if [ -n "${BACKEND_DIR:-}" ]; then
     found=1
   done
   [ "$found" -eq 1 ] || warn "成果物がありません（type=junit-xml）: $REPORTS/contract/"
+  # M-11 / M-12 はすべてのテストの結果（test-junit-xml）。M-08 の契約テスト（junit-xml）とは型で分ける
+  found=0
+  for junit in "$REPORTS"/tests/backend/TEST-*.xml; do
+    [ -e "$junit" ] || continue
+    upload test-junit-xml "$junit" "$BACKEND"
+    found=1
+  done
+  [ "$found" -eq 1 ] || warn "成果物がありません（type=test-junit-xml）: $REPORTS/tests/backend/"
 fi
-[ -z "${FRONTEND_DIR:-}" ] || upload lcov "$REPORTS/frontend-coverage/lcov.info" "$FRONTEND"
+if [ -n "${FRONTEND_DIR:-}" ]; then
+  upload lcov "$REPORTS/frontend-coverage/lcov.info" "$FRONTEND"
+  upload test-junit-xml "$REPORTS/tests/frontend/junit.xml" "$FRONTEND"
+  upload eslint-json "$REPORTS/frontend/eslint.json" "$FRONTEND" head
+  if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/frontend/eslint-base.json" ]; then
+    upload eslint-json "$REPORTS/frontend/eslint-base.json" "$FRONTEND" base
+  fi
+fi
 [ -z "${A11Y_PAGES:-}" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
 if [ -n "${OPENAPI_PATH:-}" ]; then
   if [ -e "$REPORTS/oasdiff-base-spec-missing" ]; then

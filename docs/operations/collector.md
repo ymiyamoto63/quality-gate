@@ -5,7 +5,8 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01〜M-10 の全指標**です。
+計測する指標は **M-01〜M-12 の全指標**です。
+M-07（循環的複雑度）は backend と frontend の両方を解析します。
 M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
 
 | 段階 | 状態 | 内容 |
@@ -34,6 +35,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
+| `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 画面（S-06）に保存する合格ラインの控え |
 | `collector/targets/<owner>__<name>.k6.js` | M-03〜05 の負荷試験のシナリオ（k6） |
@@ -45,13 +47,15 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | M-01（Java） | `mvn org.jacoco:jacoco-maven-plugin:<版>:prepare-agent verify ...:report`。JaCoCo をコマンドラインから差し込む。単体テストと結合テスト（failsafe）の両方を 1 つの実行データに集める |
 | M-01（TS） | `vitest run` にカバレッジのオプションを渡す。`@vitest/coverage-v8` が対象に無ければ、Vitest と同じ版を作業用の clone にだけ入れる（`npm install --no-save`） |
 | M-06 | コミット時点の作業ツリーに依存関係を取得した後で `trivy fs`（対象の CI と同じ順序） |
-| M-07 | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
+| M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
+| M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
 | M-08 | `mvn verify` が出す JUnit XML のうち、計測プロファイルの `CONTRACT_TEST_REPORTS` に合うものだけを送る |
+| M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る（M-08 の `junit-xml` とは別に送る） |
 | M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
 | M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
 | M-10 | バックエンドの jar と `vite build` した画面（`vite preview`）を起動し、計測プロファイルの `A11Y_PAGES` をライト・ダークの両方で axe-core により検査する |
 
-テストが失敗しても計測は止めません（失敗は M-08 などの判定材料として送ります）。
+テストが失敗しても計測は止めません（失敗は M-08・M-11 などの判定材料として送ります）。
 ビルド自体に失敗した場合など、成果物が出なかった指標は送られず、quality-gate では ERROR になります。
 
 比較元（base）の決め方は対象の CI と同じです。既定ブランチを計測するときは直前のコミット、
@@ -154,6 +158,7 @@ Ingest API は同一コミットへの再送信を別の Run（attempt を増や
 | M-08 | 契約テストの件数と成功率 |
 | M-09 | 破壊的変更の件数（または「対象外」） |
 | M-10 | 検査した画面と、重大（critical / serious）の違反の件数。対象の e2e は API をモックし、収集ランナーは実際のバックエンドにつなぐため、API の応答で描画が変わる画面では違反が変わりうる |
+| M-11 / M-12 | テストの件数（成功・失敗・スキップ）。`mvn verify` / `npx vitest run` の出力の件数と一致すること |
 
 参考までに、like-chatgpt の `b581260`（main）を手元で計測した結果は、JaCoCo・lcov・PMD の各数値と
 契約テストの件数が、like-chatgpt 自身のビルド（`mvn verify` / `npm run test:coverage`）の出力と一致しました。
@@ -368,8 +373,13 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
   PR で下がるかどうかは、マージ後の既定ブランチの Run で分かります
 - **M-03〜05 は計測環境（`PERF_ENVIRONMENT`）ごとに比べます。** 名前を変えると前回比が出なくなり、トレンドも新しい系列になります
 - **M-07 は base と比べて判定します。** CC 15 超の関数のうち、新しく増えたものや悪化したものだけが FAIL の対象です
+- **M-07 には frontend の関数も入ります。** frontend の CC は quality-gate 側の ESLint の設定で数えるため、
+  対象の `npm run lint` の `complexity` の警告とは版や設定の違いでずれることがあります
 - **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
   like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
+- **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
+  画面の設定で `test_results` を有効にしたときだけ判定されます（控えの `*.gate.yml` では有効にしています）。
+  M-12 は比較対象の Run からスキップが増えたら FAIL です
 - **M-09 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
 - 判定には**画面（S-06）で保存した最新の設定**を使います。コミット時点の設定ではありません。設定の変更履歴は S-06 の「変更履歴」と監査ログで追えます
 
@@ -440,6 +450,9 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `measure` で `バックエンドのビルドに失敗しました` | 対象がコンパイルできない、または `JAVA_VERSION` が対象の要求と合っていない |
 | `measure` で `M-02: PIT の実行に失敗しました` | テストに失敗がある（PIT は全テストが成功していないと動かない）、テストが JUnit 5 でない、または `MUTATION_TARGET_CLASSES` に合うクラスが無い（`No mutations found`） |
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
+| `measure` で `M-07: ESLint（head）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` のディレクトリが無い、または ESLint が設定を読めなかった（ログに ESLint の出力が出る） |
+| `measure` で `M-07: 構文を読めず、関数を数えられなかったファイルがあります` | quality-gate 側のパーサが読めない構文のファイルがある（そのファイルの関数は M-07 に入らない）。`FRONTEND_COMPLEXITY_EXCLUDE` で外すか、`collector/complexity` のパーサを見直す |
+| `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
 | PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 1-4 の 2（画面の設定の保存）をしていない。`skippable_metrics` に `mutation_score` と `performance` が必要 |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名と画面の設定の `performance.scenarios` が一致していない |

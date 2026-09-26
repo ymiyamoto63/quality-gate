@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
@@ -146,6 +147,51 @@ class JUnitXmlAdapterTest {
                 <!DOCTYPE testsuite [<!ENTITY xxe SYSTEM "file:///etc/passwd">]>
                 <testsuite name="&xxe;"/>
                 """)).isInstanceOf(ArtifactFormatException.class);
+    }
+
+    @Test
+    void すべてのテストの結果はM11として読みスキップだけをM12の違反にする() {
+        NormalizedReport report = adapter.parse(new ByteArrayInputStream("""
+                <testsuite name="src/stores/run.spec.ts" tests="4">
+                  <testcase classname="src/stores/run.spec.ts" name="読み込める"/>
+                  <testcase classname="src/stores/run.spec.ts" name="失敗を表示する">
+                    <failure message="expected true" type="AssertionError"/>
+                  </testcase>
+                  <testcase classname="src/stores/run.spec.ts" name="再読み込み">
+                    <skipped/>
+                  </testcase>
+                  <testcase classname="src/stores/run.spec.ts" name="不安定">
+                    <flakyFailure message="timeout"/>
+                  </testcase>
+                </testsuite>
+                """.getBytes(StandardCharsets.UTF_8)),
+                new ParseContext("frontend", null, List.of()), ArtifactType.TEST_JUNIT_XML);
+
+        assertThat(report.type()).isEqualTo(ArtifactType.TEST_JUNIT_XML);
+        RawMeasurement measurement = report.measurements().getFirst();
+        assertThat(measurement.metricId()).isEqualTo("M-11");
+        assertThat(measurement.componentName()).isEqualTo("frontend");
+        assertThat(measurement.detail())
+                .containsEntry("executed", 3L)
+                .containsEntry("failed", 1L)
+                .containsEntry("skipped", 1L)
+                .containsEntry("flaky", 1L);
+        assertThat(report.findings()).extracting(RawFinding::metricId, RawFinding::ruleId)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("M-11", "failed"),
+                        org.assertj.core.groups.Tuple.tuple("M-12", "skipped"),
+                        org.assertj.core.groups.Tuple.tuple("M-11", "flaky"));
+    }
+
+    @Test
+    void 型を指定しなければ契約テストとして読む() {
+        NormalizedReport report = adapter.parse(new ByteArrayInputStream("""
+                <testsuite name="A"><testcase classname="A" name="a"><skipped/></testcase></testsuite>
+                """.getBytes(StandardCharsets.UTF_8)),
+                new ParseContext("backend", null, List.of()), ArtifactType.JUNIT_XML);
+
+        assertThat(report.measurements().getFirst().metricId()).isEqualTo("M-08");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsExactly("M-08");
     }
 
     private NormalizedReport parse(String xml) {

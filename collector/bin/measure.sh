@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-10）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-12）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -16,6 +16,7 @@
 #   A11Y_CHROMIUM       M-10 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
 #   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
 #   QG_A11Y_TOOL_DIR    M-10 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
+#   QG_COMPLEXITY_TOOL_DIR  M-07（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -38,10 +39,10 @@ skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
-mkdir -p "$REPORTS/backend" "$REPORTS/contract" "$REPORTS/frontend"
+mkdir -p "$REPORTS/backend" "$REPORTS/contract" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
 rm -f "$REPORTS/skipped-metrics.tsv"
 
-# --- バックエンド: M-01（JaCoCo）/ M-08（JUnit XML） ----------------------------------
+# --- バックエンド: M-01（JaCoCo）/ M-08・M-11・M-12（JUnit XML） ------------------------
 measure_backend() {
   local dir="$SRC/$BACKEND_DIR" mvn exec
   [ -f "$dir/pom.xml" ] || { fail "M-01/M-08: $BACKEND_DIR/pom.xml がありません"; return; }
@@ -74,6 +75,20 @@ measure_backend() {
     copied=$((copied + 1))
   done
   [ "$copied" -gt 0 ] || fail "M-08: 契約テストの結果がありません（target/$CONTRACT_TEST_REPORTS）"
+
+  # M-11 / M-12 はすべてのテストの結果で判定する（契約テストに限らない）。
+  # パターンは空白区切り。read は glob を展開しない
+  local patterns pattern
+  read -ra patterns <<< "${TEST_REPORTS:-surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml}"
+  copied=0
+  for pattern in "${patterns[@]}"; do
+    for file in "$dir"/target/$pattern; do
+      [ -e "$file" ] || continue
+      cp "$file" "$REPORTS/tests/backend/"
+      copied=$((copied + 1))
+    done
+  done
+  [ "$copied" -gt 0 ] || fail "M-11/M-12: バックエンドのテストの結果がありません（target/${TEST_REPORTS:-surefire-reports/TEST-*.xml}）"
 }
 
 # --- バックエンド: M-02（PIT）。既定ブランチの計測でだけ全量を実行する -----------------
@@ -151,6 +166,18 @@ run_pmd() {
     -R "$COLLECTOR_DIR/pmd-ruleset.xml" -f xml -d "$sources" -r "$output"
 }
 
+# 比較元（base）の作業ツリー。M-07 の比較元の解析（backend の PMD と frontend の ESLint）で共用する
+prepare_base() {
+  [ -n "$BASE_SHA" ] || return 0
+  rm -rf "$WORK/base"
+  git -C "$SRC" worktree add --quiet --detach "$WORK/base" "$BASE_SHA"
+}
+
+cleanup_base() {
+  [ -d "$WORK/base" ] || return 0
+  git -C "$SRC" worktree remove --force "$WORK/base"
+}
+
 measure_complexity() {
   local sources="$SRC/$BACKEND_DIR/src/main/java"
   [ -d "$sources" ] || { fail "M-07: $BACKEND_DIR/src/main/java がありません"; return; }
@@ -160,21 +187,77 @@ measure_complexity() {
 
   # base は別の作業ツリーで解析する。PMD のパスは quality-gate がモジュール相対（src/...）に寄せるため、
   # 置き場所が違っても同じ関数として比較される
-  if [ -n "$BASE_SHA" ]; then
-    rm -rf "$WORK/base"
-    git -C "$SRC" worktree add --quiet --detach "$WORK/base" "$BASE_SHA"
+  if [ -d "$WORK/base" ]; then
     if [ -d "$WORK/base/$BACKEND_DIR/src/main/java" ]; then
       run_pmd "$WORK/base/$BACKEND_DIR/src/main/java" "$REPORTS/backend/pmd-base.xml" \
         || fail "M-07: PMD（base）の実行に失敗しました"
     else
       log "base に $BACKEND_DIR/src/main/java が無いため、base の解析を省きます"
     fi
-    git -C "$SRC" worktree remove --force "$WORK/base"
   fi
   endgroup
 }
 
-# --- フロントエンド: M-01（Vitest + v8 カバレッジ） -----------------------------------
+# --- フロントエンド: M-07（ESLint の complexity ルール）。head と base の両方を解析する ------
+# 対象の ESLint の設定は使わず、quality-gate 側の設定と版（collector/complexity）で解析する
+# run_eslint <作業ツリーのルート> <出力>
+run_eslint() {
+  local root=$1 output=$2 args=() patterns pattern status=0
+  read -ra patterns <<< "${FRONTEND_COMPLEXITY_EXCLUDE:-**/*.spec.ts **/*.test.ts **/*.d.ts}"
+  for pattern in "${patterns[@]}"; do args+=(--ignore-pattern "$pattern"); done
+  read -ra patterns <<< "${FRONTEND_COMPLEXITY_SOURCES:-src}"
+  # 終了コード 1 は構文を読めなかったファイルがあるとき（complexity は warn のため、それ以外では 0）
+  (cd "$root/$FRONTEND_DIR" && node "$COMPLEXITY_TOOL/node_modules/eslint/bin/eslint.js" \
+    -c "$COMPLEXITY_TOOL/eslint.config.mjs" --no-warn-ignored -f json -o "$output.raw" \
+    "${args[@]}" "${patterns[@]}") || status=$?
+  if [ "$status" -gt 1 ] || [ ! -s "$output.raw" ]; then
+    rm -f "$output.raw"
+    return 1
+  fi
+  # 作業ツリーの場所（head と base で違う）をパスから外し、/<FRONTEND_DIR>/src/... の形にそろえる。
+  # quality-gate はこの形からモジュール相対（src/...）とリポジトリ相対（frontend/src/...）のパスを求める
+  jq --arg root "$root" 'map(.filePath |= ltrimstr($root))' "$output.raw" > "$output"
+  rm -f "$output.raw"
+  local unreadable
+  unreadable=$(jq '[.[] | select(any(.messages[]; .fatal == true))] | length' "$output")
+  [ "$unreadable" -eq 0 ] || warn "M-07: 構文を読めず、関数を数えられなかったファイルがあります（${unreadable} 件）"
+}
+
+measure_frontend_complexity() {
+  COMPLEXITY_TOOL="$WORK/complexity-tool"
+  [ -d "$SRC/$FRONTEND_DIR" ] || { fail "M-07: $FRONTEND_DIR がありません"; return; }
+  group "循環的複雑度（フロントエンド、ESLint の complexity ルール）"
+  if ! (
+    set -e
+    rm -rf "$COMPLEXITY_TOOL"
+    mkdir -p "$COMPLEXITY_TOOL"
+    cp "$COLLECTOR_DIR"/complexity/eslint.config.mjs "$COMPLEXITY_TOOL/"
+    if [ -n "${QG_COMPLEXITY_TOOL_DIR:-}" ]; then
+      # コンテナのイメージに ESLint とパーサが入っている
+      ln -s "$QG_COMPLEXITY_TOOL_DIR/node_modules" "$COMPLEXITY_TOOL/node_modules"
+    else
+      cp "$COLLECTOR_DIR"/complexity/{package.json,package-lock.json} "$COMPLEXITY_TOOL/"
+      cd "$COMPLEXITY_TOOL"
+      npm ci --no-audit --no-fund
+    fi
+  ); then
+    fail "M-07: ESLint を用意できませんでした（フロントエンドの複雑度は送られません）"; endgroup; return
+  fi
+
+  run_eslint "$SRC" "$REPORTS/frontend/eslint.json" || fail "M-07: ESLint（head）の実行に失敗しました"
+  if [ -d "$WORK/base" ]; then
+    if [ -d "$WORK/base/$FRONTEND_DIR" ]; then
+      run_eslint "$WORK/base" "$REPORTS/frontend/eslint-base.json" \
+        || fail "M-07: ESLint（base）の実行に失敗しました"
+    else
+      log "base に $FRONTEND_DIR が無いため、base の解析を省きます"
+    fi
+  fi
+  rm -rf "$COMPLEXITY_TOOL"
+  endgroup
+}
+
+# --- フロントエンド: M-01（Vitest + v8 カバレッジ）/ M-11・M-12（Vitest の junit reporter） ----
 measure_frontend() {
   local dir="$SRC/$FRONTEND_DIR" version args=() pattern
   [ -f "$dir/package.json" ] || { fail "M-01: $FRONTEND_DIR/package.json がありません"; return; }
@@ -195,11 +278,14 @@ measure_frontend() {
     for pattern in "${patterns[@]}"; do args+=("--coverage.include=$pattern"); done
     read -ra patterns <<< "${FRONTEND_COVERAGE_EXCLUDE:-}"
     for pattern in "${patterns[@]}"; do args+=("--coverage.exclude=$pattern"); done
+    # テストの結果は JUnit XML でも出す（M-11 / M-12）。画面のログ用に default の reporter も残す
+    args+=(--reporter=default --reporter=junit "--outputFile.junit=$REPORTS/tests/frontend/junit.xml")
     # テストの失敗では止めない（カバレッジは reportOnFailure で出る）
     npx vitest run "${args[@]}" || echo "::warning::フロントエンドのテストに失敗があります"
-  ) || fail "フロントエンドの計測に失敗しました（M-01 TS は送られません）"
+  ) || fail "フロントエンドの計測に失敗しました（M-01 TS / M-11 / M-12 は送られません）"
   endgroup
   [ -s "$REPORTS/frontend-coverage/lcov.info" ] || fail "M-01: lcov.info がありません"
+  [ -s "$REPORTS/tests/frontend/junit.xml" ] || fail "M-11/M-12: フロントエンドのテストの結果（junit.xml）がありません"
 }
 
 # --- M-10（Playwright + axe-core）。対象アプリを起動して、計測プロファイルの画面を検査する ----
@@ -426,12 +512,17 @@ measure_vulnerabilities() {
   endgroup
 }
 
+prepare_base
 if [ -n "${BACKEND_DIR:-}" ]; then
   measure_backend
   [ -z "${MUTATION_TARGET_CLASSES:-}" ] || measure_mutation
   measure_complexity
 fi
-[ -z "${FRONTEND_DIR:-}" ] || measure_frontend
+if [ -n "${FRONTEND_DIR:-}" ]; then
+  measure_frontend
+  measure_frontend_complexity
+fi
+cleanup_base
 [ -z "${A11Y_PAGES:-}" ] || measure_accessibility
 [ -z "${PERF_SCRIPT:-}" ] || measure_performance
 [ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes

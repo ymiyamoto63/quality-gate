@@ -63,6 +63,12 @@ metrics:
     min_success_rate: 100
     min_test_count: 1
     breaking_changes: 0
+  # すべてのテスト（backend の単体・結合テストと frontend の Vitest）の成功率とスキップの増加
+  test_results:
+    enabled: true
+    min_success_rate: 100
+    min_test_count: 1
+    max_skipped_increase: 0
   accessibility:
     enabled: true
     standard: wcag22aa
