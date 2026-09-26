@@ -28,7 +28,8 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | `collector/bin/state.sh` | 計測済みの記録（ランナーのマシン上のファイル） |
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
-| `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない** |
+| `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
+| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-08 / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14、`duplication.sh` = M-15、`lighthouse.sh` = M-16、`bundle-size.sh` = M-17）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
