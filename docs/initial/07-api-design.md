@@ -824,7 +824,7 @@ CI の不具合で同じジョブが無限に再実行されるような事故�
 - API 以外（画面の静的ファイル、`/actuator/**`）は制限しない
 - 枠はプロセスのメモリに持つ（単一ホストでの運用が前提。Q-10）。再起動すると枠は戻る
 - 上限は `quality-gate.rate-limit.*`、無効にするなら `QG_RATE_LIMIT_ENABLED=false`。
-  超過の回数はメトリクス `qg.rate_limit.rejected`（`category` タグ）で数える
+  超過は WARN ログに残す（`category` / 主体 / パス）
 - 収集ランナー（`collector/bin/submit.sh`）は 429 を受けると `Retry-After` に従って 3 回まで再試行する（curl の `--retry`）
 
 ---

@@ -18,10 +18,8 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.job.RetryableJobException;
 import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.platform.id.Uuid7;
-import io.micrometer.core.instrument.MeterRegistry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 import tools.jackson.core.type.TypeReference;
@@ -68,7 +66,6 @@ public class NotificationService {
     private final QualityGateProperties properties;
     private final ObjectMapper objectMapper;
     private final TransactionTemplate transactions;
-    private final ObjectProvider<MeterRegistry> meters;
 
     @SuppressWarnings("java:S107")
     public NotificationService(RunRepository runs, MonitoredRepositoryRepository repositories,
@@ -77,8 +74,7 @@ public class NotificationService {
                                NotificationSettingsRepository settingsRepository,
                                NotificationRecordRepository records, EmailSender email,
                                QualityGateProperties properties, ObjectMapper objectMapper,
-                               TransactionTemplate transactions,
-                               ObjectProvider<MeterRegistry> meters) {
+                               TransactionTemplate transactions) {
         this.runs = runs;
         this.repositories = repositories;
         this.measurements = measurements;
@@ -89,7 +85,6 @@ public class NotificationService {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.transactions = transactions;
-        this.meters = meters;
     }
 
     /**
@@ -233,7 +228,6 @@ public class NotificationService {
         }
 
         ChannelResult result = delivery.send().get();
-        count(delivery.channel(), result.sent() ? "sent" : "failed");
         if (!result.sent()) {
             log.warn("通知を送れませんでした channel={} event={} target={} reason={}",
                     delivery.channel(), event, delivery.target(), result.error());
@@ -265,13 +259,6 @@ public class NotificationService {
 
     private List<String> recipientsOf(NotificationSettings settings) {
         return objectMapper.readValue(settings.getEmailRecipients(), STRING_LIST);
-    }
-
-    private void count(String channel, String result) {
-        MeterRegistry registry = meters.getIfAvailable();
-        if (registry != null) {
-            registry.counter("qg.notifications", "channel", channel, "result", result).increment();
-        }
     }
 
     private record Context(Run run, MonitoredRepository repository, NotificationSettings settings,

@@ -14,8 +14,6 @@ import com.qualitygate.evaluate.RunEvaluationService;
 import com.qualitygate.github.MergeBaseResolver;
 import com.qualitygate.github.RenameResolver;
 import com.qualitygate.normalize.ReportNormalizer;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -46,19 +44,16 @@ public class EvaluateRunJobHandler implements JobHandler {
     private final JobEnqueuer enqueuer;
     private final MergeBaseResolver mergeBaseResolver;
     private final RenameResolver renameResolver;
-    private final MeterRegistry meterRegistry;
 
     public EvaluateRunJobHandler(RunRepository runs, ArtifactRecordRepository artifacts,
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
                                  RunEvaluationService evaluationService,
                                  ObjectMapper objectMapper, JobEnqueuer enqueuer,
-                                 MergeBaseResolver mergeBaseResolver, RenameResolver renameResolver,
-                                 MeterRegistry meterRegistry) {
+                                 MergeBaseResolver mergeBaseResolver, RenameResolver renameResolver) {
         this.renameResolver = renameResolver;
         this.enqueuer = enqueuer;
         this.mergeBaseResolver = mergeBaseResolver;
-        this.meterRegistry = meterRegistry;
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
@@ -74,16 +69,6 @@ public class EvaluateRunJobHandler implements JobHandler {
 
     @Override
     public void handle(Job job) {
-        // 設定解決・正規化・判定を合わせた時間（qg.evaluation.duration の metric_id=total）
-        Timer.Sample sample = Timer.start(meterRegistry);
-        try {
-            evaluate(job);
-        } finally {
-            sample.stop(meterRegistry.timer("qg.evaluation.duration", "metric_id", "total"));
-        }
-    }
-
-    private void evaluate(Job job) {
         UUID runId = runIdOf(job);
         Run run = runs.findById(runId).orElseThrow(
                 // Run が保持期間で削除されている。再実行しても回復しない。

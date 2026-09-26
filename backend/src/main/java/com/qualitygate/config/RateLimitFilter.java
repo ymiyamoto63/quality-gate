@@ -4,7 +4,6 @@ import com.qualitygate.ingest.security.IngestAuthentication;
 import com.qualitygate.platform.observability.CorrelationIds;
 import com.qualitygate.platform.ratelimit.RateLimitProperties;
 import com.qualitygate.platform.ratelimit.RateLimiter;
-import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -46,14 +45,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private final RateLimiter limiter;
     private final RateLimitProperties properties;
     private final ObjectMapper objectMapper;
-    private final MeterRegistry meterRegistry;
 
-    public RateLimitFilter(RateLimiter limiter, RateLimitProperties properties, ObjectMapper objectMapper,
-                           MeterRegistry meterRegistry) {
+    public RateLimitFilter(RateLimiter limiter, RateLimitProperties properties, ObjectMapper objectMapper) {
         this.limiter = limiter;
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
     }
 
     @Override
@@ -71,9 +67,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         log.warn("レート制限を超えました category={} subject={} path={}", limit.category(), limit.subject(),
                 request.getRequestURI());
-        if (meterRegistry != null) {
-            meterRegistry.counter("qg.rate_limit.rejected", "category", limit.category()).increment();
-        }
         reject(response, limit, decision.retryAfterSeconds());
     }
 

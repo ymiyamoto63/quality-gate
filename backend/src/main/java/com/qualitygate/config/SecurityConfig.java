@@ -7,9 +7,7 @@ import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
 import com.qualitygate.platform.ratelimit.RateLimitProperties;
 import com.qualitygate.platform.ratelimit.RateLimiter;
-import io.micrometer.core.instrument.MeterRegistry;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -73,9 +71,8 @@ public class SecurityConfig {
      * 1 回余分に数えてしまうため、その登録は無効にする。
      */
     @Bean
-    RateLimitFilter rateLimitFilter(RateLimiter limiter, RateLimitProperties properties, ObjectMapper objectMapper,
-                                    ObjectProvider<MeterRegistry> meterRegistry) {
-        return new RateLimitFilter(limiter, properties, objectMapper, meterRegistry.getIfAvailable());
+    RateLimitFilter rateLimitFilter(RateLimiter limiter, RateLimitProperties properties, ObjectMapper objectMapper) {
+        return new RateLimitFilter(limiter, properties, objectMapper);
     }
 
     @Bean

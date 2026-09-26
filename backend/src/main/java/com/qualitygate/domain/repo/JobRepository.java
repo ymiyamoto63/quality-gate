@@ -26,11 +26,6 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
     @Query("select j from Job j where j.status = 'PENDING' and j.runAfter <= :now order by j.runAfter")
     List<Job> lockNextPending(@Param("now") Instant now, Pageable pageable);
 
-    long countByStatus(com.qualitygate.domain.model.JobStatus status);
-
-    long countByStatusAndType(com.qualitygate.domain.model.JobStatus status,
-                              com.qualitygate.domain.model.JobType type);
-
     /**
      * 同じ鍵の実行待ち・実行中のジョブが無ければ登録する。あれば何もしない（0 を返す）。
      *
