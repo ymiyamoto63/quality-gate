@@ -267,6 +267,8 @@ function print(): void {
             <dd>{{ guide.rationale }}</dd>
             <dt>基準を満たさないと</dt>
             <dd>{{ guide.risk }}</dd>
+            <dt>計測ツール</dt>
+            <dd>{{ guide.tools }}</dd>
           </dl>
           <details>
             <summary>技術的な定義</summary>

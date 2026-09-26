@@ -138,6 +138,7 @@ class ReleaseReportApiIT {
             json.extractingPath("$.metrics[0].threshold").isEqualTo("≥ 80%");
             json.extractingPath("$.guides[0].basisLabel").isEqualTo("業界の目安");
             json.extractingPath("$.guides[0].summary").asString().contains("分かれ道");
+            json.extractingPath("$.guides[0].tools").asString().contains("JaCoCo");
         });
 
         FixtureWriter.write("release-report.json", response.getResponse().getContentAsString());
