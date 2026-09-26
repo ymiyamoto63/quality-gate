@@ -62,11 +62,4 @@ class ModuleDependencyTest {
             .should().dependOnClassesThat().resideInAPackage("..config..")
             .because("アダプタは ParseContext で渡された情報だけを使う")
             .allowEmptyShould(true);
-
-    @ArchTest
-    static final ArchRule 外部API呼び出しは限られたモジュールからのみ = noClasses()
-            .that().resideInAnyPackage("..adapter..", "..evaluate..", "..query..", "..ingest..")
-            .should().dependOnClassesThat().resideInAPackage("..github..")
-            .because("外部 API の障害の影響範囲を閉じ込める")
-            .allowEmptyShould(true);
 }

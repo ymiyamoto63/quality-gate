@@ -31,9 +31,4 @@ public final class RepositoryRequests {
             @Schema(nullable = true, description = "false で無効化（ダッシュボードから外れ、取り込みも拒否される）")
             Boolean enabled) {
     }
-
-    public record IssueTokenRequest(
-            @Schema(nullable = true, description = "用途のメモ（例: GitHub Actions）") @Size(max = 255)
-            String description) {
-    }
 }

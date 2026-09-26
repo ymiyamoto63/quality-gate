@@ -37,8 +37,7 @@
 users ──┐
         │ (created_by / actor)
         ▼
-repositories ──┬──▶ ingest_tokens
-     │         ├──▶ gate_configs
+repositories ──┬──▶ gate_configs
      │         └──▶ repository_summaries (1:1 読み取りモデル)
      │
      └──▶ runs ──┬──▶ artifacts
@@ -46,7 +45,6 @@ repositories ──┬──▶ ingest_tokens
                  ├──▶ measurements
                  └──▶ findings
 
-jobs            （独立。payload で他テーブルを参照）
 audit_logs      （独立。追記のみ）
 system_settings （独立。保持期間などのシステム設定）
 ```
@@ -107,26 +105,10 @@ PR を計測するかは、収集ランナーの手動実行で PR 番号を指�
 コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まり、成果物に付いた名前
 （`measurements.component_name` / `findings.component_name`）で扱う。
 
-### 3.4 `ingest_tokens` — 取り込み用トークン
+### 3.4 `ingest_tokens` — 取り込み用トークン（V021 で削除）
 
-```sql
-CREATE TABLE ingest_tokens (
-    id              uuid        PRIMARY KEY,
-    repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-    token_prefix    varchar(8)  NOT NULL UNIQUE,   -- 検索用。秘密ではない
-    token_hash      char(64)    NOT NULL,          -- SHA-256（16 進）
-    description     varchar(255),
-    created_by      uuid        NOT NULL REFERENCES users(id),
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    last_used_at    timestamptz,
-    revoked_at      timestamptz
-);
-CREATE INDEX ix_ingest_tokens_repo ON ingest_tokens (repository_id) WHERE revoked_at IS NULL;
-```
-
-`token_prefix` にのみインデックスを張り、`token_hash` は取得後に
-**定数時間比較**する（[05](05-architecture.md) 8.3）。
-ハッシュで検索すると全件走査になるうえ、比較時間から情報が漏れうる。
+送り手が収集ランナーだけになったため、Ingest Token はリポジトリごとに発行せず、バックエンドの環境変数
+`QG_INGEST_TOKEN` の 1 つにまとめた。V021 でテーブルごと削除した（D-27）。発行・失効の記録は監査ログに残っている。
 
 ### 3.5 `gate_configs` — 合格ラインの設定（版管理）
 
@@ -189,7 +171,7 @@ CREATE TABLE runs (
 
 `tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-11）でタグを
 コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。V020 より前の Run は空（D-26）。
-`renamed_files` は収集ランナーが送る `git-renames` から判定ジョブが求める（以前は GitHub の compare API で求めていた）。
+`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求める（以前は GitHub の compare API で求めていた）。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
@@ -319,40 +301,10 @@ V017 で `waiver_id`（免除の紐付け）を削除した（D-22）。
 
 メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
 
-### 3.13 `jobs` — ジョブキュー
+### 3.13 `jobs` — ジョブキュー（V021 で削除）
 
-```sql
-CREATE TABLE jobs (
-    id            uuid        PRIMARY KEY,
-    type          varchar(32) NOT NULL,
-    dedup_key     varchar(255),
-    payload       jsonb       NOT NULL,
-    status        varchar(12) NOT NULL DEFAULT 'PENDING',
-    attempts      int         NOT NULL DEFAULT 0,
-    max_attempts  int         NOT NULL DEFAULT 5,
-    run_after     timestamptz NOT NULL DEFAULT now(),
-    locked_at     timestamptz,
-    locked_by     varchar(64),
-    last_error    text,
-    created_at    timestamptz NOT NULL DEFAULT now(),
-    updated_at    timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT jobs_status_check CHECK (status IN
-        ('PENDING','RUNNING','SUCCEEDED','FAILED','DEAD'))
-);
-CREATE UNIQUE INDEX ux_jobs_dedup ON jobs (type, dedup_key)
-    WHERE dedup_key IS NOT NULL AND status IN ('PENDING','RUNNING');
-CREATE INDEX ix_jobs_poll ON jobs (run_after) WHERE status = 'PENDING';
-```
-
-取得クエリ:
-
-```sql
-SELECT * FROM jobs
- WHERE status = 'PENDING' AND run_after <= now()
- ORDER BY run_after
- LIMIT 4
- FOR UPDATE SKIP LOCKED;
-```
+判定は取り込みの確定と再評価の中でその場で行い、日次バッチは定期実行で直接動かすようにしたため、
+V021 でテーブルごと削除した（D-27）。
 
 ### 3.14 `repository_summaries` — ダッシュボード用の読み取りモデル
 
@@ -450,7 +402,6 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | `findings.state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL` |
 | `findings.severity` | `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO` |
 | `users.role` | `ADMIN` / `VIEWER` |
-| `jobs.status` | `PENDING` / `RUNNING` / `SUCCEEDED` / `FAILED` / `DEAD` |
 
 ---
 
@@ -465,28 +416,12 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | 3 | Run 詳細の指標一覧 | `ix_measurements_run ON measurements (run_id)` |
 | 4 | **トレンド**（リポジトリ × 指標 × 期間） | `ix_measurements_trend ON measurements (repository_id, metric_id, measured_at DESC)` |
 | 5 | Finding 一覧（Run 内・状態や深刻度で絞る） | `ix_findings_run ON findings (run_id, metric_id, state)` |
-| 6 | ジョブ取得 | `ix_jobs_poll`（3.13） |
-| 7 | Ingest Token 照合 | `token_prefix` の UNIQUE 制約 |
-| 8 | 保持期間の削除対象抽出 | `ix_runs_retention ON runs (measured_at)` |
+| 6 | 保持期間の削除対象抽出 | `ix_runs_retention ON runs (measured_at)` |
+| 7 | リリース判定のタグの解決 | `ix_runs_tags ON runs USING GIN (tags)` |
 
 4 のインデックスが最も重要である。トレンドは 30 日 × 1 指標で
 数十〜数百行を返すだけだが、`measurements` は 3 年で数百万行になる。
 `repository_id` と `metric_id` で絞り込めないと、期間指定だけでは足りない。
-
-### 部分インデックスを使う箇所
-
-```sql
--- 有効なトークンだけを対象にする
-CREATE INDEX ix_ingest_tokens_repo ON ingest_tokens (repository_id) WHERE revoked_at IS NULL;
--- 実行待ちジョブだけを対象にする
-CREATE INDEX ix_jobs_poll ON jobs (run_after) WHERE status = 'PENDING';
-```
-
-いずれも「大半が対象外」のテーブルであり、部分インデックスにすることで
-サイズを小さく保てる。ジョブは成功後も履歴として残るため、
-全体では増え続けるが、実行待ちは常に数件である。
-
----
 
 ## 6. データ量の見積もり
 
@@ -521,8 +456,6 @@ CREATE INDEX ix_jobs_poll ON jobs (run_after) WHERE status = 'PENDING';
 | `artifacts` の行 | 2 年 | Run とともに削除 |
 | `runs` / `measurements` / `findings` | 2 年 | `runs` を削除し、`ON DELETE CASCADE` で連鎖 |
 | `audit_logs` | 2 年 | 管理ロールのバッチで削除 |
-| `jobs`（`SUCCEEDED`） | 30 日 | |
-| `jobs`（`DEAD`） | 無期限 | 手動で確認・削除する |
 
 削除は日次バッチで**少量ずつ**実行する（1 回あたり最大 10,000 行）。
 一括削除は長時間のロックと WAL の急増を招き、その間アプリが停止する。
@@ -575,6 +508,7 @@ DELETE FROM runs
 | `V018__drop_repository_measure_pull_requests.sql` | どこからも読まれていなかった `repositories.measure_pull_requests`（PR を計測する設定）を削除する |
 | `V019__remove_duplicated_and_unused_definitions.sql` | 表示にしか使っていなかった `components` と `measurements.component_id`、廃止した M-08 の計測値・違反・スキップ申告・成果物（`junit-xml`）、保存済みの設定の `components` と `api_contract` の `min_success_rate` / `min_test_count` を削除する（D-25） |
 | `V020__run_tags.sql` | `runs.tags`（計測したコミットを指すタグ）と GIN 索引。リリース判定のタグの解決を GitHub API から Run に移した（D-26） |
+| `V021__drop_job_queue_and_ingest_tokens.sql` | `jobs` と `ingest_tokens` を削除する（判定をその場で行い、Ingest Token を環境変数の 1 つにまとめた。D-27） |
 
 `findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 

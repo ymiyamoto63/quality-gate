@@ -8,7 +8,7 @@
 #   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
 #              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
 #   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
-#              <計測プロファイルの INGEST_TOKEN_SECRET>  対象リポジトリの Ingest Token
+#              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
 #
 # ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh。計測プロファイルの ISOLATION）。
@@ -53,7 +53,6 @@ jobs:
       java_version: ${{ steps.profile.outputs.java_version }}
       isolation: ${{ steps.profile.outputs.isolation }}
       node_version: ${{ steps.node.outputs.node_version }}
-      token_secret: ${{ steps.profile.outputs.token_secret }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -71,7 +70,6 @@ jobs:
             echo "name=${QG_TARGET#*/}"
             echo "java_version=${JAVA_VERSION:-}"
             echo "isolation=${ISOLATION:-container}"
-            echo "token_secret=${INGEST_TOKEN_SECRET}"
             echo "node_version_file=${NODE_VERSION_FILE:-}"
           } >> "$GITHUB_OUTPUT"
 
@@ -178,11 +176,11 @@ jobs:
       - name: quality-gate へ送信
         env:
           QG_BASE_URL: ${{ vars.QG_BASE_URL }}
-          QG_INGEST_TOKEN: ${{ secrets[needs.fetch.outputs.token_secret] }}
+          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
           QG_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
           if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
-            echo "::error::QG_BASE_URL（Variables）または ${{ needs.fetch.outputs.token_secret }}（Secrets）が未設定です"
+            echo "::error::QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です"
             exit 1
           fi
           ./collector/bin/submit.sh "$RUNNER_TEMP/qg-reports"

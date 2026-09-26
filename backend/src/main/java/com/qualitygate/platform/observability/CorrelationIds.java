@@ -15,7 +15,6 @@ public final class CorrelationIds {
 
     public static final String REQUEST_ID = "requestId";
     public static final String RUN_ID = "runId";
-    public static final String JOB_ID = "jobId";
 
     /** 要求・応答のヘッダ。呼び出し側が付ければそれを使い、無ければ採番して応答に返す。 */
     public static final String REQUEST_ID_HEADER = "X-Request-Id";

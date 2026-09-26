@@ -32,6 +32,8 @@ services:
       QG_ARTIFACT_ROOT: /var/lib/quality-gate/artifacts
       QG_GITHUB_CLIENT_ID: ${QG_GITHUB_CLIENT_ID:-}
       QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-}
+      # 収集ランナーが取り込み API に送るトークン（収集ランナーの Secrets の QG_INGEST_TOKEN と同じ値）
+      QG_INGEST_TOKEN: ${QG_INGEST_TOKEN:-}
       # コンテナで動かすときは JSON 構造化ログにする（ログ基盤で requestId / runId を検索できるように）
       QG_LOG_FORMAT: ${QG_LOG_FORMAT:-ecs}
     ports:

@@ -66,7 +66,8 @@ quality-gate:
   max-artifact-bytes: 52428800      # 50MB
   max-run-bytes: 209715200          # 200MB
   base-url: ${QG_BASE_URL:http://localhost:8080}
-  job-poll-interval: 1000
+  # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（D-27）
+  ingest-tokens: ${QG_INGEST_TOKEN:}
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
 

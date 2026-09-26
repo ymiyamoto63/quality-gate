@@ -1,16 +1,13 @@
 package com.qualitygate.ingest;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
-import com.qualitygate.domain.entity.Job;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.RunSkippedMetric;
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.report.ParseContext;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
@@ -35,7 +32,6 @@ import tools.jackson.databind.ObjectMapper;
 import java.io.InputStream;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -53,36 +49,31 @@ public class IngestService {
     private final RunRepository runs;
     private final RunSkippedMetricRepository skippedMetrics;
     private final ArtifactRecordRepository artifacts;
-    private final JobRepository jobs;
     private final ArtifactStore artifactStore;
     private final QualityGateProperties properties;
     private final ObjectMapper objectMapper;
 
     public IngestService(MonitoredRepositoryRepository repositories, RunRepository runs,
                          RunSkippedMetricRepository skippedMetrics,
-                         ArtifactRecordRepository artifacts, JobRepository jobs,
+                         ArtifactRecordRepository artifacts,
                          ArtifactStore artifactStore, QualityGateProperties properties,
                          ObjectMapper objectMapper) {
         this.repositories = repositories;
         this.runs = runs;
         this.skippedMetrics = skippedMetrics;
         this.artifacts = artifacts;
-        this.jobs = jobs;
         this.artifactStore = artifactStore;
         this.properties = properties;
         this.objectMapper = objectMapper;
     }
 
     @Transactional
-    public Run createRun(UUID authenticatedRepositoryId, CreateRunRequest request) {
+    public Run createRun(CreateRunRequest request) {
+        // 送れるのは quality-gate に登録したリポジトリだけ。Ingest Token は収集ランナーの 1 つだけで、
+        // リポジトリごとには分けない（D-27）
         MonitoredRepository repository = repositories
                 .findByOwnerAndName(request.owner(), request.name())
                 .orElseThrow(() -> ApiException.notFound("リポジトリ", request.repository()));
-
-        if (!repository.getId().equals(authenticatedRepositoryId)) {
-            throw new ApiException(ErrorCode.REPOSITORY_MISMATCH,
-                    "この Ingest Token は %s に対して発行されていません".formatted(request.repository()));
-        }
         if (!repository.isEnabled()) {
             // 無効化したリポジトリの計測がダッシュボードの外で積み上がり続けないようにする
             throw new ApiException(ErrorCode.FORBIDDEN,
@@ -122,11 +113,11 @@ public class IngestService {
     }
 
     @Transactional
-    public ArtifactRecord storeArtifact(UUID authenticatedRepositoryId, UUID runId,
+    public ArtifactRecord storeArtifact(UUID runId,
                                         ArtifactType type, String filename,
                                         String componentName, String scope, String metadata,
                                         InputStream content, long declaredSize) {
-        Run run = loadOwnedRun(authenticatedRepositoryId, runId);
+        Run run = loadRun(runId);
 
         if (!run.getStatus().acceptsArtifacts()) {
             throw new ApiException(ErrorCode.RUN_ALREADY_FINALIZED,
@@ -193,29 +184,19 @@ public class IngestService {
     }
 
     @Transactional
-    public Run finalizeRun(UUID authenticatedRepositoryId, UUID runId) {
-        Run run = loadOwnedRun(authenticatedRepositoryId, runId);
+    public Run finalizeRun(UUID runId) {
+        Run run = loadRun(runId);
         if (!run.getStatus().acceptsArtifacts()) {
             throw new ApiException(ErrorCode.RUN_ALREADY_FINALIZED,
                     "この Run は既に確定しています（status=%s）".formatted(run.getStatus()));
         }
         run.finalizeIngest();
-
-        // 判定は非同期で行う。同期にすると CI の待ち時間が判定時間ぶん延びる。
-        jobs.save(new Job(Uuid7.generate(), JobType.EVALUATE_RUN, runId.toString(),
-                toJson(Map.of("runId", runId.toString()))));
-        log.info("Run を確定しました runId={} 判定ジョブを登録", runId);
+        log.info("Run を確定しました runId={}", runId);
         return run;
     }
 
-    @Transactional(readOnly = true)
-    public Run loadOwnedRun(UUID authenticatedRepositoryId, UUID runId) {
-        Run run = runs.findById(runId).orElseThrow(() -> ApiException.notFound("Run", runId));
-        if (!run.getRepositoryId().equals(authenticatedRepositoryId)) {
-            // 他リポジトリの Run の存在自体を明かさないため 404 を返す。
-            throw ApiException.notFound("Run", runId);
-        }
-        return run;
+    private Run loadRun(UUID runId) {
+        return runs.findById(runId).orElseThrow(() -> ApiException.notFound("Run", runId));
     }
 
     public String detailUrl(UUID runId) {
@@ -301,10 +282,5 @@ public class IngestService {
                     "metadata は JSON オブジェクト（{...}）で指定してください");
         }
         return node;
-    }
-
-    private String toJson(Map<String, ?> value) {
-        // Jackson 3 の書き出しは非チェック例外。ここで失敗するのは実装の誤りに限られる。
-        return objectMapper.writeValueAsString(value);
     }
 }

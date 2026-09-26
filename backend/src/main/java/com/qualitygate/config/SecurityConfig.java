@@ -2,7 +2,7 @@ package com.qualitygate.config;
 
 import com.qualitygate.auth.AllowlistOAuth2UserService;
 import com.qualitygate.auth.SessionUserRefreshFilter;
-import com.qualitygate.domain.repo.IngestTokenRepository;
+import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
 import jakarta.servlet.http.HttpServletRequest;
@@ -57,19 +57,19 @@ public class SecurityConfig {
         if (uri.endsWith("/reevaluate")) {
             return false;
         }
-        return "POST".equals(request.getMethod()) || uri.endsWith("/status");
+        return "POST".equals(request.getMethod());
     }
 
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    SecurityFilterChain ingestFilterChain(HttpSecurity http, IngestTokenRepository tokens) throws Exception {
+    SecurityFilterChain ingestFilterChain(HttpSecurity http, QualityGateProperties properties) throws Exception {
         RequestMatcher ingestMatcher = SecurityConfig::isIngestRequest;
         return http
                 .securityMatcher(ingestMatcher)
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("INGEST"))
-                .addFilterBefore(new IngestTokenAuthenticationFilter(tokens),
+                .addFilterBefore(new IngestTokenAuthenticationFilter(properties.ingestTokens()),
                         UsernamePasswordAuthenticationFilter.class)
                 .exceptionHandling(e -> e.authenticationEntryPoint(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))

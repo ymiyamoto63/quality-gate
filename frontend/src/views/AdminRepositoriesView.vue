@@ -1,22 +1,17 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
-import AppDialog from '@/components/AppDialog.vue'
 import { api, messageOf } from '@/api/client'
 import type { components } from '@/api/schema'
 import { useUiStore } from '@/stores/ui'
-import { formatDateTime } from '@/api/format'
 
 type Schemas = components['schemas']
 type Repository = Schemas['RepositoryItem']
-type Token = Schemas['TokenSummary']
 
 const ui = useUiStore()
 
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const errorMessage = ref<string | null>(null)
 const repositories = ref<Repository[]>([])
-const selected = ref<Repository | null>(null)
-const tokens = ref<Token[]>([])
 const announcement = ref('')
 
 // 登録フォーム
@@ -24,10 +19,6 @@ const owner = ref('')
 const name = ref('')
 const defaultBranch = ref('main')
 const createError = ref<string | null>(null)
-
-// 発行したトークン（一度だけ表示する）
-const issuedToken = ref<string | null>(null)
-const copied = ref(false)
 
 async function load(): Promise<void> {
   state.value = 'loading'
@@ -58,19 +49,8 @@ async function create(): Promise<void> {
   }
   owner.value = ''
   name.value = ''
-  announcement.value = `${data.fullName} を登録しました。続けて Ingest Token を発行してください。`
+  announcement.value = `${data.fullName} を登録しました。収集ランナーの計測プロファイルを追加すると計測できます。`
   await load()
-  await select(repositories.value.find((r) => r.repositoryId === data.repositoryId) ?? null)
-}
-
-async function select(repository: Repository | null): Promise<void> {
-  selected.value = repository
-  tokens.value = []
-  if (!repository) return
-  const { data } = await api.GET('/api/v1/repositories/{repositoryId}/ingest-tokens', {
-    params: { path: { repositoryId: repository.repositoryId } },
-  })
-  tokens.value = data?.items ?? []
 }
 
 async function toggleEnabled(repository: Repository): Promise<void> {
@@ -92,63 +72,6 @@ async function toggleEnabled(repository: Repository): Promise<void> {
     return
   }
   await load()
-  await select(repositories.value.find((r) => r.repositoryId === repository.repositoryId) ?? null)
-}
-
-async function issueToken(): Promise<void> {
-  if (!selected.value) return
-  const { data, error } = await api.POST('/api/v1/repositories/{repositoryId}/ingest-tokens', {
-    params: { path: { repositoryId: selected.value.repositoryId } },
-    body: { description: 'GitHub Actions' },
-  })
-  if (error) {
-    ui.notify('error', messageOf(error, 'トークンを発行できませんでした'))
-    return
-  }
-  copied.value = false
-  issuedToken.value = data.token
-}
-
-async function copyToken(): Promise<void> {
-  if (!issuedToken.value) return
-  try {
-    await navigator.clipboard.writeText(issuedToken.value)
-    copied.value = true
-    announcement.value = 'トークンをコピーしました'
-  } catch {
-    // クリップボードが使えない環境では、表示された値を手で選択してコピーしてもらう
-    announcement.value = 'コピーできませんでした。値を選択してコピーしてください'
-  }
-}
-
-/** 手でコピーした場合の逃げ道。コピー操作をしたことを利用者に宣言させる。 */
-function confirmCopiedManually(): void {
-  copied.value = true
-}
-
-async function closeTokenDialog(): Promise<void> {
-  // 平文は二度と取得できない。閉じたら画面からも消す
-  issuedToken.value = null
-  if (selected.value) await select(selected.value)
-}
-
-async function revoke(token: Token): Promise<void> {
-  if (
-    !window.confirm(
-      `トークン ${token.tokenPrefix} を失効させますか？ このトークンを使う収集ランナーや CI は即座に送信できなくなります。`,
-    )
-  ) {
-    return
-  }
-  const { error } = await api.DELETE('/api/v1/ingest-tokens/{tokenId}', {
-    params: { path: { tokenId: token.tokenId } },
-  })
-  if (error) {
-    ui.notify('error', messageOf(error))
-    return
-  }
-  announcement.value = `トークン ${token.tokenPrefix} を失効させました`
-  if (selected.value) await select(selected.value)
 }
 </script>
 
@@ -211,9 +134,6 @@ async function revoke(token: Token): Promise<void> {
           <td data-label="監視対象ブランチ">{{ repository.defaultBranch }}</td>
           <td data-label="状態">{{ repository.enabled ? '有効' : '無効' }}</td>
           <td data-label="操作" class="qg-actions">
-            <button type="button" class="qg-button" @click="select(repository)">
-              トークン・コンポーネントを管理
-            </button>
             <button type="button" class="qg-button" @click="toggleEnabled(repository)">
               {{ repository.enabled ? '無効化' : '有効化' }}
             </button>
@@ -221,86 +141,6 @@ async function revoke(token: Token): Promise<void> {
         </tr>
       </tbody>
     </table>
-
-    <template v-if="selected">
-      <h2 class="qg-selected">{{ selected.fullName }}</h2>
-
-      <section class="qg-panel" aria-labelledby="tokens-heading">
-        <h3 id="tokens-heading">Ingest Token</h3>
-        <p class="qg-muted">
-          収集ランナー（または CI）が計測結果を送るためのトークンです。書き込み専用で、参照 API
-          には使えません。
-        </p>
-        <button type="button" class="qg-button qg-button--primary" @click="issueToken">
-          トークンを発行
-        </button>
-        <table v-if="tokens.length > 0" class="qg-table qg-table--stack">
-          <thead>
-            <tr>
-              <th scope="col">prefix</th>
-              <th scope="col">用途</th>
-              <th scope="col">発行</th>
-              <th scope="col">最終使用</th>
-              <th scope="col">状態</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="token in tokens" :key="token.tokenId">
-              <td data-label="prefix">
-                <code>qg_{{ token.tokenPrefix }}_…</code>
-              </td>
-              <td data-label="用途">{{ token.description ?? '—' }}</td>
-              <td data-label="発行">{{ formatDateTime(token.createdAt) }}</td>
-              <td data-label="最終使用">
-                {{ token.lastUsedAt ? formatDateTime(token.lastUsedAt) : '未使用' }}
-              </td>
-              <td data-label="状態">
-                <template v-if="token.revokedAt"
-                  >失効（{{ formatDateTime(token.revokedAt) }}）</template
-                >
-                <button v-else type="button" class="qg-button" @click="revoke(token)">
-                  失効させる
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </section>
-    </template>
-
-    <!--
-      発行したトークンは一度しか表示しない。コピーするまで閉じられず、
-      Esc と背景クリックでも閉じない（docs/initial/08-screen-design.md 4.8）。
-    -->
-    <AppDialog
-      :open="issuedToken !== null"
-      title="Ingest Token を発行しました"
-      :dismissible="false"
-    >
-      <p class="qg-form__error">
-        この値が表示されるのはこの一度だけです。閉じると二度と取得できません。
-      </p>
-      <p class="qg-token">
-        <code>{{ issuedToken }}</code>
-        <button type="button" class="qg-button" @click="copyToken">コピー</button>
-      </p>
-      <p>GitHub の Secrets に <code>QG_INGEST_TOKEN</code> として登録してください。</p>
-      <p>
-        <button type="button" class="qg-link-button" @click="confirmCopiedManually">
-          手動でコピーしました
-        </button>
-      </p>
-      <div class="qg-form__actions">
-        <button
-          type="button"
-          class="qg-button qg-button--primary"
-          :disabled="!copied"
-          @click="closeTokenDialog"
-        >
-          コピーしました
-        </button>
-      </div>
-    </AppDialog>
   </section>
 </template>
 
@@ -314,33 +154,7 @@ async function revoke(token: Token): Promise<void> {
   flex-wrap: wrap;
   gap: 0.5rem;
 }
-.qg-selected {
-  margin-top: 2rem;
-}
-h2,
-h3 {
+h2 {
   margin-top: 0;
-}
-.qg-token {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
-  flex-wrap: wrap;
-}
-.qg-token code {
-  word-break: break-all;
-  user-select: all;
-  padding: 0.4rem;
-  border: 1px solid var(--axis);
-  border-radius: var(--radius);
-}
-.qg-link-button {
-  background: none;
-  border: none;
-  padding: 0;
-  color: var(--link);
-  text-decoration: underline;
-  font: inherit;
-  cursor: pointer;
 }
 </style>

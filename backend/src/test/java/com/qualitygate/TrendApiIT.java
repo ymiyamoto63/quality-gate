@@ -14,8 +14,6 @@ import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.GateConfigRepository;
-import com.qualitygate.domain.repo.IngestTokenRepository;
-import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
@@ -79,14 +77,12 @@ class TrendApiIT {
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
-    @Autowired IngestTokenRepository tokens;
     @Autowired RunRepository runs;
     @Autowired RunSkippedMetricRepository skippedMetrics;
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
     @Autowired RepositorySummaryRepository summaries;
-    @Autowired JobRepository jobs;
     @Autowired GateConfigRepository gateConfigs;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
@@ -100,7 +96,6 @@ class TrendApiIT {
     @BeforeEach
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
-        jobs.deleteAll();
         findings.deleteAll();
         measurements.deleteAll();
         artifacts.deleteAll();
@@ -108,7 +103,6 @@ class TrendApiIT {
         summaries.deleteAll();
         runs.deleteAll();
         gateConfigs.deleteAll();
-        tokens.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 

@@ -123,14 +123,13 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 | Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（セルフホストランナーから到達できるもの） |
 | Variables | `QG_COLLECTOR_APP_ID` | 1-2 の App の App ID |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 1-2 でダウンロードした秘密鍵（PEM の中身全体） |
-| Secrets | `QG_INGEST_TOKEN_LIKE_CHATGPT` | like-chatgpt の Ingest Token（名前は計測プロファイルの `INGEST_TOKEN_SECRET`） |
+| Secrets | `QG_INGEST_TOKEN` | Ingest Token。バックエンドの環境変数 `QG_INGEST_TOKEN` と同じ値（すべての対象で共通。D-27。[作り方](ingest.md#ingest-token-の作成と交換)） |
 
 **quality-gate リポジトリは private のままにしてください。** 収集ワークフローのログと成果物には、対象のパスやテスト出力が含まれます。
 
 ### 1-4. quality-gate にリポジトリを登録する
 
-1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録し、Ingest Token を発行する（1-3 のシークレットに入れる）。
-   対象の CI 用のトークンがすでにある場合も、収集ランナー用に別のトークンを発行する（あとで CI 用だけを失効させられるように）
+1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録する。登録していないリポジトリの Run は受け付けない
 
 合格ラインは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` です。収集ランナーが Run ごとに送り、quality-gate はその内容で判定します（D-20）。
 画面（S-06）は表示するだけで、編集はできません。変更はプルリクエストで行い、main にマージした後の計測から使われます
@@ -155,7 +154,8 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
    | base_branch | （空） | 比較元を決めるブランチ。空なら既定ブランチ。PR のマージ先が既定ブランチ以外のときに指定する |
 | base | （空）/ `v1.1.0` | 比較元のコミット（40 桁）かタグ。空なら自動（上の決め方） |
 
-3. 実行画面に対象のまとまり（例: `ymiyamoto63/like-chatgpt main`）ができる。その中の `submit` ジョブのログに `Run を作成しました: <runId>` と送信したファイルが出ていることを確かめる
+3. 実行画面に対象のまとまり（例: `ymiyamoto63/like-chatgpt main`）ができる。その中の `submit` ジョブのログに `Run を作成しました: <runId>` と送信したファイル、
+   最後に判定結果（`判定: PASS` など）が出ていることを確かめる。判定に失敗した（設定の誤りなど）場合は `submit` ジョブが失敗する
 4. quality-gate の Run 詳細で結果を見る。収集ランナーの Run は `triggeredBy` が `collector` になる
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
@@ -363,8 +363,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 収集ランナーだけで計測できるようになったら、対象リポジトリの CI から quality-gate への送信は不要です。
 両方から送ると、同じコミットの Run が 2 つでき、対象の CI の Run は対象側の `.quality-gate.yml` で判定されます。
 
-対象リポジトリに手を入れずに止めるには、**quality-gate 側で対象の CI 用の Ingest Token を失効させます**（S-08）。
-収集ランナー用のトークンを別に発行しておけば、収集ランナーの送信には影響しません。
+D-27 で Ingest Token を収集ランナー用の 1 つにまとめたため、対象の CI が持っている古いトークン（`qg_...`）はもう使えません。
 対象リポジトリの計測用ファイル（`.quality-gate.yml`、`.github/workflows/quality-gate.yml`、`scripts/quality-gate-submit.sh` など）は
 収集ランナーでは使いません。消すかどうかは対象側の判断です。
 
@@ -380,7 +379,7 @@ WORK=/tmp/qg-collector
 # コンテナを使わずに直接計測するなら（JDK・Node.js・Docker が必要）
 # ./collector/bin/measure.sh ymiyamoto63/like-chatgpt "$WORK" "$WORK/reports"
 
-QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=qg_xxxxxxxx_xxxxxxxx \
+QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<バックエンドの QG_INGEST_TOKEN> \
   ./collector/bin/submit.sh "$WORK/reports"
 ```
 
@@ -395,7 +394,7 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）
 2. 合格ラインとして `collector/targets/<owner>__<name>.gate.yml` を作る（無いと送信の前に止まる）
    （性能を計測するなら `collector/targets/<owner>__<name>.k6.js` も作る。[8 章](#8-m-0305性能段階-5)）
-3. 1-2 の App を対象にもインストールし、1-3 に Ingest Token のシークレットを足す
+3. 1-2 の App を対象にもインストールし、quality-gate にリポジトリを登録する（1-4）。Ingest Token は共通なので足さなくてよい
 
 スクリプトは、Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけを扱います。
 使わない側は計測プロファイルで空にしてください。
@@ -424,7 +423,10 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 | `measure` で `M-16: ... の N 回目の計測に失敗しました` | 画面が描画されない（Lighthouse の `NO_FCP` など）、または起動したアプリが応答しない。`LIGHTHOUSE_PAGES` のパスと、M-10 と同じ起動の設定を確かめる |
 | `measure` で `M-15: jscpd（frontend）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` の最初のディレクトリが無い（jscpd は 1 つのディレクトリだけを解析する） |
 | `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
-| `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
+| `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 1-3 の設定漏れ |
+| `submit` の Run 作成が 401 | 収集ランナーの `QG_INGEST_TOKEN` とバックエンドの `QG_INGEST_TOKEN` が一致していない |
+| `submit` の Run 作成が 404 | quality-gate にリポジトリを登録していない（1-4） |
+| `submit` が `判定に失敗しました（CONFIG_VALIDATION_FAILED）` | 合格ライン（`*.gate.yml`）の誤り。Run 詳細に行番号つきの理由が出る |
 | PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 合格ライン（`*.gate.yml`）の `execution.skippable_metrics` に `mutation_score` と `performance` が必要 |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名と合格ライン（`*.gate.yml`）の `performance.scenarios` が一致していない |
 | M-04 が WARN（到達率が設定値の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `arrival_rate_rps` が一致していない |
