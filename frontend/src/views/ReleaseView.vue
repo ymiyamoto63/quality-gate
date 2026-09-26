@@ -162,6 +162,13 @@ function print(): void {
               （{{ report.run.completeness === 'FULL' ? '完全計測' : '部分計測' }}）
             </dd>
           </div>
+          <div v-if="report.run?.baseCommitSha">
+            <dt>比較元</dt>
+            <dd>
+              <code>{{ shortSha(report.run.baseCommitSha) }}</code>
+              （新規の違反・破壊的変更・スキップの増加は、ここからの差で数えています）
+            </dd>
+          </div>
           <div v-if="report.run">
             <dt>合格ライン</dt>
             <dd>{{ report.gateConfig ? `v${report.gateConfig.version}` : '既定値' }}</dd>

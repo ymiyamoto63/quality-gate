@@ -913,6 +913,8 @@ export interface components {
     ReleaseRun: {
       /** Format: int32 */
       attempt: number
+      /** @description 比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ */
+      baseCommitSha: string | null
       branch: string
       /** @enum {string} */
       completeness: 'FULL' | 'PARTIAL'

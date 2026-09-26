@@ -352,7 +352,12 @@ public class RunEvaluationService {
             Set.of(MeasurementStatus.PASS, MeasurementStatus.WARN, MeasurementStatus.FAIL);
 
     /**
-     * 比較対象 Run。同一ブランチで、この Run より前に計測された判定済みの Run。
+     * 比較対象 Run。比較元コミット（{@code baseCommitSha}）で判定済みの Run があればそれ、
+     * 無ければ同一ブランチで、この Run より前に計測された判定済みの Run。
+     *
+     * <p>比較元コミットを優先するのは、計測が手動で順不同になるため（D-22）。
+     * 例えばリリースのタグ v1.1.0 を計測するとき、比較元は前のタグ v1.0.0 で、
+     * 「同じブランチで直前に計測した Run」は v1.1.0 より新しいコミットのこともある。
      *
      * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
      * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
@@ -364,9 +369,17 @@ public class RunEvaluationService {
                 return previous;
             }
         }
+        String base = run.getBaseCommitSha();
+        if (base != null && !base.equals(run.getCommitSha())) {
+            Optional<Run> atBase = runs.findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(
+                    run.getRepositoryId(), base, RunStatus.EVALUATED);
+            if (atBase.isPresent()) {
+                return atBase;
+            }
+        }
         return runs.findFirstByRepositoryIdAndBranchAndStatusAndMeasuredAtLessThanOrderByMeasuredAtDesc(
                         run.getRepositoryId(), run.getBranch(),
-                        com.qualitygate.domain.model.RunStatus.EVALUATED, run.getMeasuredAt())
+                        RunStatus.EVALUATED, run.getMeasuredAt())
                 .filter(candidate -> !candidate.getId().equals(run.getId()));
     }
 

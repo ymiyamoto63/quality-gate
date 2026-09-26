@@ -49,7 +49,11 @@ public record ReleaseReportResponse(
                          @NotNull String branch,
                          @NotNull int attempt,
                          @NotNull Verdict verdict,
-                         @NotNull Completeness completeness) {
+                         @NotNull Completeness completeness,
+                         @NotNull @Schema(nullable = true,
+                                 description = "比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。"
+                                         + "タグで計測したときは前のタグ")
+                         String baseCommitSha) {
     }
 
     @Schema(description = "合格ラインの版。しきい値を変えた理由は、この版のコミットに残る")

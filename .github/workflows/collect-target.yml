@@ -2,7 +2,7 @@
 # collect.yml（手動実行）から呼ばれる。単独では起動しない。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 計測する指標は M-01〜M-10。M-02（PIT）と M-03〜05（k6 の負荷試験）は既定ブランチのみ。
+# 計測する指標は M-01〜M-10。M-02（PIT）と M-03〜05（k6 の負荷試験）は PR 以外の計測でだけ実行する。
 #
 # 必要な設定（Settings → Secrets and variables → Actions。呼び出し側で secrets: inherit）:
 #   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
@@ -26,7 +26,7 @@ on:
         type: string
         default: ''
       commit:
-        description: 計測するコミット（40 桁。空ならブランチまたは PR の先頭）
+        description: 計測するコミット（40 桁の SHA）またはタグ（空ならブランチまたは PR の先頭）
         type: string
         default: ''
       pull_request:
@@ -35,6 +35,10 @@ on:
         default: ''
       base_branch:
         description: 比較元を決めるブランチ（空なら DEFAULT_BRANCH。PR ではマージ先）
+        type: string
+        default: ''
+      base:
+        description: 比較元のコミット（40 桁の SHA）またはタグ（空なら自動。タグの計測では前のタグ）
         type: string
         default: ''
 
@@ -91,6 +95,7 @@ jobs:
           QG_COMMIT: ${{ inputs.commit }}
           QG_PR_NUMBER: ${{ inputs.pull_request }}
           QG_BASE_BRANCH: ${{ inputs.base_branch }}
+          QG_BASE: ${{ inputs.base }}
         run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
 
       - name: Node.js の版の解決
@@ -116,7 +121,7 @@ jobs:
   measure:
     needs: fetch
     runs-on: self-hosted
-    # 既定ブランチの計測は、ビルド・テストに加えて PIT と負荷試験（約 18 分）を実行する
+    # PR 以外の計測は、ビルド・テストに加えて PIT と負荷試験（約 18 分）を実行する
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4

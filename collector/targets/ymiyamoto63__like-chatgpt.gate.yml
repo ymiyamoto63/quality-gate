@@ -38,7 +38,7 @@ metrics:
   mutation_score:
     enabled: true
     threshold: 60
-    scope: all                    # 収集ランナーは既定ブランチで全量を実行する
+    scope: all                    # 収集ランナーは PR 以外の計測で全量を実行する
     components: [backend]
   performance:
     enabled: true

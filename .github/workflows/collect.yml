@@ -1,7 +1,8 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 起動は手動実行だけ（定期実行は D-22 で廃止）。対象とブランチ（またはコミット・PR）を指定して計測する。
+# 起動は手動実行だけ（定期実行は D-22 で廃止）。対象とブランチ（またはコミット・タグ・PR）を指定して計測する。
+# リリース判定（D-23）に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
 # 1 コミットの計測は collect-target.yml（fetch → measure → submit）が行う。
 # 必要な設定は collect-target.yml の先頭を参照。
@@ -18,7 +19,7 @@ on:
         description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH。PR の場合は PR のブランチ名）
         required: false
       commit:
-        description: 計測するコミット（40 桁。空ならブランチまたは PR の先頭）
+        description: 計測するコミット（40 桁の SHA）またはタグ（空ならブランチまたは PR の先頭）
         required: false
       pull_request:
         description: PR を計測する場合の番号
@@ -26,14 +27,17 @@ on:
       base_branch:
         description: 比較元を決めるブランチ（空なら既定ブランチ。PR ではマージ先のブランチ）
         required: false
+      base:
+        description: 比較元のコミット（40 桁の SHA）またはタグ（空なら自動。タグの計測では前のタグ）
+        required: false
 
 permissions:
   contents: read
 
 jobs:
   collect:
-    # 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14）
-    name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.branch || 'default' }}
+    # 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14 / ymiyamoto63/like-chatgpt v1.2.0）
+    name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.commit || inputs.branch || 'default' }}
     uses: ./.github/workflows/collect-target.yml
     with:
       repository: ${{ inputs.repository }}
@@ -41,4 +45,5 @@ jobs:
       commit: ${{ inputs.commit }}
       pull_request: ${{ inputs.pull_request }}
       base_branch: ${{ inputs.base_branch }}
+      base: ${{ inputs.base }}
     secrets: inherit
