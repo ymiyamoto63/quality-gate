@@ -1815,6 +1815,11 @@ components:
         attempt:
           type: integer
           format: int32
+        baseCommitSha:
+          type:
+          - string
+          - "null"
+          description: 比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ
         branch:
           type: string
         completeness:
@@ -1836,6 +1841,7 @@ components:
           - FAIL
       required:
       - attempt
+      - baseCommitSha
       - branch
       - completeness
       - measuredAt

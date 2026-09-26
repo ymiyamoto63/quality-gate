@@ -55,6 +55,7 @@ class ComplexityPastBaseIT {
 
     private static final String BASE_COMMIT = "b".repeat(40);
     private static final String HEAD_COMMIT = "c".repeat(40);
+    private static final String NEWER_COMMIT = "d".repeat(40);
 
     private static final String CONFIG = """
             version: 1
@@ -168,14 +169,35 @@ class ComplexityPastBaseIT {
                 .containsExactlyInAnyOrder(FindingState.NEW, FindingState.RESOLVED);
     }
 
+    @Test
+    void 比較元コミットのRunを直前に計測したRunより優先して比較対象にする() {
+        // リリースのタグ（HEAD）を、それより新しいコミット（NEWER）の後に計測した場合。
+        // 比較対象は前のリリース（BASE）で、同じブランチで直前に計測した NEWER ではない
+        Measurement base = evaluate(BASE_COMMIT, null, Instant.parse("2026-09-19T00:00:00Z"), "Service.java",
+                Map.of("legacy", 20), null);
+        evaluate(NEWER_COMMIT, null, Instant.parse("2026-09-20T00:00:00Z"), "Service.java", Map.of(), null);
+
+        Measurement head = evaluate(HEAD_COMMIT, BASE_COMMIT, Map.of("legacy", 20));
+
+        assertThat(runs.findById(head.getRunId()).orElseThrow().getBaselineRunId()).isEqualTo(base.getRunId());
+        assertThat(findings.findByRunId(head.getRunId())).extracting(Finding::getState)
+                .containsExactly(FindingState.CONTINUING);
+    }
+
     private Measurement evaluate(String commit, String baseCommit, Map<String, Integer> complexity) {
         return evaluate(commit, baseCommit, "Service.java", complexity, null);
     }
 
     private Measurement evaluate(String commit, String baseCommit, String file, Map<String, Integer> complexity,
                                  String renamedFiles) {
-        Run run = new Run(Uuid7.generate(), repositoryId, commit, "main", "it",
-                Instant.parse(baseCommit == null ? "2026-09-20T00:00:00Z" : "2026-09-21T00:00:00Z"), 1);
+        return evaluate(commit, baseCommit,
+                Instant.parse(baseCommit == null ? "2026-09-20T00:00:00Z" : "2026-09-21T00:00:00Z"), file,
+                complexity, renamedFiles);
+    }
+
+    private Measurement evaluate(String commit, String baseCommit, Instant measuredAt, String file,
+                                 Map<String, Integer> complexity, String renamedFiles) {
+        Run run = new Run(Uuid7.generate(), repositoryId, commit, "main", "it", measuredAt, 1);
         run.setBaseCommitSha(baseCommit);
         run.setRenamedFiles(renamedFiles);
         run.finalizeIngest();

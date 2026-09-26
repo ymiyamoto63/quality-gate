@@ -118,7 +118,8 @@ public class ReleaseReportService {
                 decisionOf(chosen, counts),
                 reasonOf(chosen, candidates.size(), counts, rows),
                 chosen == null ? null : new ReleaseReportResponse.ReleaseRun(chosen.getId(), chosen.getMeasuredAt(),
-                        chosen.getBranch(), chosen.getAttempt(), chosen.getVerdict(), chosen.getCompleteness()),
+                        chosen.getBranch(), chosen.getAttempt(), chosen.getVerdict(), chosen.getCompleteness(),
+                        chosen.getBaseCommitSha()),
                 chosen == null ? candidates.size() : candidates.size() - 1,
                 chosen == null ? null : gateConfigOf(chosen),
                 counts,
@@ -146,7 +147,7 @@ public class ReleaseReportService {
                                    List<ReleaseReportResponse.ReleaseMetric> rows) {
         if (run == null) {
             return candidateCount == 0
-                    ? "このコミットはまだ計測されていません。収集ランナーで計測してから、もう一度確認してください。"
+                    ? "このコミットはまだ計測されていません。収集ランナーの commit にタグかコミットを指定して計測してから、もう一度確認してください。"
                     : "このコミットの計測（%d 件）は、どれも判定まで終わっていません（処理の失敗など）。計測し直してください。"
                             .formatted(candidateCount);
         }
@@ -154,7 +155,7 @@ public class ReleaseReportService {
             case NOT_RELEASABLE -> "%d 件の指標が不合格です（%s）。".formatted(
                     counts.failed() + counts.errored(), namesOf(rows, MeasurementStatus.FAIL, MeasurementStatus.ERROR))
                     + (run.getCompleteness() == Completeness.FULL ? "" : "部分計測のため、測っていない指標もあります。");
-            case UNDETERMINED -> "測っていない指標があるため判定できません（%s）。完全計測で計測し直してください。"
+            case UNDETERMINED -> "測っていない指標があるため判定できません（%s）。PR ではなく、タグかコミットを指定して計測し直してください。"
                     .formatted(namesOf(rows, MeasurementStatus.SKIP, MeasurementStatus.REFERENCE));
             case RELEASABLE_WITH_WARNINGS -> "不合格はありませんが、%d 件の指標が注意です（%s）。".formatted(
                     counts.warned(), namesOf(rows, MeasurementStatus.WARN));

@@ -25,7 +25,7 @@ final class ReleaseReportCsv {
     private static final DateTimeFormatter TIMESTAMP = DateTimeFormatter.ISO_OFFSET_DATE_TIME;
 
     static final List<String> HEADER = List.of("リポジトリ", "指定", "コミット", "リリース判定", "判定の理由",
-            "Run ID", "計測日時", "計測範囲", "合格ラインの版", "除外パターン", "指標ID", "指標", "カテゴリ",
+            "Run ID", "計測日時", "計測範囲", "比較元コミット", "合格ラインの版", "除外パターン", "指標ID", "指標", "カテゴリ",
             "コンポーネント", "計測条件", "値", "しきい値", "判定", "判定の詳細", "何を見る指標か", "根拠の種類",
             "基準の根拠", "出力日時", "出力者");
 
@@ -53,6 +53,7 @@ final class ReleaseReportCsv {
                 report.run() == null ? "" : report.run().runId().toString(),
                 report.run() == null ? "" : TIMESTAMP.format(report.run().measuredAt().atZone(zone)),
                 report.run() == null ? "" : completenessLabel(report.run().completeness().name()),
+                report.run() == null ? "" : text(report.run().baseCommitSha()),
                 report.gateConfig() == null
                         ? (report.run() == null ? "" : "既定値")
                         : "v" + report.gateConfig().version(),

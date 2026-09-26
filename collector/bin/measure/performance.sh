@@ -3,7 +3,7 @@
 # measure.sh が source する（単独では実行しない）。
 
 # シナリオ（collector/targets/）とツールの版（versions.env の K6_VERSION）は quality-gate 側のもの。
-# 1 回に ウォームアップ + 計測 の時間がかかるため、既定ブランチの計測でだけ PERF_RUNS 回（既定 3 回）実行する。
+# 1 回に ウォームアップ + 計測 の時間がかかるため、PR 以外の計測で PERF_RUNS 回（既定 3 回）実行する。
 # 中央値は quality-gate が取る（docs/initial/02-metrics-spec.md M-03）
 k6_bin() {
   local home="$CACHE/k6-${K6_VERSION}" arch
@@ -19,9 +19,9 @@ k6_bin() {
 measure_performance() {
   local script="$COLLECTOR_DIR/targets/$PERF_SCRIPT" port=${PERF_BACKEND_PORT:-8080} runs=${PERF_RUNS:-3}
   local warmup=${PERF_WARMUP_SECONDS:-60} duration=${PERF_DURATION_SECONDS:-300} k6 i summary environment jvm
-  if [ -n "$PR_NUMBER" ] || [ "$BRANCH" != "$DEFAULT_BRANCH" ]; then
+  if [ -n "$PR_NUMBER" ]; then
     for i in M-03 M-04 M-05; do
-      skip "$i" "収集ランナーは既定ブランチ（$DEFAULT_BRANCH）の計測でだけ負荷試験を実行する"
+      skip "$i" "収集ランナーは PR の計測では負荷試験を実行しない"
     done
     return
   fi

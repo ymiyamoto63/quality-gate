@@ -153,6 +153,7 @@ class ReleaseReportApiIT {
                             .startsWith("1 件の指標が不合格です（ブランチカバレッジ）");
                     json.extractingPath("$.metrics[0].status").isEqualTo("FAIL");
                     json.extractingPath("$.counts.failed").asNumber().isEqualTo(1);
+                    json.extractingPath("$.run.baseCommitSha").isEqualTo(PASSING);
                 });
     }
 
@@ -218,7 +219,7 @@ class ReleaseReportApiIT {
         assertThat(lines.getFirst()).startsWith("﻿リポジトリ,指定,コミット,リリース判定");
         assertThat(lines).hasSize(2);
         assertThat(lines.get(1))
-                .contains("ymiyamoto63/quality-gate", "リリース不可", "完全計測", "v1", "M-01", "ブランチカバレッジ",
+                .contains("ymiyamoto63/quality-gate", "リリース不可", "完全計測", PASSING, "v1", "M-01", "ブランチカバレッジ",
                         "75%", "≥ 80%", "不合格", "業界の目安", "2026-09-21T12:00:00+09:00", "ymiyamoto63");
 
         assertThat(auditLogs.findAll()).singleElement().satisfies(log -> {
@@ -248,6 +249,12 @@ class ReleaseReportApiIT {
     private void evaluated(String commitSha, String measuredAt, String config, int covered, boolean skipMutation) {
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main", "github-actions",
                 Instant.parse(measuredAt), runs.findMaxAttempt(repositoryId, commitSha) + 1);
+        // 前のリリースと比べた計測（PASSING の比較元は計測していないコミット）
+        if (PASSING.equals(commitSha)) {
+            run.setBaseCommitSha("0".repeat(40));
+        } else if (FAILING.equals(commitSha)) {
+            run.setBaseCommitSha(PASSING);
+        }
         run.finalizeIngest();
         runs.save(run);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, config);
