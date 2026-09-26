@@ -268,6 +268,26 @@ class GateConfigParserTest {
     }
 
     @Test
+    void シークレットとライセンスの指標は既定で無効で書けば有効になる() {
+        GateConfigDocument defaults = parser.parse("version: 1");
+        assertThat(defaults.metric("secrets").enabled()).isFalse();
+        assertThat(defaults.metric("licenses").enabled()).isFalse();
+
+        GateConfigDocument document = parser.parse("""
+                version: 1
+                metrics:
+                  secrets:
+                    max_secrets: 0
+                  licenses:
+                    max_forbidden: 0
+                    max_restricted: 3
+                """);
+        assertThat(document.metric("secrets").enabled()).isTrue();
+        assertThat(document.metric("licenses").number("max_restricted"))
+                .contains(new java.math.BigDecimal("3"));
+    }
+
+    @Test
     void 編集距離が遠い候補は提示しない() {
         // 遠い候補を出すと、かえって迷わせる
         assertThat(GateConfigParser.closest("zzzzzzzz",

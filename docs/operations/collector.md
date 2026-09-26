@@ -5,7 +5,7 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01〜M-12 の全指標**です。
+計測する指標は **M-01〜M-14 の全指標**です。
 M-07（循環的複雑度）は backend と frontend の両方を解析します。
 M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブランチの計測でだけ**実行します（PR などの計測ではスキップを申告します）。
 
@@ -46,7 +46,8 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | --- | --- |
 | M-01（Java） | `mvn org.jacoco:jacoco-maven-plugin:<版>:prepare-agent verify ...:report`。JaCoCo をコマンドラインから差し込む。単体テストと結合テスト（failsafe）の両方を 1 つの実行データに集める |
 | M-01（TS） | `vitest run` にカバレッジのオプションを渡す。`@vitest/coverage-v8` が対象に無ければ、Vitest と同じ版を作業用の clone にだけ入れる（`npm install --no-save`） |
-| M-06 | コミット時点の作業ツリーに依存関係を取得した後で `trivy fs`（対象の CI と同じ順序） |
+| M-06 / M-13 | コミット時点の作業ツリーに依存関係を取得した後で `trivy fs --scanners vuln,secret`（対象の CI と同じ順序）。メタデータ `{"scanners":["vuln","secret"]}` を添えて送り、脆弱性は M-06、シークレットは M-13 で判定される |
+| M-14 | 同じ作業ツリーを `trivy fs --scanners license` で走査する（深刻度で絞らない。デュアルライセンスの緩いほうを選ぶため）。`trivy-license.sarif` をメタデータ `{"scanners":["license"]}` を添えて送る |
 | M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
 | M-08 | `mvn verify` が出す JUnit XML のうち、計測プロファイルの `CONTRACT_TEST_REPORTS` に合うものだけを送る |
@@ -377,6 +378,10 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
   対象の `npm run lint` の `complexity` の警告とは版や設定の違いでずれることがあります
 - **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
   like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
+- **M-13（シークレット）は M-06（脆弱性）から分かれました。** 以前は Trivy が見つけたシークレットも M-06 の件数に入っていました。
+  画面の設定で `secrets` を有効にしないと、シークレットは判定されません（控えの `*.gate.yml` では有効にしています）
+- **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
+  使ってよいと判断したパッケージは、違反単位の免除で外します
 - **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
   画面の設定で `test_results` を有効にしたときだけ判定されます（控えの `*.gate.yml` では有効にしています）。
   M-12 は比較対象の Run からスキップが増えたら FAIL です

@@ -70,6 +70,14 @@ metrics:
     min_success_rate: 100
     min_test_count: 1
     max_skipped_increase: 0
+  # コミットされた鍵やトークン（Trivy のシークレットの走査）。1 件でも不合格
+  secrets:
+    enabled: true
+    max_secrets: 0
+  # 依存関係のライセンス（Trivy の分類）。forbidden は不合格、restricted・分類不明は警告
+  licenses:
+    enabled: true
+    max_forbidden: 0
   accessibility:
     enabled: true
     standard: wcag22aa

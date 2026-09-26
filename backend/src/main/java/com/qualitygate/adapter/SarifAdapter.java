@@ -14,13 +14,17 @@ import java.io.InputStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 /**
- * SARIF 2.1.0 から M-06（脆弱性）を読む。
+ * SARIF 2.1.0 から M-06（脆弱性）・M-13（シークレット）・M-14（ライセンス）を読む。
  *
  * <p>SARIF を静的解析系の第一形式としたのは、SARIF で出せるツールをすべて
  * このアダプタ 1 本に集約できるためである。Trivy / Semgrep / gitleaks / OSV などの
@@ -29,6 +33,14 @@ import java.util.Set;
  * <p>深刻度は <strong>CVSS スコアを正</strong>として正規化する。ツールごとの
  * severity 表記に従うと「High」の意味がツール間で揺れ、判定の信頼性が落ちる。
  * CVSS が無い検出（SAST・シークレット混入）のみ、ツール固有の値からマッピングする。
+ *
+ * <p><strong>走査した対象（メタデータの {@code scanners}）が宣言されていれば</strong>、検出を指標に振り分ける。
+ * シークレット（Trivy のルールの tags に {@code secret}、または gitleaks などのシークレット専用ツール）は M-13、
+ * ライセンス（tags に {@code license}）は M-14、それ以外は M-06。値を与えるのも宣言した対象の指標だけにする
+ * （ライセンスだけを走査した SARIF で、M-06 を「0 件」として合格にしないため）。
+ *
+ * <p>宣言が無い SARIF は従来どおりすべてを M-06 として読む。シークレットの分離を知らない送り手の
+ * シークレットが、判定から黙って消えないようにするためである。
  */
 @Component
 public class SarifAdapter implements ArtifactAdapter {
@@ -42,6 +54,17 @@ public class SarifAdapter implements ArtifactAdapter {
 
     /** シークレット混入は有効な認証情報の流出であり、常に重大として扱う。 */
     private static final Set<String> SECRET_TOOLS = Set.of("gitleaks", "trufflehog");
+
+    static final String VULNERABILITY_METRIC = "M-06";
+    static final String SECRET_METRIC = "M-13";
+    static final String LICENSE_METRIC = "M-14";
+
+    /** 宣言が無い SARIF が値を与える指標（従来どおり）。 */
+    private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, "M-07");
+
+    /** Trivy のライセンスの分類。メッセージの {@code Classification: forbidden} から読む。 */
+    private static final Pattern CLASSIFICATION =
+            Pattern.compile("Classification:\\s*([A-Za-z-]+)");
 
     private final ObjectMapper objectMapper;
 
@@ -64,6 +87,7 @@ public class SarifAdapter implements ArtifactAdapter {
                             + " SARIF 2.1.0 形式のファイルを送信してください");
         }
 
+        Set<String> declared = declaredMetrics(context);
         List<RawFinding> findings = new ArrayList<>();
         for (JsonNode run : runs) {
             String toolName = toolNameOf(run);
@@ -74,17 +98,39 @@ public class SarifAdapter implements ArtifactAdapter {
             }
             Map<String, JsonNode> rules = rulesOf(run);
             for (JsonNode result : run.path("results")) {
-                RawFinding finding = toFinding(result, rules, toolName, context);
-                if (finding != null) {
+                RawFinding finding = toFinding(result, rules, toolName, context, declared != null);
+                // 宣言していない対象の検出は捨てる（その指標は計測していないことになっている）
+                if (finding != null && (declared == null || declared.contains(finding.metricId()))) {
                     findings.add(finding);
                 }
             }
         }
-        return NormalizedReport.of(ArtifactType.SARIF, List.of(), findings);
+        return NormalizedReport.of(ArtifactType.SARIF, List.of(), findings)
+                .withSuppliedMetrics(declared == null ? UNDECLARED_METRICS : declared);
+    }
+
+    /** メタデータの {@code scanners} から、値を与える指標を決める。宣言が無ければ null。 */
+    private static Set<String> declaredMetrics(ParseContext context) {
+        List<String> scanners = context.metadataList(ParseContext.SCANNERS);
+        if (scanners.isEmpty()) {
+            return null;
+        }
+        Set<String> metrics = new LinkedHashSet<>();
+        for (String scanner : scanners) {
+            switch (scanner.toLowerCase(Locale.ROOT)) {
+                case "vuln", "misconfig" -> metrics.add(VULNERABILITY_METRIC);
+                case "secret" -> metrics.add(SECRET_METRIC);
+                case "license" -> metrics.add(LICENSE_METRIC);
+                default -> throw new ArtifactFormatException(
+                        "メタデータの scanners に未知の値があります: %s（指定できるのは vuln / misconfig / secret / license）"
+                                .formatted(scanner));
+            }
+        }
+        return metrics;
     }
 
     private RawFinding toFinding(JsonNode result, Map<String, JsonNode> rules,
-                                 String toolName, ParseContext context) {
+                                 String toolName, ParseContext context, boolean split) {
         String ruleId = result.path("ruleId").asString("");
         String filePath = filePathOf(result);
         if (context.isExcluded(filePath)) {
@@ -92,6 +138,10 @@ public class SarifAdapter implements ArtifactAdapter {
         }
 
         JsonNode rule = rules.getOrDefault(ruleId, objectMapper.nullNode());
+        String metricId = split ? metricOf(rule, toolName) : VULNERABILITY_METRIC;
+        if (LICENSE_METRIC.equals(metricId)) {
+            return toLicenseFinding(result, rule, ruleId, filePath, context);
+        }
         Severity severity = severityOf(result, rule, toolName);
         String title = titleOf(result, rule, ruleId);
 
@@ -108,8 +158,55 @@ public class SarifAdapter implements ArtifactAdapter {
         // 「新規発生」と誤判定しないため。
         String identity = identityOf(ruleId, detail, filePath);
 
-        return new RawFinding("M-06", ruleId, severity, title, filePath, lineOf(result),
+        return new RawFinding(metricId, ruleId, severity, title, filePath, lineOf(result),
                 context.componentName(), identity, detail);
+    }
+
+    /** 検出の種類。Trivy はルールの tags に secret / license / vulnerability を載せる。 */
+    private static String metricOf(JsonNode rule, String toolName) {
+        if (SECRET_TOOLS.contains(toolName)) {
+            return SECRET_METRIC;
+        }
+        Set<String> tags = new HashSet<>();
+        for (JsonNode tag : rule.path("properties").path("tags")) {
+            tags.add(tag.asString("").toLowerCase(Locale.ROOT));
+        }
+        if (tags.contains("secret")) {
+            return SECRET_METRIC;
+        }
+        if (tags.contains("license")) {
+            return LICENSE_METRIC;
+        }
+        return VULNERABILITY_METRIC;
+    }
+
+    /**
+     * ライセンスの検出。ルール ID は Trivy の {@code <パッケージ>:<ライセンス>}。
+     * 分類（forbidden / restricted / reciprocal / notice / permissive / unencumbered / unknown）で判定するため、
+     * CVSS ではなく分類を内訳に残す。同じパッケージに複数のライセンスが並ぶ場合の扱いは評価器が決める。
+     */
+    private static RawFinding toLicenseFinding(JsonNode result, JsonNode rule, String ruleId,
+                                               String filePath, ParseContext context) {
+        String message = result.path("message").path("text").asString("");
+        int separator = ruleId.lastIndexOf(':');
+        String pkg = separator > 0 ? ruleId.substring(0, separator) : ruleId;
+        String license = separator > 0 ? ruleId.substring(separator + 1) : ruleId;
+        Matcher matcher = CLASSIFICATION.matcher(message);
+        String classification = matcher.find() ? matcher.group(1).toLowerCase(Locale.ROOT) : "unknown";
+
+        Map<String, Object> detail = new HashMap<>();
+        detail.put("package", pkg);
+        detail.put("license", license);
+        detail.put("classification", classification);
+        Severity severity = switch (classification) {
+            case "forbidden" -> Severity.CRITICAL;
+            case "restricted" -> Severity.HIGH;
+            case "reciprocal", "unknown" -> Severity.MEDIUM;
+            default -> Severity.INFO;
+        };
+        String title = "%s のライセンス %s（%s）".formatted(pkg, license, classification);
+        return new RawFinding(LICENSE_METRIC, ruleId, severity, title, filePath, null,
+                context.componentName(), pkg + "|" + license, detail);
     }
 
     /**

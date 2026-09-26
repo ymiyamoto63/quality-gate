@@ -27,6 +27,12 @@ public record ParseContext(String componentName, String scope, List<String> excl
      */
     public static final String BASE_SPEC_MISSING = "baseSpecMissing";
 
+    /**
+     * SARIF の成果物のメタデータで、走査した対象を表すキー（文字列の配列。{@code vuln} / {@code secret} /
+     * {@code license}）。Trivy の {@code --scanners} と同じ書き方。あれば走査した対象の指標だけに値を与える。
+     */
+    public static final String SCANNERS = "scanners";
+
     public ParseContext(String componentName, String scope, List<String> exclusions) {
         this(componentName, scope, exclusions, Map.of());
     }
@@ -40,6 +46,14 @@ public record ParseContext(String componentName, String scope, List<String> excl
         return metadata.get(key) instanceof String text && !text.isBlank()
                 ? Optional.of(text)
                 : Optional.empty();
+    }
+
+    /** 文字列の配列のメタデータ。無い・配列でない場合は空。 */
+    public List<String> metadataList(String key) {
+        if (!(metadata.get(key) instanceof List<?> list)) {
+            return List.of();
+        }
+        return list.stream().filter(String.class::isInstance).map(String.class::cast).toList();
     }
 
     /** 真偽値のメタデータ。無い・真偽値でない場合は false。 */

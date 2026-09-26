@@ -133,7 +133,9 @@ if [ -n "${OPENAPI_PATH:-}" ]; then
     upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND"
   fi
 fi
-upload sarif "$REPORTS/trivy.sarif"
+# 走査した対象を申告する（申告の無い SARIF は、すべて M-06 として読まれる）
+upload sarif "$REPORTS/trivy.sarif" '' '' '{"scanners":["vuln","secret"]}'
+upload sarif "$REPORTS/trivy-license.sarif" '' '' '{"scanners":["license"]}'
 # M-03〜05。1 ファイル = 1 回の実行。計測環境（と異常終了）は measure.sh が書いた .metadata を添える
 if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
   found=0

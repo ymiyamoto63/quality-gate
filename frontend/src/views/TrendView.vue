@@ -27,6 +27,8 @@ const METRICS = [
   { metricId: 'M-10', name: 'アクセシビリティ違反' },
   { metricId: 'M-11', name: 'テスト成功率' },
   { metricId: 'M-12', name: 'スキップされたテスト数' },
+  { metricId: 'M-13', name: 'シークレット検出件数' },
+  { metricId: 'M-14', name: 'ライセンス違反件数' },
 ]
 
 onMounted(() => store.load(repositoryId.value))

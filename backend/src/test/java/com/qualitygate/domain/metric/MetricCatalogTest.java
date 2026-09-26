@@ -13,7 +13,7 @@ class MetricCatalogTest {
     void 要件定義の指標と追加した指標をすべて持つ() {
         assertThat(MetricCatalog.all()).extracting(MetricDefinition::metricId)
                 .containsExactly("M-01", "M-02", "M-03", "M-04", "M-05",
-                        "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12");
+                        "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12", "M-13", "M-14");
     }
 
     @Test

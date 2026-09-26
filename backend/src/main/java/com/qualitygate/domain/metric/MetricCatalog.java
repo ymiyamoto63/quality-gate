@@ -33,7 +33,9 @@ public final class MetricCatalog {
             new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false, false),
             // 要件定義の後に追加した指標。カテゴリは既存の表に合わせる
             new MetricDefinition("M-11", "テスト成功率", MetricCategory.FUNCTIONAL, true, false),
-            new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false, false));
+            new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false, false),
+            new MetricDefinition("M-13", "シークレット検出件数", MetricCategory.SECURITY, false, false),
+            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false, false));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 
