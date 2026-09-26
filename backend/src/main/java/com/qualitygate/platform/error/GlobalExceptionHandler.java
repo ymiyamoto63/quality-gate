@@ -3,9 +3,12 @@ package com.qualitygate.platform.error;
 import com.qualitygate.platform.observability.CorrelationIds;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.TypeMismatchException;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.web.ErrorResponse;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -58,10 +61,38 @@ public class GlobalExceptionHandler {
                 "リクエストの本文を解釈できません。JSON の形式と値の型を確認してください");
     }
 
+    /** パスやクエリの値の型が合わない（UUID の形でない ID など）。サーバの異常ではない。 */
+    @ExceptionHandler(TypeMismatchException.class)
+    public ProblemDetail handleTypeMismatch(TypeMismatchException ex) {
+        return problemOf(ErrorCode.VALIDATION_FAILED,
+                "%s の値の形式が不正です（受信値: %s）".formatted(ex.getPropertyName(), ex.getValue()));
+    }
+
     @ExceptionHandler(Exception.class)
-    public ProblemDetail handleUnexpected(Exception ex) {
+    public ResponseEntity<ProblemDetail> handleUnexpected(Exception ex) {
+        // Spring MVC が要求の誤りとして投げる例外（405 / 415 / 404 / 必須パラメータの欠落など）は
+        // 状態コードを持っている。まとめて 500 にすると、利用者の誤りがサーバの異常に見える
+        if (ex instanceof ErrorResponse response && response.getStatusCode().is4xxClientError()) {
+            return handleClientError(ex, response);
+        }
         log.error("想定外のエラー", ex);
-        return problemOf(ErrorCode.INTERNAL_ERROR, "サーバ内部でエラーが発生しました");
+        ProblemDetail problem = problemOf(ErrorCode.INTERNAL_ERROR, "サーバ内部でエラーが発生しました");
+        return ResponseEntity.status(problem.getStatus()).body(problem);
+    }
+
+    private ResponseEntity<ProblemDetail> handleClientError(Exception ex, ErrorResponse response) {
+        log.warn("要求の誤り: status={} {}", response.getStatusCode().value(), ex.getMessage());
+        ErrorCode code = switch (response.getStatusCode().value()) {
+            case 404 -> ErrorCode.RESOURCE_NOT_FOUND;
+            case 405 -> ErrorCode.METHOD_NOT_ALLOWED;
+            case 406 -> ErrorCode.NOT_ACCEPTABLE;
+            case 413 -> ErrorCode.ARTIFACT_TOO_LARGE;
+            case 415 -> ErrorCode.UNSUPPORTED_MEDIA_TYPE;
+            default -> ErrorCode.VALIDATION_FAILED;
+        };
+        ProblemDetail problem = problemOf(code, code.title() + "（" + response.getBody().getDetail() + "）");
+        // 405 の Allow や 415 の Accept など、Spring が組み立てたヘッダをそのまま返す
+        return ResponseEntity.status(problem.getStatus()).headers(response.getHeaders()).body(problem);
     }
 
     private ProblemDetail problemOf(ErrorCode code, String detail) {

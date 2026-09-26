@@ -768,14 +768,16 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 
 | `errorCode` | HTTP | 意味 |
 | --- | --- | --- |
-| `VALIDATION_FAILED` | 400 | リクエストの検証エラー（`violations` に詳細） |
+| `VALIDATION_FAILED` | 400 | リクエストの検証エラー（`violations` に詳細）。パスやクエリの値の形式の誤り、必須パラメータの欠落も含む |
 | `UNAUTHENTICATED` | 401 | 未認証 |
 | `TOKEN_INVALID` | 401 | Ingest Token が不正または失効済み |
 | `USER_NOT_ALLOWLISTED` | 403 | 認証は成功したが許可リストに未登録 |
 | `USER_DISABLED` | 403 | アカウントが無効 |
 | `FORBIDDEN` | 403 | 権限不足 |
 | `REPOSITORY_MISMATCH` | 403 | トークンの発行元と `repository` が不一致 |
-| `RESOURCE_NOT_FOUND` | 404 | 対象が存在しない |
+| `RESOURCE_NOT_FOUND` | 404 | 対象が存在しない（存在しない API の URL も含む） |
+| `METHOD_NOT_ALLOWED` | 405 | その URL で使えない HTTP メソッド。`Allow` ヘッダに使えるメソッドを付ける |
+| `NOT_ACCEPTABLE` | 406 | `Accept` で求められた形式では応答できない（API は JSON だけを返す） |
 | `RUN_ALREADY_FINALIZED` | 409 | finalize 済みの Run への操作 |
 | `USER_ALREADY_EXISTS` | 409 | 同じ GitHub ログイン名の利用者が既にある |
 | `ADMIN_REQUIRED` | 409 | 自分自身の降格・無効化、または有効な管理者が 0 人になる変更 |
@@ -784,6 +786,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `WAIVER_ALREADY_EXISTS` | 409 | 同一対象に有効な免除が存在する |
 | `ARTIFACTS_DELETED` | 409 | 成果物が保持期間経過で削除済み（再評価不可） |
 | `ARTIFACT_TOO_LARGE` | 413 | ファイルまたは Run 合計のサイズ超過 |
+| `UNSUPPORTED_MEDIA_TYPE` | 415 | 本文の形式（`Content-Type`）に対応していない |
 | `ARTIFACT_TYPE_UNKNOWN` | 422 | 未知の成果物種別 |
 | `ARTIFACT_FORMAT_INVALID` | 422 | パースに失敗 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
@@ -792,7 +795,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
 | `RATE_LIMITED` | 429 | レート制限超過（8 章）。`Retry-After` ヘッダに待つ秒数を付ける |
 | `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API を呼ぶのは判定ジョブの比較元の解決だけで、失敗しても比較元なしで判定を続けるため、API の応答としては返さない） |
-| `INTERNAL_ERROR` | 500 | 想定外の例外 |
+| `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 
 ---
 
