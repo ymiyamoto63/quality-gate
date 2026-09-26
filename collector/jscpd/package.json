@@ -1,0 +1,9 @@
+{
+  "name": "quality-gate-collector-jscpd",
+  "private": true,
+  "description": "収集ランナーの M-15（コード重複率。参考値）。jscpd で backend と frontend の重複を数える",
+  "type": "module",
+  "dependencies": {
+    "jscpd": "5.3.2"
+  }
+}

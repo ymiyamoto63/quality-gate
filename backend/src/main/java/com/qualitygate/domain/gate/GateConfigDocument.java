@@ -86,6 +86,10 @@ public record GateConfigDocument(
                 "min_success_rate", 100, "min_test_count", 1, "max_skipped_increase", 0)));
         metrics.put("secrets", new MetricConfig(false, Map.of("max_secrets", 0)));
         metrics.put("licenses", new MetricConfig(false, Map.of("max_forbidden", 0)));
+        // 参考値の指標（合格ラインを持たない）
+        metrics.put("duplication", new MetricConfig(false, Map.of()));
+        metrics.put("lighthouse", new MetricConfig(false, Map.of()));
+        metrics.put("bundle_size", new MetricConfig(false, Map.of()));
 
         return new GateConfigDocument(1, "report-only", "fail",
                 new Execution(Set.of("mutation_score", "performance"), 7,

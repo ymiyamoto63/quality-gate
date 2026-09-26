@@ -102,6 +102,9 @@ public record GateThresholds(
     public static final String M_SKIPPED_TESTS = "M-12";
     public static final String M_SECRETS = "M-13";
     public static final String M_LICENSES = "M-14";
+    public static final String M_DUPLICATION = "M-15";
+    public static final String M_LIGHTHOUSE = "M-16";
+    public static final String M_BUNDLE_SIZE = "M-17";
 
     /**
      * 判定器を実装済みの指標。
@@ -113,7 +116,8 @@ public record GateThresholds(
             Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
                     M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
                     M_API_CONTRACT, M_BREAKING_CHANGES, M_ACCESSIBILITY,
-                    M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES);
+                    M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES,
+                    M_DUPLICATION, M_LIGHTHOUSE, M_BUNDLE_SIZE);
 
     /** YAML の指標名と指標 ID の対応。 */
     private static final Map<String, List<String>> METRIC_IDS_OF = Map.ofEntries(
@@ -126,7 +130,10 @@ public record GateThresholds(
             Map.entry("accessibility", List.of(M_ACCESSIBILITY)),
             Map.entry("test_results", List.of(M_TEST_SUCCESS, M_SKIPPED_TESTS)),
             Map.entry("secrets", List.of(M_SECRETS)),
-            Map.entry("licenses", List.of(M_LICENSES)));
+            Map.entry("licenses", List.of(M_LICENSES)),
+            Map.entry("duplication", List.of(M_DUPLICATION)),
+            Map.entry("lighthouse", List.of(M_LIGHTHOUSE)),
+            Map.entry("bundle_size", List.of(M_BUNDLE_SIZE)));
 
     public static GateThresholds defaults() {
         return from(GateConfigDocument.defaults());

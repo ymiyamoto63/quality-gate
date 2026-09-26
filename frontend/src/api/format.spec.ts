@@ -11,6 +11,8 @@ describe('formatValue', () => {
   it('単位を記号に直す', () => {
     expect(formatValue(82.4, 'percent')).toBe('82.4%')
     expect(formatValue(412.5, 'ms')).toBe('412.5ms')
+    expect(formatValue(88, 'score')).toBe('88 点')
+    expect(formatValue(110.5, 'KB')).toBe('110.5 KB')
   })
 
   it('余計な 0 を落とす', () => {

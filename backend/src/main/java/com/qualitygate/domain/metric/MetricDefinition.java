@@ -9,11 +9,20 @@ package com.qualitygate.domain.metric;
  * @param higherIsBetter 値が大きいほど良いか。差分（前回比）の良し悪しの向きに使う
  * @param environmentSensitive 計測環境（ランナー種別など）によって値が変わるか。
  *        トレンドで系列を分ける基準になる（FR-08-2）
+ * @param referenceOnly 合格ラインを持たず、値とトレンドだけを残す指標か（参考値の指標）。
+ *        判定は常に REFERENCE で、Run の合否・部分計測・カテゴリの状態に影響しない。
+ *        基準値が見えてから合格ラインを決めるための、蓄積の期間に使う
  */
 public record MetricDefinition(
         String metricId,
         String name,
         MetricCategory category,
         boolean higherIsBetter,
-        boolean environmentSensitive) {
+        boolean environmentSensitive,
+        boolean referenceOnly) {
+
+    public MetricDefinition(String metricId, String name, MetricCategory category,
+                            boolean higherIsBetter, boolean environmentSensitive) {
+        this(metricId, name, category, higherIsBetter, environmentSensitive, false);
+    }
 }

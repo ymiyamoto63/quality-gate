@@ -763,6 +763,61 @@ class EvaluationPipelineIT {
     }
 
     @Test
+    void 参考値の指標は値とトレンドだけを残し合否と部分計測に影響しない() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+                version: 1
+                metrics:
+                  mutation_score:
+                    enabled: false
+                  vulnerabilities:
+                    enabled: false
+                  cyclomatic_complexity:
+                    enabled: false
+                  accessibility:
+                    enabled: false
+                  api_contract:
+                    enabled: false
+                  performance:
+                    enabled: false
+                  duplication:
+                    enabled: true
+                  bundle_size:
+                    enabled: true
+                  lighthouse:
+                    enabled: true
+                """);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.JSCPD_JSON, "jscpd-report.json", "backend", null, """
+                { "statistics": { "total": { "lines": 2000, "duplicatedLines": 100, "clones": 4 } } }
+                """);
+        attach(run, ArtifactType.BUNDLE_SIZE_JSON, "bundle-size.json", "frontend", null, """
+                { "files": [ { "path": "assets/index.js", "bytes": 300000, "gzipBytes": 102400 } ] }
+                """);
+        // Lighthouse は送らない（計測できなかった）
+
+        Run evaluated = evaluate(run);
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.FULL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> !m.getMetricId().equals("M-01"))
+                .extracting(Measurement::getMetricId, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-15", MeasurementStatus.REFERENCE),
+                        org.assertj.core.groups.Tuple.tuple("M-16", MeasurementStatus.ERROR),
+                        org.assertj.core.groups.Tuple.tuple("M-17", MeasurementStatus.REFERENCE));
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-16"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getReason()).contains("合否には影響しません"));
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getMetricId().equals("M-15"))
+                .singleElement()
+                .satisfies(m -> assertThat(m.getValue()).isEqualByComparingTo("5.00"));
+    }
+
+    @Test
     void 比較元にOpenAPI定義が無ければ破壊的変更は対象外() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);

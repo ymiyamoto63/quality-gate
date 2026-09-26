@@ -288,6 +288,27 @@ class GateConfigParserTest {
     }
 
     @Test
+    void 参考値の指標には合格ラインを書けない() {
+        GateConfigDocument document = parser.parse("""
+                version: 1
+                metrics:
+                  duplication:
+                    enabled: true
+                """);
+        assertThat(document.metric("duplication").enabled()).isTrue();
+        assertThat(parser.parse("version: 1").metric("lighthouse").enabled()).isFalse();
+
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                metrics:
+                  bundle_size:
+                    max_kb: 500
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .hasMessageContaining("metrics.bundle_size.max_kb");
+    }
+
+    @Test
     void 編集距離が遠い候補は提示しない() {
         // 遠い候補を出すと、かえって迷わせる
         assertThat(GateConfigParser.closest("zzzzzzzz",
