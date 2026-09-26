@@ -78,9 +78,6 @@ public class RepositoryAdminService {
         if (request.defaultBranch() != null && !request.defaultBranch().isBlank()) {
             repository.setDefaultBranch(request.defaultBranch().strip());
         }
-        if (request.measurePullRequests() != null) {
-            repository.setMeasurePullRequests(request.measurePullRequests());
-        }
         repositories.save(repository);
         auditLogger.record(actor, AuditAction.REPOSITORY_CREATED, TARGET_REPOSITORY,
                 repository.getId(), null, snapshot(repository));
@@ -94,9 +91,6 @@ public class RepositoryAdminService {
         Map<String, Object> before = snapshot(repository);
         if (request.defaultBranch() != null) {
             repository.setDefaultBranch(request.defaultBranch().strip());
-        }
-        if (request.measurePullRequests() != null) {
-            repository.setMeasurePullRequests(request.measurePullRequests());
         }
         if (request.enabled() != null) {
             repository.setEnabled(request.enabled());
@@ -195,7 +189,6 @@ public class RepositoryAdminService {
         Map<String, Object> values = new LinkedHashMap<>();
         values.put("fullName", repository.fullName());
         values.put("defaultBranch", repository.getDefaultBranch());
-        values.put("measurePullRequests", repository.isMeasurePullRequests());
         values.put("enabled", repository.isEnabled());
         return values;
     }

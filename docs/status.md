@@ -22,7 +22,7 @@ M-13 シークレット検出件数 / M-14 ライセンス違反件数（`secret
 
 ## 動くもの
 
-- Flyway による全スキーマ（V001〜V017）の適用
+- Flyway による全スキーマ（V001〜V018）の適用
 - Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）

@@ -578,8 +578,6 @@ export interface components {
     CreateRepositoryRequest: {
       /** @description 省略時は main */
       defaultBranch?: string | null
-      /** @description 省略時は true */
-      measurePullRequests?: boolean | null
       name: string
       owner: string
     }
@@ -799,7 +797,6 @@ export interface components {
       defaultBranch: string
       enabled: boolean
       fullName: string
-      measurePullRequests: boolean
       /** Format: uuid */
       repositoryId: string
     }
@@ -851,7 +848,6 @@ export interface components {
       defaultBranch: string
       enabled: boolean
       fullName: string
-      measurePullRequests: boolean
       name: string
       owner: string
       /** Format: uuid */
@@ -1137,7 +1133,6 @@ export interface components {
       defaultBranch?: string | null
       /** @description false で無効化（ダッシュボードから外れ、取り込みも拒否される） */
       enabled?: boolean | null
-      measurePullRequests?: boolean | null
     }
     UpdateUserRequest: {
       /** @enum {string|null} */

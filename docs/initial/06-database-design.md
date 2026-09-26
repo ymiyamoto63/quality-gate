@@ -91,7 +91,6 @@ CREATE TABLE repositories (
     owner           varchar(39) NOT NULL,
     name            varchar(100) NOT NULL,
     default_branch  varchar(255) NOT NULL DEFAULT 'main',
-    measure_pull_requests boolean NOT NULL DEFAULT true,
     enabled         boolean     NOT NULL DEFAULT true,
     created_by      uuid        NOT NULL REFERENCES users(id),
     created_at      timestamptz NOT NULL DEFAULT now(),
@@ -99,6 +98,9 @@ CREATE TABLE repositories (
     CONSTRAINT repositories_full_name_key UNIQUE (owner, name)
 );
 ```
+
+PR を計測する設定（`measure_pull_requests`）は、どこからも読まれていなかったため V018 で削除した。
+PR を計測するかは、収集ランナーの手動実行で PR 番号を指定するかどうかで決まる。
 
 ### 3.3 `components` — リポジトリ内の構成単位
 
@@ -576,6 +578,7 @@ DELETE FROM runs
 | `V015__run_renamed_files.sql` | `runs.renamed_files`（ファイルの移動・リネームの対応表） |
 | `V016__collector_only_ingest.sql` | 取り込み経路を収集ランナーに絞ったため、`runs.runner_type` と Check Run のジョブ、設定の削除したキーを取り除く（D-19） |
 | `V017__drop_waivers_and_notifications.sql` | 免除と通知を廃止したため、`waivers` / `notifications` / `notification_settings`・`findings.waiver_id`・`repository_summaries.active_waiver_count`・`runs.previous_verdict` と、処理する側の無いジョブ、保存済みの設定の `notifications` / `full_measurement_interval_days` を削除する（D-22） |
+| `V018__drop_repository_measure_pull_requests.sql` | どこからも読まれていなかった `repositories.measure_pull_requests`（PR を計測する設定）を削除する |
 
 `findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 
