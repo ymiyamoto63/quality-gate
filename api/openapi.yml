@@ -1666,6 +1666,9 @@ components:
         summary:
           type: string
           description: 何を見る指標か
+        tools:
+          type: string
+          description: 計測に使うライブラリ・ソフトウェア
       required:
       - basis
       - basisLabel
@@ -1675,6 +1678,7 @@ components:
       - rationale
       - risk
       - summary
+      - tools
     ReleaseMetric:
       type: object
       properties:

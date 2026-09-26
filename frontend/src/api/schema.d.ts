@@ -860,6 +860,8 @@ export interface components {
       risk: string
       /** @description 何を見る指標か */
       summary: string
+      /** @description 計測に使うライブラリ・ソフトウェア */
+      tools: string
     }
     ReleaseMetric: {
       category: string
