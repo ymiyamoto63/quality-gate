@@ -1,7 +1,6 @@
 package com.qualitygate.job;
 
 import com.qualitygate.domain.entity.Job;
-import com.qualitygate.domain.model.JobStatus;
 import com.qualitygate.domain.repo.JobRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -83,10 +82,5 @@ public class JobQueue {
         }
         log.warn("RUNNING のまま滞留したジョブを実行待ちに戻します 件数={}", stale.size());
         stale.forEach(job -> job.requeue(Instant.now()));
-    }
-
-    @Transactional(readOnly = true)
-    public long countByStatus(JobStatus status) {
-        return jobs.countByStatus(status);
     }
 }

@@ -22,8 +22,6 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.platform.id.Uuid7;
-import io.micrometer.core.instrument.MeterRegistry;
-import io.micrometer.core.instrument.Timer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -62,14 +60,12 @@ public class RunEvaluationService {
     private final WaiverRepository waivers;
     private final List<MetricEvaluator> evaluators;
     private final ObjectMapper objectMapper;
-    private final MeterRegistry meterRegistry;
 
     @SuppressWarnings("java:S107")
     public RunEvaluationService(RunRepository runs, RunSkippedMetricRepository skippedMetrics,
                                 MeasurementRepository measurements, FindingRepository findings,
                                 RepositorySummaryRepository summaries, WaiverRepository waivers,
-                                List<MetricEvaluator> evaluators, ObjectMapper objectMapper,
-                                MeterRegistry meterRegistry) {
+                                List<MetricEvaluator> evaluators, ObjectMapper objectMapper) {
         this.runs = runs;
         this.skippedMetrics = skippedMetrics;
         this.measurements = measurements;
@@ -78,7 +74,6 @@ public class RunEvaluationService {
         this.waivers = waivers;
         this.evaluators = evaluators;
         this.objectMapper = objectMapper;
-        this.meterRegistry = meterRegistry;
     }
 
     @Transactional
@@ -198,10 +193,7 @@ public class RunEvaluationService {
             return List.of(MetricResult.error(metricId, "この指標の判定は未実装です"));
         }
 
-        // 指標ごとの判定時間（qg.evaluation.duration。NFR 10.1 の監視用）
-        Timer.Sample sample = Timer.start(meterRegistry);
         List<MetricResult> results = evaluator.evaluate(context);
-        sample.stop(meterRegistry.timer("qg.evaluation.duration", "metric_id", metricId));
         return results.isEmpty()
                 ? List.of(MetricResult.error(metricId, "成果物から値を取り出せませんでした"))
                 : results;

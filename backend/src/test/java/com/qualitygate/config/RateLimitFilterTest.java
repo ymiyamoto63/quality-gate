@@ -21,7 +21,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 class RateLimitFilterTest {
 
     private final RateLimitFilter filter = new RateLimitFilter(new RateLimiter(),
-            new RateLimitProperties(true, 2, 3, 4, 5), JsonMapper.builder().build(), null);
+            new RateLimitProperties(true, 2, 3, 4, 5), JsonMapper.builder().build());
 
     @AfterEach
     void clear() {
@@ -75,7 +75,7 @@ class RateLimitFilterTest {
     @Test
     void 無効にすれば制限しない() throws Exception {
         RateLimitFilter disabled = new RateLimitFilter(new RateLimiter(),
-                new RateLimitProperties(false, 1, 1, 1, 1), JsonMapper.builder().build(), null);
+                new RateLimitProperties(false, 1, 1, 1, 1), JsonMapper.builder().build());
         for (int i = 0; i < 3; i++) {
             MockHttpServletResponse response = new MockHttpServletResponse();
             disabled.doFilter(request("GET", "/api/v1/runs"), response, new MockFilterChain());

@@ -658,27 +658,20 @@ ERROR を「対応が必要な異常」に限定しておかないと、アラ�
 
 ### 10.2 メトリクス（Micrometer）
 
-`/actuator/prometheus`（ADMIN のみ）で公開する。
+`/actuator/prometheus`（ADMIN のみ）で、Spring Boot が標準で出すメトリクス（JVM、HTTP、DB 接続プール）を公開する。
 
-| メトリクス | 用途 |
+独自のメトリクス（`qg.ingest.*`、`qg.evaluation.duration`、`qg.jobs.*`、`qg.artifacts.bytes`、`qg.notifications`、
+`qg.rate_limit.rejected`）は削除した。収集する Prometheus もアラートの設定も無く、誰も読まない値を記録し続けていたためである。
+監視の仕組みを用意するときに、必要なものだけを足す。
+
+### 10.3 異常の気づき方
+
+| 異常 | 気づき方 |
 | --- | --- |
-| `qg.ingest.runs`（counter、`result` = created / rejected / finalized） | 取り込みの成功・失敗率 |
-| `qg.ingest.artifacts`（counter、`result` = accepted / rejected、`type`） | 成果物の受領。拒否が増えたら CI 側の設定の誤りを疑う |
-| `qg.evaluation.duration`（timer、`metric_id` タグ） | 判定の所要時間。指標ごとと、設定解決・正規化・判定を合わせた `metric_id=total`。NFR 10.1 の 60 秒 / 5 分を監視する |
-| `qg.jobs.pending`（gauge、`type` タグ） | ジョブの滞留検知（30 秒ごとに DB から読み直す） |
-| `qg.jobs.dead`（gauge） | 恒久的失敗の蓄積 |
-| `qg.artifacts.bytes`（gauge） | ストレージ使用量（実体が残っている成果物の合計） |
-| `qg.notifications`（counter、`channel` / `result` タグ） | 通知の到達状況 |
-| `qg.rate_limit.rejected`（counter、`category` タグ） | レート制限で拒否した回数（API 設計 8 章）。CI の暴走の検知 |
-
-### 10.3 アラート
-
-| 条件 | 意味 |
-| --- | --- |
-| `qg.jobs.pending` が 10 分以上 10 件超 | ワーカーが処理しきれていない、または停止している |
-| `qg.jobs.dead` が 1 件でも増加 | 手動対応が必要な失敗 |
-| 日次バッチの未完了 | スケジューラの停止 |
-| ストレージ使用量が上限の 80% 超 | 容量逼迫 |
+| ジョブの恒久的失敗 | ERROR ログ（10.1）。Run は「処理失敗」として画面に出る |
+| ワーカーの停止・滞留 | Run が「処理中」のまま進まない（画面） |
+| 日次バッチの未完了 | ログにバッチの完了が出ない |
+| ストレージの逼迫 | サーバのディスク使用量を OS 側で監視する |
 
 ---
 
