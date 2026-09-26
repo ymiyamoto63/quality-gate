@@ -31,7 +31,19 @@ GATE_CONFIG="${COLLECTOR_DIR}/targets/${QG_REPOSITORY/\//__}.gate.yml"
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
-# curl の --retry は、一時的な障害（5xx など）を再試行する
+
+# call <curl の引数...>: Ingest API を呼び、応答本文を標準出力に出す。
+# curl の --retry は、一時的な障害（5xx など）を再試行する。
+# 失敗したときは応答本文（エラーの理由）をログに出す。パイプの先に吸われると、400 などの理由が分からない
+call() {
+  local body status=0
+  body=$(curl -sS --retry 3 --fail-with-body "$@") || status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "::error::quality-gate が要求を拒否しました（curl の終了コード $status）: $(printf '%s' "$body" | jq -c . 2>/dev/null || printf '%s' "$body")" >&2
+    return "$status"
+  fi
+  printf '%s\n' "$body"
+}
 
 # スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
 skipped_json() {
@@ -69,8 +81,8 @@ REQUEST=$(jq -n \
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
-RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
-  -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
+RESPONSE=$(call -X POST "$API" "${AUTH[@]}" -H 'Content-Type: application/json' -d "$REQUEST")
+RUN_ID=$(jq -r '.runId' <<<"$RESPONSE")
 echo "Run を作成しました: $RUN_ID"
 
 # upload <type> <file> [component] [scope] [metadata]
@@ -86,7 +98,7 @@ upload() {
   local query="type=${type}"
   [ -n "$component" ] && query="${query}&component=${component}"
   [ -n "$scope" ] && query="${query}&scope=${scope}"
-  curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
+  call -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
   echo "送信しました: type=$type ${component:+component=$component }${scope:+scope=$scope }${file#"$REPORTS"/}"
 }
 
@@ -168,4 +180,4 @@ if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
   [ "$found" -eq 1 ] || warn "成果物がありません（type=k6-summary）: $REPORTS/perf/"
 fi
 
-curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .
+call -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .
