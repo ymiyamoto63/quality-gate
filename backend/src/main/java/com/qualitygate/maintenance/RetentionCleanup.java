@@ -120,7 +120,7 @@ public class RetentionCleanup {
 
     /**
      * 監査ログの削除。本番ではアプリのロールから DELETE を剥奪しているため失敗する
-     * （管理ロールのバッチが消す。docs/initial/06-database-design.md 3.15）。その場合は警告に留める。
+     * （管理ロールのバッチが消す。docs/initial/06-database-design.md 3.12）。その場合は警告に留める。
      */
     private int deleteAuditLogs(Instant before) {
         try {

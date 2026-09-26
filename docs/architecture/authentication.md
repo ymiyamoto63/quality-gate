@@ -1,15 +1,16 @@
 # 認証と GitHub App
 
 quality-gate は GitHub App を **「ログイン手段」として使います**（OAuth App は使いません。D-11）。
-計測結果は CI または収集ランナーが Ingest API で送ってきます。収集ランナーは、計測対象のリポジトリを読むためにも同じ App を使います。
+計測結果は収集ランナーが Ingest API で送ってきます。収集ランナーは、計測対象のリポジトリを読むためにも同じ App を使います。
+バックエンドは GitHub API を呼びません（ログインの OAuth だけ。D-26）。
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](overview-for-beginners.md) を参照してください。
 
 | 用途 | 使うもの | 状態 |
 | --- | --- | --- |
 | 画面へのログイン | GitHub App の Client ID / Client Secret（user-to-server 認可、スコープ `read:user`） | 実装済み |
-| 収集ランナー（または CI）からの計測結果の送信 | GitHub App ではなく **Ingest Token**（quality-gate が発行する Bearer トークン。管理 › リポジトリ管理で発行） | 実装済み |
+| 収集ランナーからの計測結果の送信 | GitHub App ではなく **Ingest Token**（Bearer トークン。バックエンドの環境変数 `QG_INGEST_TOKEN` と収集ランナーの Secret `QG_INGEST_TOKEN` に同じ値を入れる。[作り方と交換](../operations/ingest.md#ingest-token-の作成と交換)） | 実装済み |
 | 違反箇所へのリンク | `https://github.com/<owner>/<repo>/blob/<sha>/<path>#L<n>` を組み立てるだけ（API 呼び出しなし） | 実装済み |
-| 計測対象リポジトリの読み取り（収集ランナー） | GitHub App の Contents / Pull requests: Read-only 権限と、対象リポジトリへのインストール。秘密鍵から 1 時間有効のトークンを発行して clone し、PR の一覧を読む（[収集ランナーで計測する](../operations/collector.md)） | 実装済み（D-16） |
+| 計測対象リポジトリの読み取り（収集ランナー） | GitHub App の Contents / Pull requests: Read-only 権限と、対象リポジトリへのインストール。秘密鍵から 1 時間有効のトークンを発行して clone する（[収集ランナーで計測する](../operations/collector.md)） | 実装済み（D-16） |
 
 ## ログインの流れ（`SecurityConfig` の `oauth2Login`）
 
@@ -34,7 +35,7 @@ Organization のメンバーシップによる制限は行っていません。
 
 | 経路 | 対象 | 認証 | CSRF |
 | --- | --- | --- | --- |
-| Ingest | `POST /api/v1/runs/**`（`/reevaluate` を除く）と `GET /api/v1/runs/{id}/status` | `Authorization: Bearer qg_<prefix>_<secret>`（リポジトリ単位の Ingest Token） | 無効（Cookie を使わない） |
+| Ingest | `POST /api/v1/runs/**`（`/reevaluate` を除く） | `Authorization: Bearer <QG_INGEST_TOKEN の値>`（収集ランナー用の 1 つ。D-27） | 無効（Cookie を使わない） |
 | 画面 | それ以外の `/api/**` | GitHub ログインのセッション Cookie | 有効（`XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` ヘッダで送り返す） |
 
 再評価（`POST /api/v1/runs/{id}/reevaluate`）は `/api/v1/runs` 配下の POST ですが、管理者が画面から行う操作のため画面の経路で認証します。

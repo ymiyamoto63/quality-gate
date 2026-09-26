@@ -53,11 +53,12 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 
 ## 3. リポジトリ変数とシークレットの設定
 
-収集ランナーの変数とシークレット（`QG_BASE_URL` / `QG_COLLECTOR_APP_ID` / `QG_COLLECTOR_APP_PRIVATE_KEY` / 対象ごとの Ingest Token）は
+収集ランナーの変数とシークレット（`QG_BASE_URL` / `QG_COLLECTOR_APP_ID` / `QG_COLLECTOR_APP_PRIVATE_KEY` / `QG_INGEST_TOKEN`）は
 [収集ランナーで計測する](collector.md#1-3-quality-gate-リポジトリの変数とシークレット) を参照してください。
 
-以前 quality-gate 自身の計測に使っていたリポジトリ変数 `QG_RUNNER` / `QG_RUN_HEAVY_ON_GITHUB` とシークレット `QG_INGEST_TOKEN` は
-使わなくなりました。設定済みなら削除して構いません（`QG_BASE_URL` は収集ランナーが使うため残します）。
+以前 quality-gate 自身の計測に使っていたリポジトリ変数 `QG_RUNNER` / `QG_RUN_HEAVY_ON_GITHUB` と、
+対象ごとの Ingest Token のシークレット（`QG_INGEST_TOKEN_LIKE_CHATGPT` など）は使わなくなりました。設定済みなら削除して構いません。
+シークレット `QG_INGEST_TOKEN` は収集ランナーが使います（すべての対象で共通。D-27）。
 
 ## 4. 動作確認
 

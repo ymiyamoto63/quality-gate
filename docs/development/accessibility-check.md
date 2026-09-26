@@ -1,4 +1,4 @@
-# アクセシビリティ検査（M-10）
+# アクセシビリティ検査
 
 ```bash
 cd frontend && npm run test:a11y      # ライト / ダークの両モードで検査（playwright test）

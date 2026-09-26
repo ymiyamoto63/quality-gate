@@ -98,7 +98,7 @@ like-chatgpt そのものには一切手を加えません。
 | --- | --- | --- | --- |
 | ① | ランナー → GitHub | 「実行するジョブはありますか」と取りに行く | ランナー登録時の資格情報（ランナーが自動で管理） |
 | ② | ランナー → like-chatgpt | ソースを写し取る（読むだけ） | GitHub App が発行する 1 時間だけ有効なトークン |
-| ③ | ランナー → quality-gate | 計測結果を送る | like-chatgpt 用の Ingest Token |
+| ③ | ランナー → quality-gate | 計測結果を送る | Ingest Token（quality-gate に送るための合言葉。対象ごとには分けない） |
 | ④ | あなたのブラウザ → quality-gate | 結果を見る | GitHub アカウントでのログイン |
 
 **like-chatgpt から誰かへ向かう矢印は 1 本もありません。** like-chatgpt は読まれるだけです。
@@ -114,7 +114,7 @@ like-chatgpt そのものには一切手を加えません。
 | 立場 | 測る側（健診センター） | 測られる側（受診者） |
 | 持っているもの | アプリ本体、収集ワークフロー、計測スクリプト、ツールの版、計測プロファイル、鍵 | 自分のアプリのソースだけ |
 | 計測のために必要な変更 | 計測プロファイルを 1 つ置く（`collector/targets/ymiyamoto63__like-chatgpt.env`） | **なし** |
-| 設定する Secrets | App の秘密鍵、like-chatgpt の Ingest Token | **なし** |
+| 設定する Secrets | App の秘密鍵、Ingest Token | **なし** |
 
 ### 4.2 「どう測るか」と「何を合格とするか」は別の場所にある
 
@@ -125,10 +125,7 @@ like-chatgpt そのものには一切手を加えません。
 | **測るツールの版** | quality-gate リポジトリの `collector/versions.env` | JaCoCo 0.8.15、PIT 1.20.4、PMD 7.17.0 |
 
 like-chatgpt 自身の `.quality-gate.yml` やワークフロー（以前の方式の名残）は、収集ランナーでは**使いません**。
-ただし like-chatgpt 側の CI が quality-gate への送信を続けていると、同じコミットの Run が 2 つでき、
-その Run は like-chatgpt の `.quality-gate.yml` で判定されます。
-like-chatgpt 側の CI 用の Ingest Token を quality-gate の管理画面で失効させれば、like-chatgpt に触らずに送信を止められます
-（[対象の CI からの送信を止める](../operations/collector.md#対象の-ci-からの送信を止める)）。
+quality-gate が受け付けるのは収集ランナーからの送信だけなので、like-chatgpt 側の CI からは送れません。
 
 ### 4.3 like-chatgpt のコードは書き換えるのか
 
@@ -212,7 +209,7 @@ like-chatgpt 側の CI 用の Ingest Token を quality-gate の管理画面で�
 | --- | --- | --- | --- | --- |
 | **ログイン（GitHub App の Client ID / Secret ＋ 許可リスト）** | 人（ブラウザ） | quality-gate アプリの `.env` | quality-gate の画面を見る。ADMIN なら設定の変更も | 許可リストに無い人は、GitHub アカウントがあっても入れない |
 | **GitHub App の秘密鍵 → インストールトークン** | `fetch` ジョブ | quality-gate の Secrets（`QG_COLLECTOR_APP_PRIVATE_KEY`） | like-chatgpt を**読む**（1 時間だけ） | 書き込み、ほかのリポジトリの読み取り |
-| **Ingest Token**（`qg_xxxx_yyyy`） | `submit` ジョブ | quality-gate の Secrets（`QG_INGEST_TOKEN_LIKE_CHATGPT`） | like-chatgpt の Run を作り、成果物を送る | 画面の閲覧、設定の変更、**ほかのリポジトリへの送信** |
+| **Ingest Token** | `submit` ジョブ | quality-gate の Secrets（`QG_INGEST_TOKEN`）と、quality-gate アプリの環境変数（同じ値） | 登録済みのリポジトリの Run を作り、成果物を送る | 画面の閲覧、設定の変更、**登録していないリポジトリへの送信** |
 | **GITHUB_TOKEN** | 全ジョブ（GitHub が自動発行） | 自動 | quality-gate リポジトリ自身を読む（計測スクリプトを取り出すため） | like-chatgpt へのアクセス、書き込み |
 
 ### 6.3 GitHub App の「インストール」とは
@@ -299,23 +296,24 @@ Actions の画面で **collect → Run workflow** を押してから、画面に
 | 3 | ランナー（fetch） | 計測プロファイル `ymiyamoto63__like-chatgpt.env` を読む |
 | 4 | ランナー → GitHub | App の秘密鍵で、like-chatgpt 専用・読み取り専用・1 時間有効のトークンを発行する |
 | 5 | ランナー → like-chatgpt | トークンで like-chatgpt を全履歴ごと clone する（base のコミットも必要なため） |
-| 6 | ランナー（fetch） | 測るコミット（head）と比較相手（base）を決める。main なら 1 つ前のコミット、PR なら main との分岐点 |
+| 6 | ランナー（fetch） | 測るコミット（head）と比較相手（base）を決める。main なら 1 つ前のコミット、タグなら前のタグ、PR なら main との分岐点。あわせてコミットに付いたタグとファイルの移動も調べる |
 | 7 | ランナー（measure） | Java・Node.js を用意し、ビルド・テスト・解析をする（詳しくは次章） |
 | 8 | ランナー（measure） | 成果物を `reports/` にまとめ、写し取ったソースを削除する |
 | 9 | ランナー → quality-gate（submit） | Ingest Token で Run を作り、成果物を 1 つずつ送り、最後に「送り終わりました」（finalize）を伝える |
-| 10 | quality-gate | 成果物を読み取り、一緒に送られた合格ライン（`*.gate.yml`）と比べて判定する（数秒） |
+| 10 | quality-gate | その場で成果物を読み取り、一緒に送られた合格ライン（`*.gate.yml`）と比べて判定し、結果を返す（数秒）。submit のログに判定が出る |
 | 11 | あなたのブラウザ | ダッシュボードや Run 詳細で結果を見る |
 
 ---
 
 ## 8. 中で測っているもの
 
-### 8.1 いま測っている 13 の指標（うち 3 つは参考値）
+### 8.1 いま測っている 13 の指標
 
 | 指標 | ひとことで | 測り方（ツール） | like-chatgpt の合格ライン |
 | --- | --- | --- | --- |
 | **M-01** ブランチカバレッジ | テストが、コードの分かれ道（if の真と偽など）をどれだけ通ったか | Java: JaCoCo ／ TypeScript: Vitest（v8） | 75% 以上（backend / frontend それぞれ） |
-| **M-02** ミューテーションスコア | コードをわざと壊したとき、テストがそれを見つけられるか（main のみ） | PIT | 60% 以上（backend のみ） |
+| **M-02** ミューテーションスコア | コードをわざと壊したとき、テストがそれを見つけられるか（PR 以外） | PIT | 60% 以上（backend のみ） |
+| **M-03〜05** 性能 | 応答の速さ（p95）・処理量・エラー率（PR 以外） | k6 | 毎秒 50 件の負荷で p95 500ms 以内、エラー率 0.1% 以下 |
 | **M-06** 脆弱性 | 使っているライブラリに、既知の危険な穴がいくつあるか | Trivy | Critical 0 件、High 0 件 |
 | **M-07** 循環的複雑度 | 新しく複雑すぎる関数（分かれ道が多すぎて読みにくい関数）が増えていないか | Java: PMD ／ TypeScript・Vue: ESLint | 複雑度 15 を超える新規・悪化関数が 0 件（11〜15 は警告） |
 | **M-09** API の破壊的変更 | 利用者を壊すような API の変更（項目の削除など）をしていないか | oasdiff | 0 件 |
@@ -324,9 +322,6 @@ Actions の画面で **collect → Run workflow** を押してから、画面に
 | **M-12** スキップされたテスト | 飛ばした（`@Disabled` / `it.skip`）テストが前回より増えていないか | M-11 と同じ | 前回から増やさない |
 | **M-13** シークレット | パスワードや API キーなどをコミットしていないか | Trivy | 0 件 |
 | **M-14** ライセンス | 使ってはいけないライセンスのライブラリに依存していないか | Trivy | forbidden 0 件（GPL などの restricted は警告） |
-| **M-15** コード重複率（参考値） | 同じようなコードのコピーがどれだけあるか | jscpd | 合格ラインなし（推移だけを見る） |
-| **M-16** Lighthouse（参考値） | 画面の表示が速いか（LCP など） | Lighthouse | 合格ラインなし（推移だけを見る） |
-| **M-17** バンドルサイズ（参考値） | 画面を開くときにダウンロードするコードの量 | vite build の結果 | 合格ラインなし（推移だけを見る） |
 
 ### 8.2 それぞれの中身
 
@@ -375,12 +370,6 @@ PIT もコマンドラインから動かすので、like-chatgpt の `pom.xml` �
 
 以前の方式（like-chatgpt 自身の CI）は base を送っていなかったため、この区別ができていませんでした。
 
-**M-08 API 契約テスト（廃止）**
-
-以前は `*ControllerTest` という名前のテストの成功率を別の指標にしていました。
-ただしそのテストは M-11（すべてのテスト）にも含まれていて、1 件の失敗が 2 つの指標で数えられていたため、廃止しました（D-25）。
-テストが通っているかは M-11、API の互換性は M-09 で見ます。
-
 **M-09 API の破壊的変更**
 
 like-chatgpt は API の定義書（`api/openapi.yml`）をリポジトリに置いています。
@@ -395,15 +384,7 @@ head と base の定義書を oasdiff で比べ、「API のパスを消した�
 調べる画面は計測プロファイルの `A11Y_PAGES` に書いたもので、合格ラインの `accessibility.pages` と一致している必要があります。
 画面を開けなかったときは「調べた画面が足りない」として ERROR になり、合格には見えません。
 
-### 8.3 まだ測っていないもの
-
-| 指標 | ひとことで | まだ測らない理由 |
-| --- | --- | --- |
-| M-03〜05 性能 | 応答の速さ、処理量、エラー率 | 負荷をかける対象のアプリと専用の環境が要る |
-
-これは合格ライン（`*.gate.yml`）で `enabled: false` にしています。有効のままだと「結果が届かなかった」として ERROR になります。
-
-### 8.4 テストが失敗したら
+### 8.3 テストが失敗したら
 
 収集ランナーは、テストが失敗しても**止まらずに最後まで測ります**。テストの失敗も大事な計測結果だからです（M-11 に表れます）。
 ただし M-02 の PIT は、テストがすべて通っていないと動きません（M-02 は ERROR になります）。
@@ -433,16 +414,14 @@ Run 全体の判定（verdict）は次のように決まります。
 quality-gate はマージを止めないので（D-4）、FAIL になっても like-chatgpt の開発は何も止まりません。結果を見て判断するための情報です。
 
 同じコミットを何度測っても、前の結果は上書きされず、新しい Run（attempt 2、3…）として残ります。
-収集ランナーが作った Run は、Run 詳細の CI 実行へのリンクが quality-gate リポジトリの collect ワークフローを指します。
-like-chatgpt 自身の CI が作った Run は like-chatgpt のワークフローを指すので、そこで見分けられます
-（API で取得した Run のデータでは `triggeredBy` が `collector` になっています）。
+Run 詳細の CI 実行へのリンクは、その Run を作った quality-gate リポジトリの collect ワークフローの実行を指します。
 
 ---
 
 ## 10. よくある疑問
 
 **Q. like-chatgpt に push したら自動で測られますか？**
-A. いいえ。測りたいときに Actions の画面から **collect → Run workflow** で手動実行します（定期実行は D-22 で廃止しました）。
+A. いいえ。測りたいときに Actions の画面から **collect → Run workflow** で手動実行します。
 フォーク（他人のコピー）から出された PR は、他人のコードを自分のマシンで動かすことになるため測らないでください。
 
 **Q. ランナーのマシンを止めるとどうなりますか？**
@@ -455,7 +434,7 @@ A. いいえ。ランナーから quality-gate の URL（`QG_BASE_URL`）に届�
 同じマシンなら `http://localhost:8080` で届きます。
 
 **Q. like-chatgpt 以外のリポジトリも測れますか？**
-A. 計測プロファイルを追加し、App をそのリポジトリにもインストールし、Ingest Token を発行すれば測れます
+A. 計測プロファイルと合格ラインを追加し、App をそのリポジトリにもインストールし、quality-gate の画面でリポジトリを登録すれば測れます
 （[収集ランナーで計測する](../operations/collector.md)「対象を追加する」）。
 収集ランナーのスクリプトは Maven と npm + Vitest の構成を前提にしています。
 
@@ -469,7 +448,7 @@ A. 計測プロファイルを追加し、App をそのリポジトリにもイ�
 | quality-gate のアプリ | 成果物ファイル（`data/artifacts/`）と判定結果（PostgreSQL） | 保持期間の設定（管理画面 S-09）に従う |
 
 **Q. like-chatgpt 側のワークフロー（`.github/workflows/quality-gate.yml`）は消してよいですか？**
-A. 収集ランナーで M-01 / M-02 / M-06〜M-10 が問題なく測れることを確かめたら、消しても構いません。消すかどうかは like-chatgpt 側の判断です。
+A. 収集ランナーで全指標が問題なく測れることを確かめたら、消しても構いません。消すかどうかは like-chatgpt 側の判断です。
 
 ---
 
@@ -479,8 +458,8 @@ A. 収集ランナーで M-01 / M-02 / M-06〜M-10 が問題なく測れるこ�
 | --- | --- |
 | 収集ランナーの設定と実行の手順 | [収集ランナーで計測する](../operations/collector.md) |
 | セルフホストランナーの準備 | [セルフホストランナー](../operations/self-hosted-runner.md) |
-| 収集ランナー方式を選んだ理由と今後の計画 | [収集ランナー方式](collector-runner.md) |
-| 決定事項（D-1〜D-16） | [決定事項の記録と残課題](../initial/03-open-questions.md) |
+| 収集ランナー方式を選んだ理由と移行の記録 | [収集ランナー方式](collector-runner.md) |
+| 決定事項（D-1〜D-28） | [決定事項の記録と残課題](../initial/03-open-questions.md) |
 | ログインと GitHub App の詳細 | [認証と GitHub App](authentication.md) |
 | アプリの起動構成 | [起動の仕組み](runtime.md) |
 | 各指標の正確な定義と計算式 | [指標・判定仕様](../initial/02-metrics-spec.md) |

@@ -3,10 +3,12 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate データベース設計（基本設計） |
-| バージョン | 1.0 |
-| 最終更新 | 2026-09-21 |
+| バージョン | 2.0 |
+| 最終更新 | 2026-09-26 |
 | DBMS | PostgreSQL 17 |
-| 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) |
+| 前提文書 | [要件定義書](01-requirements.md) / [方式設計](05-architecture.md) |
+
+現行のスキーマだけを記す。削除したテーブル・列の経緯はマイグレーションの一覧（8 章）と [03](03-open-questions.md) の決定記録に残す。
 
 ---
 
@@ -99,17 +101,6 @@ CREATE TABLE repositories (
 PR を計測する設定（`measure_pull_requests`）は、どこからも読まれていなかったため V018 で削除した。
 PR を計測するかは、収集ランナーの手動実行で PR 番号を指定するかどうかで決まる。
 
-### 3.3 `components` — リポジトリ内の構成単位（V019 で削除）
-
-画面に表示するだけで判定に使っていなかったため、V019 でテーブルごと削除した（D-25）。
-コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まり、成果物に付いた名前
-（`measurements.component_name` / `findings.component_name`）で扱う。
-
-### 3.4 `ingest_tokens` — 取り込み用トークン（V021 で削除）
-
-送り手が収集ランナーだけになったため、Ingest Token はリポジトリごとに発行せず、バックエンドの環境変数
-`QG_INGEST_TOKEN` の 1 つにまとめた。V021 でテーブルごと削除した（D-27）。発行・失効の記録は監査ログに残っている。
-
 ### 3.5 `gate_configs` — 合格ラインの設定（版管理）
 
 ```sql
@@ -167,11 +158,9 @@ CREATE TABLE runs (
 );
 ```
 
-ランナー種別の列（`runner_type`）は、計測を収集ランナーに絞ったため V016 で削除した（D-19）。
-
 `tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-11）でタグを
-コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。V020 より前の Run は空（D-26）。
-`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求める（以前は GitHub の compare API で求めていた）。
+コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。V020 より前の Run は空。
+`renamed_files` は収集ランナーが送る `git-renames` から判定の中で求め、再評価でも同じものを使う。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
@@ -291,22 +280,7 @@ CREATE TABLE findings (
 );
 ```
 
-V017 で `waiver_id`（免除の紐付け）を削除した（D-22）。
-
-### 3.11 `waivers` — 免除（V017 で削除）
-
-免除（D-12）を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.12 `notifications` — 通知の送信履歴（V017 で削除）
-
-メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.13 `jobs` — ジョブキュー（V021 で削除）
-
-判定は取り込みの確定と再評価の中でその場で行い、日次バッチは定期実行で直接動かすようにしたため、
-V021 でテーブルごと削除した（D-27）。
-
-### 3.14 `repository_summaries` — ダッシュボード用の読み取りモデル
+### 3.11 `repository_summaries` — ダッシュボード用の読み取りモデル
 
 ```sql
 CREATE TABLE repository_summaries (
@@ -331,7 +305,7 @@ Run や Measurement を走査しない（[05](05-architecture.md) 11 章）。
 
 `last_full_measured_at` は最後の完全計測の日時として画面に常に表示する（FR-06-3）。
 
-### 3.15 `audit_logs` — 監査ログ
+### 3.12 `audit_logs` — 監査ログ
 
 ```sql
 CREATE TABLE audit_logs (
@@ -366,11 +340,7 @@ V006 はロール `quality_gate_app` が存在する場合だけこれを実行�
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が操作したか」が失われないようにするため。
 
-### 3.16 `notification_settings` — リポジトリごとの通知設定（V017 で削除）
-
-メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
-
-### 3.17 `system_settings` — システム全体の設定
+### 3.13 `system_settings` — システム全体の設定
 
 ```sql
 CREATE TABLE system_settings (
@@ -383,13 +353,22 @@ CREATE TABLE system_settings (
 
 保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
 
-### 3.18 Spring Session
+### 3.14 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
 （自動生成に任せず、スキーマ変更を明示的に管理するため）。
 
 ---
+
+### 3.15 削除したテーブル
+
+| テーブル | 削除 | 理由 |
+| --- | --- | --- |
+| `components` | V019 | コンポーネントは計測プロファイルで決め、成果物に付いた名前で扱う（D-25） |
+| `ingest_tokens` | V021 | Ingest Token を環境変数 `QG_INGEST_TOKEN` の 1 つにまとめた（D-27） |
+| `jobs` | V021 | 判定をその場で行い、日次バッチは `@Scheduled` で直接動かす（D-27） |
+| `waivers` / `notifications` / `notification_settings` | V017 | 免除と通知を廃止した（D-22） |
 
 ## 4. 状態と列挙値の一覧
 

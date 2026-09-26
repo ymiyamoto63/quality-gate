@@ -76,5 +76,8 @@ cd frontend && npm ci && npm run dev
    - Windows 側のエディタで編集した場合は改行コードを LF にしてください
      （CRLF だと値の末尾に `\r` が付きます）
 
+取り込み（Ingest API）を手元で試す場合は、`.env` に `QG_INGEST_TOKEN` も書きます（値は `openssl rand -hex 32` などで作る。
+[取り込み](../operations/ingest.md#ローカルで取り込みを試す)）。未設定なら取り込み API はすべて 401 になります。
+
 利用者が 1 件も存在しない初期状態では、**最初にログインしたユーザーが自動的に ADMIN として登録されます**。
 2 人目以降は、ADMIN が許可リストに追加するまでログインできません（`/forbidden` に遷移します）。

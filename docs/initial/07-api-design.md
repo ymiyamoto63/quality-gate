@@ -3,13 +3,13 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate API 設計（基本設計） |
-| バージョン | 1.0 |
-| 最終更新 | 2026-09-23 |
-| 前提文書 | [要件定義書 v1.1](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
+| バージョン | 2.0 |
+| 最終更新 | 2026-09-26 |
+| 前提文書 | [要件定義書](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
 
 本書で定義した API から `api/openapi.yml` が生成され、
 それを入力にフロントエンドの型と呼び出しコードが生成される（[04](04-tech-stack.md) 4 章）。
-**本書と実装がずれた場合、正は実装（springdoc の出力）**である。
+**本書と実装がずれた場合、正は実装（springdoc の出力）**である。現行の API だけを記し、削除した API の経緯は [03](03-open-questions.md) の決定記録に残す。
 本書は設計意図と全体像を示すものと位置づける。
 
 ---
@@ -109,7 +109,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 凡例: 認可の `—` は認証のみで可（`VIEWER` 以上）。
 
-### 2.1 Ingest API（収集ランナー / CI → quality-gate）
+### 2.1 Ingest API（収集ランナー → quality-gate）
 
 | メソッド | パス | 用途 | 認可 |
 | --- | --- | --- | --- |
@@ -203,7 +203,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 }
 ```
 
-`detailUrl` を返すのは、CI のログに Run 詳細への直リンクを出せるようにするため。
+`detailUrl` を返すのは、収集ランナーのログに Run 詳細への直リンクを出せるようにするため。
 不合格を知ったときに、その場から詳細へ飛べる。
 
 ### 3.2 `POST /api/v1/runs/{runId}/artifacts`
@@ -257,7 +257,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 - 判定に失敗しても 200 を返し、`status` を `FAILED`、`errorCode` に理由のコード（`CONFIG_VALIDATION_FAILED` /
   `EVALUATION_FAILED`）を入れる。確定は取り消さない。理由の詳細は Run 詳細（S-03）に表示する
 - 収集ランナー（`submit.sh`）は `status` が `FAILED` ならワークフローを失敗にする。判定結果の `FAIL` では失敗にしない
-- 以前の判定ジョブのキューと、CI がポーリングするための `GET /api/v1/runs/{runId}/status` は D-27 で削除した
 
 ---
 
@@ -265,7 +264,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 4.1 `GET /api/v1/dashboard`
 
-`repository_summaries`（[06](06-database-design.md) 3.14）を読むだけで応答する。
+`repository_summaries`（[06](06-database-design.md) 3.11）を読むだけで応答する。
 
 ```json
 {
@@ -299,9 +298,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 }
 ```
 
-`freshness` は最終計測と最後の完全計測の日時だけを返す（FR-06-2 / FR-06-3）。
-計測途絶・完全計測途絶の判定（`staleMeasurement` / `staleFullMeasurement`）と `alerts`、
-免除の件数（`activeWaiverCount`）は D-22 で削除した。
+`freshness` は最終計測と最後の完全計測の日時を返す（FR-06-2 / FR-06-3）。
 
 ### 4.2 `GET /api/v1/runs/{runId}`
 
@@ -450,7 +447,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | コンポーネント | 常に分ける。backend と frontend のカバレッジを 1 本の線にしても意味がない |
 | 計測条件（`variant`） | 値に計測条件が添えられている場合に分ける。M-02 の実行範囲（変更範囲 / 全量）と、性能の計測環境（`environment.name`）。範囲や環境が切り替わるたびに品質が乱高下して見えるのを防ぐ |
 
-ランナー種別（self-hosted / github-hosted）の軸は、計測を収集ランナーに絞ったため削除した（D-19）。
 系列名は「backend（変更範囲）」のように条件を括弧内に並べる。
 
 **計測条件を持たない点は、同じコンポーネントの条件つき系列に配る。** 成果物の未提出などに
@@ -597,7 +593,7 @@ M-11 の `detail` は実行件数 `executed` と結果別の `passed` / `failed`
 （再実行で成功）を返す。`value` は成功率で、切り捨てで丸める（失敗があるのに `100` と表示しない）。
 M-11 / M-12 の違反はテスト 1 件ごとに 1 件で、`ruleId` が `failed` / `errored` / `flaky`（M-11）と
 `skipped`（M-12）になる。`detail` に `testClass`・`testName`・`outcome`、あれば `failureType` と
-`message`（先頭 512 文字）を添える。M-08 API 契約テスト成功率は v1.10 で廃止した（D-25）。
+`message`（先頭 512 文字）を添える。
 
 M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破壊的になりうる変更 `warnings`（level 2）、
 非破壊的な変更 `informational`（level 1）の件数を返す。違反になるのは level 3 と 2 だけで、
@@ -632,7 +628,7 @@ API のパスはリポジトリ上のファイルではない。
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
 | 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。D-20）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
-| 違反一覧 | 各違反に `fingerprint` を返す（免除と、その登録に使っていた `repositoryId` / `waiver` は D-22 で削除） |
+| 違反一覧 | 各違反に `fingerprint` を返す |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` はその場で判定し直し、判定後の `status` と `verdict` を返す。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
 | 保持期間 | Run・成果物・監査ログの日数を扱う |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
@@ -641,15 +637,7 @@ API のパスはリポジトリ上のファイルではない。
 
 ## 5. 操作 API の詳細
 
-### 5.1 ~~`POST /api/v1/waivers`~~（D-22 で削除）
-
-免除の登録・一覧・失効の API は、免除の廃止とともに削除した。
-
-### 5.2 ~~`POST /api/v1/repositories/{id}/ingest-tokens`~~（D-27 で削除）
-
-Ingest Token の発行・一覧・失効の API は、トークンを環境変数 `QG_INGEST_TOKEN` の 1 つにまとめたため削除した。
-
-### 5.3 `POST /api/v1/runs/{runId}/reevaluate`
+### 5.1 `POST /api/v1/runs/{runId}/reevaluate`
 
 **応答（200）**
 
@@ -662,7 +650,7 @@ Ingest Token の発行・一覧・失効の API は、トークンを環境変�
 成果物が保持期間を過ぎて削除されている場合は 409 `ARTIFACTS_DELETED` を返す。
 再評価は保存済みの成果物を読み直すため、実体が無いと実行できない。
 
-### 5.4 `POST /api/v1/users`
+### 5.2 `POST /api/v1/users`
 
 ```json
 { "githubLogin": "someone", "role": "VIEWER" }
@@ -689,7 +677,7 @@ Ingest Token の発行・一覧・失効の API は、トークンを環境変�
 | 監査ログの閲覧 | — | ○ | — |
 
 Ingest Token は**書き込み専用**であり、参照 API を一切呼べない。
-CI に置かれる認証情報であるため、漏洩時の影響を
+収集ランナーの Secrets に置かれる認証情報であるため、漏洩時の影響を
 「偽の計測結果を送れる」に限定し、蓄積データの読み出しには使えないようにする。
 
 ---
@@ -719,14 +707,14 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `ARTIFACT_FORMAT_INVALID` | 422 | パースに失敗 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
-| `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
+| `CONFIG_VALIDATION_FAILED` | 422 | 合格ライン（`*.gate.yml`）の検証エラー（Run の処理失敗の理由としても使う） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 
 ---
 
 ## 8. レート制限
 
-設けない（D-21）。取り込み元はトークンで認証した収集ランナー 1 台、参照するのは許可リストの少人数で、
+設けない。取り込み元はトークンで認証した収集ランナー 1 台、参照するのは許可リストの少人数で、
 上限に届く使い方が無いため。
 
 ---

@@ -3,9 +3,9 @@
 | 項目 | 内容 |
 | --- | --- |
 | ドキュメント名 | quality-gate 技術スタック |
-| バージョン | **1.1（確定）** |
-| 最終更新 | 2026-09-21 |
-| ステータス | **確定**。[要件定義書](01-requirements.md) v1.1 の付属仕様。雛形の実装で検証済み |
+| バージョン | **1.2（確定）** |
+| 最終更新 | 2026-09-26 |
+| ステータス | **確定**。[要件定義書](01-requirements.md) の付属仕様。雛形の実装で検証済み |
 
 ---
 
@@ -58,9 +58,11 @@ quality-gate/
 │  └ vite.config.ts
 ├ api/
 │  └ openapi.yml                        バックエンドから生成（コミットする）
+├ collector/                            収集ランナー（計測スクリプト・計測プロファイル・合格ライン・ツールの版）
+├ .github/workflows/                    collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
 ├ docs/
 ├ compose.yaml
-└ .quality-gate.yml                     CI から直接送る方式の設定例（D-18）
+└ Dockerfile                            アプリのイメージ（SPA を同梱した jar）
 ```
 
 ---
@@ -350,7 +352,7 @@ volumes: { pgdata: }
 
 ## 6. 品質ツールの自己適用
 
-quality-gate 自身は quality-gate で計測しない（D-18。2026-09-24 に A-7 を取り下げた）。
+quality-gate 自身は quality-gate で計測しない（D-17 / D-18）。
 代わりに Pull Request の CI（`.github/workflows/ci.yml`）で次を実行し、失敗すればマージしない。
 
 | 検査 | ツール | 基準 |

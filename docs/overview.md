@@ -7,6 +7,7 @@ quality-gate は、指定したリポジトリの品質指標を定量的に計�
 対象リポジトリを取得して行い、その成果物（JaCoCo / lcov / SARIF / PMD / JUnit XML / oasdiff など）を
 Ingest API で送ります。対象リポジトリには設定ファイルもワークフローも置きません（D-16）。
 バックエンドは送られた成果物を取り込んで、正規化・判定・可視化を担当します（テストは実行しません。D-1）。
+リリース前には、タグかコミットを指定して全指標の合否と結論（リリースしてよいか）を 1 画面で確認し、CSV を証跡として残せます（S-11）。
 取り込み経路は収集ランナーだけです（D-19）。quality-gate 自身は計測せず、Pull Request の CI でテストと検査だけを行います（D-18）。
 
 ## 対象とする品質指標
@@ -19,7 +20,6 @@ Ingest API で送ります。対象リポジトリには設定ファイルもワ
 | コード構造 | 循環的複雑度 15 超の新規関数数（backend と frontend） | 0 件 |
 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 |
 | 使いやすさ | アクセシビリティ違反 | 重大 0 件 |
-| 参考値（合否に使わない） | コード重複率 / Lighthouse パフォーマンススコア / バンドルサイズ | 合格ラインなし（値とトレンドだけを残す。設定で有効にしたときだけ） |
 
 計測対象リポジトリの想定構成は **Java Spring Boot 4（バックエンド）+ Vue 3 SPA（フロントエンド）** です。
 
@@ -46,7 +46,7 @@ quality-gate/
 │  └ src/api/schema.d.ts                openapi.yml から生成（コミットする）
 ├ api/openapi.yml   バックエンドから生成（コミットする）
 ├ collector/        収集ランナー（計測スクリプト・対象ごとの計測プロファイル・ツールの版）
-├ docs/             ドキュメント（initial/ は初期の要件定義・設計）
+├ docs/             ドキュメント（initial/ は要件定義・設計、operations/ は運用手順）
 ├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
 └ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）
 ```
