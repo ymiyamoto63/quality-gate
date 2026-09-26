@@ -22,7 +22,6 @@ public enum ErrorCode {
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ GitHub ログイン名の利用者が既に登録されています"),
     ADMIN_REQUIRED(HttpStatus.CONFLICT, "管理者が 1 人以上必要です"),
     REPOSITORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じリポジトリが既に登録されています"),
-    CONFIG_MANAGED_BY_FILE(HttpStatus.CONFLICT, "設定は CI が送るファイルで管理されています"),
     WAIVER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ対象に有効な免除が既に存在します"),
     RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
     ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),

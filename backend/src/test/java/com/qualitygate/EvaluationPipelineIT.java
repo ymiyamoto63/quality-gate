@@ -1,6 +1,7 @@
 package com.qualitygate;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
+import com.qualitygate.domain.entity.GateConfig;
 import com.qualitygate.domain.entity.IngestToken;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
@@ -920,6 +921,25 @@ class EvaluationPipelineIT {
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
         assertThat(evaluated.getGateConfigId()).isNull();
         assertThat(gateConfigs.count()).isZero();
+    }
+
+    /**
+     * 設定ファイルの無い Run（D-20 より前に画面で保存した設定で判定された Run）を再評価するときは、
+     * 前回の判定で使った版を使う。再評価で判定の基準が変わらないように。
+     */
+    @Test
+    void 設定ファイルの無いRunは前回の判定で使った版で判定し直す() {
+        GateConfig applied = gateConfigs.save(new GateConfig(Uuid7.generate(), repositoryId, 1, "UI", null,
+                "hash", "version: 1\nmetrics:\n  branch_coverage:\n    threshold: 95\n", "{}"));
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        run.applyGateConfig(applied.getId());
+        runs.save(run);
+
+        GateConfigService.Resolved config = gateConfigService.resolve(run, artifacts.findByRunId(run.getId()));
+
+        assertThat(config.gateConfig().getId()).isEqualTo(applied.getId());
+        assertThat(config.document().metric("branch_coverage").number("threshold"))
+                .contains(new java.math.BigDecimal("95"));
     }
 
     @Test

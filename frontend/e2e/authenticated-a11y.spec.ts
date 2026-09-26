@@ -10,7 +10,6 @@ import waivers from './fixtures/waivers.json' with { type: 'json' }
 import repositories from './fixtures/repositories.json' with { type: 'json' }
 import users from './fixtures/users.json' with { type: 'json' }
 import report from './fixtures/report.json' with { type: 'json' }
-import dryRun from './fixtures/dry-run.json' with { type: 'json' }
 
 /**
  * ログインが要る画面のアクセシビリティ検査（M-10）。
@@ -30,7 +29,6 @@ const RESPONSES: [RegExp, unknown][] = [
   [/^\/api\/v1\/runs\/[^/]+$/, runDetail],
   [/^\/api\/v1\/runs$/, runs],
   [/^\/api\/v1\/repositories\/[^/]+\/trends$/, trend],
-  [/^\/api\/v1\/repositories\/[^/]+\/config\/dry-run$/, dryRun],
   [/^\/api\/v1\/repositories\/[^/]+\/config$/, configInvalid],
   [/^\/api\/v1\/repositories\/[^/]+$/, repositoryDetail],
   [/^\/api\/v1\/repositories$/, repositories],
@@ -95,20 +93,6 @@ const PAGES: Target[] = [
   { path: '/admin/users', name: '利用者管理', expected: 'admin-user', role: 'ADMIN' },
   { path: '/admin/repositories', name: 'リポジトリ管理', expected: 'acme/web-app', role: 'ADMIN' },
   { path: '/reports', name: '品質レポート', expected: '最新の指標と期間内の変化' },
-  // 設定の変更を過去の Run で試算した結果を出した状態で検査する（FR-02-5）
-  {
-    path: `/repositories/${REPOSITORY_ID}/config`,
-    name: '設定（試算の結果）',
-    expected: "'mutation_score' の誤り",
-    role: 'ADMIN',
-    prepare: async (page) => {
-      await page.getByRole('tab', { name: '画面から編集' }).click()
-      await page.getByRole('button', { name: '過去の Run で試算（保存しない）' }).click()
-      await expect(
-        page.getByRole('heading', { name: '試算の結果（保存していません）' }),
-      ).toBeVisible()
-    },
-  },
 ]
 
 for (const target of PAGES) {

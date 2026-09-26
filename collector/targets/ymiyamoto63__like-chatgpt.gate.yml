@@ -1,7 +1,7 @@
 # like-chatgpt の合格ライン（収集ランナー用）
 #
-# 収集ランナーは .quality-gate.yml を送らないため、quality-gate は画面（S-06）で保存した設定で判定する。
-# この内容を S-06 に貼り付けて保存する（このファイル自体は判定に使われない。控えと差分確認用）。
+# 収集ランナー（collector/bin/submit.sh）が Run ごとにこのファイルを送り、quality-gate はこの内容で判定する（D-20）。
+# 変更は main にマージした後の計測から効く。画面（S-06）は表示するだけで、編集はできない。
 #
 # like-chatgpt の .quality-gate.yml との違い:
 #   - mutation_score は対象と同じ（全量・60%）。収集ランナーは PR では PIT を実行せずスキップを申告するため、

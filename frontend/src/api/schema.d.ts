@@ -185,7 +185,7 @@ export interface paths {
     options?: never
     head?: never
     /** リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効） */
-    patch: operations['update_3']
+    patch: operations['update_2']
     trace?: never
   }
   '/api/v1/repositories/{repositoryId}/components': {
@@ -217,32 +217,8 @@ export interface paths {
      * @description 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
      */
     get: operations['get_1']
-    /**
-     * UI から設定を更新する
-     * @description CI が送ったファイルが優先される。直近に判定された Run がファイルの設定で判定されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
-     */
-    put: operations['update_1']
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/repositories/{repositoryId}/config/dry-run': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
     put?: never
-    /**
-     * 設定の変更を過去の Run で試算する（ドライラン）
-     * @description 既定ブランチで判定された直近の Run を、保存前の設定で判定し直した結果を返す（FR-02-5）。何も保存しない。検証エラーは 422 CONFIG_VALIDATION_FAILED（行番号付き）。
-     */
-    post: operations['dryRun']
+    post?: never
     delete?: never
     options?: never
     head?: never
@@ -529,7 +505,7 @@ export interface paths {
      * ロールの変更・無効化
      * @description 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
      */
-    patch: operations['update_2']
+    patch: operations['update_1']
     trace?: never
   }
   '/api/v1/waivers': {
@@ -779,32 +755,6 @@ export interface components {
       name: string
       pathPatterns: string[]
     }
-    /** @description 設定変更のドライラン（FR-02-5） */
-    DryRunResponse: {
-      /**
-       * Format: int32
-       * @description 試算した Run の数
-       */
-      evaluated: number
-      /**
-       * Format: int32
-       * @description 合格 → 不合格に変わる Run の数
-       */
-      newlyFailing: number
-      /**
-       * Format: int32
-       * @description 不合格 → 合格に変わる Run の数
-       */
-      newlyPassing: number
-      runs: components['schemas']['RunResult'][]
-      /** @description 成果物が保持期間で削除されているなど、試算できなかった Run */
-      skipped: components['schemas']['SkippedRun'][]
-      /**
-       * Format: int32
-       * @description 判定結果が変わる Run の数
-       */
-      verdictChanged: number
-    }
     FinalizeResponse: {
       detailUrl?: string
       /** Format: uuid */
@@ -922,21 +872,6 @@ export interface components {
       /** Format: uuid */
       userId?: string
     }
-    MetricChange: {
-      componentName: string | null
-      /**
-       * @description 現在の状態。現在は判定されていない指標なら null
-       * @enum {string|null}
-       */
-      currentStatus:
-        'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE' | null
-      metricId: string
-      reason: string | null
-      /** @enum {string} */
-      simulatedStatus: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
-      unit: string | null
-      value: number | null
-    }
     MetricRow: {
       /** @description 最新の値 − 最初の値 */
       change: number | null
@@ -1011,10 +946,8 @@ export interface components {
     RepositoryConfig: {
       /** @description 設定版が 1 つも無ければ null（既定値で判定） */
       current: components['schemas']['ConfigVersion']
-      /** @description 既定値の YAML。設定版が無いときの表示と UI 編集の初期値 */
+      /** @description 既定値の YAML。設定版が無いときの表示 */
       defaultYaml: string
-      /** @description UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false */
-      editable: boolean
       history: components['schemas']['ConfigHistoryItem'][]
       validation: components['schemas']['ConfigValidation']
     }
@@ -1090,15 +1023,6 @@ export interface components {
        * @description 期間内に判定された既定ブランチの Run の数
        */
       runs: number
-    }
-    Request: {
-      /** @description 試す .quality-gate.yml の内容 */
-      rawYaml: string
-      /**
-       * Format: int32
-       * @description 試算する直近の Run の数（既定 10、最大 30）
-       */
-      runs?: number | null
     }
     /** @description データ保持期間（日） */
     RetentionSettings: {
@@ -1239,19 +1163,6 @@ export interface components {
       /** @description 計測条件の表示名（変更範囲 / 全量 など） */
       variantLabel: string | null
     }
-    RunResult: {
-      /** @description 判定（合否または指標の状態）が変わる指標だけを並べる */
-      changes: components['schemas']['MetricChange'][]
-      commitSha: string
-      /** @enum {string} */
-      currentVerdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-      /** Format: date-time */
-      measuredAt: string
-      /** Format: uuid */
-      runId: string
-      /** @enum {string} */
-      simulatedVerdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-    }
     /** @description CI がポーリングするための軽量な状態応答。 */
     RunStatusResponse: {
       /** @enum {string} */
@@ -1305,11 +1216,6 @@ export interface components {
       metricId: string
       name: string
       reason: string
-    }
-    SkippedRun: {
-      reason: string
-      /** Format: uuid */
-      runId: string
     }
     TokenList: {
       items: components['schemas']['TokenSummary'][]
@@ -1367,9 +1273,6 @@ export interface components {
       label: string
       points: components['schemas']['TrendPoint'][]
       seriesId: string
-    }
-    UpdateConfigRequest: {
-      rawYaml: string
     }
     UpdateNotificationSettingsRequest: {
       /** @enum {string|null} */
@@ -1737,7 +1640,7 @@ export interface operations {
       }
     }
   }
-  update_3: {
+  update_2: {
     parameters: {
       query?: never
       header?: never
@@ -1805,58 +1708,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['RepositoryConfig']
-        }
-      }
-    }
-  }
-  update_1: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateConfigRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryConfig']
-        }
-      }
-    }
-  }
-  dryRun: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['Request']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['DryRunResponse']
         }
       }
     }
@@ -2323,7 +2174,7 @@ export interface operations {
       }
     }
   }
-  update_2: {
+  update_1: {
     parameters: {
       query?: never
       header?: never

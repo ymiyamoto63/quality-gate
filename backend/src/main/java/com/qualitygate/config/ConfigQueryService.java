@@ -5,19 +5,12 @@ import com.qualitygate.domain.entity.GateConfig;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
-import com.qualitygate.domain.gate.GateConfigDocument;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.platform.audit.AuditAction;
-import com.qualitygate.platform.audit.AuditLogger;
 import com.qualitygate.platform.error.ApiException;
-import com.qualitygate.platform.error.ErrorCode;
-import com.qualitygate.platform.id.Uuid7;
-import com.qualitygate.platform.security.Actor;
-import com.qualitygate.platform.security.CurrentUser;
 import com.qualitygate.platform.storage.ArtifactStore;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -34,24 +27,18 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * 設定の参照と UI からの更新（S-06 / FR-02-3）。
+ * 設定の参照（S-06）。
  *
- * <p>優先順位は {@code .quality-gate.yml（CI が送信） > UI 設定 > システム既定値}。
- * ファイルで管理されているリポジトリでは UI 編集を受け付けない。優先順位を知らずに
- * UI で変更し、反映されずに混乱する事故を防ぐ（docs/initial/08-screen-design.md 4.6）。
- *
- * <p>ファイルで管理されているかは、直近に判定された Run がファイルの設定で判定されたかで決める。
- * 収集ランナー（docs/architecture/collector-runner.md）は設定ファイルを送らないため、
- * 対象の CI から収集ランナーへ切り替えた後は、過去のファイル由来の版が残っていても UI で編集できる。
+ * <p>設定は {@code collector/targets/<owner>__<name>.gate.yml} を Git で管理し、収集ランナーが Run ごとに送る（D-20）。
+ * 画面は表示するだけで、編集は受け付けない。置き場所を 1 つにして、どちらが効いているか迷わないようにする。
  */
 @Service
 public class ConfigQueryService {
 
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
-    private static final String TARGET = "REPOSITORY";
 
-    /** 設定ファイルが無いリポジトリの表示と、UI 編集の初期値。 */
+    /** 設定版が無いリポジトリの表示（既定値）。 */
     static final String DEFAULT_YAML = """
             version: 1
             on_missing_report: fail
@@ -91,24 +78,18 @@ public class ConfigQueryService {
     private final ArtifactRecordRepository artifacts;
     private final ArtifactStore artifactStore;
     private final GateConfigParser parser;
-    private final CurrentUser currentUser;
-    private final AuditLogger auditLogger;
     private final ObjectMapper objectMapper;
 
-    @SuppressWarnings("java:S107")
     public ConfigQueryService(GateConfigRepository configs,
                               MonitoredRepositoryRepository repositories, RunRepository runs,
                               ArtifactRecordRepository artifacts, ArtifactStore artifactStore,
-                              GateConfigParser parser, CurrentUser currentUser,
-                              AuditLogger auditLogger, ObjectMapper objectMapper) {
+                              GateConfigParser parser, ObjectMapper objectMapper) {
         this.configs = configs;
         this.repositories = repositories;
         this.runs = runs;
         this.artifacts = artifacts;
         this.artifactStore = artifactStore;
         this.parser = parser;
-        this.currentUser = currentUser;
-        this.auditLogger = auditLogger;
         this.objectMapper = objectMapper;
     }
 
@@ -120,63 +101,7 @@ public class ConfigQueryService {
         return new ConfigResponses.RepositoryConfig(current,
                 versions.stream().map(ConfigQueryService::historyOf).toList(),
                 latestValidation(repositoryId),
-                isEditable(repositoryId, versions),
                 DEFAULT_YAML);
-    }
-
-    /**
-     * UI から設定を更新する。検証を通った内容だけを新しい版として保存する。
-     * 内容が同じなら版を増やさない（変更履歴がノイズで埋まるため）。
-     */
-    @Transactional
-    public void update(UUID repositoryId, String rawYaml) {
-        Actor actor = currentUser.actor();
-        requireRepository(repositoryId);
-        List<GateConfig> versions = configs.findByRepositoryIdOrderByVersionDesc(repositoryId);
-        if (!isEditable(repositoryId, versions)) {
-            throw new ApiException(ErrorCode.CONFIG_MANAGED_BY_FILE,
-                    "このリポジトリの設定は .quality-gate.yml で管理されており、ファイルが優先されます。"
-                            + "設定を変えるにはファイルを編集してください"
-                            + "（CI が .quality-gate.yml を送らなくなれば、次に判定された Run から画面で編集できます）");
-        }
-
-        GateConfigDocument document;
-        try {
-            document = parser.parse(rawYaml);
-        } catch (ConfigValidationException e) {
-            throw new ApiException(ErrorCode.CONFIG_VALIDATION_FAILED,
-                    "設定に %d 件の誤りがあります".formatted(e.errors().size()),
-                    Map.of("errors", e.errors().stream().map(ConfigQueryService::errorOf).toList()));
-        }
-
-        String hash = GateConfigService.sha256(rawYaml);
-        if (configs.findByRepositoryIdAndContentHash(repositoryId, hash).isPresent()) {
-            return;
-        }
-        int before = versions.isEmpty() ? 0 : versions.getFirst().getVersion();
-        GateConfig saved = configs.save(new GateConfig(Uuid7.generate(), repositoryId,
-                configs.findMaxVersion(repositoryId) + 1, GateConfig.SOURCE_UI, null, hash,
-                rawYaml, objectMapper.writeValueAsString(document)));
-        auditLogger.record(actor, AuditAction.CONFIG_UPDATED, TARGET, repositoryId,
-                before == 0 ? null : Map.of("version", before),
-                Map.of("version", saved.getVersion(), "sourceType", GateConfig.SOURCE_UI));
-    }
-
-    /**
-     * 直近に判定された Run がファイル由来の設定で判定されていなければ UI から編集できる。
-     * 判定済みの Run が無いときは、最新の版がファイル由来かで決める。
-     */
-    private boolean isEditable(UUID repositoryId, List<GateConfig> versions) {
-        Optional<Run> latest = runs.findFirstByRepositoryIdAndStatusOrderByMeasuredAtDesc(
-                repositoryId, RunStatus.EVALUATED);
-        if (latest.isPresent()) {
-            UUID applied = latest.get().getGateConfigId();
-            return applied == null || versions.stream()
-                    .filter(v -> v.getId().equals(applied))
-                    .noneMatch(v -> GateConfig.SOURCE_FILE.equals(v.getSourceType()));
-        }
-        return versions.isEmpty()
-                || !GateConfig.SOURCE_FILE.equals(versions.getFirst().getSourceType());
     }
 
     /**

@@ -21,7 +21,6 @@ import java.util.UUID;
 public class GateConfig {
 
     public static final String SOURCE_FILE = "FILE";
-    public static final String SOURCE_UI = "UI";
     public static final String SOURCE_DEFAULT = "DEFAULT";
 
     @Id
