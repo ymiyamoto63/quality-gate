@@ -129,7 +129,7 @@ function formatBytes(bytes: number): string {
           </a>
           <span v-if="detail.gateConfig">
             設定 v{{ detail.gateConfig.version }}（{{
-              detail.gateConfig.sourceType === 'FILE' ? '.quality-gate.yml' : '画面から設定'
+              detail.gateConfig.sourceType === 'FILE' ? '設定ファイル' : '画面から設定'
             }}）
           </span>
           <span v-else>設定 既定値</span>

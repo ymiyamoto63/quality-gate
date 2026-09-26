@@ -1,9 +1,7 @@
 package com.qualitygate.config;
 
 import io.swagger.v3.oas.annotations.media.Schema;
-import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Size;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,9 +20,7 @@ public final class ConfigResponses {
             ConfigVersion current,
             @NotNull List<ConfigHistoryItem> history,
             @NotNull ConfigValidation validation,
-            @NotNull @Schema(description = "UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false")
-            boolean editable,
-            @NotNull @Schema(description = "既定値の YAML。設定版が無いときの表示と UI 編集の初期値")
+            @NotNull @Schema(description = "既定値の YAML。設定版が無いときの表示")
             String defaultYaml) {
     }
 
@@ -58,9 +54,5 @@ public final class ConfigResponses {
             @NotNull @Schema(nullable = true, description = "1 始まりの行番号") Integer line,
             @NotNull String path,
             @NotNull String message) {
-    }
-
-    public record UpdateConfigRequest(
-            @NotBlank @Size(max = 262144) String rawYaml) {
     }
 }

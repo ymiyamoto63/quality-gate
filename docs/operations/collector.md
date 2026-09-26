@@ -29,7 +29,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない** |
-| `collector/bin/submit.sh` | Ingest API に送る。`.quality-gate.yml` は送らない（判定は画面の設定で行う） |
+| `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
@@ -39,7 +39,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**既定ブ�
 | `collector/bundle/size.mjs` | M-17 のビルド結果のファイルサイズ（gzip 後を含む）を JSON に書き出すスクリプト（依存パッケージなし） |
 | `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
-| `collector/targets/<owner>__<name>.gate.yml` | 画面（S-06）に保存する合格ラインの控え |
+| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（D-20。無ければ送信しない） |
 | `collector/targets/<owner>__<name>.k6.js` | M-03〜05 の負荷試験のシナリオ（k6） |
 
 ### 指標ごとの計測方法
@@ -114,21 +114,17 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 **quality-gate リポジトリは private のままにしてください。** 収集ワークフローのログと成果物には、対象のパスやテスト出力が含まれます。
 
-### 1-4. quality-gate にリポジトリと合格ラインを登録する
+### 1-4. quality-gate にリポジトリを登録する
 
 1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録し、Ingest Token を発行する（1-3 のシークレットに入れる）。
    対象の CI 用のトークンがすでにある場合も、収集ランナー用に別のトークンを発行する（あとで CI 用だけを失効させられるように）
-2. like-chatgpt の **設定（S-06）** に `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` の内容を貼り付けて保存する
 
-2 を忘れると既定値で判定され、性能のシナリオ名（`performance.scenarios`）が照合されないなど、控えと違う合格ラインで判定されます。
-控えの設定は `execution.skippable_metrics` に `mutation_score` と `performance` を入れています。PR の計測では M-02 と M-03〜05 のスキップを申告するため、
+合格ラインは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` です。収集ランナーが Run ごとに送り、quality-gate はその内容で判定します（D-20）。
+画面（S-06）は表示するだけで、編集はできません。変更はプルリクエストで行い、main にマージした後の計測から使われます
+（すぐに反映したいときは collect ワークフローを手動実行する）。内容が変わったときだけ新しい版として S-06 の「変更履歴」に残ります。
+
+この設定は `execution.skippable_metrics` に `mutation_score` と `performance` を入れています。PR の計測では M-02 と M-03〜05 のスキップを申告するため、
 これが無いと申告が受け付けられず、PR の Run の M-02 / M-03〜05 が ERROR になります。
-
-対象の CI から `.quality-gate.yml` 付きの Run が届いていたリポジトリでは、**直近の Run がファイルの設定で判定されている間は S-06 から保存できません**
-（「直近の Run がファイルの設定で判定されているため、画面からは編集できません」）。
-収集ランナーで 1 回計測すると（既定値で判定されて FAIL になります）保存できるようになるので、
-保存した後にその Run を **Run 詳細 › 再評価** で判定し直してください。
-対象の CI がまだ送信を続けていると、そちらの Run が届くたびにまた編集できなくなります（[対象の CI からの送信を止める](#対象の-ci-からの送信を止める)）。
 
 ## 2. 手動で実行する
 
@@ -274,7 +270,7 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 | --- | --- |
 | 方式 | 対象アプリを**計測用のコンテナの中で起動**して検査する（共有の検証環境の URL は使わない。コミットごとの画面を検査するため） |
 | 起動するもの | バックエンド: `measure_backend` のビルドで出来た実行可能 jar（`java -jar`）。フロントエンド: `vite build` の結果を `vite preview` で配る。`/api` の proxy は対象の `vite.config` の `server.proxy` がそのまま使われる |
-| 検査する画面 | 計測プロファイルの `A11Y_PAGES`。画面の設定の `accessibility.pages` と一致させる（一致しないと ERROR） |
+| 検査する画面 | 計測プロファイルの `A11Y_PAGES`。合格ライン（`*.gate.yml`）の `accessibility.pages` と一致させる（一致しないと ERROR） |
 | 検査の内容 | 各画面をライト・ダークの 2 通りで開き、WCAG 2.2 AA のタグ（`wcag2a` 〜 `wcag22aa`）で axe-core を実行する。対象の e2e と同じ条件 |
 | 実行する計測 | すべての計測（既定ブランチも PR も） |
 | 所要時間 | like-chatgpt で約 1 分（ツールの取得を含む） |
@@ -359,9 +355,9 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 シナリオの書き方（`collector/targets/ymiyamoto63__like-chatgpt.k6.js` を写して書き換える）:
 
 - 計測区間のシナリオに `phase: measure` のタグを付け、ウォームアップには `phase: warmup` を付ける
-- シナリオ名（`options.scenarios` のキー）を画面の設定の `performance.scenarios` と一致させる。
+- シナリオ名（`options.scenarios` のキー）を合格ライン（`*.gate.yml`）の `performance.scenarios` と一致させる。
   シナリオごとに `http_req_duration{scenario:<名前>}` のしきい値を書いておく（k6 はしきい値のあるタグ付き指標だけを出力する）
-- 計測区間の到達率の合計を画面の設定の `performance.arrival_rate_rps` と一致させる
+- 計測区間の到達率の合計を合格ライン（`*.gate.yml`）の `performance.arrival_rate_rps` と一致させる
 - `handleSummary` で `http_reqs{phase:measure}` の rate を「件数 ÷ 計測秒数」に直して出力する。
   k6 の rate はテスト全体の時間（ウォームアップを含む）で割るため、そのままでは到達率が 5/6 に見え、M-04 が WARN になる
 
@@ -384,22 +380,22 @@ sudo -iu runner sed -i '/pr:14 c643edd24a5441dc2d7063a7394f51a9127fa472/d' ~/.lo
 - **M-08 は計測プロファイルの `CONTRACT_TEST_REPORTS` に合うテストの成功率**です。
   like-chatgpt には Pact などの契約テストが無いため、MockMvc で API を検証する `*ControllerTest` を契約テストとして扱っています
 - **M-13（シークレット）は M-06（脆弱性）から分かれました。** 以前は Trivy が見つけたシークレットも M-06 の件数に入っていました。
-  画面の設定で `secrets` を有効にしないと、シークレットは判定されません（控えの `*.gate.yml` では有効にしています）
+  合格ライン（`*.gate.yml`）で `secrets` を有効にしないと、シークレットは判定されません（like-chatgpt の `*.gate.yml` では有効にしています）
 - **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
   使ってよいと判断したパッケージは、違反単位の免除で外します
 - **M-15〜M-17 は参考値**です。合格ラインを持たず、Run の合否にも部分計測にも影響しません（計測に失敗して ERROR でも同じ）。
-  画面の設定で `duplication` / `lighthouse` / `bundle_size` を有効にしたときだけ Run 詳細とトレンドに出ます。
+  合格ライン（`*.gate.yml`）で `duplication` / `lighthouse` / `bundle_size` を有効にしたときだけ Run 詳細とトレンドに出ます。
   M-16 は計測するマシンの性能に左右されるため、同じ収集ランナーでの推移を見てください
 - **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
-  画面の設定で `test_results` を有効にしたときだけ判定されます（控えの `*.gate.yml` では有効にしています）。
+  合格ライン（`*.gate.yml`）で `test_results` を有効にしたときだけ判定されます（like-chatgpt の `*.gate.yml` では有効にしています）。
   M-12 は比較対象の Run からスキップが増えたら FAIL です
 - **M-09 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
-- 判定には**画面（S-06）で保存した最新の設定**を使います。コミット時点の設定ではありません。設定の変更履歴は S-06 の「変更履歴」と監査ログで追えます
+- 判定には**計測した時点の main の `*.gate.yml`** を使います。再評価ではその Run が送った設定で判定し直します。設定の変更履歴は S-06 の「変更履歴」と Git の履歴で追えます
 
 ## 対象の CI からの送信を止める
 
 収集ランナーだけで計測できるようになったら、対象リポジトリの CI から quality-gate への送信は不要です。
-両方から送ると、同じコミットの Run が 2 つでき、対象の CI が送る `.quality-gate.yml` が画面の設定より優先されます。
+両方から送ると、同じコミットの Run が 2 つでき、対象の CI の Run は対象側の `.quality-gate.yml` で判定されます。
 
 対象リポジトリに手を入れずに止めるには、**quality-gate 側で対象の CI 用の Ingest Token を失効させます**（S-08）。
 収集ランナー用のトークンを別に発行しておけば、収集ランナーの送信には影響しません。
@@ -437,7 +433,7 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 ## 対象を追加する
 
 1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）。定期実行するなら `SCHEDULE=true`
-2. 画面の設定の控えとして `collector/targets/<owner>__<name>.gate.yml` を作り、S-06 に保存する
+2. 合格ラインとして `collector/targets/<owner>__<name>.gate.yml` を作る（無いと送信の前に止まる）
    （性能を計測するなら `collector/targets/<owner>__<name>.k6.js` も作る。[8 章](#8-m-0305性能段階-5)）
 3. 1-2 の App を対象にもインストールし、1-3 に Ingest Token のシークレットを足す
 
@@ -469,8 +465,8 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `measure` で `M-15: jscpd（frontend）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` の最初のディレクトリが無い（jscpd は 1 つのディレクトリだけを解析する） |
 | `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または ... が未設定です` | 1-3 の設定漏れ。Ingest Token のシークレット名は計測プロファイルの `INGEST_TOKEN_SECRET` と一致させる |
-| PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 1-4 の 2（画面の設定の保存）をしていない。`skippable_metrics` に `mutation_score` と `performance` が必要 |
-| M-03 が ERROR（シナリオがありません） | k6 のシナリオ名と画面の設定の `performance.scenarios` が一致していない |
+| PR の Run で M-02 / M-03〜05 が ERROR（スキップが許容されていない） | 合格ライン（`*.gate.yml`）の `execution.skippable_metrics` に `mutation_score` と `performance` が必要 |
+| M-03 が ERROR（シナリオがありません） | k6 のシナリオ名と合格ライン（`*.gate.yml`）の `performance.scenarios` が一致していない |
 | M-04 が WARN（到達率が設定値の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `arrival_rate_rps` が一致していない |
 | `measure` で `M-03〜05: バックエンドが起動しませんでした` | ポート（`PERF_BACKEND_PORT`）が使われている、または起動に外部のサービスが要る |
 | `measure` で `M-03〜05: k6 を取得できませんでした` | github.com に届かない |
@@ -479,11 +475,11 @@ GH_TOKEN=<読み取り権限のあるトークン> ./collector/bin/detect.sh
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
 | `measure` で `Node.js の版を解決できませんでした` | 対象の `.nvmrc` の書き方が解釈できない（`22` / `v22.21.1` / `lts/*` の形に対応）、または nodejs.org に届かない |
 | `measure` で `M-10: 検査ツールを用意できませんでした` | npm レジストリに届かない、または Chromium の取得に失敗した（1-1） |
-| M-10 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と画面の設定の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
+| M-10 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と合格ライン（`*.gate.yml`）の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
 | Chromium が `error while loading shared libraries` で起動しない | ランナーに Chromium のライブラリが無い。`sudo npx playwright install-deps chromium` を一度実行する |
-| PR の Run の M-02 が ERROR（スキップの申告が受け付けられない） | 画面の設定の `execution.skippable_metrics` に `mutation_score` が無い（1-4） |
+| PR の Run の M-02 が ERROR（スキップの申告が受け付けられない） | 合格ライン（`*.gate.yml`）の `execution.skippable_metrics` に `mutation_score` が無い（1-4） |
 | 定期実行の `plan` で `PR の一覧を取得できませんでした` | App に Pull requests の読み取り権限が無い、または権限の追加をインストール先で承認していない |
 | 定期実行の `plan` で `トークンの owner（…）と違うため飛ばします` | 対象の owner が quality-gate の owner と違う。定期実行の対象外（手動実行で計測する） |
 | 定期実行の `plan` で `3 回失敗しているため計測しません` | そのコミットの計測が 3 回失敗した。原因を直して手動実行するか、4-4 の手順で記録を消す |
 | 定期実行が動かない | ワークフローが main に無い、Disable されている、またはランナーが止まっている（`plan` もセルフホストランナーで動く） |
-| S-06 で「直近の Run がファイルの設定で判定されているため、画面からは編集できません」 | 対象の CI が `.quality-gate.yml` を送っている。収集ランナーで 1 回計測してから保存する（1-4）。対象の CI からの送信を止める |
+| submit で `合格ラインがありません` | `collector/targets/<owner>__<name>.gate.yml` が無い（[対象を追加する](#対象を追加する)） |

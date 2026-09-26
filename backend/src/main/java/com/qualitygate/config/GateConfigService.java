@@ -27,17 +27,12 @@ import java.util.Optional;
 /**
  * 判定に使う設定を解決する。
  *
- * <p>設定は CI が {@code quality-gate-config} 型の成果物として送る。
- * quality-gate 自身が GitHub API で取得する方式も検討したが、
- * <strong>取り込み型（要件定義書 D-1）の下では CI をすでに信頼している</strong>
- * ためである。CI は計測値そのものを送っており、設定だけを別経路で取っても
- * 守れる範囲は増えない。代わりに GitHub の認証情報と障害点を持ち込まずに済む。
+ * <p>設定は収集ランナーが {@code quality-gate-config} 型の成果物として送る
+ * （{@code collector/targets/<owner>__<name>.gate.yml}。Git で管理する唯一の置き場所。D-20）。
+ * 内容が同じなら同じ版を使い、変わったときだけ新しい版を保存する。
  *
- * <p>将来、多重防御として GitHub からの直接取得を足す余地は
- * {@code sourceType} と {@code sourceCommitSha} に残してある。
- *
- * <p>収集ランナー（docs/architecture/collector-runner.md）は設定ファイルを送らないため、
- * その Run は UI で保存した設定（無ければ既定値）で判定される。
+ * <p>設定ファイルの無い Run（D-20 より前の Run）は、前回の判定で使った版で判定し直す。
+ * 再評価で判定の基準が変わらないように（判定の再現性。FR-02-4）。
  */
 @Service
 public class GateConfigService {
@@ -61,7 +56,7 @@ public class GateConfigService {
     /**
      * Run に対応する設定を解決する。
      *
-     * <p>設定ファイルが提出されていなければシステム既定値を使う。
+     * <p>設定ファイルが提出されていなければ、前回の判定で使った版、それも無ければシステム既定値を使う。
      * 検証エラーは {@link ConfigValidationException} として投げる。
      * 不正な設定で判定を続けると、意図しないしきい値で合格が出てしまう。
      */
@@ -72,13 +67,11 @@ public class GateConfigService {
                 .findFirst();
 
         if (configArtifact.isEmpty()) {
-            // ファイルが無ければ UI で保存した設定、それも無ければシステム既定値（FR-02-3）
-            Optional<GateConfig> ui = configs.findFirstByRepositoryIdAndSourceTypeOrderByVersionDesc(
-                    run.getRepositoryId(), GateConfig.SOURCE_UI);
-            if (ui.isPresent()) {
-                log.info("設定ファイルが提出されていないため UI の設定 v{} を使います runId={}",
-                        ui.get().getVersion(), run.getId());
-                return new Resolved(parser.parse(ui.get().getRawYaml()), ui.get());
+            Optional<GateConfig> applied = Optional.ofNullable(run.getGateConfigId()).flatMap(configs::findById);
+            if (applied.isPresent()) {
+                log.info("設定ファイルが提出されていないため前回の判定で使った設定 v{} を使います runId={}",
+                        applied.get().getVersion(), run.getId());
+                return new Resolved(parser.parse(applied.get().getRawYaml()), applied.get());
             }
             log.info("設定ファイルが提出されていないため既定値を使います runId={}", run.getId());
             return new Resolved(GateConfigDocument.defaults(), null);
@@ -98,7 +91,7 @@ public class GateConfigService {
                     log.info("新しい設定版を保存します repositoryId={} version={}",
                             run.getRepositoryId(), version);
                     return configs.save(new GateConfig(Uuid7.generate(), run.getRepositoryId(),
-                            version, GateConfig.SOURCE_FILE, run.getCommitSha(), hash, yaml,
+                            version, GateConfig.SOURCE_FILE, null, hash, yaml,
                             objectMapper.writeValueAsString(document)));
                 });
     }

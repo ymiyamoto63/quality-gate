@@ -22,6 +22,8 @@ tags:
   name: Ingest
 - description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
   name: RepositoryAdmin
+- description: 設定の表示・検証結果・版履歴
+  name: Config
 - description: Run の参照
   name: Runs
 - description: 保持期間などのシステム設定（管理者のみ）
@@ -34,8 +36,6 @@ tags:
   name: Operations
 - description: 品質レポート（FR-08-4）
   name: Reports
-- description: .quality-gate.yml の表示・検証結果・版履歴
-  name: Config
 - description: リポジトリ単位の参照
   name: Repositories
 - description: README 用のバッジ
@@ -284,7 +284,7 @@ paths:
       tags:
       - Repositories
     patch:
-      operationId: update_3
+      operationId: update_2
       parameters:
       - in: path
         name: repositoryId
@@ -349,61 +349,6 @@ paths:
                 $ref: "#/components/schemas/RepositoryConfig"
           description: OK
       summary: 現在の設定と版の履歴、直近の検証結果を取得する
-      tags:
-      - Config
-    put:
-      description: CI が送ったファイルが優先される。直近に判定された Run がファイルの設定で判定されている場合は 409 CONFIG_MANAGED_BY_FILE。検証エラーは
-        422 CONFIG_VALIDATION_FAILED（行番号付き）。
-      operationId: update_1
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateConfigRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryConfig"
-          description: OK
-      summary: UI から設定を更新する
-      tags:
-      - Config
-  /api/v1/repositories/{repositoryId}/config/dry-run:
-    post:
-      description: 既定ブランチで判定された直近の Run を、保存前の設定で判定し直した結果を返す（FR-02-5）。何も保存しない。検証エラーは
-        422 CONFIG_VALIDATION_FAILED（行番号付き）。
-      operationId: dryRun
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/Request"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/DryRunResponse"
-          description: OK
-      summary: 設定の変更を過去の Run で試算する（ドライラン）
       tags:
       - Config
   /api/v1/repositories/{repositoryId}/ingest-tokens:
@@ -906,7 +851,7 @@ paths:
   /api/v1/users/{userId}:
     patch:
       description: 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
-      operationId: update_2
+      operationId: update_1
       parameters:
       - in: path
         name: userId
@@ -1464,42 +1409,6 @@ components:
       - language
       - name
       - pathPatterns
-    DryRunResponse:
-      type: object
-      description: 設定変更のドライラン（FR-02-5）
-      properties:
-        evaluated:
-          type: integer
-          format: int32
-          description: 試算した Run の数
-        newlyFailing:
-          type: integer
-          format: int32
-          description: 合格 → 不合格に変わる Run の数
-        newlyPassing:
-          type: integer
-          format: int32
-          description: 不合格 → 合格に変わる Run の数
-        runs:
-          type: array
-          items:
-            $ref: "#/components/schemas/RunResult"
-        skipped:
-          type: array
-          description: 成果物が保持期間で削除されているなど、試算できなかった Run
-          items:
-            $ref: "#/components/schemas/SkippedRun"
-        verdictChanged:
-          type: integer
-          format: int32
-          description: 判定結果が変わる Run の数
-      required:
-      - evaluated
-      - newlyFailing
-      - newlyPassing
-      - runs
-      - skipped
-      - verdictChanged
     FinalizeResponse:
       type: object
       properties:
@@ -1778,58 +1687,6 @@ components:
         userId:
           type: string
           format: uuid
-    MetricChange:
-      type: object
-      properties:
-        componentName:
-          type:
-          - string
-          - "null"
-        currentStatus:
-          type:
-          - string
-          - "null"
-          description: 現在の状態。現在は判定されていない指標なら null
-          enum:
-          - PASS
-          - WARN
-          - FAIL
-          - SKIP
-          - REFERENCE
-          - ERROR
-          - NOT_APPLICABLE
-        metricId:
-          type: string
-        reason:
-          type:
-          - string
-          - "null"
-        simulatedStatus:
-          type: string
-          enum:
-          - PASS
-          - WARN
-          - FAIL
-          - SKIP
-          - REFERENCE
-          - ERROR
-          - NOT_APPLICABLE
-        unit:
-          type:
-          - string
-          - "null"
-        value:
-          type:
-          - number
-          - "null"
-      required:
-      - componentName
-      - currentStatus
-      - metricId
-      - reason
-      - simulatedStatus
-      - unit
-      - value
     MetricRow:
       type: object
       properties:
@@ -2011,10 +1868,7 @@ components:
           description: 設定版が 1 つも無ければ null（既定値で判定）
         defaultYaml:
           type: string
-          description: 既定値の YAML。設定版が無いときの表示と UI 編集の初期値
-        editable:
-          type: boolean
-          description: UI から編集できるか。直近に判定された Run が .quality-gate.yml の設定で判定されていれば false
+          description: 既定値の YAML。設定版が無いときの表示
         history:
           type: array
           items:
@@ -2024,7 +1878,6 @@ components:
       required:
       - current
       - defaultYaml
-      - editable
       - history
       - validation
     RepositoryDetail:
@@ -2194,23 +2047,6 @@ components:
       - passedWithWarnings
       - repositoryId
       - runs
-    Request:
-      type: object
-      properties:
-        rawYaml:
-          type: string
-          description: 試す .quality-gate.yml の内容
-          minLength: 1
-        runs:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: 試算する直近の Run の数（既定 10、最大 30）
-          maximum: 30
-          minimum: 1
-      required:
-      - rawYaml
     RetentionSettings:
       type: object
       description: データ保持期間（日）
@@ -2546,41 +2382,6 @@ components:
       - value
       - variant
       - variantLabel
-    RunResult:
-      type: object
-      properties:
-        changes:
-          type: array
-          description: 判定（合否または指標の状態）が変わる指標だけを並べる
-          items:
-            $ref: "#/components/schemas/MetricChange"
-        commitSha:
-          type: string
-        currentVerdict:
-          type: string
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-        measuredAt:
-          type: string
-          format: date-time
-        runId:
-          type: string
-          format: uuid
-        simulatedVerdict:
-          type: string
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-      required:
-      - changes
-      - commitSha
-      - currentVerdict
-      - measuredAt
-      - runId
-      - simulatedVerdict
     RunStatusResponse:
       type: object
       description: CI がポーリングするための軽量な状態応答。
@@ -2707,17 +2508,6 @@ components:
       - metricId
       - name
       - reason
-    SkippedRun:
-      type: object
-      properties:
-        reason:
-          type: string
-        runId:
-          type: string
-          format: uuid
-      required:
-      - reason
-      - runId
     TokenList:
       type: object
       properties:
@@ -2864,15 +2654,6 @@ components:
       - label
       - points
       - seriesId
-    UpdateConfigRequest:
-      type: object
-      properties:
-        rawYaml:
-          type: string
-          maxLength: 262144
-          minLength: 0
-      required:
-      - rawYaml
     UpdateNotificationSettingsRequest:
       type: object
       properties:

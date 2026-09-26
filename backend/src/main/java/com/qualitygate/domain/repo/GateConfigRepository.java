@@ -17,9 +17,6 @@ public interface GateConfigRepository extends JpaRepository<GateConfig, UUID> {
 
     java.util.List<GateConfig> findByRepositoryIdOrderByVersionDesc(UUID repositoryId);
 
-    Optional<GateConfig> findFirstByRepositoryIdAndSourceTypeOrderByVersionDesc(UUID repositoryId,
-                                                                              String sourceType);
-
     @Query("select coalesce(max(c.version), 0) from GateConfig c where c.repositoryId = :repositoryId")
     int findMaxVersion(@Param("repositoryId") UUID repositoryId);
 }

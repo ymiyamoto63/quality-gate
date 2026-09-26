@@ -13,7 +13,7 @@
 #   QG_TRIGGERED_BY  既定: collector（対象リポジトリの CI から送った Run と区別する）
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
-# .quality-gate.yml は送らない。判定には quality-gate の画面（S-06）で保存した設定が使われる。
+# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（D-20）。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -24,6 +24,10 @@ REPORTS=$1
 
 load_env "$REPORTS/meta.env"
 load_profile "$QG_REPOSITORY"
+
+# 合格ラインが無ければ Run を作らずに止める。既定値で黙って判定すると、意図しない基準で合否が出る
+GATE_CONFIG="${COLLECTOR_DIR}/targets/${QG_REPOSITORY/\//__}.gate.yml"
+[ -s "$GATE_CONFIG" ] || die "合格ラインがありません: $GATE_CONFIG"
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
@@ -85,6 +89,8 @@ upload() {
   curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
   echo "送信しました: type=$type ${component:+component=$component }${scope:+scope=$scope }${file#"$REPORTS"/}"
 }
+
+upload quality-gate-config "$GATE_CONFIG"
 
 # コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
 BACKEND=${BACKEND_DIR##*/}

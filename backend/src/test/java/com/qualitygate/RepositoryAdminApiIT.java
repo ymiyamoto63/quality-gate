@@ -155,8 +155,9 @@ class RepositoryAdminApiIT {
         assertThat(createRun(token)).hasStatus(403);
     }
 
+    /** 設定は collector/targets/*.gate.yml を Git で管理する（D-20）。画面は表示するだけ（更新の API は無い）。 */
     @Test
-    void UIから設定を保存でき検証エラーは行番号付きで返る() {
+    void 設定版が無ければ既定値を表示する() {
         String repositoryId = createRepository();
 
         assertThat(mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
@@ -165,108 +166,9 @@ class RepositoryAdminApiIT {
                 .bodyJson()
                 .satisfies(json -> {
                     json.assertThat().extractingPath("$.current").isNull();
-                    json.assertThat().extractingPath("$.editable").isEqualTo(true);
                     json.assertThat().extractingPath("$.validation.valid").isEqualTo(true);
+                    json.assertThat().extractingPath("$.defaultYaml").asString().startsWith("version: 1");
                 });
-
-        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rawYaml\":\"version: 1\\nmetrics:\\n  branch_coverage:\\n    threshold: \\\"75%\\\"\\n\"}"))
-                .hasStatus(422)
-                .bodyJson()
-                .satisfies(json -> {
-                    json.assertThat().extractingPath("$.errorCode").isEqualTo("CONFIG_VALIDATION_FAILED");
-                    json.assertThat().extractingPath("$.errors[0].line").isEqualTo(4);
-                });
-
-        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rawYaml\":\"version: 1\\nmetrics:\\n  branch_coverage:\\n    threshold: 80\\n\"}"))
-                .hasStatusOk()
-                .bodyJson()
-                .satisfies(json -> {
-                    json.assertThat().extractingPath("$.current.version").isEqualTo(1);
-                    json.assertThat().extractingPath("$.current.sourceType").isEqualTo("UI");
-                });
-        assertThat(auditLogs.findAll()).extracting(l -> l.getAction()).contains("CONFIG_UPDATED");
-
-        // 閲覧者は編集できない
-        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("viewer-user", "VIEWER"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rawYaml\":\"version: 1\\n\"}"))
-                .hasStatus(403);
-    }
-
-    @Test
-    void ファイルで管理されている設定はUIから編集できない() {
-        String repositoryId = createRepository();
-        jdbc.update("""
-                INSERT INTO gate_configs (id, repository_id, version, source_type, content_hash,
-                                          raw_yaml, parsed)
-                VALUES (?, ?::uuid, 1, 'FILE', 'h', 'version: 1', '{}'::jsonb)
-                """, Uuid7.generate(), repositoryId);
-
-        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rawYaml\":\"version: 1\\n\"}"))
-                .hasStatus(409)
-                .bodyJson().extractingPath("$.errorCode").isEqualTo("CONFIG_MANAGED_BY_FILE");
-    }
-
-    /**
-     * 対象の CI（ファイルを送る）から収集ランナー（ファイルを送らない）へ切り替えた後は、
-     * ファイル由来の版が残っていても UI から編集できる。編集できるかは直近に判定された Run が
-     * どの設定で判定されたかで決める。
-     */
-    @Test
-    void 直近のRunがファイルの設定で判定されていなければUIから編集できる() {
-        String repositoryId = createRepository();
-        java.util.UUID fileConfigId = Uuid7.generate();
-        jdbc.update("""
-                INSERT INTO gate_configs (id, repository_id, version, source_type, content_hash,
-                                          raw_yaml, parsed)
-                VALUES (?, ?::uuid, 1, 'FILE', 'h', 'version: 1', '{}'::jsonb)
-                """, fileConfigId, repositoryId);
-
-        // CI がファイルを送っていた頃の Run
-        evaluatedRun(repositoryId, "a", "2026-09-22T00:00:00Z", fileConfigId);
-        assertThat(mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("viewer-user", "VIEWER")))
-                .hasStatusOk()
-                .bodyJson().extractingPath("$.editable").isEqualTo(false);
-
-        // 収集ランナーの Run（ファイルを送らないため既定値で判定され、設定版は紐づかない）
-        evaluatedRun(repositoryId, "b", "2026-09-23T00:00:00Z", null);
-        assertThat(mvc.get().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("viewer-user", "VIEWER")))
-                .hasStatusOk()
-                .bodyJson().extractingPath("$.editable").isEqualTo(true);
-
-        assertThat(mvc.put().uri("/api/v1/repositories/{id}/config", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"rawYaml\":\"version: 1\\n\"}"))
-                .hasStatusOk()
-                .bodyJson()
-                .satisfies(json -> {
-                    json.assertThat().extractingPath("$.current.version").isEqualTo(2);
-                    json.assertThat().extractingPath("$.current.sourceType").isEqualTo("UI");
-                });
-    }
-
-    private void evaluatedRun(String repositoryId, String sha, String measuredAt, java.util.UUID configId) {
-        var run = new com.qualitygate.domain.entity.Run(Uuid7.generate(),
-                java.util.UUID.fromString(repositoryId), sha.repeat(40), "main",
-                "collector",
-                java.time.Instant.parse(measuredAt), 1);
-        run.applyGateConfig(configId);
-        run.markEvaluated(com.qualitygate.domain.model.Verdict.PASS,
-                com.qualitygate.domain.model.Completeness.FULL, java.time.Instant.parse(measuredAt));
-        runs.save(run);
     }
 
     /**

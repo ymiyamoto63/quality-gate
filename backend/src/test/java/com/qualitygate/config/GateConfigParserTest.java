@@ -184,7 +184,7 @@ class GateConfigParserTest {
 
     @Test
     void 収集ランナーの対象の合格ラインを読める() {
-        // collector/targets/*.gate.yml は画面（S-06）に貼り付ける控え。貼り付けて保存できる内容であることを保証する
+        // collector/targets/*.gate.yml は収集ランナーが Run ごとに送る合格ライン（D-20）。常に妥当であることを保証する
         String yaml;
         try {
             yaml = java.nio.file.Files.readString(java.nio.file.Path.of(

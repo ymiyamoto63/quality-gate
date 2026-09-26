@@ -4,7 +4,7 @@
 //   負荷モデル   constant-arrival-rate（到達率を固定し、VU 数は固定しない）
 //   ウォームアップ 60 秒。phase=warmup のタグを付け、集計（phase=measure）から除く
 //   計測時間     300 秒
-//   到達率       合計 50 req/s（画面の設定の performance.arrival_rate_rps と一致させる）
+//   到達率       合計 50 req/s（合格ライン（*.gate.yml）の performance.arrival_rate_rps と一致させる）
 //
 // 対象は API だけ（静的アセットは含めない）。バックエンドの jar を直接叩く。
 // like-chatgpt の API は外部のサービスを呼ばず、メモリ上のデータだけで応答する。
@@ -48,7 +48,7 @@ export const options = {
       preAllocatedVUs: 100,
       tags: { phase: 'warmup' },
     },
-    // シナリオ名は画面の設定の performance.scenarios と一致させる
+    // シナリオ名は合格ライン（*.gate.yml）の performance.scenarios と一致させる
     chat: measured('chat', 25),
     suggest: measured('suggest', 15),
     monitoring: measured('monitoring', 10),

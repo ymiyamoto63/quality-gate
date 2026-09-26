@@ -23,7 +23,7 @@ quality-gate が like-chatgpt をどうやって計測しているのかを、Gi
 | 健診センター | **quality-gate**（リポジトリとアプリ） | 測り方の道具と、結果を判定・記録する仕組みを持つ |
 | 検査技師 | **収集ランナー**（`collect` ワークフロー） | 受診者のところへ行き、検査をして、結果を受付に届ける |
 | 検査室 | **セルフホストランナー**（あなたが用意したマシン） | 実際に検査（ビルド・テスト・解析）が行われる場所 |
-| 基準値表 | **合格ライン**（画面 S-06 で保存した設定） | 「カバレッジ 75% 以上」などの判定基準 |
+| 基準値表 | **合格ライン**（quality-gate リポジトリの `collector/targets/*.gate.yml`） | 「カバレッジ 75% 以上」などの判定基準 |
 | 受付と医師 | **quality-gate のアプリ**（Ingest API と判定処理） | 検査結果を受け取り、基準値と比べて合否を出す |
 | 健診結果の画面 | **ダッシュボード・Run 詳細** | 結果を見る場所 |
 
@@ -121,12 +121,12 @@ like-chatgpt そのものには一切手を加えません。
 | 情報 | 置き場所 | 例 |
 | --- | --- | --- |
 | **どう測るか**（計測プロファイル） | quality-gate リポジトリの `collector/targets/ymiyamoto63__like-chatgpt.env` | バックエンドは `backend/` にある、Java 21 を使う、契約テストは `*ControllerTest` |
-| **何を合格とするか**（合格ライン） | quality-gate アプリの画面（S-06）。控えは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` | カバレッジ 75% 以上、重大な脆弱性 0 件 |
+| **何を合格とするか**（合格ライン） | quality-gate リポジトリの `collector/targets/ymiyamoto63__like-chatgpt.gate.yml`（画面 S-06 は表示だけ） | カバレッジ 75% 以上、重大な脆弱性 0 件 |
 | **測るツールの版** | quality-gate リポジトリの `collector/versions.env` | JaCoCo 0.8.15、PIT 1.20.4、PMD 7.17.0 |
 
 like-chatgpt 自身の `.quality-gate.yml` やワークフロー（以前の方式の名残）は、収集ランナーでは**使いません**。
 ただし like-chatgpt 側の CI が quality-gate への送信を続けていると、同じコミットの Run が 2 つでき、
-その Run は like-chatgpt の `.quality-gate.yml` で判定されます（その間は画面 S-06 で設定を編集できません）。
+その Run は like-chatgpt の `.quality-gate.yml` で判定されます。
 like-chatgpt 側の CI 用の Ingest Token を quality-gate の管理画面で失効させれば、like-chatgpt に触らずに送信を止められます
 （[対象の CI からの送信を止める](../operations/collector.md#対象の-ci-からの送信を止める)）。
 
@@ -305,7 +305,7 @@ Actions の画面で **collect → Run workflow** を押してから、画面に
 | 7 | ランナー（measure） | Java・Node.js を用意し、ビルド・テスト・解析をする（詳しくは次章） |
 | 8 | ランナー（measure） | 成果物を `reports/` にまとめ、写し取ったソースを削除する |
 | 9 | ランナー → quality-gate（submit） | Ingest Token で Run を作り、成果物を 1 つずつ送り、最後に「送り終わりました」（finalize）を伝える |
-| 10 | quality-gate | 成果物を読み取り、画面で保存した合格ラインと比べて判定する（数秒） |
+| 10 | quality-gate | 成果物を読み取り、一緒に送られた合格ライン（`*.gate.yml`）と比べて判定する（数秒） |
 | 11 | あなたのブラウザ | ダッシュボードや Run 詳細で結果を見る |
 
 ---
@@ -404,7 +404,7 @@ head と base の定義書を oasdiff で比べ、「API のパスを消した�
 | --- | --- | --- |
 | M-03〜05 性能 | 応答の速さ、処理量、エラー率 | 負荷をかける対象のアプリと専用の環境が要る |
 
-これは合格ライン（画面の設定）で `enabled: false` にしています。有効のままだと「結果が届かなかった」として ERROR になります。
+これは合格ライン（`*.gate.yml`）で `enabled: false` にしています。有効のままだと「結果が届かなかった」として ERROR になります。
 
 ### 8.4 テストが失敗したら
 
