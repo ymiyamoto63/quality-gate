@@ -78,13 +78,6 @@ quality-gate:
     mail-from: ${QG_MAIL_FROM:quality-gate@localhost}
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
-  # API のレート制限（1 分あたりの上限。docs/initial/07-api-design.md 8 章）。超過すると 429 と Retry-After を返す
-  rate-limit:
-    enabled: ${QG_RATE_LIMIT_ENABLED:true}
-    ingest-per-minute: 60     # Ingest API（トークンごと。成果物のアップロードを除く）
-    upload-per-minute: 100    # 成果物のアップロード（トークンごと）
-    query-per-minute: 600     # 参照 API（利用者ごと。未ログインは IP ごと）
-    badge-per-minute: 60      # バッジ（IP ごと）
   # baseCommitSha が省略された Run の比較元（merge-base）を GitHub API で求める（FR-05-4）。
   # 認証は GitHub App（App ID と秘密鍵）かトークン。どちらも無ければ認証なし（public リポジトリのみ）
   github:

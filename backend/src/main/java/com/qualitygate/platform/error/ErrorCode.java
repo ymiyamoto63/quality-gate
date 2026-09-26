@@ -35,7 +35,6 @@ public enum ErrorCode {
     MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "ミューテーションテストの実行範囲が指定されていません"),
     CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "設定ファイルの内容が不正です"),
     WAIVER_EXPIRY_TOO_FAR(HttpStatus.UNPROCESSABLE_ENTITY, "免除の期限が上限を超えています"),
-    RATE_LIMITED(HttpStatus.TOO_MANY_REQUESTS, "リクエストが多すぎます"),
     GITHUB_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "GitHub API に接続できません"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 

@@ -27,8 +27,6 @@ M-13 シークレット検出件数 / M-14 ライセンス違反件数（`secret
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
 - 品質レポート（S-10。FR-08-4）— 期間とリポジトリを選んで既定ブランチの判定をまとめ、明細は CSV、PDF はブラウザの印刷で出す
-- README 用のバッジ（`/badges/{owner}/{name}.svg`。認証不要で、既定ブランチの最新の合否だけを返す。FR-08-5）
-- API のレート制限（トークンバケット。Ingest Token・利用者・IP ごと。超過は 429 と `Retry-After`）
 - 可観測性 — JSON 構造化ログ（`QG_LOG_FORMAT`）、相関 ID（`requestId` / `runId` / `jobId` を MDC に載せ、エラー応答の `traceId` と一致）。
   メトリクスは Spring Boot 標準のもの（`/actuator/prometheus`）だけで、独自のものは持たない
 - 比較元（`baseCommitSha`）が省略された Run の merge-base を、判定ジョブの中で GitHub API により求める（GitHub App / トークン / 認証なし。失敗しても判定は続ける）

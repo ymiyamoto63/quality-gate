@@ -552,23 +552,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/badges/{owner}/{name}.svg': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 既定ブランチの最新の合否のバッジ（認証不要） */
-    get: operations['badge']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
 }
 export type webhooks = Record<string, never>
 export interface components {
@@ -2266,29 +2249,6 @@ export interface operations {
           [name: string]: unknown
         }
         content?: never
-      }
-    }
-  }
-  badge: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        owner: string
-        name: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          'image/svg+xml': string
-        }
       }
     }
   }

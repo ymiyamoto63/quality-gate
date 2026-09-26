@@ -12,8 +12,6 @@ quality-gate:
   artifact-root: ${java.io.tmpdir}/quality-gate-test-artifacts
   base-url: http://localhost:8080
   job-poll-interval: 60000   # テスト中にジョブが勝手に走らないよう長くする
-  rate-limit:
-    enabled: false           # 1 つの Ingest Token で大量に送るテストがあるため。制限は RateLimitIT で確かめる
   github:
     enabled: false           # テストから GitHub API を呼ばない（比較元の解決は GitHub のテストで確かめる）
   schedule:                  # 日次バッチはテストから明示的に呼ぶ

@@ -5,10 +5,7 @@ import com.qualitygate.auth.SessionUserRefreshFilter;
 import com.qualitygate.domain.repo.IngestTokenRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
-import com.qualitygate.platform.ratelimit.RateLimitProperties;
-import com.qualitygate.platform.ratelimit.RateLimiter;
 import jakarta.servlet.http.HttpServletRequest;
-import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.Ordered;
@@ -25,7 +22,6 @@ import org.springframework.security.web.authentication.HttpStatusEntryPoint;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.util.matcher.RequestMatcher;
-import tools.jackson.databind.ObjectMapper;
 
 /**
  * 認証の 2 経路を分ける。
@@ -64,28 +60,9 @@ public class SecurityConfig {
         return "POST".equals(request.getMethod()) || uri.endsWith("/status");
     }
 
-    /**
-     * レート制限。両方のチェーンに同じインスタンスを入れる（枠は RateLimiter が持つ）。
-     *
-     * <p>{@code @Bean} の Filter はサーブレットコンテナにも自動で登録され、チェーンの外でも
-     * 1 回余分に数えてしまうため、その登録は無効にする。
-     */
-    @Bean
-    RateLimitFilter rateLimitFilter(RateLimiter limiter, RateLimitProperties properties, ObjectMapper objectMapper) {
-        return new RateLimitFilter(limiter, properties, objectMapper);
-    }
-
-    @Bean
-    FilterRegistrationBean<RateLimitFilter> rateLimitFilterRegistration(RateLimitFilter filter) {
-        FilterRegistrationBean<RateLimitFilter> registration = new FilterRegistrationBean<>(filter);
-        registration.setEnabled(false);
-        return registration;
-    }
-
     @Bean
     @Order(Ordered.HIGHEST_PRECEDENCE)
-    SecurityFilterChain ingestFilterChain(HttpSecurity http, IngestTokenRepository tokens,
-                                          RateLimitFilter rateLimitFilter) throws Exception {
+    SecurityFilterChain ingestFilterChain(HttpSecurity http, IngestTokenRepository tokens) throws Exception {
         RequestMatcher ingestMatcher = SecurityConfig::isIngestRequest;
         return http
                 .securityMatcher(ingestMatcher)
@@ -94,8 +71,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth.anyRequest().hasRole("INGEST"))
                 .addFilterBefore(new IngestTokenAuthenticationFilter(tokens),
                         UsernamePasswordAuthenticationFilter.class)
-                // 制限の単位（トークン）は認証の結果で決まるため、認証の後に置く
-                .addFilterAfter(rateLimitFilter, IngestTokenAuthenticationFilter.class)
                 .exceptionHandling(e -> e.authenticationEntryPoint(
                         new HttpStatusEntryPoint(HttpStatus.UNAUTHORIZED)))
                 .build();
@@ -104,8 +79,7 @@ public class SecurityConfig {
     @Bean
     SecurityFilterChain appFilterChain(HttpSecurity http,
                                        AllowlistOAuth2UserService userService,
-                                       UserAccountRepository users,
-                                       RateLimitFilter rateLimitFilter) throws Exception {
+                                       UserAccountRepository users) throws Exception {
         return http
                 // Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で免除登録や
                 // 設定変更が実行できてしまう。SPA は XSRF-TOKEN Cookie の値を
@@ -114,7 +88,6 @@ public class SecurityConfig {
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 // ロールの変更・無効化を次のリクエストから反映する（ログアウトを待たない）
                 .addFilterBefore(new SessionUserRefreshFilter(users), AuthorizationFilter.class)
-                .addFilterBefore(rateLimitFilter, AuthorizationFilter.class)
                 .authorizeHttpRequests(auth -> auth
                         // データを返すのは API だけ。保護すべきはここ。
                         .requestMatchers("/api/**").authenticated()

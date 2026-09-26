@@ -27,7 +27,7 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
     private static final String INDEX = "/static/index.html";
 
     private static final List<String> NON_SPA_PREFIXES =
-            List.of("api/", "actuator/", "v3/", "swagger-ui", "badges/", "oauth2/", "login/", "logout");
+            List.of("api/", "actuator/", "v3/", "swagger-ui", "oauth2/", "login/", "logout");
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

@@ -18,9 +18,6 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
             + "where r.repositoryId = :repositoryId and r.commitSha = :commitSha")
     int findMaxAttempt(@Param("repositoryId") UUID repositoryId, @Param("commitSha") String commitSha);
 
-    Optional<Run> findFirstByRepositoryIdAndBranchAndStatusOrderByMeasuredAtDesc(
-            UUID repositoryId, String branch, RunStatus status);
-
     Optional<Run> findFirstByRepositoryIdAndBranchAndStatusAndMeasuredAtLessThanOrderByMeasuredAtDesc(
             UUID repositoryId, String branch, RunStatus status, Instant measuredAt);
 
