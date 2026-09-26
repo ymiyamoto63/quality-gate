@@ -1,1 +1,1 @@
-{"items":[{"repositoryId":"00000000-0000-7000-8000-000000000001","fullName":"acme/web-app","owner":"acme","name":"web-app","defaultBranch":"develop","measurePullRequests":true,"enabled":true,"createdAt":"2026-09-22T09:00:00Z"}]}
+{"items":[{"repositoryId":"00000000-0000-7000-8000-000000000001","fullName":"acme/web-app","owner":"acme","name":"web-app","defaultBranch":"develop","enabled":true,"createdAt":"2026-09-22T09:00:00Z"}]}

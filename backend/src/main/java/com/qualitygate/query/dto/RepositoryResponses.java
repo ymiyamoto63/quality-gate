@@ -26,7 +26,6 @@ public final class RepositoryResponses {
             @NotNull String owner,
             @NotNull String name,
             @NotNull String defaultBranch,
-            @NotNull boolean measurePullRequests,
             @NotNull boolean enabled,
             @NotNull Instant createdAt) {
     }

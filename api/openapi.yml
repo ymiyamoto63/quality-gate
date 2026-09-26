@@ -1031,11 +1031,6 @@ components:
           description: 省略時は main
           maxLength: 255
           minLength: 0
-        measurePullRequests:
-          type:
-          - boolean
-          - "null"
-          description: 省略時は true
         name:
           type: string
           minLength: 1
@@ -1576,8 +1571,6 @@ components:
           type: boolean
         fullName:
           type: string
-        measurePullRequests:
-          type: boolean
         repositoryId:
           type: string
           format: uuid
@@ -1585,7 +1578,6 @@ components:
       - defaultBranch
       - enabled
       - fullName
-      - measurePullRequests
       - repositoryId
     RepositoryCard:
       type: object
@@ -1690,8 +1682,6 @@ components:
           type: boolean
         fullName:
           type: string
-        measurePullRequests:
-          type: boolean
         name:
           type: string
         owner:
@@ -1704,7 +1694,6 @@ components:
       - defaultBranch
       - enabled
       - fullName
-      - measurePullRequests
       - name
       - owner
       - repositoryId
@@ -2390,10 +2379,6 @@ components:
           - boolean
           - "null"
           description: false で無効化（ダッシュボードから外れ、取り込みも拒否される）
-        measurePullRequests:
-          type:
-          - boolean
-          - "null"
     UpdateUserRequest:
       type: object
       properties:

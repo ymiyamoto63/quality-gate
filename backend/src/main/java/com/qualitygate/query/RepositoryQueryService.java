@@ -83,7 +83,7 @@ public class RepositoryQueryService {
     static RepositoryResponses.RepositoryItem itemOf(MonitoredRepository repository) {
         return new RepositoryResponses.RepositoryItem(repository.getId(), repository.fullName(),
                 repository.getOwner(), repository.getName(), repository.getDefaultBranch(),
-                repository.isMeasurePullRequests(), repository.isEnabled(),
+                repository.isEnabled(),
                 repository.getCreatedAt());
     }
 

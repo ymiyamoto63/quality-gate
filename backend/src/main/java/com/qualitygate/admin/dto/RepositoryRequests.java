@@ -24,14 +24,12 @@ public final class RepositoryRequests {
                     message = "リポジトリ名（英数字と . _ -、100 文字以内）を指定してください")
             String name,
             @Schema(nullable = true, description = "省略時は main") @Size(max = 255)
-            String defaultBranch,
-            @Schema(nullable = true, description = "省略時は true") Boolean measurePullRequests) {
+            String defaultBranch) {
     }
 
     /** 省略した項目は変更しない。 */
     public record UpdateRepositoryRequest(
             @Schema(nullable = true) @Size(min = 1, max = 255) String defaultBranch,
-            @Schema(nullable = true) Boolean measurePullRequests,
             @Schema(nullable = true, description = "false で無効化（ダッシュボードから外れ、取り込みも拒否される）")
             Boolean enabled) {
     }
