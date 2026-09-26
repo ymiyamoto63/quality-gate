@@ -7,8 +7,6 @@ public enum MeasurementStatus {
     FAIL,
     /** 設定で無効化、または CI が申告したスキップ。 */
     SKIP,
-    /** 値は取得したが計測条件が統制外のため判定に用いない（参考値）。 */
-    REFERENCE,
     /** 提出されるはずの成果物が未提出、または形式不正。 */
     ERROR,
     /**
@@ -21,8 +19,8 @@ public enum MeasurementStatus {
      */
     NOT_APPLICABLE;
 
-    /** Run 全体の集約に影響するか。SKIP・REFERENCE・NOT_APPLICABLE は影響しない。 */
+    /** Run 全体の集約に影響するか。SKIP・NOT_APPLICABLE は影響しない。 */
     public boolean affectsVerdict() {
-        return this != SKIP && this != REFERENCE && this != NOT_APPLICABLE;
+        return this != SKIP && this != NOT_APPLICABLE;
     }
 }

@@ -103,7 +103,6 @@ final class ReleaseReportCsv {
             case FAIL -> "不合格";
             case ERROR -> "計測エラー";
             case SKIP -> "未計測";
-            case REFERENCE -> "参考値";
             case NOT_APPLICABLE -> "対象外";
         };
     }

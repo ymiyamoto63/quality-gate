@@ -270,7 +270,6 @@ public class RunQueryService {
             case ERROR -> 5;
             case FAIL -> 4;
             case WARN -> 3;
-            case REFERENCE -> 2;
             case SKIP -> 1;
             case PASS -> 0;
             case NOT_APPLICABLE -> -1;

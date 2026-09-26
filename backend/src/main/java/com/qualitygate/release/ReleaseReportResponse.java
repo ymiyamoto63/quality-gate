@@ -81,8 +81,7 @@ public record ReleaseReportResponse(
             @NotNull
             @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）")
             String threshold,
-            @NotNull @Schema(nullable = true) String reason,
-            @NotNull boolean referenceOnly) {
+            @NotNull @Schema(nullable = true) String reason) {
     }
 
     public record ReleaseGuide(

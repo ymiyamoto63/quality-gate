@@ -18,9 +18,9 @@ describe('StatusChip', () => {
   })
 
   it('ステータスを data 属性に出し、CSS 側で色を切り替える', () => {
-    const wrapper = mount(StatusChip, { props: { status: 'REFERENCE' } })
+    const wrapper = mount(StatusChip, { props: { status: 'NOT_APPLICABLE' } })
 
-    expect(wrapper.attributes('data-status')).toBe('REFERENCE')
-    expect(wrapper.text()).toContain('参考値')
+    expect(wrapper.attributes('data-status')).toBe('NOT_APPLICABLE')
+    expect(wrapper.text()).toContain('対象外')
   })
 })

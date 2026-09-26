@@ -5,7 +5,7 @@
 方式の考え方と移行計画は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01〜M-17 の全指標**です（M-15〜M-17 は合否に使わない参考値）。
+計測する指標は **M-01〜M-14 の全指標**です（M-08 は D-25 で廃止）。
 M-07（循環的複雑度）は backend と frontend の両方を解析します。
 M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計測では実行せず**スキップを申告します。
 ブランチ・コミット・タグの計測ではすべて実行します（リリースブランチやタグも完全計測にし、リリース判定に使えるようにするため。D-24）。
@@ -28,15 +28,13 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
-| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14、`duplication.sh` = M-15、`lighthouse.sh` = M-16、`bundle-size.sh` = M-17）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
+| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-11 / M-12、`frontend-tests.sh` = M-01 TS / M-11 / M-12、`mutation.sh` = M-02、`performance.sh` = M-03〜05、`vulnerabilities.sh` = M-06 / M-13、`complexity.sh` = M-07、`breaking-changes.sh` = M-09、`accessibility.sh` = M-10、`licenses.sh` = M-14）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
 | `collector/pmd-ruleset.xml` | M-07 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
-| `collector/jscpd/` / `collector/lighthouse/` | M-15（jscpd）/ M-16（Lighthouse）の版を固定した `package.json` / `package-lock.json` |
-| `collector/bundle/size.mjs` | M-17 のビルド結果のファイルサイズ（gzip 後を含む）を JSON に書き出すスクリプト（依存パッケージなし） |
 | `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
 | `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（D-20。無ければ送信しない） |
@@ -52,9 +50,6 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | M-14 | 同じ作業ツリーを `trivy fs --scanners license` で走査する（深刻度で絞らない。デュアルライセンスの緩いほうを選ぶため）。`trivy-license.sarif` をメタデータ `{"scanners":["license"]}` を添えて送る |
 | M-07（Java） | PMD のコマンドライン版で `src/main/java` を解析する。**head と base の両方**を解析し、base は `scope=base` で送る |
 | M-07（TS） | quality-gate 側の ESLint の設定（`collector/complexity`）で `FRONTEND_COMPLEXITY_SOURCES`（既定: `src`）を解析する。対象の ESLint の設定は使わない。**head と base の両方**を解析し、ESLint が出す絶対パスを `/<FRONTEND_DIR>/src/...` にそろえてから `eslint-json` で送る |
-| M-15（参考値） | `DUPLICATION=true` のとき、jscpd で backend の `src/main/java` と frontend の `FRONTEND_COMPLEXITY_SOURCES`（テストと型定義を除く）を解析する |
-| M-16（参考値） | `LIGHTHOUSE_PAGES` の画面を、M-10 と同じく起動した対象アプリに対して Lighthouse で `LIGHTHOUSE_RUNS` 回（既定 3 回）ずつ計測する（`LIGHTHOUSE_PRESET`、既定 desktop）。M-10 と 1 回の起動を共用する |
-| M-17（参考値） | `BUNDLE_SIZE=true` のとき、`vite build` の結果（`FRONTEND_DIST`、既定 `dist`）のファイルサイズを数える。ビルドは M-10 / M-16 と共用する |
 | M-11 / M-12 | backend は `mvn verify` が出す JUnit XML のうち `TEST_REPORTS`（既定: `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml`）に合うものすべて、frontend は Vitest に junit reporter を足して出した `junit.xml` を `test-junit-xml` で送る |
 | M-09 | コミットされている OpenAPI 定義を head と base で取り出し、oasdiff で比べる。base に定義が無ければ「新規 API」として送る |
 | M-03〜05 | バックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（k6 のシナリオ）で API に負荷をかける。3 回実行し、それぞれの summary を送る |
@@ -349,9 +344,8 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
   合格ライン（`*.gate.yml`）で `secrets` を有効にしないと、シークレットは判定されません（like-chatgpt の `*.gate.yml` では有効にしています）
 - **M-14（ライセンス）は forbidden だけが不合格**です。restricted（GPL など）と分類不明は警告にとどめます。
   使ってよいと判断したパッケージがあれば、合格ライン（`*.gate.yml`）で扱います（免除は D-22 で廃止）
-- **M-15〜M-17 は参考値**です。合格ラインを持たず、Run の合否にも部分計測にも影響しません（計測に失敗して ERROR でも同じ）。
-  合格ライン（`*.gate.yml`）で `duplication` / `lighthouse` / `bundle_size` を有効にしたときだけ Run 詳細とトレンドに出ます。
-  M-16 は計測するマシンの性能に左右されるため、同じ収集ランナーでの推移を見てください
+- **参考値の M-15〜M-17（コード重複率・Lighthouse・バンドルサイズ）は廃止しました（D-28）。** 計測プロファイルの
+  `DUPLICATION` / `BUNDLE_SIZE` / `LIGHTHOUSE_*` と、合格ラインの `duplication` / `lighthouse` / `bundle_size` は不要です
 - **M-11 / M-12 はすべてのテスト**（`TEST_REPORTS` に合う backend のテストと、frontend の Vitest）の結果です。
   合格ライン（`*.gate.yml`）で `test_results` を有効にしたときだけ判定されます（like-chatgpt の `*.gate.yml` では有効にしています）。
   M-12 は比較対象の Run からスキップが増えたら FAIL です
@@ -420,8 +414,6 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 | `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `measure` で `M-07: ESLint（head）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` のディレクトリが無い、または ESLint が設定を読めなかった（ログに ESLint の出力が出る） |
 | `measure` で `M-07: 構文を読めず、関数を数えられなかったファイルがあります` | quality-gate 側のパーサが読めない構文のファイルがある（そのファイルの関数は M-07 に入らない）。`FRONTEND_COMPLEXITY_EXCLUDE` で外すか、`collector/complexity` のパーサを見直す |
-| `measure` で `M-16: ... の N 回目の計測に失敗しました` | 画面が描画されない（Lighthouse の `NO_FCP` など）、または起動したアプリが応答しない。`LIGHTHOUSE_PAGES` のパスと、M-10 と同じ起動の設定を確かめる |
-| `measure` で `M-15: jscpd（frontend）の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` の最初のディレクトリが無い（jscpd は 1 つのディレクトリだけを解析する） |
 | `measure` で `M-11/M-12: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない（`BACKEND_DIR/target` からの相対で、空白区切りで書く） |
 | `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 1-3 の設定漏れ |
 | `submit` の Run 作成が 401 | 収集ランナーの `QG_INGEST_TOKEN` とバックエンドの `QG_INGEST_TOKEN` が一致していない |

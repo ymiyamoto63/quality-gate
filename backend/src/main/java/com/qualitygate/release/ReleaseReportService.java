@@ -156,18 +156,18 @@ public class ReleaseReportService {
                     counts.failed() + counts.errored(), namesOf(rows, MeasurementStatus.FAIL, MeasurementStatus.ERROR))
                     + (run.getCompleteness() == Completeness.FULL ? "" : "部分計測のため、測っていない指標もあります。");
             case UNDETERMINED -> "測っていない指標があるため判定できません（%s）。PR ではなく、タグかコミットを指定して計測し直してください。"
-                    .formatted(namesOf(rows, MeasurementStatus.SKIP, MeasurementStatus.REFERENCE));
+                    .formatted(namesOf(rows, MeasurementStatus.SKIP));
             case RELEASABLE_WITH_WARNINGS -> "不合格はありませんが、%d 件の指標が注意です（%s）。".formatted(
                     counts.warned(), namesOf(rows, MeasurementStatus.WARN));
             case RELEASABLE -> "合否に使う %d 件の指標がすべて合格です。".formatted(counts.judged());
         };
     }
 
-    /** 該当した指標の名前（重複なし、参考値の指標を除く）。 */
+    /** 該当した指標の名前（重複なし）。 */
     private static String namesOf(List<ReleaseReportResponse.ReleaseMetric> rows, MeasurementStatus... statuses) {
         List<MeasurementStatus> targets = List.of(statuses);
         LinkedHashSet<String> names = new LinkedHashSet<>();
-        rows.stream().filter(row -> !row.referenceOnly() && targets.contains(row.status()))
+        rows.stream().filter(row -> targets.contains(row.status()))
                 .forEach(row -> names.add(row.name()));
         return names.isEmpty() ? "—" : String.join("、", names);
     }
@@ -175,8 +175,7 @@ public class ReleaseReportService {
     private List<ReleaseReportResponse.ReleaseMetric> rowsOf(Run run) {
         List<Measurement> rows = new ArrayList<>(measurements.findByRunId(run.getId()));
         rows.sort(Comparator
-                .comparing((Measurement m) -> MetricCatalog.isReferenceOnly(m.getMetricId()))
-                .thenComparing(m -> attentionRank(m.getStatus()))
+                .comparing((Measurement m) -> attentionRank(m.getStatus()))
                 .thenComparing(Measurement::getMetricId, MetricCatalog::compareByCatalogOrder)
                 .thenComparing(m -> Objects.toString(m.getComponentName(), ""))
                 .thenComparing(m -> Objects.toString(m.getVariant(), ""))
@@ -191,8 +190,7 @@ public class ReleaseReportService {
             case WARN -> 1;
             case SKIP -> 2;
             case PASS -> 3;
-            case REFERENCE -> 4;
-            case NOT_APPLICABLE -> 5;
+            case NOT_APPLICABLE -> 4;
         };
     }
 
@@ -201,8 +199,7 @@ public class ReleaseReportService {
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), definition.name(),
                 definition.category().displayName(), m.getComponentName(),
                 MetricCatalog.variantLabel(m.getMetricId(), m.getVariant()), m.getScenario(), m.getStatus(),
-                m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason(),
-                definition.referenceOnly());
+                m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason());
     }
 
     private static ReleaseReportResponse.ReleaseCounts countsOf(List<ReleaseReportResponse.ReleaseMetric> rows) {
@@ -212,15 +209,12 @@ public class ReleaseReportService {
         int errored = 0;
         int skipped = 0;
         for (ReleaseReportResponse.ReleaseMetric row : rows) {
-            if (row.referenceOnly()) {
-                continue;
-            }
             switch (row.status()) {
                 case PASS -> passed++;
                 case WARN -> warned++;
                 case FAIL -> failed++;
                 case ERROR -> errored++;
-                case SKIP, REFERENCE -> skipped++;
+                case SKIP -> skipped++;
                 case NOT_APPLICABLE -> {
                     // 測りようがないものは数えない（部分計測の理由にもならない）
                 }

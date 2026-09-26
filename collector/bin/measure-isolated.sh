@@ -60,8 +60,7 @@ OASDIFF_VERSION=${OASDIFF_IMAGE##*:v}
 BASE_IMAGE=${QG_COLLECTOR_BASE_IMAGE:-eclipse-temurin:${JAVA}-jdk-noble}
 # ベースのイメージ・Dockerfile・検査ツールの内容でタグを決める。同じなら作り直さない
 HASH=$({ echo "$BASE_IMAGE"; cat "$COLLECTOR_DIR/runner/Dockerfile" "$COLLECTOR_DIR/a11y/package-lock.json" \
-  "$COLLECTOR_DIR/complexity/package-lock.json" "$COLLECTOR_DIR/jscpd/package-lock.json" \
-  "$COLLECTOR_DIR/lighthouse/package-lock.json"; } \
+  "$COLLECTOR_DIR/complexity/package-lock.json"; } \
   | sha256sum | cut -c1-12)
 IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-${HASH}"
 

@@ -37,7 +37,6 @@ public record TrendResponse(
     /**
      * 系列。
      *
-     * @param judged 判定に使われた系列か。false は参考値であり、画面では破線で描く
      * @param colorIndex 色の割り当て番号。<strong>サーバが固定して返す</strong>。
      *        画面側で「並び順の n 番目」に色を振ると、絞り込みで系列が減ったときに
      *        生き残った系列の色が塗り替わり、同じものが別の色で見える
@@ -46,7 +45,6 @@ public record TrendResponse(
             @NotNull String seriesId,
             @NotNull String label,
             @NotNull @Schema(nullable = true) String componentName,
-            @NotNull boolean judged,
             @NotNull int colorIndex,
             @NotNull List<TrendPoint> points) {
     }

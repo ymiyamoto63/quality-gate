@@ -5,7 +5,6 @@ function series(values: (number | null)[], overrides: Partial<RawSeries> = {}): 
   return {
     seriesId: 'backend',
     label: 'backend',
-    judged: true,
     colorIndex: 0,
     points: values.map((value, i) => ({
       measuredAt: `2026-09-${String(10 + i).padStart(2, '0')}T00:00:00Z`,

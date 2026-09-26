@@ -3,15 +3,7 @@ import { presentationOf, verdictToStatus } from './status'
 
 describe('ステータスの表示定義', () => {
   it('すべてのステータスにラベル・記号・アイコン・色が揃っている', () => {
-    const statuses = [
-      'PASS',
-      'WARN',
-      'FAIL',
-      'SKIP',
-      'REFERENCE',
-      'ERROR',
-      'NOT_APPLICABLE',
-    ] as const
+    const statuses = ['PASS', 'WARN', 'FAIL', 'SKIP', 'ERROR', 'NOT_APPLICABLE'] as const
 
     for (const status of statuses) {
       const p = presentationOf(status)
@@ -24,23 +16,14 @@ describe('ステータスの表示定義', () => {
 
   it('記号は互いに重複しない', () => {
     // 色が使えない状況（モノクロ印刷・強制カラーモード）では記号が唯一の手がかりになる
-    const statuses = [
-      'PASS',
-      'WARN',
-      'FAIL',
-      'SKIP',
-      'REFERENCE',
-      'ERROR',
-      'NOT_APPLICABLE',
-    ] as const
+    const statuses = ['PASS', 'WARN', 'FAIL', 'SKIP', 'ERROR', 'NOT_APPLICABLE'] as const
     const marks = statuses.map((s) => presentationOf(s).mark)
 
     expect(new Set(marks).size).toBe(statuses.length)
   })
 
-  it('未計測・参考値・対象外は中立色で、良し悪しを表さない', () => {
+  it('未計測・対象外は中立色で、良し悪しを表さない', () => {
     expect(presentationOf('SKIP').colorVar).toBe('--status-neutral')
-    expect(presentationOf('REFERENCE').colorVar).toBe('--status-neutral')
     expect(presentationOf('NOT_APPLICABLE').colorVar).toBe('--status-neutral')
   })
 

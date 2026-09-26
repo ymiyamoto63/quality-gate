@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-17。M-15〜M-17 は参考値）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-14。M-08 は欠番）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -19,7 +19,6 @@
 #   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
 #   QG_A11Y_TOOL_DIR    M-10 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
 #   QG_COMPLEXITY_TOOL_DIR  M-07（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
-#   QG_JSCPD_TOOL_DIR / QG_LIGHTHOUSE_TOOL_DIR  M-15 の jscpd / M-16 の Lighthouse を取得済みのディレクトリ（同上）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -48,27 +47,21 @@ rm -f "$REPORTS/skipped-metrics.tsv"
 
 MEASURE_DIR="$COLLECTOR_DIR/bin/measure"
 source "$MEASURE_DIR/common.sh"
-for metric in backend-tests mutation complexity frontend-tests bundle-size accessibility lighthouse \
-    performance duplication breaking-changes vulnerabilities licenses; do
+for metric in backend-tests mutation complexity frontend-tests accessibility \
+    performance breaking-changes vulnerabilities licenses; do
   source "$MEASURE_DIR/$metric.sh"
 done
 
-# M-10 / M-16。対象アプリを 1 回だけ起動して、両方の検査で共用する
+# M-10。対象アプリを起動して検査する
 measure_app() {
-  local metrics=()
-  [ -z "${A11Y_PAGES:-}" ] || metrics+=(M-10)
-  [ -z "${LIGHTHOUSE_PAGES:-}" ] || metrics+=(M-16)
-  local label
-  label=$(IFS=/; echo "${metrics[*]}")
+  local label=M-10
   [ -f "$SRC/$FRONTEND_DIR/package.json" ] || { fail "$label: $FRONTEND_DIR/package.json がありません"; return; }
   group "画面の検査（${label}）"
-  # Lighthouse も M-10 の Playwright の Chromium を使うため、どちらの場合も用意する
   if ! prepare_a11y_tool; then
     fail "$label: 検査ツール（Playwright と Chromium）を用意できませんでした"; endgroup; return
   fi
   if start_app "$label"; then
-    [ -z "${A11Y_PAGES:-}" ] || measure_accessibility
-    [ -z "${LIGHTHOUSE_PAGES:-}" ] || measure_lighthouse
+    measure_accessibility
   fi
   stop_servers
   endgroup
@@ -86,16 +79,10 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend_complexity
 fi
 cleanup_base
-if [ -n "${FRONTEND_DIR:-}" ]; then
-  if [ -n "${A11Y_PAGES:-}" ] || [ -n "${LIGHTHOUSE_PAGES:-}" ] || [ "${BUNDLE_SIZE:-}" = true ]; then
-    build_frontend
-  fi
-  [ "${BUNDLE_SIZE:-}" != true ] || measure_bundle_size
-fi
-if [ -n "${A11Y_PAGES:-}" ] || [ -n "${LIGHTHOUSE_PAGES:-}" ]; then
+if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ]; then
+  build_frontend
   measure_app
 fi
-[ "${DUPLICATION:-}" != true ] || measure_duplication
 [ -z "${PERF_SCRIPT:-}" ] || measure_performance
 [ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes
 measure_vulnerabilities

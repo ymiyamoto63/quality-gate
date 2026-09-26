@@ -28,9 +28,6 @@ const METRICS = [
   { metricId: 'M-12', name: 'スキップされたテスト数' },
   { metricId: 'M-13', name: 'シークレット検出件数' },
   { metricId: 'M-14', name: 'ライセンス違反件数' },
-  { metricId: 'M-15', name: 'コード重複率' },
-  { metricId: 'M-16', name: 'Lighthouse パフォーマンススコア' },
-  { metricId: 'M-17', name: 'バンドルサイズ（gzip）' },
 ]
 
 onMounted(() => store.load(repositoryId.value))

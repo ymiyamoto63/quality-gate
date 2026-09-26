@@ -17,7 +17,6 @@ export interface RawPoint {
 export interface RawSeries {
   seriesId: string
   label: string
-  judged: boolean
   colorIndex: number
   points: RawPoint[]
 }

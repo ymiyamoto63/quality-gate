@@ -82,10 +82,6 @@ public record GateConfigDocument(
         // 成果物を送っていないリポジトリの Run がすべて ERROR（不合格）に変わる
         metrics.put("secrets", new MetricConfig(false, Map.of("max_secrets", 0)));
         metrics.put("licenses", new MetricConfig(false, Map.of("max_forbidden", 0)));
-        // 参考値の指標（合格ラインを持たない）
-        metrics.put("duplication", new MetricConfig(false, Map.of()));
-        metrics.put("lighthouse", new MetricConfig(false, Map.of()));
-        metrics.put("bundle_size", new MetricConfig(false, Map.of()));
 
         return new GateConfigDocument(1,
                 new Execution(Set.of("mutation_score", "performance")),

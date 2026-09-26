@@ -3,7 +3,6 @@ package com.qualitygate.query;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricDefinition;
-import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.TrendRow;
@@ -116,8 +115,7 @@ public class TrendQueryService {
                     .map(TrendQueryService::pointOf)
                     .toList();
             series.add(new TrendResponse.TrendSeries(key.id(), key.label(definition),
-                    key.componentName(),
-                    judged(points), i % MAX_COLORED_SERIES, points));
+                    key.componentName(), i % MAX_COLORED_SERIES, points));
         }
         return series;
     }
@@ -172,17 +170,6 @@ public class TrendQueryService {
         for (TrendRow row : componentLess) {
             grouped.values().forEach(points -> points.add(row));
         }
-    }
-
-    /**
-     * 判定に使われた系列か。
-     *
-     * <p>1 点でも判定に使われていれば判定系列とみなす。全点が参考値
-     * （{@code REFERENCE}）の系列だけを参考値扱いにする。判定された点を
-     * 参考値の系列に混ぜると、合否の根拠がグラフから消える。
-     */
-    private static boolean judged(List<TrendResponse.TrendPoint> points) {
-        return points.stream().anyMatch(p -> p.status() != MeasurementStatus.REFERENCE);
     }
 
     private static TrendResponse.TrendPoint pointOf(TrendRow row) {

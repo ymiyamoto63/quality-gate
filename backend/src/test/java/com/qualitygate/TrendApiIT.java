@@ -125,7 +125,6 @@ class TrendApiIT {
         assertThat(trend.threshold()).containsEntry("operator", ">=");
         assertThat(trend.series()).singleElement().satisfies(series -> {
             assertThat(series.componentName()).isEqualTo("backend");
-            assertThat(series.judged()).isTrue();
             assertThat(series.points()).extracting(TrendResponse.TrendPoint::measuredAt)
                     .containsExactly(
                             Instant.parse("2026-09-20T00:00:00Z"),
