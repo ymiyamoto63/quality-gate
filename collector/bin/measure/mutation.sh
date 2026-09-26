@@ -4,8 +4,8 @@
 
 # PIT のコマンドライン版を、対象のテストのクラスパスで動かす（対象の pom は書き換えない）。
 # measure_backend のビルドで出来た target/classes と target/test-classes をそのまま使う。
-# 時間がかかるため、PR の計測では実行せずスキップを申告する（Q-6、D-16）。
-# リリース判定（D-23）でリリースブランチやタグも完全計測にするため、ブランチでは絞らない
+# 時間がかかるため、PR の計測では実行せずスキップを申告する（DD-8）。
+# リリース判定（DD-16）でリリースブランチやタグも完全計測にするため、ブランチでは絞らない
 measure_mutation() {
   local dir="$SRC/$BACKEND_DIR" out="$WORK/pit" mvn platform
   if [ -n "$PR_NUMBER" ]; then

@@ -1,8 +1,8 @@
 # 認証と GitHub App
 
-quality-gate は GitHub App を **「ログイン手段」として使います**（OAuth App は使いません。D-11）。
+quality-gate は GitHub App を **「ログイン手段」として使います**（OAuth App は使いません。[03](../spec/03-design-decisions.md) DD-18）。
 計測結果は収集ランナーが Ingest API で送ってきます。収集ランナーは、計測対象のリポジトリを読むためにも同じ App を使います。
-バックエンドは GitHub API を呼びません（ログインの OAuth だけ。D-26）。
+バックエンドは GitHub API を呼びません（ログインの OAuth だけ。DD-10）。
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](overview-for-beginners.md) を参照してください。
 
 | 用途 | 使うもの | 状態 |
@@ -35,7 +35,7 @@ Organization のメンバーシップによる制限は行っていません。
 
 | 経路 | 対象 | 認証 | CSRF |
 | --- | --- | --- | --- |
-| Ingest | `POST /api/v1/runs/**`（`/reevaluate` を除く） | `Authorization: Bearer <QG_INGEST_TOKEN の値>`（収集ランナー用の 1 つ。D-27） | 無効（Cookie を使わない） |
+| Ingest | `POST /api/v1/runs/**`（`/reevaluate` を除く） | `Authorization: Bearer <QG_INGEST_TOKEN の値>`（収集ランナー用の 1 つ。DD-20） | 無効（Cookie を使わない） |
 | 画面 | それ以外の `/api/**` | GitHub ログインのセッション Cookie | 有効（`XSRF-TOKEN` Cookie の値を `X-XSRF-TOKEN` ヘッダで送り返す） |
 
 再評価（`POST /api/v1/runs/{id}/reevaluate`）は `/api/v1/runs` 配下の POST ですが、管理者が画面から行う操作のため画面の経路で認証します。

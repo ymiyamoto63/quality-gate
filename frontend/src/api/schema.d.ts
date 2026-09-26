@@ -126,7 +126,7 @@ export interface paths {
     }
     /**
      * リリース判定を取得する
-     * @description 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは GitHub API でコミットに解決する。ブランチ名は受け付けない
+     * @description 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは、そのタグを付けて計測した Run からコミットを探す。ブランチ名は受け付けない
      */
     get: operations['releaseReport']
     put?: never

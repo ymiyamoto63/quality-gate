@@ -13,7 +13,7 @@ import java.util.Map;
 import java.util.TreeMap;
 
 /**
- * M-03 応答時間 p95（docs/initial/02-metrics-spec.md M-03）。
+ * M-03 応答時間 p95（docs/spec/02-metrics-spec.md M-03）。
  *
  * <p>全体とシナリオ単位の<strong>双方</strong>で判定する。全体だけを見ると、
  * リクエスト数の多い軽いエンドポイントが重いエンドポイントの遅さを薄めてしまう。

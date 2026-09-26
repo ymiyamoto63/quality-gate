@@ -13,7 +13,7 @@
 #   QG_TRIGGERED_BY  既定: collector（対象リポジトリの CI から送った Run と区別する）
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
-# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（D-20）。
+# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（DD-13）。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 

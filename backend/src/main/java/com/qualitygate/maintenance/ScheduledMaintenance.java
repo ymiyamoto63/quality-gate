@@ -6,9 +6,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 /**
- * 日次バッチの起動（docs/initial/05-architecture.md 4.2）。保持期間の削除と、滞留した Run の後始末だけを行う。
+ * 日次バッチの起動（docs/spec/05-architecture.md 4.2）。保持期間の削除と、滞留した Run の後始末だけを行う。
  *
- * <p>失敗しても翌日にもう一度動くため、再試行の仕組みは持たない（D-27）。
+ * <p>失敗しても翌日にもう一度動くため、再試行の仕組みは持たない（DD-15）。
  * 時刻は {@code quality-gate.schedule.*} で変えられる。{@code -} を指定すると無効になる。
  */
 @Component

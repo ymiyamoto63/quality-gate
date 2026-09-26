@@ -19,7 +19,7 @@ import java.util.TreeMap;
 import java.util.TreeSet;
 
 /**
- * M-02 ミューテーションスコア（docs/initial/02-metrics-spec.md M-02）。
+ * M-02 ミューテーションスコア（docs/spec/02-metrics-spec.md M-02）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
@@ -110,7 +110,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
      * 「対象外」として並べる。
      *
      * <p>黙って行を出さないと、frontend の M-02 が「測り忘れ」なのか
-     * 「測りようがない」のか画面から区別できない（docs/initial/02-metrics-spec.md M-02）。
+     * 「測りようがない」のか画面から区別できない（docs/spec/02-metrics-spec.md M-02）。
      * リポジトリの構成を別に持たず、この Run に現れたコンポーネントを使うのは、
      * 実際に計測しているものだけを並べるため。
      */

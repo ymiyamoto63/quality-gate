@@ -13,7 +13,7 @@ import FindingListView from '@/views/FindingListView.vue'
 import TrendView from '@/views/TrendView.vue'
 import ReleaseView from '@/views/ReleaseView.vue'
 
-/** 画面一覧は docs/initial/08-screen-design.md 1 章と対応する。 */
+/** 画面一覧は docs/spec/08-screen-design.md 1 章と対応する。 */
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -118,7 +118,7 @@ router.beforeEach(async (to) => {
   return true
 })
 
-// 画面遷移でタイトルを更新する（docs/08 A-12）
+// 画面遷移でタイトルを更新する（docs/spec/08-screen-design.md A-12）
 router.afterEach((to) => {
   const title = typeof to.meta.title === 'string' ? to.meta.title : null
   document.title = title ? `${title} | quality-gate` : 'quality-gate'

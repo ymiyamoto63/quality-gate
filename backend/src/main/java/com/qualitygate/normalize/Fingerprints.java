@@ -11,7 +11,7 @@ import java.util.HexFormat;
  * 違反を Run をまたいで同一と見なすキーを生成する。
  *
  * <p>生成をアダプタではなくここに集約するのは、指標ごとの fingerprint 定義
- * （docs/initial/02-metrics-spec.md 0.4）が 1 箇所に収まっていないと、
+ * （docs/spec/02-metrics-spec.md 0.4）が 1 箇所に収まっていないと、
  * アダプタごとに実装がぶれて名寄せが壊れるためである。
  *
  * <p><strong>行番号を含めない。</strong>無関係な編集で行がずれただけの違反を

@@ -29,7 +29,7 @@ import java.util.UUID;
 /**
  * 設定の参照（S-06）。
  *
- * <p>設定は {@code collector/targets/<owner>__<name>.gate.yml} を Git で管理し、収集ランナーが Run ごとに送る（D-20）。
+ * <p>設定は {@code collector/targets/<owner>__<name>.gate.yml} を Git で管理し、収集ランナーが Run ごとに送る（DD-13）。
  * 画面は表示するだけで、編集は受け付けない。置き場所を 1 つにして、どちらが効いているか迷わないようにする。
  */
 @Service

@@ -1,14 +1,14 @@
 # 収集ランナーで計測する
 
 対象リポジトリに**何も置かずに**、quality-gate 側で対象を取得・計測して取り込む手順です。
-これが対象リポジトリを計測する標準の方法です（[決定事項 D-16](../initial/03-open-questions.md)）。
-方式の考え方と移行の記録は [収集ランナー方式](../architecture/collector-runner.md)、
+これが対象リポジトリを計測する方法です（[03](../spec/03-design-decisions.md) DD-6）。
+方式の構成と考え方は [収集ランナー方式](../architecture/collector-runner.md)、
 しくみの全体像は [はじめての人向け: quality-gate のしくみ](../architecture/overview-for-beginners.md) を参照してください。
 
-計測する指標は **M-01〜M-14 の全指標**です（M-08 は欠番）。
+計測する指標は**全 13 指標**です（[指標・判定仕様](../spec/02-metrics-spec.md)）。
 M-07（循環的複雑度）は backend と frontend の両方を解析します。
 M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計測では実行せず**スキップを申告します。
-ブランチ・コミット・タグの計測ではすべて実行します（リリースブランチやタグも完全計測にし、リリース判定に使えるようにするため。D-24）。
+ブランチ・コミット・タグの計測ではすべて実行します（リリースブランチやタグも完全計測にし、リリース判定に使えるようにするため。DD-17）。
 
 | 内容 | 詳細 |
 | --- | --- |
@@ -36,7 +36,7 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 | `collector/a11y/` | M-10 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
 | `collector/complexity/` | M-07（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
-| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（D-20。無ければ送信しない） |
+| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（DD-13。無ければ送信しない） |
 | `collector/targets/<owner>__<name>.k6.js` | M-03〜05 の負荷試験のシナリオ（k6） |
 
 ### 指標ごとの計測方法
@@ -67,12 +67,12 @@ M-02（PIT）と M-03〜05（性能）は時間がかかるため、**PR の計�
 quality-gate は、比較元のコミットで判定済みの Run があれば、それを比較対象 Run（前回比・新規 / 継続 / 解消の起点）にします。
 無ければ、同じブランチで直前に計測した Run です。
 
-取得（`fetch`）では、あわせて次の 2 つを対象の履歴から求めて送ります。quality-gate のバックエンドは GitHub API を呼びません（D-26）。
+取得（`fetch`）では、あわせて次の 2 つを対象の履歴から求めて送ります。quality-gate のバックエンドは GitHub API を呼びません（DD-10）。
 
 | 送るもの | 求め方 | 使い道 |
 | --- | --- | --- |
 | タグ（Run の `tags`） | 計測するコミットを指すタグ（`git tag --points-at`） | リリース判定（S-11）でタグをコミットに解決する |
-| ファイルの移動（成果物 `git-renames`） | 比較元からの `git diff -M` と、first-parent 1,000 コミット分のコミットごとの `git log -M`（`collector/bin/renames.sh`） | 移動しただけのファイルの違反を新規・解消として扱わない（[指標仕様書 0.4](../initial/02-metrics-spec.md)） |
+| ファイルの移動（成果物 `git-renames`） | 比較元からの `git diff -M` と、first-parent 1,000 コミット分のコミットごとの `git log -M`（`collector/bin/renames.sh`） | 移動しただけのファイルの違反を新規・解消として扱わない（[指標仕様書 0.4](../spec/02-metrics-spec.md)） |
 
 ## 1. 事前の準備
 
@@ -94,7 +94,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 空いているポート 8080 / 4173（M-10 と M-03〜05 で対象アプリを起動する）が必要です。
 
 ランナーは 1 台なので、収集ジョブは同時には動きません（`max-parallel: 1`）。
-性能計測（M-03〜05）の値が他のジョブに乱されないよう、**このマシンには他のランナーや常駐サービスを置かないでください**（D-7 の「同居させない」）。
+性能計測（M-03〜05）の値が他のジョブに乱されないよう、**このマシンには他のランナーや常駐サービスを置かないでください**（[03](../spec/03-design-decisions.md) DD-11 の「同居させない」）。
 
 ### 1-2. 対象を読むための GitHub App（private リポジトリの場合）
 
@@ -117,7 +117,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 | Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（セルフホストランナーから到達できるもの） |
 | Variables | `QG_COLLECTOR_APP_ID` | 1-2 の App の App ID |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 1-2 でダウンロードした秘密鍵（PEM の中身全体） |
-| Secrets | `QG_INGEST_TOKEN` | Ingest Token。バックエンドの環境変数 `QG_INGEST_TOKEN` と同じ値（すべての対象で共通。D-27。[作り方](ingest.md#ingest-token-の作成と交換)） |
+| Secrets | `QG_INGEST_TOKEN` | Ingest Token。バックエンドの環境変数 `QG_INGEST_TOKEN` と同じ値（すべての対象で共通。DD-20。[作り方](ingest.md#ingest-token-の作成と交換)） |
 
 **quality-gate リポジトリは private のままにしてください。** 収集ワークフローのログと成果物には、対象のパスやテスト出力が含まれます。
 
@@ -125,7 +125,7 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
 
 1. **管理 › リポジトリ管理（S-08）** で like-chatgpt を登録する。登録していないリポジトリの Run は受け付けない
 
-合格ラインは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` です。収集ランナーが Run ごとに送り、quality-gate はその内容で判定します（D-20）。
+合格ラインは `collector/targets/ymiyamoto63__like-chatgpt.gate.yml` です。収集ランナーが Run ごとに送り、quality-gate はその内容で判定します（DD-13）。
 画面（S-06）は表示するだけで、編集はできません。変更はプルリクエストで行い、main にマージした後の計測から使われます
 （すぐに反映したいときは collect ワークフローを手動実行する）。内容が変わったときだけ新しい版として S-06 の「変更履歴」に残ります。
 
@@ -162,8 +162,8 @@ quality-gate の既存のセルフホストランナー（[セルフホストラ
    （比較元は前のタグになる。前のリリースと比べたくないときだけ `base` を指定する）
 2. 計測が終わったら（約 20 分）、quality-gate のリポジトリ詳細 → リリース判定で同じタグを入れる
 
-リリース判定は、計測したときにコミットを指していたタグでコミットを探します。タグを付ける前に計測したコミットや、
-この仕組みより前（V020 より前）の計測は、タグでは見つかりません。タグを付けてから計測し直すか、コミット SHA で指定してください。
+リリース判定は、計測したときにコミットを指していたタグでコミットを探します。タグを付ける前に計測したコミットは、
+タグでは見つかりません。タグを付けてから計測し直すか、コミット SHA で指定してください。
 
 前のタグのコミットも計測しておくと、前回比（例: カバレッジが何ポイント下がったか）と、違反の新規 / 継続 / 解消が前のリリースとの比較になります。
 
@@ -285,7 +285,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 | 実行する計測 | **PR 以外の計測**（ブランチ・コミット・タグ）。PR の計測では M-03〜05 のスキップを申告する |
 | 方式 | `measure_backend` のビルドで出来たバックエンドの jar を起動し、k6 で API に負荷をかける。画面（静的アセット）は対象にしない |
 | シナリオ | 計測プロファイルの `PERF_SCRIPT`（`collector/targets/` のファイル）。like-chatgpt は `chat`（25 req/s）・`suggest`（15 req/s）・`monitoring`（10 req/s）の合計 50 req/s |
-| 計測条件 | 仕様（[指標・判定仕様](../initial/02-metrics-spec.md) M-03）のとおり。到達率一定、ウォームアップ 60 秒を除き 300 秒計測、3 回実行して quality-gate が中央値で判定する |
+| 計測条件 | 仕様（[指標・判定仕様](../spec/02-metrics-spec.md) M-03）のとおり。到達率一定、ウォームアップ 60 秒を除き 300 秒計測、3 回実行して quality-gate が中央値で判定する |
 | 所要時間 | 1 回 約 6 分 × 3 回 = **約 18 分**（起動を含む） |
 | ツールの版 | `collector/versions.env` の `K6_VERSION`。初回にキャッシュ（`quality-gate-collector-home`）へ取得する |
 | 送るもの | `k6-summary` を 3 ファイル（component はバックエンド）。metadata の `environment` に計測環境の名前・CPU 数・メモリ・シードデータ・k6 の版を入れる。k6 が異常終了した回は `aborted: true` を付けて送り、その Run の M-03〜05 は ERROR になる |
@@ -338,11 +338,10 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 - **M-09 の初回**（比較元に OpenAPI 定義が無いとき）は「対象外」になります
 - 判定には**計測した時点の main の `*.gate.yml`** を使います。再評価ではその Run が送った設定で判定し直します。設定の変更履歴は S-06 の「変更履歴」と Git の履歴で追えます
 
-## 対象リポジトリの計測用ファイル
+## 対象リポジトリの CI からの送信
 
-取り込みは収集ランナーからだけで（D-19）、Ingest Token も収集ランナー用の 1 つです（D-27）。対象リポジトリの CI からは送れません。
-対象リポジトリに以前の方式の計測用ファイル（`.quality-gate.yml`、`.github/workflows/quality-gate.yml`、`scripts/quality-gate-submit.sh` など）は
-収集ランナーでは使いません。消すかどうかは対象側の判断です。
+取り込みは収集ランナーからだけで（DD-6）、Ingest Token も収集ランナー用の 1 つです（DD-20）。対象リポジトリの CI からは送れません。
+対象リポジトリに置いた計測用のファイルやワークフローは、収集ランナーでは使いません。
 
 ## 手元で試す
 

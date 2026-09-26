@@ -13,7 +13,7 @@ import java.util.Map;
  * 2 箇所に持つと、指標を足したときに片方だけ直して「その他」に落ちる。
  *
  * <p>カテゴリ分類をサーバに置くのは、画面がカテゴリ表として描かれるため
- * （docs/initial/07-api-design.md 4.2）。平坦な配列を返して画面側で分類すると、
+ * （docs/spec/07-api-design.md 4.2）。平坦な配列を返して画面側で分類すると、
  * 分類規則がサーバとクライアントに二重化する。
  */
 public final class MetricCatalog {

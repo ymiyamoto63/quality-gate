@@ -28,10 +28,10 @@ import java.util.Optional;
  * 判定に使う設定を解決する。
  *
  * <p>設定は収集ランナーが {@code quality-gate-config} 型の成果物として送る
- * （{@code collector/targets/<owner>__<name>.gate.yml}。Git で管理する唯一の置き場所。D-20）。
+ * （{@code collector/targets/<owner>__<name>.gate.yml}。Git で管理する唯一の置き場所。DD-13）。
  * 内容が同じなら同じ版を使い、変わったときだけ新しい版を保存する。
  *
- * <p>設定ファイルの無い Run（D-20 より前の Run）は、前回の判定で使った版で判定し直す。
+ * <p>設定ファイルの無い Run は、前回の判定で使った版で判定し直す。
  * 再評価で判定の基準が変わらないように（判定の再現性。FR-02-4）。
  */
 @Service

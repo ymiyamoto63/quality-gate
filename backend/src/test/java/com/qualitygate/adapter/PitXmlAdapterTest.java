@@ -65,7 +65,7 @@ class PitXmlAdapterTest {
 
     @Test
     void 除外パターンはJaCoCoと同じパッケージ相対のパスで照合する() {
-        // M-01 と同じ exclusions を書けるようにする（docs/initial/02-metrics-spec.md 0.2）
+        // M-01 と同じ exclusions を書けるようにする（docs/spec/02-metrics-spec.md 0.2）
         RawMeasurement measurement = parse(resource("/pit/mutations.xml"),
                 context(List.of("com/qualitygate/platform/**"), Map.of()));
 

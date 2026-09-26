@@ -108,7 +108,7 @@ public class ReportNormalizer {
 
     /**
      * fingerprint をキーに名寄せする。複数のツールが同じ問題を報告しても 1 件にまとまる
-     * （docs/initial/02-metrics-spec.md 0.4）。
+     * （docs/spec/02-metrics-spec.md 0.4）。
      */
     private static void collect(List<RawFinding> findings, Map<String, IdentifiedFinding> into) {
         for (RawFinding finding : findings) {

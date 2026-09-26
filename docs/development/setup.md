@@ -37,7 +37,7 @@ cd frontend && npm ci && npm run dev
 
 ## ログイン用の GitHub App
 
-ログインは GitHub App の user-to-server 認可フローで行います（D-11）。
+ログインは GitHub App の user-to-server 認可フローで行います（[03](../spec/03-design-decisions.md) DD-18）。
 ローカルで動かすには、開発者ごとに GitHub App を 1 つ作成し、その認証情報を
 バックエンドに渡す必要があります。
 

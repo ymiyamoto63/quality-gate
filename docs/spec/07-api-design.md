@@ -1,15 +1,10 @@
 # quality-gate API 設計
 
-| 項目 | 内容 |
-| --- | --- |
-| ドキュメント名 | quality-gate API 設計（基本設計） |
-| バージョン | 2.0 |
-| 最終更新 | 2026-09-26 |
-| 前提文書 | [要件定義書](01-requirements.md) / [方式設計](05-architecture.md) / [DB 設計](06-database-design.md) |
+前提は [要件定義書](01-requirements.md)・[方式設計](05-architecture.md)・[DB 設計](06-database-design.md)。
 
 本書で定義した API から `api/openapi.yml` が生成され、
 それを入力にフロントエンドの型と呼び出しコードが生成される（[04](04-tech-stack.md) 4 章）。
-**本書と実装がずれた場合、正は実装（springdoc の出力）**である。現行の API だけを記し、削除した API の経緯は [03](03-open-questions.md) の決定記録に残す。
+**本書と実装がずれた場合、正は実装（springdoc の出力）**である。
 本書は設計意図と全体像を示すものと位置づける。
 
 ---
@@ -189,7 +184,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `measuredAt` | ○ | |
-| `tags` | | 計測したコミットを指すタグ。収集ランナーが clone した履歴から求めて送る（`git tag --points-at`）。リリース判定でタグをコミットに解決するのに使う（D-26）。git のタグ名に使えない文字を含めば 400 |
+| `tags` | | 計測したコミットを指すタグ。収集ランナーが clone した履歴から求めて送る（`git tag --points-at`）。リリース判定でタグをコミットに解決するのに使う（[03](03-design-decisions.md) DD-10）。git のタグ名に使えない文字を含めば 400 |
 | `skippedMetrics` | | 省略時は「全指標を計測した」とみなす |
 
 **応答（201）**
@@ -239,7 +234,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 3.3 `POST /api/v1/runs/{runId}/finalize`
 
-リクエストボディなし。取り込みを確定し、**その場で**設定の解決・正規化・判定を行って結果を返す（D-27）。
+リクエストボディなし。取り込みを確定し、**その場で**設定の解決・正規化・判定を行って結果を返す（DD-15）。
 
 **応答（200）**
 
@@ -264,7 +259,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ### 4.1 `GET /api/v1/dashboard`
 
-`repository_summaries`（[06](06-database-design.md) 3.11）を読むだけで応答する。
+`repository_summaries`（[06](06-database-design.md) 3.9）を読むだけで応答する。
 
 ```json
 {
@@ -512,7 +507,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 ---
 
-## 4.6 実装で確定した仕様
+### 4.6 詳細仕様
 
 本書と実装がずれた場合の正は実装（springdoc の出力）である（冒頭の前提）。
 参照 API の実装にあたって確定した点を記す。
@@ -522,7 +517,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 入れ子の型には**応答をまたいで一意な名前**を付ける（`RunSummary` / `FindingItem` など）。
 springdoc はスキーマ名に Java の単純名を使うため、別の応答に同じ名前の入れ子型があると
 片方の定義がもう片方を静かに上書きし、生成されるクライアント型が別物になる
-（[04](04-tech-stack.md) 10.6）。
+（[04](04-tech-stack.md) 10.5）。
 
 ### 必須と null の宣言
 
@@ -608,7 +603,7 @@ API のパスはリポジトリ上のファイルではない。
 
 - `ref` が 16 進数 7〜40 桁ならコミット SHA とみなし、計測済みの Run から前方一致で探す（複数のコミットに一致すれば 400）。
   それ以外はタグ名とみなし、そのタグを付けて計測した Run（`POST /api/v1/runs` の `tags`）のコミットに解決する。
-  タグが付け替えられていれば、最も新しい計測のコミット。GitHub API は使わない（D-26）。
+  タグが付け替えられていれば、最も新しい計測のコミット。GitHub API は使わない（DD-10）。
   ブランチ名は受け付けない（先頭が動くため証跡にならない）。タグを付けて計測した Run が無ければ 404（タグを指定して計測するか、コミット SHA で指定する）
 - 結論 `decision` は `RELEASABLE` / `RELEASABLE_WITH_WARNINGS` / `NOT_RELEASABLE` / `UNDETERMINED`。理由の文 `decisionReason` はサーバが持つ
 - 未計測でも 200 を返す（`decision: UNDETERMINED`、`run: null`）。判定できなかったことも証跡として残せるようにするため
@@ -627,7 +622,7 @@ API のパスはリポジトリ上のファイルではない。
 | ロールの反映 | セッションのロールを信じず、リクエストのたびに `users` の現在値で置き換える。降格・無効化は次のリクエストから効く |
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
-| 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。D-20）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
+| 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。DD-13）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
 | 違反一覧 | 各違反に `fingerprint` を返す |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` はその場で判定し直し、判定後の `status` と `verdict` を返す。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
 | 保持期間 | Run・成果物・監査ログの日数を扱う |
@@ -712,14 +707,7 @@ Ingest Token は**書き込み専用**であり、参照 API を一切呼べな�
 
 ---
 
-## 8. レート制限
-
-設けない。取り込み元はトークンで認証した収集ランナー 1 台、参照するのは許可リストの少人数で、
-上限に届く使い方が無いため。
-
----
-
-## 9. OpenAPI 仕様の生成と検証
+## 8. OpenAPI 仕様の生成と検証
 
 | 項目 | 方針 |
 | --- | --- |

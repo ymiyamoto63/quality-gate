@@ -47,7 +47,7 @@ public class ReleaseReportController {
     @GetMapping("/release-report")
     @Operation(summary = "リリース判定を取得する",
             description = "指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。"
-                    + "タグは GitHub API でコミットに解決する。ブランチ名は受け付けない")
+                    + "タグは、そのタグを付けて計測した Run からコミットを探す。ブランチ名は受け付けない")
     public ReleaseReportResponse releaseReport(
             @PathVariable UUID repositoryId,
             @RequestParam @Parameter(description = "タグ名、またはコミット SHA（7〜40 桁）") String ref) {

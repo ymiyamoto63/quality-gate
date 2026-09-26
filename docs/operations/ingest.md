@@ -1,20 +1,20 @@
 # 取り込み（Ingest API）と判定
 
 計測結果は Ingest API で quality-gate に送ります。送り手は収集ランナーです
-（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)）。対象の CI から送るための補助は D-19 で削除しました。
+（`collector/bin/submit.sh`。[収集ランナーで計測する](collector.md)）。
 
 取り込みから表示までの流れ:
 
 1. 送り手が `POST /api/v1/runs` で Run を作成する（`repository` は quality-gate に登録済みで、有効である必要がある）
 2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` /
-   `git-renames`（ファイルの移動。[指標仕様書 0.4](../initial/02-metrics-spec.md)）など）を
+   `git-renames`（ファイルの移動。[指標仕様書 0.4](../spec/02-metrics-spec.md)）など）を
    アップロードする。この時点ではパースせず、`QG_ARTIFACT_ROOT` に保存するだけ
 3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、その場で設定の解決 → 正規化 → 判定 → 読み取りモデル更新を行い、
-   判定結果（`status` / `verdict` / `completeness`）を返す（D-27）。判定に失敗した場合も 200 で、`status` が `FAILED` になる
+   判定結果（`status` / `verdict` / `completeness`）を返す（[03](../spec/03-design-decisions.md) DD-15）。判定に失敗した場合も 200 で、`status` が `FAILED` になる
 4. 画面（Run 詳細 / 違反一覧 / トレンド / ダッシュボード）に結果が表示される
 
 認証には Ingest Token を使います。トークンはバックエンドの環境変数 `QG_INGEST_TOKEN` に設定した 1 つだけで、
-収集ランナーの Secret `QG_INGEST_TOKEN` に同じ値を入れます（D-27）。セッション Cookie との使い分けは
+収集ランナーの Secret `QG_INGEST_TOKEN` に同じ値を入れます（DD-20）。セッション Cookie との使い分けは
 [認証と GitHub App](../architecture/authentication.md#認証の経路) を参照してください。
 
 ## Ingest Token の作成と交換
@@ -49,4 +49,4 @@ curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/finalize" -H "Authori
 ```
 
 リクエスト・応答の詳細は `http://localhost:8080/swagger-ui.html` または
-[API 設計](../initial/07-api-design.md) を参照してください。
+[API 設計](../spec/07-api-design.md) を参照してください。

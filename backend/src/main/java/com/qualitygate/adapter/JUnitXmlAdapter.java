@@ -20,7 +20,7 @@ import java.util.Map;
 
 /**
  * JUnit XML から M-11 / M-12（テスト成功率 / スキップされたテスト数）を読む
- * （docs/initial/02-metrics-spec.md M-11）。
+ * （docs/spec/02-metrics-spec.md M-11）。
  *
  * <p>Surefire / Failsafe と Vitest の junit reporter の出力を受け付ける。ルートは
  * {@code <testsuites>} でも {@code <testsuite>} でもよい。

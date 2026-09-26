@@ -6,9 +6,9 @@
 | `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。`compose.yaml` の `db` と一致している |
 | `QG_ARTIFACT_ROOT` | `./data/artifacts` | 成果物の保存先（起動したディレクトリからの相対パス） |
 | `QG_BASE_URL` | `http://localhost:8080` | 取り込み API の応答に含める Run 詳細画面の URL の組み立てに使う |
-| `QG_INGEST_TOKEN` | なし | 収集ランナーが取り込み API に送る Ingest Token。収集ランナーの Secret `QG_INGEST_TOKEN` と同じ値にする。交換中だけ新旧をカンマ区切りで並べる。未設定なら取り込み API はすべて 401（[作り方と交換](ingest.md#ingest-token-の作成と交換)。D-27） |
+| `QG_INGEST_TOKEN` | なし | 収集ランナーが取り込み API に送る Ingest Token。収集ランナーの Secret `QG_INGEST_TOKEN` と同じ値にする。交換中だけ新旧をカンマ区切りで並べる。未設定なら取り込み API はすべて 401（[作り方と交換](ingest.md#ingest-token-の作成と交換)） |
 | `QG_LOG_FORMAT` | なし（テキスト） | `ecs` / `logstash` / `gelf` で JSON 構造化ログにする。相関 ID（`requestId` / `runId`）が項目として載る。`compose.yaml` の `full` では `ecs` |
-| `QG_SCHEDULE_ZONE` | `Asia/Tokyo` | 日次バッチ（03:00 保持期間の削除・03:10 滞留した Run の後始末）とレポートの期間の区切りのタイムゾーン。各時刻は `quality-gate.schedule.*` の cron 式で変えられる |
+| `QG_SCHEDULE_ZONE` | `Asia/Tokyo` | 日次バッチ（03:00 保持期間の削除・03:10 滞留した Run の後始末）と、リリース判定の CSV に書く出力日時のタイムゾーン。各時刻は `quality-gate.schedule.*` の cron 式で変えられる |
 
 優先順位は **環境変数 > `.env` > `application.yml` の既定値**です。
 

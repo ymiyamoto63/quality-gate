@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * M-13 シークレット検出件数（docs/initial/02-metrics-spec.md M-13）。
+ * M-13 シークレット検出件数（docs/spec/02-metrics-spec.md M-13）。
  *
  * <p>コミットされた鍵やトークンは、履歴に残った時点で漏えいとみなす。M-07 のように
  * 「新規だけを数える」ことはせず、<strong>検出されたものすべて</strong>を数える。

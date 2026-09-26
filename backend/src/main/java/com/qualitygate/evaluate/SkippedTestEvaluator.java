@@ -14,7 +14,7 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * M-12 スキップされたテスト数（docs/initial/02-metrics-spec.md M-12）。
+ * M-12 スキップされたテスト数（docs/spec/02-metrics-spec.md M-12）。
  *
  * <p>スキップ（{@code @Disabled} / {@code it.skip} など）は失敗にならないため、成功率（M-11）では
  * 見えない。落ちるテストを黙らせる手段として使われると、成功率 100% のまま検証が減っていく。

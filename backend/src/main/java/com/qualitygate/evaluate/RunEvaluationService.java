@@ -132,7 +132,7 @@ public class RunEvaluationService {
     }
 
     /**
-     * 指標 1 件の判定。優先順位は docs/initial/05-architecture.md 6.2 に従う。
+     * 指標 1 件の判定。優先順位は docs/spec/05-architecture.md 6.2 に従う。
      *
      * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
      * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。
@@ -334,7 +334,7 @@ public class RunEvaluationService {
      * 比較対象 Run。比較元コミット（{@code baseCommitSha}）で判定済みの Run があればそれ、
      * 無ければ同一ブランチで、この Run より前に計測された判定済みの Run。
      *
-     * <p>比較元コミットを優先するのは、計測が手動で順不同になるため（D-22）。
+     * <p>比較元コミットを優先するのは、計測が手動で順不同になるため（DD-7 / DD-17）。
      * 例えばリリースのタグ v1.1.0 を計測するとき、比較元は前のタグ v1.0.0 で、
      * 「同じブランチで直前に計測した Run」は v1.1.0 より新しいコミットのこともある。
      *

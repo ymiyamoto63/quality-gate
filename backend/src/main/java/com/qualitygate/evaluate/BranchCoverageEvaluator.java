@@ -14,7 +14,7 @@ import java.util.Map;
  * M-01 ブランチカバレッジ。
  *
  * <p><strong>コンポーネントを合算しない。</strong>片方の高いカバレッジが
- * もう片方の低さを隠すためである（docs/initial/02-metrics-spec.md M-01）。
+ * もう片方の低さを隠すためである（docs/spec/02-metrics-spec.md M-01）。
  */
 @Component
 public class BranchCoverageEvaluator implements MetricEvaluator {

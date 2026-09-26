@@ -47,7 +47,7 @@ public record GateThresholds(
         Licenses licenses) {
 
     /**
-     * ライセンスの合格ライン（docs/initial/02-metrics-spec.md M-14）。件数はパッケージの数。
+     * ライセンスの合格ライン（docs/spec/02-metrics-spec.md M-14）。件数はパッケージの数。
      *
      * @param maxForbidden  分類が forbidden のパッケージの上限
      * @param maxRestricted 分類が restricted のパッケージの上限。null なら件数では問わない（WARN にとどめる）
@@ -57,7 +57,7 @@ public record GateThresholds(
     }
 
     /**
-     * 性能指標の合格ライン（docs/initial/02-metrics-spec.md M-03）。
+     * 性能指標の合格ライン（docs/spec/02-metrics-spec.md M-03）。
      *
      * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
      * @param p95WarnMs      これを超えたら WARN（既定は合格ラインの 80%）
@@ -70,7 +70,7 @@ public record GateThresholds(
     }
 
     /**
-     * テスト結果の合格ライン（docs/initial/02-metrics-spec.md M-11 / M-12）。
+     * テスト結果の合格ライン（docs/spec/02-metrics-spec.md M-11 / M-12）。
      *
      * @param minSuccessRate     M-11 の合格ライン（成功率 %）
      * @param minTestCount       M-11 の最小実行件数。下回れば値を確定できない（ERROR）

@@ -42,7 +42,7 @@ public class TrendQueryService {
     /**
      * 色を割り当てられる系列の数。
      *
-     * <p>検証済みの配色は 3 色（docs/initial/08-screen-design.md 3.5）。色を増やして
+     * <p>検証済みの配色は 3 色（docs/spec/08-screen-design.md 3.5）。色を増やして
      * 系列を増やすことはしない。生成した 4 色目は色覚特性下で既存の色と
      * 見分けがつかなくなり、検証の意味が失われる。
      */

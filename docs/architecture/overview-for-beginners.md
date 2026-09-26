@@ -124,7 +124,7 @@ like-chatgpt そのものには一切手を加えません。
 | **何を合格とするか**（合格ライン） | quality-gate リポジトリの `collector/targets/ymiyamoto63__like-chatgpt.gate.yml`（画面 S-06 は表示だけ） | カバレッジ 75% 以上、重大な脆弱性 0 件 |
 | **測るツールの版** | quality-gate リポジトリの `collector/versions.env` | JaCoCo 0.8.15、PIT 1.20.4、PMD 7.17.0 |
 
-like-chatgpt 自身の `.quality-gate.yml` やワークフロー（以前の方式の名残）は、収集ランナーでは**使いません**。
+like-chatgpt 側に置いた設定ファイルやワークフローは、収集ランナーでは**使いません**。
 quality-gate が受け付けるのは収集ランナーからの送信だけなので、like-chatgpt 側の CI からは送れません。
 
 ### 4.3 like-chatgpt のコードは書き換えるのか
@@ -368,8 +368,6 @@ PIT もコマンドラインから動かすので、like-chatgpt の `pom.xml` �
 - もともと複雑だった関数で、今回は悪化していないもの → 責めない
 - 今回新しく作られた、または今回さらに複雑になった関数 → 判定の対象
 
-以前の方式（like-chatgpt 自身の CI）は base を送っていなかったため、この区別ができていませんでした。
-
 **M-09 API の破壊的変更**
 
 like-chatgpt は API の定義書（`api/openapi.yml`）をリポジトリに置いています。
@@ -411,7 +409,7 @@ Run 全体の判定（verdict）は次のように決まります。
 | PASS_WITH_WARNINGS（注意つき合格） | FAIL・ERROR は無いが、WARN がある |
 | PASS（合格） | それ以外（対象外の指標は影響しない） |
 
-quality-gate はマージを止めないので（D-4）、FAIL になっても like-chatgpt の開発は何も止まりません。結果を見て判断するための情報です。
+quality-gate はマージを止めないので（[03](../spec/03-design-decisions.md) DD-3）、FAIL になっても like-chatgpt の開発は何も止まりません。結果を見て判断するための情報です。
 
 同じコミットを何度測っても、前の結果は上書きされず、新しい Run（attempt 2、3…）として残ります。
 Run 詳細の CI 実行へのリンクは、その Run を作った quality-gate リポジトリの collect ワークフローの実行を指します。
@@ -458,8 +456,8 @@ A. 収集ランナーで全指標が問題なく測れることを確かめた�
 | --- | --- |
 | 収集ランナーの設定と実行の手順 | [収集ランナーで計測する](../operations/collector.md) |
 | セルフホストランナーの準備 | [セルフホストランナー](../operations/self-hosted-runner.md) |
-| 収集ランナー方式を選んだ理由と移行の記録 | [収集ランナー方式](collector-runner.md) |
-| 決定事項（D-1〜D-28） | [決定事項の記録と残課題](../initial/03-open-questions.md) |
+| 収集ランナー方式の構成と考え方 | [収集ランナー方式](collector-runner.md) |
+| 設計判断とその理由 | [設計判断と未決事項](../spec/03-design-decisions.md) |
 | ログインと GitHub App の詳細 | [認証と GitHub App](authentication.md) |
 | アプリの起動構成 | [起動の仕組み](runtime.md) |
-| 各指標の正確な定義と計算式 | [指標・判定仕様](../initial/02-metrics-spec.md) |
+| 各指標の正確な定義と計算式 | [指標・判定仕様](../spec/02-metrics-spec.md) |

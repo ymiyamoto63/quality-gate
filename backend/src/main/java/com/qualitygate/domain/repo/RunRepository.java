@@ -55,12 +55,6 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     @Query("select r from Run r where r.status in ('CREATED','UPLOADING') and r.createdAt < :before")
     List<Run> findStaleRuns(@Param("before") Instant before);
 
-    /** レポート（FR-08-4）の対象。期間内に判定まで終わった Run を、計測日時の古い順に返す。 */
-    @Query("select r from Run r where r.repositoryId in :repositoryIds and r.status = 'EVALUATED' "
-            + "and r.measuredAt >= :from and r.measuredAt < :to order by r.measuredAt, r.id")
-    List<Run> findEvaluatedBetween(@Param("repositoryIds") java.util.Collection<UUID> repositoryIds,
-                                   @Param("from") Instant from, @Param("to") Instant to);
-
     /** リリース判定（UC-10）。短い SHA の前方一致で、このリポジトリで計測したコミットを探す。 */
     @Query("select distinct r.commitSha from Run r where r.repositoryId = :repositoryId "
             + "and r.commitSha like :prefix")

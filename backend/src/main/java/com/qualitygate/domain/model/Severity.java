@@ -4,7 +4,7 @@ import java.math.BigDecimal;
 
 /**
  * 正規化済みの深刻度。CVSS スコアを正とし、スコアが無い検出のみ
- * ツール固有 severity からマッピングする（docs/initial/02-metrics-spec.md M-06）。
+ * ツール固有 severity からマッピングする（docs/spec/02-metrics-spec.md M-06）。
  */
 public enum Severity {
     CRITICAL,

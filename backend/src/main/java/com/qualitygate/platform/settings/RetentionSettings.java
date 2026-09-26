@@ -6,7 +6,7 @@ import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotNull;
 
 /**
- * データ保持期間（FR-17-1 / docs/initial/06-database-design.md 7 章）。
+ * データ保持期間（FR-17-1 / docs/spec/06-database-design.md 7 章）。
  *
  * <p>下限を設けるのは、誤って 0 日などを保存すると日次バッチが全データを消すため。
  */

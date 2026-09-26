@@ -111,7 +111,7 @@ class RepositoryAdminApiIT {
         assertThat(createRun(token)).hasStatus(403);
     }
 
-    /** 設定は collector/targets/*.gate.yml を Git で管理する（D-20）。画面は表示するだけ（更新の API は無い）。 */
+    /** 設定は collector/targets/*.gate.yml を Git で管理する（DD-13）。画面は表示するだけ（更新の API は無い）。 */
     @Test
     void 設定版が無ければ既定値を表示する() {
         String repositoryId = createRepository();

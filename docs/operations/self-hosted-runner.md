@@ -5,7 +5,7 @@ quality-gate リポジトリの**収集ランナー**（`collect-target.yml` の
 （[収集ランナーで計測する](collector.md)）。常にセルフホストランナーで動きます。
 
 Pull Request の CI（`ci.yml`）は GitHub ホストランナー（`ubuntu-latest`）で動き、セルフホストランナーを使いません。
-ランナーが止まっていても PR の CI は止まりません。quality-gate 自身を計測するワークフローはありません（D-18）。
+ランナーが止まっていても PR の CI は止まりません。quality-gate 自身を計測するワークフローはありません（[03](../spec/03-design-decisions.md) DD-5）。
 
 ## 1. マシンの準備
 
@@ -22,7 +22,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 | 十分なディスク（目安 20GB 以上） | Maven / npm のキャッシュ、Docker イメージ、Playwright のブラウザ |
 
 性能計測の条件として **他のジョブと同居させない**ことが決まっているため
-（[指標・判定仕様](../initial/02-metrics-spec.md)「計測条件」）、
+（[指標・判定仕様](../spec/02-metrics-spec.md)「計測条件」）、
 専有マシンに 1 台だけ登録し、他のリポジトリのランナーや常駐サービスは同じマシンに置かないでください。
 
 ## 2. ランナーの登録
@@ -56,9 +56,7 @@ JDK と Node.js は `actions/setup-java` / `actions/setup-node` がジョブご�
 収集ランナーの変数とシークレット（`QG_BASE_URL` / `QG_COLLECTOR_APP_ID` / `QG_COLLECTOR_APP_PRIVATE_KEY` / `QG_INGEST_TOKEN`）は
 [収集ランナーで計測する](collector.md#1-3-quality-gate-リポジトリの変数とシークレット) を参照してください。
 
-以前 quality-gate 自身の計測に使っていたリポジトリ変数 `QG_RUNNER` / `QG_RUN_HEAVY_ON_GITHUB` と、
-対象ごとの Ingest Token のシークレット（`QG_INGEST_TOKEN_LIKE_CHATGPT` など）は使わなくなりました。設定済みなら削除して構いません。
-シークレット `QG_INGEST_TOKEN` は収集ランナーが使います（すべての対象で共通。D-27）。
+シークレット `QG_INGEST_TOKEN` はすべての対象で共通です（[03](../spec/03-design-decisions.md) DD-20）。
 
 ## 4. 動作確認
 

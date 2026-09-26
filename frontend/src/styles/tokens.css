@@ -1,5 +1,5 @@
 /*
- * 配色トークン（docs/initial/08-screen-design.md 3.4）。
+ * 配色トークン（docs/spec/08-screen-design.md 3.4）。
  * ダーク値は 2 つのスコープに書く。OS 設定とアプリ内のテーマ切替の両方を効かせ、
  * かつ利用者が明示的に選んだライトが OS のダークに勝つようにするため。
  */
@@ -255,7 +255,7 @@ a {
   font-weight: 600;
 }
 
-/* 表はモバイル幅でカード形式に変形する（docs/initial/08-screen-design.md 6 章） */
+/* 表はモバイル幅でカード形式に変形する（docs/spec/08-screen-design.md 6 章） */
 @media (max-width: 767px) {
   .qg-table--stack thead {
     position: absolute;

@@ -21,7 +21,7 @@ import java.util.Map;
 
 /**
  * oasdiff の JSON 出力から M-09（OpenAPI の破壊的変更件数）を読む
- * （docs/initial/02-metrics-spec.md M-09）。
+ * （docs/spec/02-metrics-spec.md M-09）。
  *
  * <p>受け付けるのは {@code oasdiff breaking <base> <head> --format json} の出力
  * （変更の配列）。{@code []} と {@code null} は 0 件として読む。

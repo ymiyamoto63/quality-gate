@@ -32,7 +32,7 @@ import java.util.UUID;
 /**
  * 収集ランナーからの取り込み API。認証は Ingest Token（書き込み専用。収集ランナーの 1 つだけ）。
  *
- * <p>{@code finalize} はその場で判定し、判定結果を返す（D-27）。
+ * <p>{@code finalize} はその場で判定し、判定結果を返す（DD-15）。
  */
 @RestController
 @RequestMapping("/api/v1/runs")
@@ -98,7 +98,7 @@ public class IngestController {
             return ArtifactType.fromWire(type);
         } catch (IllegalArgumentException e) {
             throw new ApiException(ErrorCode.ARTIFACT_TYPE_UNKNOWN,
-                    "未知の成果物種別です: %s（対応形式は docs/initial/02-metrics-spec.md 0.5 を参照）"
+                    "未知の成果物種別です: %s（対応形式は docs/spec/02-metrics-spec.md 0.5 を参照）"
                             .formatted(type));
         }
     }
