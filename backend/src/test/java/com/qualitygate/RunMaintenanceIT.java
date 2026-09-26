@@ -5,7 +5,6 @@ import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
@@ -13,8 +12,8 @@ import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
-import com.qualitygate.job.JobEnqueuer;
-import com.qualitygate.job.JobWorker;
+import com.qualitygate.maintenance.ScheduledMaintenance;
+import com.qualitygate.pipeline.RunEvaluationPipeline;
 import com.qualitygate.platform.id.Uuid7;
 import com.qualitygate.platform.storage.ArtifactStore;
 import com.qualitygate.platform.storage.StoredArtifact;
@@ -30,7 +29,6 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.time.Instant;
-import java.util.Map;
 import java.util.UUID;
 
 import static com.qualitygate.TestSessions.as;
@@ -73,8 +71,8 @@ class RunMaintenanceIT {
     @Autowired RunRepository runs;
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired ArtifactStore artifactStore;
-    @Autowired JobEnqueuer enqueuer;
-    @Autowired JobWorker worker;
+    @Autowired RunEvaluationPipeline pipeline;
+    @Autowired ScheduledMaintenance maintenance;
 
     private MockMvcTester mvc;
     private UUID repositoryId;
@@ -100,9 +98,12 @@ class RunMaintenanceIT {
                 .hasStatus(403);
         assertThat(mvc.post().uri("/api/v1/runs/{id}/reevaluate", run.getId())
                 .with(as("admin-user", "ADMIN")))
-                .hasStatus(202)
-                .bodyJson().extractingPath("$.jobId").isNotNull();
-        worker.poll();
+                .hasStatusOk()
+                .bodyJson().satisfies(json -> {
+                    // その場で判定し直し、結果を返す
+                    json.assertThat().extractingPath("$.status").isEqualTo("EVALUATED");
+                    json.assertThat().extractingPath("$.verdict").isEqualTo("FAIL");
+                });
         assertThat(runs.findById(run.getId()).orElseThrow().getStatus()).isEqualTo(RunStatus.EVALUATED);
 
         jdbc.update("UPDATE artifacts SET deleted_at = now()");
@@ -119,8 +120,7 @@ class RunMaintenanceIT {
         jdbc.update("UPDATE artifacts SET uploaded_at = now() - interval '100 days'");
         String recentKey = artifacts.findByRunId(recent.getId()).getFirst().getStorageKey();
 
-        enqueuer.enqueue(JobType.CLEANUP_RETENTION, "test", Map.of());
-        worker.poll();
+        maintenance.cleanupRetention();
 
         // 2 年を過ぎた Run は判定結果ごと消える
         assertThat(runs.findById(old.getId())).isEmpty();
@@ -138,14 +138,13 @@ class RunMaintenanceIT {
         jdbc.update("UPDATE runs SET created_at = now() - interval '2 days' WHERE id = ?",
                 stale.getId());
 
-        enqueuer.enqueue(JobType.ABANDON_STALE_RUNS, "test", Map.of());
-        worker.poll();
+        maintenance.abandonStaleRuns();
 
         assertThat(runs.findById(stale.getId()).orElseThrow().getStatus())
                 .isEqualTo(RunStatus.ABANDONED);
     }
 
-    /** High の脆弱性 1 件を含む Run を取り込み、判定ジョブまで流す。 */
+    /** High の脆弱性 1 件を含む Run を取り込み、判定まで流す。 */
     private Run evaluatedRun(Instant measuredAt) {
         Run run = new Run(Uuid7.generate(), repositoryId,
                 String.format("%040x", Math.abs(measuredAt.hashCode())), "main",
@@ -154,10 +153,7 @@ class RunMaintenanceIT {
         runs.save(run);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", ONLY_VULNERABILITIES);
         attach(run, ArtifactType.SARIF, "trivy.sarif", TRIVY_HIGH);
-        enqueuer.enqueue(JobType.EVALUATE_RUN, run.getId().toString(),
-                Map.of("runId", run.getId().toString()));
-        worker.poll();
-        return runs.findById(run.getId()).orElseThrow();
+        return pipeline.evaluate(run.getId());
     }
 
     private void attach(Run run, ArtifactType type, String filename, String content) {

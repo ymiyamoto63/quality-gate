@@ -45,18 +45,25 @@ const reevaluateMessage = ref('')
 const reevaluating = ref(false)
 
 /**
- * 再評価は非同期に行われる。受け付けたことだけを伝え、結果は再読み込みで見る。
+ * 再評価はその場で判定し直す（D-27）。終わったら表示を読み直す。
  * 権限の無い利用者にもボタンは見せ、無効化して理由を示す（docs/08 5 章）。
  */
 async function reevaluate(): Promise<void> {
   reevaluating.value = true
-  const { error } = await api.POST('/api/v1/runs/{runId}/reevaluate', {
+  reevaluateMessage.value = '再評価しています…'
+  const { data, error } = await api.POST('/api/v1/runs/{runId}/reevaluate', {
     params: { path: { runId: runId.value } },
   })
   reevaluating.value = false
-  reevaluateMessage.value = error
-    ? messageOf(error, '再評価を依頼できませんでした')
-    : '再評価を受け付けました。数十秒後に再読み込みすると結果が反映されます。'
+  if (error || !data) {
+    reevaluateMessage.value = messageOf(error, '再評価できませんでした')
+    return
+  }
+  reevaluateMessage.value =
+    data.status === 'FAILED'
+      ? '再評価しましたが、処理に失敗しました。理由を確認してください。'
+      : '再評価しました。'
+  await store.load(runId.value)
 }
 
 const artifacts = ref<components['schemas']['ArtifactItem'][] | null>(null)

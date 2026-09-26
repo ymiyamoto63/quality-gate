@@ -16,12 +16,12 @@ servers:
 tags:
 - description: 全リポジトリのサマリ
   name: Dashboard
+- description: 再評価（管理者のみ）
+  name: Operations
 - description: ログイン中の利用者
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
-- description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
-  name: RepositoryAdmin
 - description: 設定の表示・検証結果・版履歴
   name: Config
 - description: Run の参照
@@ -30,14 +30,14 @@ tags:
   name: Settings
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
-- description: 再評価とジョブの運用（管理者のみ）
-  name: Operations
 - description: 品質レポート（FR-08-4）
   name: Reports
 - description: リリース判定（UC-10）
   name: Release
 - description: リポジトリ単位の参照
   name: Repositories
+- description: リポジトリの登録と設定（管理者のみ）
+  name: RepositoryAdmin
 - description: 許可リストとロールの管理（管理者のみ）
   name: Users
 paths:
@@ -101,51 +101,6 @@ paths:
       summary: ダッシュボードを取得する
       tags:
       - Dashboard
-  /api/v1/ingest-tokens/{tokenId}:
-    delete:
-      operationId: revoke
-      parameters:
-      - in: path
-        name: tokenId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-      summary: Ingest Token を失効させる（即座に無効になる）
-      tags:
-      - RepositoryAdmin
-  /api/v1/jobs/dead:
-    get:
-      operationId: deadJobs
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/DeadJobList"
-          description: OK
-      summary: 恒久的に失敗したジョブを一覧する（新しい順に最大 100 件）
-      tags:
-      - Operations
-  /api/v1/jobs/{jobId}/retry:
-    post:
-      operationId: retry
-      parameters:
-      - in: path
-        name: jobId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          description: OK
-      summary: 恒久的に失敗したジョブを再実行する
-      tags:
-      - Operations
   /api/v1/me:
     get:
       operationId: me
@@ -301,7 +256,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/RepositoryAdminResponse"
           description: OK
-      summary: リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効）
+      summary: リポジトリの設定を更新する（既定ブランチ・有効/無効）
       tags:
       - RepositoryAdmin
   /api/v1/repositories/{repositoryId}/config:
@@ -325,51 +280,6 @@ paths:
       summary: 現在の設定と版の履歴、直近の検証結果を取得する
       tags:
       - Config
-  /api/v1/repositories/{repositoryId}/ingest-tokens:
-    get:
-      operationId: tokens
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/TokenList"
-          description: OK
-      summary: 発行済みの Ingest Token を一覧する（平文は返さない）
-      tags:
-      - RepositoryAdmin
-    post:
-      description: token（平文）はこの応答でのみ返す。以後どの API からも取得できない。
-      operationId: issue
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/IssueTokenRequest"
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/IssuedToken"
-          description: OK
-      summary: Ingest Token を発行する
-      tags:
-      - RepositoryAdmin
   /api/v1/repositories/{repositoryId}/release-report:
     get:
       description: 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは GitHub API でコミットに解決する。ブランチ名は受け付けない
@@ -559,7 +469,7 @@ paths:
       tags:
       - Runs
     post:
-      description: この時点ではパースしない。受領・検証・保存のみを行い、パースは判定ジョブで実施する。
+      description: この時点ではパースしない。受領・検証・保存のみを行い、パースは確定時の判定で行う。
       operationId: uploadArtifact
       parameters:
       - in: path
@@ -639,7 +549,7 @@ paths:
       - Runs
   /api/v1/runs/{runId}/finalize:
     post:
-      description: 判定は非同期で開始される。CI は判定の完了を待たずに次へ進んでよい。
+      description: その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は Run 詳細に表示される）。
       operationId: finalizeRun
       parameters:
       - in: path
@@ -655,7 +565,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/FinalizeResponse"
           description: OK
-      summary: 取り込み完了を宣言する
+      summary: 取り込み完了を宣言し、判定する
       tags:
       - Ingest
   /api/v1/runs/{runId}/findings:
@@ -716,8 +626,8 @@ paths:
       - Runs
   /api/v1/runs/{runId}/reevaluate:
     post:
-      description: 保存済みの成果物と、その Run とともに送られた設定を読み直して判定し直す。成果物が保持期間を過ぎて削除されていれば 409
-        ARTIFACTS_DELETED。
+      description: 保存済みの成果物と、その Run とともに送られた設定を読み直して、その場で判定し直す。成果物が保持期間を過ぎて削除されていれば
+        409 ARTIFACTS_DELETED。判定に失敗した場合も 200 で、status が FAILED になる。
       operationId: reevaluate
       parameters:
       - in: path
@@ -736,26 +646,6 @@ paths:
       summary: Run を再評価する
       tags:
       - Operations
-  /api/v1/runs/{runId}/status:
-    get:
-      operationId: status
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RunStatusResponse"
-          description: OK
-      summary: 処理状態と判定結果を取得する（CI のポーリング用）
-      tags:
-      - Ingest
   /api/v1/settings/retention:
     get:
       operationId: retention
@@ -1157,58 +1047,27 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/RepositoryCard"
-    DeadJobItem:
-      type: object
-      properties:
-        attempts:
-          type: integer
-          format: int32
-        createdAt:
-          type: string
-          format: date-time
-        dedupKey:
-          type:
-          - string
-          - "null"
-        jobId:
-          type: string
-          format: uuid
-        lastError:
-          type:
-          - string
-          - "null"
-        type:
-          type: string
-        updatedAt:
-          type: string
-          format: date-time
-      required:
-      - attempts
-      - createdAt
-      - dedupKey
-      - jobId
-      - lastError
-      - type
-      - updatedAt
-    DeadJobList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/DeadJobItem"
-      required:
-      - items
     FinalizeResponse:
       type: object
+      description: 確定と判定の結果。収集ランナーはこれをログに出す
       properties:
+        completeness:
+          type: string
+          description: 完全計測か部分計測か。処理失敗なら null
+          enum:
+          - FULL
+          - PARTIAL
         detailUrl:
           type: string
+        errorCode:
+          type: string
+          description: 処理失敗の理由のコード。判定済みなら null
         runId:
           type: string
           format: uuid
         status:
           type: string
+          description: EVALUATED（判定済み）か FAILED（処理失敗）
           enum:
           - CREATED
           - UPLOADING
@@ -1217,6 +1076,13 @@ components:
           - EVALUATED
           - FAILED
           - ABANDONED
+        verdict:
+          type: string
+          description: 判定結果。処理失敗なら null
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
     FindingItem:
       type: object
       properties:
@@ -1347,36 +1213,6 @@ components:
       - sourceCommitSha
       - sourceType
       - version
-    IssueTokenRequest:
-      type: object
-      properties:
-        description:
-          type:
-          - string
-          - "null"
-          description: "用途のメモ（例: GitHub Actions）"
-          maxLength: 255
-          minLength: 0
-    IssuedToken:
-      type: object
-      description: 発行した Ingest Token。token は<strong>この応答でのみ</strong>返す
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        token:
-          type: string
-          description: 平文のトークン。以後どの API からも取得できない
-        tokenId:
-          type: string
-          format: uuid
-        tokenPrefix:
-          type: string
-      required:
-      - createdAt
-      - token
-      - tokenId
-      - tokenPrefix
     LatestRun:
       type: object
       properties:
@@ -1519,17 +1355,19 @@ components:
       - variant
     ReevaluateResponse:
       type: object
-      description: 再評価を受け付けた。判定は非同期で行う
+      description: 再評価の結果
       properties:
-        jobId:
-          type: string
-          format: uuid
+        errorCode:
+          type:
+          - string
+          - "null"
+          description: 処理失敗の理由のコード
         runId:
           type: string
           format: uuid
         status:
           type: string
-          description: 受付時点の Run の状態
+          description: EVALUATED（判定済み）か FAILED（処理失敗）
           enum:
           - CREATED
           - UPLOADING
@@ -1538,10 +1376,20 @@ components:
           - EVALUATED
           - FAILED
           - ABANDONED
+        verdict:
+          type:
+          - string
+          - "null"
+          description: 判定結果。処理失敗なら null
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
       required:
-      - jobId
+      - errorCode
       - runId
       - status
+      - verdict
     ReleaseCounts:
       type: object
       description: 合否に使った指標の件数（参考値・対象外を除く）
@@ -2352,39 +2200,6 @@ components:
       - value
       - variant
       - variantLabel
-    RunStatusResponse:
-      type: object
-      description: CI がポーリングするための軽量な状態応答。
-      properties:
-        completeness:
-          type: string
-          enum:
-          - FULL
-          - PARTIAL
-        detailUrl:
-          type: string
-        errorCode:
-          type: string
-        runId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
-          - ABANDONED
-        verdict:
-          type: string
-          description: 判定結果。未判定の場合は null
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
     RunSummary:
       type: object
       properties:
@@ -2478,49 +2293,6 @@ components:
       - metricId
       - name
       - reason
-    TokenList:
-      type: object
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/TokenSummary"
-      required:
-      - items
-    TokenSummary:
-      type: object
-      description: 発行済みのトークン。平文もハッシュも返さない
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        description:
-          type:
-          - string
-          - "null"
-        lastUsedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-          description: 一度も使われていなければ null
-        revokedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        tokenId:
-          type: string
-          format: uuid
-        tokenPrefix:
-          type: string
-      required:
-      - createdAt
-      - description
-      - lastUsedAt
-      - revokedAt
-      - tokenId
-      - tokenPrefix
     TrendPoint:
       type: object
       properties:

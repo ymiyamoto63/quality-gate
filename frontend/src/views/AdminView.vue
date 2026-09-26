@@ -10,7 +10,7 @@ import { formatDateTime } from '@/api/format'
 type Schemas = components['schemas']
 type User = Schemas['UserResponse']
 type AuditLog = Schemas['AuditLogItem']
-type Tab = 'users' | 'audit' | 'retention' | 'jobs'
+type Tab = 'users' | 'audit' | 'retention'
 
 const route = useRoute()
 const auth = useAuthStore()
@@ -20,7 +20,6 @@ const TABS: { id: Tab; label: string; routeName: string }[] = [
   { id: 'users', label: '利用者', routeName: 'users' },
   { id: 'audit', label: '監査ログ', routeName: 'audit-logs' },
   { id: 'retention', label: '保持期間', routeName: 'retention' },
-  { id: 'jobs', label: '失敗したジョブ', routeName: 'jobs' },
 ]
 const tab = computed<Tab>(() => TABS.find((t) => t.routeName === route.name)?.id ?? 'users')
 const announcement = ref('')
@@ -41,7 +40,6 @@ const retention = ref<Schemas['RetentionSettings'] | null>(null)
 const retentionError = ref<string | null>(null)
 
 // 失敗したジョブ
-const deadJobs = ref<Schemas['DeadJobItem'][]>([])
 
 // 削除した機能（免除・通知設定・設定の編集）の操作も、過去の監査ログを読めるよう残す
 const ACTION_LABELS: Record<string, string> = {
@@ -70,12 +68,9 @@ async function loadTab(): Promise<void> {
     users.value = data?.items ?? []
   } else if (tab.value === 'audit') {
     await loadLogs(false)
-  } else if (tab.value === 'retention') {
+  } else {
     const { data } = await api.GET('/api/v1/settings/retention')
     retention.value = data ?? null
-  } else {
-    const { data } = await api.GET('/api/v1/jobs/dead')
-    deadJobs.value = data?.items ?? []
   }
 }
 
@@ -149,16 +144,6 @@ async function saveRetention(): Promise<void> {
   }
   retention.value = data
   announcement.value = '保持期間を保存しました。翌日の保持期間バッチから適用されます。'
-}
-
-async function retry(jobId: string): Promise<void> {
-  const { error } = await api.POST('/api/v1/jobs/{jobId}/retry', { params: { path: { jobId } } })
-  if (error) {
-    ui.notify('error', messageOf(error))
-    return
-  }
-  announcement.value = 'ジョブを再実行待ちに戻しました'
-  await loadTab()
 }
 </script>
 
@@ -357,35 +342,6 @@ async function retry(jobId: string): Promise<void> {
           <button type="submit" class="qg-button qg-button--primary">保存</button>
         </div>
       </form>
-    </template>
-
-    <template v-else>
-      <p class="qg-muted">
-        再試行しても直らなかったジョブです。原因を取り除いてから再実行してください。
-      </p>
-      <p v-if="deadJobs.length === 0" class="qg-empty">恒久的に失敗したジョブはありません。</p>
-      <table v-else class="qg-table qg-table--stack">
-        <thead>
-          <tr>
-            <th scope="col">種別</th>
-            <th scope="col">最終更新</th>
-            <th scope="col">試行</th>
-            <th scope="col">エラー</th>
-            <th scope="col">操作</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr v-for="job in deadJobs" :key="job.jobId">
-            <td data-label="種別">{{ job.type }}</td>
-            <td data-label="最終更新">{{ formatDateTime(job.updatedAt) }}</td>
-            <td data-label="試行">{{ job.attempts }} 回</td>
-            <td data-label="エラー" class="qg-change">{{ job.lastError ?? '—' }}</td>
-            <td data-label="操作">
-              <button type="button" class="qg-button" @click="retry(job.jobId)">再実行</button>
-            </td>
-          </tr>
-        </tbody>
-      </table>
     </template>
   </section>
 </template>

@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # measure.sh がまとめた成果物を quality-gate の Ingest API に送る。
 #
-# 流れ: Run 作成 → 成果物のアップロード（あるものだけ） → finalize
+# 流れ: Run 作成 → 成果物のアップロード（あるものだけ） → finalize（その場で判定され、結果が返る）
 # 仕様: docs/operations/ingest.md
 #
 # 使い方: submit.sh <reports ディレクトリ>
 #
 # 必須の環境変数:
 #   QG_BASE_URL      取り込み先の quality-gate の URL
-#   QG_INGEST_TOKEN  対象リポジトリの Ingest Token
+#   QG_INGEST_TOKEN  quality-gate の Ingest Token（すべての対象で共通）
 # 任意の環境変数:
 #   QG_TRIGGERED_BY  既定: collector（対象リポジトリの CI から送った Run と区別する）
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
@@ -165,4 +165,11 @@ if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
   [ "$found" -eq 1 ] || warn "成果物がありません（type=k6-summary）: $REPORTS/perf/"
 fi
 
-curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}" | jq .
+# 確定するとその場で判定される。判定に時間がかかる Run があるため、再試行はしない（二重に確定すると 409 になる）
+RESULT=$(curl -sS --fail-with-body --max-time 600 -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}")
+echo "$RESULT" | jq .
+STATUS=$(echo "$RESULT" | jq -r '.status')
+echo "判定: $(echo "$RESULT" | jq -r '.verdict // "—"')（$(echo "$RESULT" | jq -r '.detailUrl')）"
+# 処理失敗（設定の誤りなど）は計測のやり直しでは直らないため、ワークフローを失敗にして気づけるようにする。
+# 判定結果の不合格（FAIL）はワークフローの失敗にしない（品質の結果であって、計測の失敗ではない）
+[ "$STATUS" = "EVALUATED" ] || die "判定に失敗しました（$(echo "$RESULT" | jq -r '.errorCode')）。理由は Run 詳細を確認してください"

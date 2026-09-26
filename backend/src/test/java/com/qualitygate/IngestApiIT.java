@@ -1,18 +1,15 @@
 package com.qualitygate;
 
-import com.qualitygate.domain.entity.IngestToken;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.UserAccount;
+import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.domain.repo.IngestTokenRepository;
-import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
-import com.qualitygate.ingest.security.IngestTokenAuthenticationFilter;
 import com.qualitygate.platform.id.Uuid7;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -43,7 +40,7 @@ class IngestApiIT {
 
     private static final String REPOSITORY = "ymiyamoto63/quality-gate";
     private static final String COMMIT = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
-    private static final String TOKEN = "qg_testpfx_0123456789abcdef0123456789abcdef";
+    private static final String TOKEN = IntegrationCleanup.INGEST_TOKEN;
 
     @Value("${local.server.port}")
     int port;
@@ -51,34 +48,27 @@ class IngestApiIT {
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
-    @Autowired IngestTokenRepository tokens;
     @Autowired RunRepository runs;
     @Autowired RunSkippedMetricRepository skippedMetrics;
     @Autowired ArtifactRecordRepository artifacts;
-    @Autowired JobRepository jobs;
     @Autowired com.qualitygate.platform.storage.ArtifactStore artifactStore;
 
     private RestClient client;
-    private UUID repositoryId;
 
     @BeforeEach
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
-        jobs.deleteAll();
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
         runs.deleteAll();
-        tokens.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
-        MonitoredRepository repository = repositories.save(new MonitoredRepository(
+        repositories.save(new MonitoredRepository(
                 Uuid7.generate(), "ymiyamoto63", "quality-gate", admin.getId()));
-        repositoryId = repository.getId();
-        tokens.save(new IngestToken(Uuid7.generate(), repositoryId, "testpfx",
-                IngestTokenAuthenticationFilter.sha256(TOKEN), "IT 用", admin.getId()));
+
 
         client = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
@@ -140,15 +130,16 @@ class IngestApiIT {
         assertThat(uploaded.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(artifacts.findByRunId(runId)).hasSize(1);
 
-        // 確定する。判定は非同期のため、ここではジョブが積まれることを確認する。
+        // 確定すると、その場で判定して結果を返す
         ResponseEntity<Map> finalized = client.post()
                 .uri("/api/v1/runs/{runId}/finalize", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .retrieve().toEntity(Map.class);
 
-        assertThat(finalized.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
-        assertThat(finalized.getBody()).containsEntry("status", "FINALIZED");
-        assertThat(jobs.count()).isEqualTo(1);
+        assertThat(finalized.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(finalized.getBody()).containsEntry("status", "EVALUATED")
+                .containsKeys("verdict", "completeness", "detailUrl");
+        assertThat(runs.findById(runId).orElseThrow().getStatus()).isEqualTo(RunStatus.EVALUATED);
 
         // 確定後の成果物追加は 409
         ResponseEntity<Map> afterFinalize = client.post()
@@ -193,10 +184,21 @@ class IngestApiIT {
     }
 
     @Test
-    void 発行元と違うリポジトリへは送信できない() {
-        UUID otherOwner = users.findAll().getFirst().getId();
-        repositories.save(new MonitoredRepository(Uuid7.generate(), "someone", "other", otherOwner));
+    void 違うトークンは拒否される() {
+        ResponseEntity<Void> response = client.post()
+                .uri("/api/v1/runs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN + "x")
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
+                        "triggeredBy", "ci",
+                        "measuredAt", "2026-09-21T02:10:00Z"))
+                .retrieve().toBodilessEntity();
 
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void 登録していないリポジトリへは送信できない() {
         ResponseEntity<Map> response = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
@@ -206,8 +208,8 @@ class IngestApiIT {
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(Map.class);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.FORBIDDEN);
-        assertThat(response.getBody()).containsEntry("errorCode", "REPOSITORY_MISMATCH");
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
+        assertThat(runs.findAll()).isEmpty();
     }
 
     @Test

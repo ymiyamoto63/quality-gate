@@ -16,7 +16,6 @@ public enum ErrorCode {
     USER_NOT_ALLOWLISTED(HttpStatus.FORBIDDEN, "許可リストに登録されていません"),
     USER_DISABLED(HttpStatus.FORBIDDEN, "アカウントが無効です"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "この操作を行う権限がありません"),
-    REPOSITORY_MISMATCH(HttpStatus.FORBIDDEN, "トークンの発行元リポジトリと一致しません"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "対象が見つかりません"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "この URL ではこの HTTP メソッドを使えません"),
     NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "要求された形式では応答できません"),

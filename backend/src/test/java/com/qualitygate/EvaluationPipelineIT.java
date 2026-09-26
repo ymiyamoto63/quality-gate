@@ -2,7 +2,6 @@ package com.qualitygate;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
 import com.qualitygate.domain.entity.GateConfig;
-import com.qualitygate.domain.entity.IngestToken;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
@@ -19,8 +18,6 @@ import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingRepository;
-import com.qualitygate.domain.repo.IngestTokenRepository;
-import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
@@ -122,14 +119,12 @@ class EvaluationPipelineIT {
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
-    @Autowired IngestTokenRepository tokens;
     @Autowired RunRepository runs;
     @Autowired RunSkippedMetricRepository skippedMetrics;
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
     @Autowired RepositorySummaryRepository summaries;
-    @Autowired JobRepository jobs;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
@@ -141,7 +136,6 @@ class EvaluationPipelineIT {
     @BeforeEach
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
-        jobs.deleteAll();
         findings.deleteAll();
         measurements.deleteAll();
         artifacts.deleteAll();
@@ -149,7 +143,6 @@ class EvaluationPipelineIT {
         summaries.deleteAll();
         runs.deleteAll();
         gateConfigs.deleteAll();
-        tokens.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 
@@ -157,8 +150,6 @@ class EvaluationPipelineIT {
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
                 "ymiyamoto63", "quality-gate", admin.getId())).getId();
-        tokens.save(new IngestToken(Uuid7.generate(), repositoryId, "pfx",
-                "hash", "IT", admin.getId()));
     }
 
     @Test

@@ -41,57 +41,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/ingest-tokens/{tokenId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    /** Ingest Token を失効させる（即座に無効になる） */
-    delete: operations['revoke']
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/jobs/dead': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 恒久的に失敗したジョブを一覧する（新しい順に最大 100 件） */
-    get: operations['deadJobs']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/jobs/{jobId}/retry': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /** 恒久的に失敗したジョブを再実行する */
-    post: operations['retry']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/me': {
     parameters: {
       query?: never
@@ -184,7 +133,7 @@ export interface paths {
     delete?: never
     options?: never
     head?: never
-    /** リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効） */
+    /** リポジトリの設定を更新する（既定ブランチ・有効/無効） */
     patch: operations['update_1']
     trace?: never
   }
@@ -202,27 +151,6 @@ export interface paths {
     get: operations['get']
     put?: never
     post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/repositories/{repositoryId}/ingest-tokens': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 発行済みの Ingest Token を一覧する（平文は返さない） */
-    get: operations['tokens']
-    put?: never
-    /**
-     * Ingest Token を発行する
-     * @description token（平文）はこの応答でのみ返す。以後どの API からも取得できない。
-     */
-    post: operations['issue']
     delete?: never
     options?: never
     head?: never
@@ -342,7 +270,7 @@ export interface paths {
     put?: never
     /**
      * 成果物をアップロードする
-     * @description この時点ではパースしない。受領・検証・保存のみを行い、パースは判定ジョブで実施する。
+     * @description この時点ではパースしない。受領・検証・保存のみを行い、パースは確定時の判定で行う。
      */
     post: operations['uploadArtifact']
     delete?: never
@@ -381,8 +309,8 @@ export interface paths {
     get?: never
     put?: never
     /**
-     * 取り込み完了を宣言する
-     * @description 判定は非同期で開始される。CI は判定の完了を待たずに次へ進んでよい。
+     * 取り込み完了を宣言し、判定する
+     * @description その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は Run 詳細に表示される）。
      */
     post: operations['finalizeRun']
     delete?: never
@@ -422,26 +350,9 @@ export interface paths {
     put?: never
     /**
      * Run を再評価する
-     * @description 保存済みの成果物と、その Run とともに送られた設定を読み直して判定し直す。成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。
+     * @description 保存済みの成果物と、その Run とともに送られた設定を読み直して、その場で判定し直す。成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。判定に失敗した場合も 200 で、status が FAILED になる。
      */
     post: operations['reevaluate']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/runs/{runId}/status': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 処理状態と判定結果を取得する（CI のポーリング用） */
-    get: operations['status']
-    put?: never
-    post?: never
     delete?: never
     options?: never
     head?: never
@@ -645,29 +556,29 @@ export interface components {
     DashboardResponse: {
       repositories?: components['schemas']['RepositoryCard'][]
     }
-    DeadJobItem: {
-      /** Format: int32 */
-      attempts: number
-      /** Format: date-time */
-      createdAt: string
-      dedupKey: string | null
-      /** Format: uuid */
-      jobId: string
-      lastError: string | null
-      type: string
-      /** Format: date-time */
-      updatedAt: string
-    }
-    DeadJobList: {
-      items: components['schemas']['DeadJobItem'][]
-    }
+    /** @description 確定と判定の結果。収集ランナーはこれをログに出す */
     FinalizeResponse: {
+      /**
+       * @description 完全計測か部分計測か。処理失敗なら null
+       * @enum {string}
+       */
+      completeness?: 'FULL' | 'PARTIAL'
       detailUrl?: string
+      /** @description 処理失敗の理由のコード。判定済みなら null */
+      errorCode?: string
       /** Format: uuid */
       runId?: string
-      /** @enum {string} */
+      /**
+       * @description EVALUATED（判定済み）か FAILED（処理失敗）
+       * @enum {string}
+       */
       status?:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+      /**
+       * @description 判定結果。処理失敗なら null
+       * @enum {string}
+       */
+      verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
     }
     FindingItem: {
       componentName: string | null
@@ -721,20 +632,6 @@ export interface components {
       /** Format: int32 */
       version: number | null
     }
-    IssueTokenRequest: {
-      /** @description 用途のメモ（例: GitHub Actions） */
-      description?: string | null
-    }
-    /** @description 発行した Ingest Token。token は<strong>この応答でのみ</strong>返す */
-    IssuedToken: {
-      /** Format: date-time */
-      createdAt: string
-      /** @description 平文のトークン。以後どの API からも取得できない */
-      token: string
-      /** Format: uuid */
-      tokenId: string
-      tokenPrefix: string
-    }
     LatestRun: {
       commitSha: string
       /** Format: date-time */
@@ -784,18 +681,23 @@ export interface components {
       /** @description 計測条件（全量 / 変更範囲、計測環境など） */
       variant: string | null
     }
-    /** @description 再評価を受け付けた。判定は非同期で行う */
+    /** @description 再評価の結果 */
     ReevaluateResponse: {
-      /** Format: uuid */
-      jobId: string
+      /** @description 処理失敗の理由のコード */
+      errorCode: string | null
       /** Format: uuid */
       runId: string
       /**
-       * @description 受付時点の Run の状態
+       * @description EVALUATED（判定済み）か FAILED（処理失敗）
        * @enum {string}
        */
       status:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+      /**
+       * @description 判定結果。処理失敗なら null
+       * @enum {string|null}
+       */
+      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
     }
     /** @description 合否に使った指標の件数（参考値・対象外を除く） */
     ReleaseCounts: {
@@ -1135,23 +1037,6 @@ export interface components {
       /** @description 計測条件の表示名（変更範囲 / 全量 など） */
       variantLabel: string | null
     }
-    /** @description CI がポーリングするための軽量な状態応答。 */
-    RunStatusResponse: {
-      /** @enum {string} */
-      completeness?: 'FULL' | 'PARTIAL'
-      detailUrl?: string
-      errorCode?: string
-      /** Format: uuid */
-      runId?: string
-      /** @enum {string} */
-      status?:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-      /**
-       * @description 判定結果。未判定の場合は null
-       * @enum {string}
-       */
-      verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-    }
     RunSummary: {
       branch: string
       commitSha: string
@@ -1188,25 +1073,6 @@ export interface components {
       metricId: string
       name: string
       reason: string
-    }
-    TokenList: {
-      items: components['schemas']['TokenSummary'][]
-    }
-    /** @description 発行済みのトークン。平文もハッシュも返さない */
-    TokenSummary: {
-      /** Format: date-time */
-      createdAt: string
-      description: string | null
-      /**
-       * Format: date-time
-       * @description 一度も使われていなければ null
-       */
-      lastUsedAt: string | null
-      /** Format: date-time */
-      revokedAt: string | null
-      /** Format: uuid */
-      tokenId: string
-      tokenPrefix: string
     }
     TrendPoint: {
       commitSha: string
@@ -1352,66 +1218,6 @@ export interface operations {
         content: {
           '*/*': components['schemas']['DashboardResponse']
         }
-      }
-    }
-  }
-  revoke: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        tokenId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  deadJobs: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['DeadJobList']
-        }
-      }
-    }
-  }
-  retry: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        jobId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
       }
     }
   }
@@ -1592,54 +1398,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['RepositoryConfig']
-        }
-      }
-    }
-  }
-  tokens: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['TokenList']
-        }
-      }
-    }
-  }
-  issue: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['IssueTokenRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['IssuedToken']
         }
       }
     }
@@ -1941,28 +1699,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ReevaluateResponse']
-        }
-      }
-    }
-  }
-  status: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        runId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RunStatusResponse']
         }
       }
     }

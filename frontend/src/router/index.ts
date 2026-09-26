@@ -87,12 +87,6 @@ const routes: RouteRecordRaw[] = [
     component: AdminView,
     meta: { title: '保持期間', adminOnly: true },
   },
-  {
-    path: '/admin/jobs',
-    name: 'jobs',
-    component: AdminView,
-    meta: { title: '失敗したジョブ', adminOnly: true },
-  },
 
   {
     path: '/:pathMatch(.*)*',

@@ -2,35 +2,42 @@ package com.qualitygate.ingest.security;
 
 import org.junit.jupiter.api.Test;
 
-import java.util.Optional;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 class IngestTokenAuthenticationFilterTest {
 
-    @Test
-    void トークンからprefixを取り出せる() {
-        Optional<String> prefix = IngestTokenAuthenticationFilter
-                .extractPrefix("qg_a1b2c3d4_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX");
+    private final IngestTokenAuthenticationFilter filter =
+            new IngestTokenAuthenticationFilter(List.of("current-token", " next-token ", ""));
 
-        assertThat(prefix).contains("a1b2c3d4");
+    @Test
+    void 設定したトークンなら取り込みの権限で認証する() {
+        assertThat(filter.authenticate("Bearer current-token")).hasValueSatisfying(auth -> {
+            assertThat(auth.getName()).isEqualTo(IngestTokenAuthenticationFilter.PRINCIPAL);
+            assertThat(auth.getAuthorities()).extracting(Object::toString).containsExactly("ROLE_INGEST");
+        });
     }
 
     @Test
-    void 形式が違うトークンからはprefixを取り出さない() {
-        assertThat(IngestTokenAuthenticationFilter.extractPrefix("Bearer something")).isEmpty();
-        assertThat(IngestTokenAuthenticationFilter.extractPrefix("qg_")).isEmpty();
-        assertThat(IngestTokenAuthenticationFilter.extractPrefix("qg_nounderscore")).isEmpty();
-        assertThat(IngestTokenAuthenticationFilter.extractPrefix("")).isEmpty();
+    void 交換中は新旧どちらのトークンも受け付ける() {
+        assertThat(filter.authenticate("Bearer next-token")).isPresent();
     }
 
     @Test
-    void 同じ入力からは同じハッシュが得られる() {
-        String token = "qg_a1b2c3d4_secret";
+    void 違うトークンや形式の違うヘッダは認証しない() {
+        assertThat(filter.authenticate("Bearer current-tokenx")).isEmpty();
+        assertThat(filter.authenticate("Bearer ")).isEmpty();
+        assertThat(filter.authenticate("current-token")).isEmpty();
+        assertThat(filter.authenticate("Basic current-token")).isEmpty();
+        assertThat(filter.authenticate(null)).isEmpty();
+    }
 
-        assertThat(IngestTokenAuthenticationFilter.sha256(token))
-                .isEqualTo(IngestTokenAuthenticationFilter.sha256(token))
-                .hasSize(64)
-                .isNotEqualTo(IngestTokenAuthenticationFilter.sha256(token + "x"));
+    @Test
+    void トークンを設定していなければ何も認証しない() {
+        IngestTokenAuthenticationFilter unconfigured = new IngestTokenAuthenticationFilter(List.of());
+
+        assertThat(unconfigured.authenticate("Bearer ")).isEmpty();
+        assertThat(unconfigured.authenticate("Bearer anything")).isEmpty();
     }
 }

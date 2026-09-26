@@ -35,7 +35,7 @@
 | 経路 | 対象 | 方式 |
 | --- | --- | --- |
 | セッション | `/api/v1/**`（Ingest を除く） | GitHub OAuth ログイン後の `SESSION` Cookie（HttpOnly / SameSite=Lax / Secure） |
-| Ingest Token | `/api/v1/runs` 配下の POST（`/reevaluate` を除く）と `GET /api/v1/runs/{runId}/status` | `Authorization: Bearer qg_<prefix>_<secret>` |
+| Ingest Token | `/api/v1/runs` 配下の POST（`/reevaluate` を除く） | `Authorization: Bearer <token>`。トークンはバックエンドの `QG_INGEST_TOKEN` に設定した 1 つだけ（送り手は収集ランナーだけ。D-27） |
 
 同一オリジン構成のため CORS 設定は行わない。
 **状態変更を伴う操作には CSRF トークンを要求する**（Spring Security の既定）。
@@ -92,7 +92,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- |
 | 200 | 取得・更新の成功 |
 | 201 | 生成の成功（`Location` ヘッダを付す） |
-| 202 | 受理したが処理は非同期（`finalize`、再評価） |
+| 202 | 受理した（成果物のアップロード） |
 | 204 | 削除・失効の成功 |
 | 400 | リクエスト形式の誤り |
 | 401 | 未認証 |
@@ -115,8 +115,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- | --- |
 | POST | `/api/v1/runs` | Run を作成し `runId` を払い出す | Ingest Token |
 | POST | `/api/v1/runs/{runId}/artifacts` | 成果物をアップロード | Ingest Token |
-| POST | `/api/v1/runs/{runId}/finalize` | 取り込み完了を宣言 | Ingest Token |
-| GET | `/api/v1/runs/{runId}/status` | 処理状態と判定結果（CI のポーリング用の軽量版） | Ingest Token |
+| POST | `/api/v1/runs/{runId}/finalize` | 取り込み完了を宣言し、その場で判定する | Ingest Token |
 
 ### 2.2 参照 API
 
@@ -144,17 +143,12 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- | --- |
 | POST | `/api/v1/repositories` | リポジトリ登録 | ADMIN |
 | PATCH | `/api/v1/repositories/{id}` | リポジトリ設定の更新 | ADMIN |
-| POST | `/api/v1/repositories/{id}/ingest-tokens` | トークン発行（平文は応答時のみ） | ADMIN |
-| DELETE | `/api/v1/ingest-tokens/{id}` | トークン失効 | ADMIN |
 | POST | `/api/v1/runs/{runId}/reevaluate` | 再評価の実行 | ADMIN |
 | GET | `/api/v1/users` | 利用者（許可リスト）一覧 | ADMIN |
 | POST | `/api/v1/users` | 許可リストへの追加 | ADMIN |
 | PATCH | `/api/v1/users/{id}` | ロール変更・無効化 | ADMIN |
 | GET | `/api/v1/audit-logs` | 監査ログ | ADMIN |
-| GET | `/api/v1/repositories/{id}/ingest-tokens` | トークン一覧（平文もハッシュも返さない） | ADMIN |
 | GET / PUT | `/api/v1/settings/retention` | 保持期間の取得・更新 | ADMIN |
-| GET | `/api/v1/jobs/dead` | 恒久的に失敗したジョブの一覧 | ADMIN |
-| POST | `/api/v1/jobs/{id}/retry` | 失敗したジョブの再実行 | ADMIN |
 
 ### 2.4 認証以外の公開エンドポイント
 
@@ -191,7 +185,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 
 | 項目 | 必須 | 備考 |
 | --- | --- | --- |
-| `repository` | ○ | `owner/name`。トークンの発行元と一致しない場合 403 |
+| `repository` | ○ | `owner/name`。quality-gate に登録したリポジトリでなければ 404、無効化していれば 403 |
 | `commitSha` | ○ | 40 桁の 16 進 |
 | `baseCommitSha` | | 差分を扱う指標の比較元。収集ランナーが clone した履歴から求めて送る（[指標仕様書 0.3](02-metrics-spec.md)）。省略すると比較元なしで判定する（最初のコミットなど） |
 | `branch` | ○ | |
@@ -242,40 +236,30 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | 400 | `VALIDATION_FAILED` | `metadata` が JSON オブジェクトでない、`mutationScope` が選択肢に無い、`baseSpecMissing` が真偽値でない |
 
 **この時点ではパースしない。** 受領・検証・保存のみを行い、
-パースは判定ジョブで実施する。アップロードごとにパースすると、
-CI の待ち時間がファイル数に比例して延びるためである。
+パースは確定（`finalize`）の判定でまとめて行う。アップロードごとにパースすると、
+同じ成果物を置き換えたときに解析をやり直すことになるためである。
 
 ### 3.3 `POST /api/v1/runs/{runId}/finalize`
 
-リクエストボディなし。
+リクエストボディなし。取り込みを確定し、**その場で**設定の解決・正規化・判定を行って結果を返す（D-27）。
 
-**応答（202）**
-
-```json
-{ "runId": "018f8c1a-...", "status": "FINALIZED", "detailUrl": "https://..." }
-```
-
-判定の完了は待たない（[05](05-architecture.md) 3.1）。
-
-### 3.4 `GET /api/v1/runs/{runId}/status`
-
-CI からのポーリング用。Run 詳細より軽量な応答を返す。
+**応答（200）**
 
 ```json
 {
   "runId": "018f8c1a-...",
   "status": "EVALUATED",
   "verdict": "FAIL",
-  "completeness": "PARTIAL",
-  "summary": {
-    "pass": 5, "warn": 1, "fail": 1, "skip": 4, "reference": 0, "error": 0
-  },
-  "failedMetrics": [
-    { "metricId": "M-06", "name": "重大・高 脆弱性件数", "value": 2, "threshold": 0 }
-  ],
+  "completeness": "FULL",
+  "errorCode": null,
   "detailUrl": "https://..."
 }
 ```
+
+- 判定に失敗しても 200 を返し、`status` を `FAILED`、`errorCode` に理由のコード（`CONFIG_VALIDATION_FAILED` /
+  `EVALUATION_FAILED`）を入れる。確定は取り消さない。理由の詳細は Run 詳細（S-03）に表示する
+- 収集ランナー（`submit.sh`）は `status` が `FAILED` ならワークフローを失敗にする。判定結果の `FAIL` では失敗にしない
+- 以前の判定ジョブのキューと、CI がポーリングするための `GET /api/v1/runs/{runId}/status` は D-27 で削除した
 
 ---
 
@@ -650,11 +634,9 @@ API のパスはリポジトリ上のファイルではない。
 | ロールの反映 | セッションのロールを信じず、リクエストのたびに `users` の現在値で置き換える。降格・無効化は次のリクエストから効く |
 | 利用者 | `PATCH /api/v1/users/{id}` で自分自身の降格・無効化、有効な管理者が 0 人になる変更は `409 ADMIN_REQUIRED`。同名の登録は `409 USER_ALREADY_EXISTS` |
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
-| トークン | 一覧は平文もハッシュも返さない。監査ログにも平文を残さない |
 | 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。D-20）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
 | 違反一覧 | 各違反に `fingerprint` を返す（免除と、その登録に使っていた `repositoryId` / `waiver` は D-22 で削除） |
-| 再評価 | `POST /api/v1/runs/{id}/reevaluate` の `status` は受付時点の Run の状態。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
-| ジョブ | 恒久的失敗（`DEAD`）の確認と手動再実行（[05](05-architecture.md) 4.3） |
+| 再評価 | `POST /api/v1/runs/{id}/reevaluate` はその場で判定し直し、判定後の `status` と `verdict` を返す。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
 | 保持期間 | Run・成果物・監査ログの日数を扱う |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
 
@@ -666,30 +648,19 @@ API のパスはリポジトリ上のファイルではない。
 
 免除の登録・一覧・失効の API は、免除の廃止とともに削除した。
 
-### 5.2 `POST /api/v1/repositories/{id}/ingest-tokens`
+### 5.2 ~~`POST /api/v1/repositories/{id}/ingest-tokens`~~（D-27 で削除）
 
-**応答（201）**
-
-```json
-{
-  "tokenId": "018f...",
-  "token": "qg_a1b2c3d4_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX",
-  "tokenPrefix": "a1b2c3d4",
-  "createdAt": "2026-09-21T03:00:00Z"
-}
-```
-
-`token` は**この応答でのみ**返す。以後どの API からも取得できない。
-画面には「この値は二度と表示されません」と明示し、
-コピーするまで閉じられないダイアログで表示する（[08](08-screen-design.md) 4.8）。
+Ingest Token の発行・一覧・失効の API は、トークンを環境変数 `QG_INGEST_TOKEN` の 1 つにまとめたため削除した。
 
 ### 5.3 `POST /api/v1/runs/{runId}/reevaluate`
 
-**応答（202）**
+**応答（200）**
 
 ```json
-{ "runId": "018f...", "status": "PROCESSING", "jobId": "018f..." }
+{ "runId": "018f...", "status": "EVALUATED", "verdict": "PASS", "errorCode": null }
 ```
+
+その場で判定し直す。判定に失敗した場合も 200 で、`status` が `FAILED` になる。依頼は監査ログに残す。
 
 成果物が保持期間を過ぎて削除されている場合は 409 `ARTIFACTS_DELETED` を返す。
 再評価は保存済みの成果物を読み直すため、実体が無いと実行できない。
@@ -717,7 +688,6 @@ API のパスはリポジトリ上のファイルではない。
 | Run の作成・成果物の送信・finalize | — | — | ○ |
 | 再評価の実行 | — | ○ | — |
 | リポジトリ登録・設定変更 | — | ○ | — |
-| トークンの発行・失効 | — | ○ | — |
 | 利用者・ロールの管理 | — | ○ | — |
 | 監査ログの閲覧 | — | ○ | — |
 
@@ -733,11 +703,10 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | --- | --- | --- |
 | `VALIDATION_FAILED` | 400 | リクエストの検証エラー（`violations` に詳細）。パスやクエリの値の形式の誤り、必須パラメータの欠落も含む |
 | `UNAUTHENTICATED` | 401 | 未認証 |
-| `TOKEN_INVALID` | 401 | Ingest Token が不正または失効済み |
+| `TOKEN_INVALID` | 401 | Ingest Token が不正 |
 | `USER_NOT_ALLOWLISTED` | 403 | 認証は成功したが許可リストに未登録 |
 | `USER_DISABLED` | 403 | アカウントが無効 |
 | `FORBIDDEN` | 403 | 権限不足 |
-| `REPOSITORY_MISMATCH` | 403 | トークンの発行元と `repository` が不一致 |
 | `RESOURCE_NOT_FOUND` | 404 | 対象が存在しない（存在しない API の URL も含む） |
 | `METHOD_NOT_ALLOWED` | 405 | その URL で使えない HTTP メソッド。`Allow` ヘッダに使えるメソッドを付ける |
 | `NOT_ACCEPTABLE` | 406 | `Accept` で求められた形式では応答できない（API は JSON だけを返す） |

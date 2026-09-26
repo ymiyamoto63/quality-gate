@@ -159,6 +159,8 @@ public class Run {
     /** 処理そのものが失敗した場合。判定結果 FAIL とは区別する。 */
     public void markFailed(String errorCode, String errorDetail) {
         this.status = RunStatus.FAILED;
+        this.verdict = null;
+        this.completeness = null;
         this.errorCode = errorCode;
         this.errorDetail = errorDetail;
         this.evaluatedAt = Instant.now();
@@ -169,6 +171,9 @@ public class Run {
         this.verdict = verdict;
         this.completeness = completeness;
         this.evaluatedAt = at;
+        // 処理失敗の後に再評価で判定できた場合、失敗の理由を残さない
+        this.errorCode = null;
+        this.errorDetail = null;
     }
 
     public UUID getId() {

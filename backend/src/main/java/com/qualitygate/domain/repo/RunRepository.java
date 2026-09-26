@@ -2,8 +2,10 @@ package com.qualitygate.domain.repo;
 
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.model.RunStatus;
+import jakarta.persistence.LockModeType;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
@@ -13,6 +15,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 public interface RunRepository extends JpaRepository<Run, UUID> {
+
+    /** 判定の間、同じ Run の判定（再評価の二重押しなど）を待たせる。 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select r from Run r where r.id = :id")
+    Optional<Run> findByIdForUpdate(@Param("id") UUID id);
 
     @Query("select coalesce(max(r.attempt), 0) from Run r "
             + "where r.repositoryId = :repositoryId and r.commitSha = :commitSha")

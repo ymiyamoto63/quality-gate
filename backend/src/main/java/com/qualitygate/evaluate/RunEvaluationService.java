@@ -76,7 +76,7 @@ public class RunEvaluationService {
     @Transactional
     public Run evaluate(UUID runId, NormalizedInput input, GateThresholds thresholds,
                         UUID gateConfigId) {
-        Run run = runs.findById(runId).orElseThrow(
+        Run run = runs.findByIdForUpdate(runId).orElseThrow(
                 () -> new IllegalStateException("Run が見つかりません: " + runId));
         run.markProcessing();
         // どの設定版で判定したかを残す。後からしきい値を変えても、

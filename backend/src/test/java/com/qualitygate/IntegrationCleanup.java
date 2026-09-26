@@ -11,14 +11,17 @@ import org.springframework.jdbc.core.JdbcTemplate;
  */
 final class IntegrationCleanup {
 
+    /** 結合テストの Ingest Token（application-test.yml の {@code quality-gate.ingest-tokens}）。 */
+    static final String INGEST_TOKEN = "test-ingest-token-0123456789abcdef";
+
     private IntegrationCleanup() {
     }
 
     static void deleteAll(JdbcTemplate jdbc) {
         jdbc.execute("""
-                TRUNCATE audit_logs, system_settings, jobs, findings,
+                TRUNCATE audit_logs, system_settings, findings,
                          measurements, artifacts, run_skipped_metrics,
-                         repository_summaries, runs, gate_configs, ingest_tokens,
+                         repository_summaries, runs, gate_configs,
                          repositories, users CASCADE
                 """);
     }

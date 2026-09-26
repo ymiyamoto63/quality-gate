@@ -30,13 +30,15 @@ class FlywayMigrationIT {
                 String.class);
 
         assertThat(tables).contains(
-                "users", "repositories", "ingest_tokens",
+                "users", "repositories",
                 "gate_configs", "runs", "run_skipped_metrics", "artifacts",
-                "measurements", "findings", "jobs",
+                "measurements", "findings",
                 "repository_summaries", "audit_logs",
                 "flyway_schema_history");
-        // 免除と通知は廃止した（D-22）。コンポーネントは計測プロファイルだけで決める（D-25）
-        assertThat(tables).doesNotContain("waivers", "notifications", "notification_settings", "components");
+        // 免除と通知は廃止した（D-22）。コンポーネントは計測プロファイルだけで決める（D-25）。
+        // 判定はその場で行い、Ingest Token は環境変数の 1 つにまとめた（D-27）
+        assertThat(tables).doesNotContain("waivers", "notifications", "notification_settings", "components",
+                "jobs", "ingest_tokens");
     }
 
     @Test

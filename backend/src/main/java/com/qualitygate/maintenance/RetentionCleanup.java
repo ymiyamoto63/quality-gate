@@ -1,10 +1,7 @@
-package com.qualitygate.job;
+package com.qualitygate.maintenance;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
-import com.qualitygate.domain.entity.Job;
-import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.domain.repo.JobRepository;
 import com.qualitygate.platform.settings.RetentionSettings;
 import com.qualitygate.platform.settings.SystemSettingsService;
 import com.qualitygate.platform.storage.ArtifactStore;
@@ -21,51 +18,41 @@ import java.time.Instant;
 import java.util.List;
 
 /**
- * 保持期間を過ぎたデータの削除（{@code CLEANUP_RETENTION}、FR-12-3）。
+ * 保持期間を過ぎたデータの削除（FR-12-3。毎日 {@link ScheduledMaintenance} から呼ぶ）。
  *
  * <p>削除は<strong>少量ずつ、短いトランザクションで</strong>行う（1 回あたり最大 10,000 行）。
  * 一括削除は長時間のロックと WAL の急増を招き、その間アプリが止まる
  * （docs/initial/06-database-design.md 7 章）。
  */
 @Component
-public class RetentionJobHandler implements JobHandler {
+public class RetentionCleanup {
 
-    private static final Logger log = LoggerFactory.getLogger(RetentionJobHandler.class);
+    private static final Logger log = LoggerFactory.getLogger(RetentionCleanup.class);
 
     static final int BATCH = 10_000;
     static final int FILE_BATCH = 500;
-    /** 1 回のジョブで回す上限。残りは翌日に回す（ジョブを長時間走らせない）。 */
+    /** 1 回で回す上限。残りは翌日に回す（長時間走らせない）。 */
     static final int MAX_ROUNDS = 20;
-    /** 成功したジョブの記録を残す期間。 */
-    static final Duration JOB_RETENTION = Duration.ofDays(30);
     /** 書き込み途中のファイルを孤児と取り違えないための猶予。 */
     static final Duration ORPHAN_GRACE = Duration.ofDays(1);
 
     private final ArtifactRecordRepository artifacts;
-    private final JobRepository jobs;
     private final ArtifactStore artifactStore;
     private final SystemSettingsService settings;
     private final JdbcTemplate jdbc;
     private final TransactionTemplate transactions;
 
-    public RetentionJobHandler(ArtifactRecordRepository artifacts, JobRepository jobs,
+    public RetentionCleanup(ArtifactRecordRepository artifacts,
                                ArtifactStore artifactStore, SystemSettingsService settings,
                                JdbcTemplate jdbc, TransactionTemplate transactions) {
         this.artifacts = artifacts;
-        this.jobs = jobs;
         this.artifactStore = artifactStore;
         this.settings = settings;
         this.jdbc = jdbc;
         this.transactions = transactions;
     }
 
-    @Override
-    public boolean supports(JobType type) {
-        return type == JobType.CLEANUP_RETENTION;
-    }
-
-    @Override
-    public void handle(Job job) {
+    public void run() {
         RetentionSettings retention = settings.retention();
         Instant now = Instant.now();
 
@@ -74,20 +61,11 @@ public class RetentionJobHandler implements JobHandler {
                 DELETE FROM runs WHERE id IN (
                     SELECT id FROM runs WHERE measured_at < ? ORDER BY measured_at LIMIT ?)
                 """, now.minus(Duration.ofDays(retention.runDays())));
-        int succeededJobs = 0;
-        for (int round = 0; round < MAX_ROUNDS; round++) {
-            Integer deleted = transactions.execute(status ->
-                    jobs.deleteSucceededBefore(now.minus(JOB_RETENTION), BATCH));
-            succeededJobs += deleted == null ? 0 : deleted;
-            if (deleted == null || deleted < BATCH) {
-                break;
-            }
-        }
         int orphans = deleteOrphanFiles(now.minus(ORPHAN_GRACE));
         int auditLogs = deleteAuditLogs(now.minus(Duration.ofDays(retention.auditLogDays())));
 
-        log.info("保持期間の削除が完了しました 成果物={} Run={} ジョブ={} 孤児ファイル={} 監査ログ={}",
-                files, runs, succeededJobs, orphans, auditLogs);
+        log.info("保持期間の削除が完了しました 成果物={} Run={} 孤児ファイル={} 監査ログ={}",
+                files, runs, orphans, auditLogs);
     }
 
     /** 成果物のファイル実体を消し、メタデータには削除した事実を残す。 */

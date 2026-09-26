@@ -6,7 +6,6 @@ import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.AuditLogRepository;
 import com.qualitygate.domain.repo.GateConfigRepository;
-import com.qualitygate.domain.repo.IngestTokenRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.junit.jupiter.api.BeforeEach;
@@ -32,7 +31,6 @@ class RepositoryAdminApiIT {
 
     @Autowired WebApplicationContext context;
     @Autowired UserAccountRepository users;
-    @Autowired IngestTokenRepository tokens;
     @Autowired GateConfigRepository configs;
     @Autowired AuditLogRepository auditLogs;
     @Autowired JdbcTemplate jdbc;
@@ -93,48 +91,16 @@ class RepositoryAdminApiIT {
     }
 
     @Test
-    void 発行したトークンで取り込めて失効後は使えない() {
-        String repositoryId = createRepository();
+    void 登録したリポジトリには取り込める() {
+        createRepository();
 
-        MvcTestResult issued = mvc.post().uri("/api/v1/repositories/{id}/ingest-tokens", repositoryId)
-                .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"description\":\"GitHub Actions\"}")
-                .exchange();
-        assertThat(issued).hasStatus(201);
-        String token = JsonPath.read(body(issued), "$.token");
-        String tokenId = JsonPath.read(body(issued), "$.tokenId");
-        assertThat(token).matches("qg_[A-Za-z0-9]{8}_[A-Za-z0-9]{32}");
-        // 保存するのはハッシュだけ。平文は DB にも監査ログにも残さない
-        assertThat(tokens.findAll()).singleElement()
-                .satisfies(t -> assertThat(t.getTokenHash()).doesNotContain(token));
-        assertThat(auditLogs.findAll()).allSatisfy(log ->
-                assertThat(String.valueOf(log.getAfterValue())).doesNotContain(token));
-
-        // 一覧には平文を出さない
-        assertThat(mvc.get().uri("/api/v1/repositories/{id}/ingest-tokens", repositoryId)
-                .with(as("admin-user", "ADMIN")))
-                .hasStatusOk()
-                .bodyJson()
-                .satisfies(json -> {
-                    json.assertThat().extractingPath("$.items[0].description").isEqualTo("GitHub Actions");
-                    json.assertThat().doesNotHavePath("$.items[0].token");
-                });
-
-        assertThat(createRun(token)).hasStatus(201);
-
-        assertThat(mvc.delete().uri("/api/v1/ingest-tokens/{id}", tokenId)
-                .with(as("admin-user", "ADMIN")))
-                .hasStatus(204);
-        assertThat(createRun(token)).hasStatus(401);
+        assertThat(createRun(IntegrationCleanup.INGEST_TOKEN)).hasStatus(201);
     }
 
     @Test
     void 無効化したリポジトリには取り込めない() {
         String repositoryId = createRepository();
-        MvcTestResult issued = mvc.post().uri("/api/v1/repositories/{id}/ingest-tokens", repositoryId)
-                .with(as("admin-user", "ADMIN")).exchange();
-        String token = JsonPath.read(body(issued), "$.token");
+        String token = IntegrationCleanup.INGEST_TOKEN;
 
         assertThat(mvc.patch().uri("/api/v1/repositories/{id}", repositoryId)
                 .with(as("admin-user", "ADMIN"))
