@@ -46,7 +46,7 @@ final class EvaluatorTestSupport {
                 new LinkedHashMap<>(defaults.metrics());
         metrics.put(metric, new GateConfigDocument.MetricConfig(true, values));
         return GateThresholds.from(new GateConfigDocument(defaults.version(),
-                defaults.onMissingReport(), defaults.execution(),
+                defaults.execution(),
                 defaults.exclusions(), metrics));
     }
 

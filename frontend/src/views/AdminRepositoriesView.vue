@@ -25,11 +25,6 @@ const name = ref('')
 const defaultBranch = ref('main')
 const createError = ref<string | null>(null)
 
-// コンポーネント定義
-const componentName = ref('')
-const componentLanguage = ref('java')
-const componentPaths = ref('')
-
 // 発行したトークン（一度だけ表示する）
 const issuedToken = ref<string | null>(null)
 const copied = ref(false)
@@ -155,29 +150,6 @@ async function revoke(token: Token): Promise<void> {
   announcement.value = `トークン ${token.tokenPrefix} を失効させました`
   if (selected.value) await select(selected.value)
 }
-
-async function defineComponent(): Promise<void> {
-  if (!selected.value) return
-  const patterns = componentPaths.value
-    .split(/[\n,]/)
-    .map((p) => p.trim())
-    .filter(Boolean)
-  const { error } = await api.POST('/api/v1/repositories/{repositoryId}/components', {
-    params: { path: { repositoryId: selected.value.repositoryId } },
-    body: {
-      name: componentName.value.trim(),
-      language: componentLanguage.value.trim(),
-      pathPatterns: patterns,
-    },
-  })
-  if (error) {
-    ui.notify('error', messageOf(error, 'コンポーネントを定義できませんでした'))
-    return
-  }
-  announcement.value = `コンポーネント ${componentName.value} を定義しました`
-  componentName.value = ''
-  componentPaths.value = ''
-}
 </script>
 
 <template>
@@ -293,27 +265,6 @@ async function defineComponent(): Promise<void> {
             </tr>
           </tbody>
         </table>
-      </section>
-
-      <section class="qg-panel" aria-labelledby="components-heading">
-        <h3 id="components-heading">コンポーネント定義</h3>
-        <form class="qg-form" @submit.prevent="defineComponent">
-          <label>
-            名前
-            <input v-model="componentName" required placeholder="backend" />
-          </label>
-          <label>
-            言語
-            <input v-model="componentLanguage" required />
-          </label>
-          <label>
-            パス（glob、1 行に 1 件）
-            <textarea v-model="componentPaths" rows="2" required placeholder="backend/**" />
-          </label>
-          <div class="qg-form__actions">
-            <button type="submit" class="qg-button">定義を保存</button>
-          </div>
-        </form>
       </section>
     </template>
 

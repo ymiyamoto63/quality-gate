@@ -601,7 +601,7 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CLEAN);
-        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]");
         return evaluate(run);
     }
@@ -627,8 +627,8 @@ class RunQueryApiIT {
         attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
                 "{\"mutationScope\":\"changed\"}");
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CONTRAST);
-        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
-        attach(run, ArtifactType.JUNIT_XML, "junit.xml", "frontend", JUNIT_CONSUMER);
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
+        attach(run, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", JUNIT_CONSUMER);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]");
         return evaluate(run);
     }

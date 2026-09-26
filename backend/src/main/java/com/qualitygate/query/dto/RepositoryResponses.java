@@ -33,19 +33,12 @@ public final class RepositoryResponses {
     @Schema(description = "リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く")
     public record RepositoryDetail(
             @NotNull RepositoryItem repository,
-            @NotNull List<ComponentItem> components,
             @NotNull @Schema(nullable = true, description = "判定済みの最新 Run。まだ無ければ null")
             LatestRunSummary latestRun,
             @NotNull @Schema(nullable = true) UUID lastFullRunId,
             @NotNull RepositoryFreshness freshness,
             @NotNull @Schema(nullable = true, description = "判定に使われている設定の版。既定値なら null")
             Integer configVersion) {
-    }
-
-    public record ComponentItem(
-            @NotNull String name,
-            @NotNull String language,
-            @NotNull List<String> pathPatterns) {
     }
 
     public record LatestRunSummary(

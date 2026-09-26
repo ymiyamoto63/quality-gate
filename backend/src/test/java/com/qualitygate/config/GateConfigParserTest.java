@@ -1,5 +1,6 @@
 package com.qualitygate.config;
 
+import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.gate.GateConfigDocument;
 import org.junit.jupiter.api.Test;
@@ -106,25 +107,6 @@ class GateConfigParserTest {
     }
 
     @Test
-    void 列挙値の誤りは選択肢を示して拒否する() {
-        assertThatThrownBy(() -> parser.parse("version: 1\non_missing_report: skip\n"))
-                .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("warn");
-    }
-
-    @Test
-    void ミューテーションの実行範囲の誤りは選択肢を示して拒否する() {
-        assertThatThrownBy(() -> parser.parse("""
-                version: 1
-                metrics:
-                  mutation_score:
-                    scope: diff
-                """))
-                .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("all / changed");
-    }
-
-    @Test
     void ミューテーションの対象コンポーネントは配列でなければ拒否する() {
         // 文字列のまま読み流すと「限定なし」になり、書いた意図と逆に効く
         assertThatThrownBy(() -> parser.parse("""
@@ -167,8 +149,8 @@ class GateConfigParserTest {
         // 後勝ちで黙らせると、消したはずの設定が効き続ける
         assertThatThrownBy(() -> parser.parse("""
                 version: 1
-                on_missing_report: fail
-                on_missing_report: warn
+                exclusions: ["a"]
+                exclusions: ["b"]
                 """))
                 .isInstanceOf(ConfigValidationException.class)
                 .hasMessageContaining("YAML として解析できません");
@@ -201,33 +183,54 @@ class GateConfigParserTest {
     }
 
     @Test
-    void 契約テストの最小実行件数に0は指定できない() {
-        // 0 件で合格する設定は「検証していない」を「すべて成功」と読み違える
-        assertThatThrownBy(() -> parser.parse("""
-                version: 1
-                metrics:
-                  api_contract:
-                    min_test_count: 0
-                """))
-                .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("metrics.api_contract.min_test_count")
-                .hasMessageContaining("1 以上");
+    void テスト結果の指標は既定で有効() {
+        // 契約テスト（M-08）を廃止した代わりに、テストの成功は M-11 で既定から見る（D-25）
+        assertThat(parser.parse("version: 1").metric("test_results").enabled()).isTrue();
     }
 
     @Test
-    void テスト結果の指標は既定で無効で書けば有効になる() {
-        // 既定で有効にすると、成果物を送っていないリポジトリの Run がすべて ERROR になる
-        GateConfigDocument defaults = parser.parse("version: 1");
-        assertThat(defaults.metric("test_results").enabled()).isFalse();
+    void 判定に使わない項目は未知のキーとして拒否する() {
+        // 受け付けて無視すると、書いた人は効いていると思い込む（D-25 で削除した項目）
+        assertThatThrownBy(() -> parser.parse("""
+                version: 1
+                on_missing_report: warn
+                components:
+                  - name: backend
+                metrics:
+                  branch_coverage:
+                    scope: diff
+                    per_component: false
+                    diff_threshold: 90
+                  mutation_score:
+                    scope: changed
+                  vulnerabilities:
+                    max_medium: 0
+                  cyclomatic_complexity:
+                    scope: all
+                  api_contract:
+                    min_success_rate: 100
+                """))
+                .isInstanceOf(ConfigValidationException.class)
+                .satisfies(e -> assertThat(((ConfigValidationException) e).errors())
+                        .extracting(ConfigValidationError::path)
+                        .containsExactlyInAnyOrder("on_missing_report", "components",
+                                "metrics.branch_coverage.scope", "metrics.branch_coverage.per_component",
+                                "metrics.branch_coverage.diff_threshold", "metrics.mutation_score.scope",
+                                "metrics.vulnerabilities.max_medium", "metrics.cyclomatic_complexity.scope",
+                                "metrics.api_contract.min_success_rate"));
+    }
 
+    @Test
+    void カバレッジの注意ラインを読める() {
         GateConfigDocument document = parser.parse("""
                 version: 1
                 metrics:
-                  test_results:
-                    min_success_rate: 100
-                    max_skipped_increase: 0
+                  branch_coverage:
+                    threshold: 70
+                    warn_below: 72
                 """);
-        assertThat(document.metric("test_results").enabled()).isTrue();
+        assertThat(document.metric("branch_coverage").number("warn_below"))
+                .contains(new java.math.BigDecimal("72"));
     }
 
     @Test

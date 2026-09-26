@@ -304,28 +304,6 @@ paths:
       summary: リポジトリの設定を更新する（既定ブランチ・PR 計測・有効/無効）
       tags:
       - RepositoryAdmin
-  /api/v1/repositories/{repositoryId}/components:
-    post:
-      operationId: defineComponent
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/DefineComponentRequest"
-        required: true
-      responses:
-        "200":
-          description: OK
-      summary: コンポーネントを定義する（同名があれば置き換える）
-      tags:
-      - RepositoryAdmin
   /api/v1/repositories/{repositoryId}/config:
     get:
       description: 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
@@ -976,21 +954,6 @@ components:
       - hasMore
       - items
       - nextCursor
-    ComponentItem:
-      type: object
-      properties:
-        language:
-          type: string
-        name:
-          type: string
-        pathPatterns:
-          type: array
-          items:
-            type: string
-      required:
-      - language
-      - name
-      - pathPatterns
     ConfigHistoryItem:
       type: object
       properties:
@@ -1099,7 +1062,7 @@ components:
       properties:
         baseCommitSha:
           type: string
-          description: 差分計測の比較基準。省略時は quality-gate が merge-base を解決する
+          description: 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する
           pattern: "^[0-9a-f]{40}$"
         branch:
           type: string
@@ -1226,27 +1189,6 @@ components:
             $ref: "#/components/schemas/DeadJobItem"
       required:
       - items
-    DefineComponentRequest:
-      type: object
-      properties:
-        language:
-          type: string
-          maxLength: 32
-          minLength: 0
-        name:
-          type: string
-          minLength: 1
-          pattern: "^[A-Za-z0-9._-]{1,64}$"
-        pathPatterns:
-          type: array
-          items:
-            type: string
-            minLength: 1
-          minItems: 1
-      required:
-      - language
-      - name
-      - pathPatterns
     FinalizeResponse:
       type: object
       properties:
@@ -1935,10 +1877,6 @@ components:
       type: object
       description: リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く
       properties:
-        components:
-          type: array
-          items:
-            $ref: "#/components/schemas/ComponentItem"
         configVersion:
           type:
           - integer
@@ -1959,7 +1897,6 @@ components:
         repository:
           $ref: "#/components/schemas/RepositoryItem"
       required:
-      - components
       - configVersion
       - freshness
       - lastFullRunId

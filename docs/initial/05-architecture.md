@@ -31,7 +31,7 @@ com.qualitygate
 ├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値
 └ platform/     監査ログ、ArtifactStore、共通例外、設定
 
-github/（GitHub API クライアント）は判定ジョブ（比較元・リネームの解決）と release（タグの解決）だけが使う。
+github/（GitHub API クライアント）は判定ジョブ（リネームの解決）と release（タグの解決）だけが使う。
 ```
 
 ### 依存規則
@@ -333,7 +333,7 @@ record RawFinding(
 | `K6SummaryAdapter` | `k6-summary` | M-03 / M-04 / M-05 |
 | `SarifAdapter` | `sarif` | M-06 |
 | `PmdXmlAdapter` | `pmd-xml` | M-07 |
-| `JUnitXmlAdapter` | `junit-xml` | M-08 |
+| `JUnitXmlAdapter` | `test-junit-xml` | M-11 / M-12 |
 | `OasdiffJsonAdapter` | `oasdiff-json` | M-09 |
 | `AxeJsonAdapter` | `axe-json` | M-10 |
 | `EslintJsonAdapter` | `eslint-json` | M-07 |

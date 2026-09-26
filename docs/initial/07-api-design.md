@@ -144,7 +144,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- | --- |
 | POST | `/api/v1/repositories` | リポジトリ登録 | ADMIN |
 | PATCH | `/api/v1/repositories/{id}` | リポジトリ設定の更新 | ADMIN |
-| POST | `/api/v1/repositories/{id}/components` | コンポーネント定義 | ADMIN |
 | POST | `/api/v1/repositories/{id}/ingest-tokens` | トークン発行（平文は応答時のみ） | ADMIN |
 | DELETE | `/api/v1/ingest-tokens/{id}` | トークン失効 | ADMIN |
 | POST | `/api/v1/runs/{runId}/reevaluate` | 再評価の実行 | ADMIN |
@@ -193,7 +192,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | --- | --- | --- |
 | `repository` | ○ | `owner/name`。トークンの発行元と一致しない場合 403 |
 | `commitSha` | ○ | 40 桁の 16 進 |
-| `baseCommitSha` | | 省略時は quality-gate が判定ジョブの中で GitHub API により求めて記録する（PR はマージ先との merge-base、既定ブランチは直前のコミット、それ以外は既定ブランチとの merge-base）。求められなければ未指定のまま判定する（`QG_GITHUB_*`、[設定値](../operations/configuration.md)） |
+| `baseCommitSha` | | 差分を扱う指標の比較元。収集ランナーが clone した履歴から求めて送る（[指標仕様書 0.3](02-metrics-spec.md)）。省略すると比較元なしで判定する（最初のコミットなど） |
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `measuredAt` | ○ | |
@@ -609,16 +608,13 @@ M-10 の違反は `filePath` / `line` / `sourceUrl` が `null` である。リ�
 `page`（`/runs/:id`）と `selector`（CSS セレクタ）で示し、`impact`・`tags`・`helpUrl`・
 `html`（先頭 512 文字）・`failureSummary` を添える。
 
-### 契約・互換性（M-08 / M-09）の指標行と違反
+### テスト（M-11 / M-12）と互換性（M-09）の指標行と違反
 
-M-08 の `threshold` は `operator`（`>=`）/ `value`（成功率 %）に加え、最小実行件数 `minTestCount` を持つ。
-`detail` は実行件数 `executed` と結果別の `passed` / `failed` / `errored` / `skipped` / `flaky`
-（再実行で成功）を返し、コンポーネントを宣言した成果物があれば `components` にコンポーネント別の同じ内訳を返す。
-`value` は合算した成功率で、切り捨てで丸める（失敗があるのに `100` と表示しない）。
-
-M-08 の違反は失敗・エラー・スキップ・再実行で成功したテスト 1 件ごとに 1 件で、`ruleId` が
-`failed` / `errored` / `skipped` / `flaky` になる。`detail` に `testClass`・`testName`・`outcome`、
-あれば `failureType` と `message`（先頭 512 文字）を添える。
+M-11 の `detail` は実行件数 `executed` と結果別の `passed` / `failed` / `errored` / `skipped` / `flaky`
+（再実行で成功）を返す。`value` は成功率で、切り捨てで丸める（失敗があるのに `100` と表示しない）。
+M-11 / M-12 の違反はテスト 1 件ごとに 1 件で、`ruleId` が `failed` / `errored` / `flaky`（M-11）と
+`skipped`（M-12）になる。`detail` に `testClass`・`testName`・`outcome`、あれば `failureType` と
+`message`（先頭 512 文字）を添える。M-08 API 契約テスト成功率は v1.10 で廃止した（D-25）。
 
 M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破壊的になりうる変更 `warnings`（level 2）、
 非破壊的な変更 `informational`（level 1）の件数を返す。違反になるのは level 3 と 2 だけで、
@@ -626,7 +622,7 @@ M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破�
 `level`（`error` / `warning`）・`operation`・`apiPath`・`operationId`・`section`・`source` を添える。
 比較元に OpenAPI 定義が無い Run では `status` が `NOT_APPLICABLE` になる。
 
-M-08 / M-09 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
+M-11 / M-12 / M-09 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
 API のパスはリポジトリ上のファイルではない。
 
 ### リリース判定（`release-report`）
@@ -755,7 +751,7 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
-| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API を呼ぶのは判定ジョブの比較元の解決だけで、失敗しても比較元なしで判定を続けるため、API の応答としては返さない） |
+| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害。リリース判定（S-11）でタグをコミットに解決できなかったときに返す |
 | `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 
 ---

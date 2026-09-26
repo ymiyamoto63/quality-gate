@@ -6,10 +6,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 /**
- * テストの結果別件数と、M-08 / M-11 の計算式（docs/initial/02-metrics-spec.md M-08 / M-11）。
- *
- * <p>契約テスト（M-08）とすべてのテスト（M-11 / M-12）で同じ数え方をする。
- * 式が 2 つあると、同じレポートの成功率が指標によって食い違う。
+ * テストの結果別件数と、M-11 の計算式（docs/initial/02-metrics-spec.md M-11）。
  *
  * <p>式をここに 1 つだけ置く。アダプタ（1 ファイル分の参考値）と評価器
  * （複数ファイルを合算した判定値）が同じ式を使わないと、画面の値と判定が食い違う。
@@ -17,23 +14,23 @@ import java.util.Map;
  *
  * @param flaky 再実行で成功したテスト。成功に数えるが、不安定さとして残す
  */
-public record ContractTally(long passed, long failed, long errored, long skipped, long flaky) {
+public record TestTally(long passed, long failed, long errored, long skipped, long flaky) {
 
-    public static final ContractTally EMPTY = new ContractTally(0, 0, 0, 0, 0);
+    public static final TestTally EMPTY = new TestTally(0, 0, 0, 0, 0);
 
     /** テスト 1 件の結果を数える。未知の結果は失敗に倒す（fail-closed）。 */
-    public ContractTally plus(String outcome) {
+    public TestTally plus(String outcome) {
         return switch (outcome == null ? "" : outcome) {
-            case "passed" -> plus(new ContractTally(1, 0, 0, 0, 0));
-            case "skipped" -> plus(new ContractTally(0, 0, 0, 1, 0));
-            case "flaky" -> plus(new ContractTally(0, 0, 0, 0, 1));
-            case "errored" -> plus(new ContractTally(0, 0, 1, 0, 0));
-            default -> plus(new ContractTally(0, 1, 0, 0, 0));
+            case "passed" -> plus(new TestTally(1, 0, 0, 0, 0));
+            case "skipped" -> plus(new TestTally(0, 0, 0, 1, 0));
+            case "flaky" -> plus(new TestTally(0, 0, 0, 0, 1));
+            case "errored" -> plus(new TestTally(0, 0, 1, 0, 0));
+            default -> plus(new TestTally(0, 1, 0, 0, 0));
         };
     }
 
-    public ContractTally plus(ContractTally other) {
-        return new ContractTally(passed + other.passed, failed + other.failed,
+    public TestTally plus(TestTally other) {
+        return new TestTally(passed + other.passed, failed + other.failed,
                 errored + other.errored, skipped + other.skipped, flaky + other.flaky);
     }
 
@@ -86,8 +83,8 @@ public record ContractTally(long passed, long failed, long errored, long skipped
         return detail;
     }
 
-    public static ContractTally fromDetail(Map<String, Object> detail) {
-        return new ContractTally(count(detail, "passed"), count(detail, "failed"),
+    public static TestTally fromDetail(Map<String, Object> detail) {
+        return new TestTally(count(detail, "passed"), count(detail, "failed"),
                 count(detail, "errored"), count(detail, "skipped"), count(detail, "flaky"));
     }
 

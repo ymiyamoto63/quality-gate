@@ -42,7 +42,7 @@ skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
-mkdir -p "$REPORTS/backend" "$REPORTS/contract" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
+mkdir -p "$REPORTS/backend" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
 rm -f "$REPORTS/skipped-metrics.tsv"
 
 MEASURE_DIR="$COLLECTOR_DIR/bin/measure"

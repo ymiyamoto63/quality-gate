@@ -34,9 +34,6 @@ public class Measurement {
     @Column(name = "repository_id", nullable = false)
     private UUID repositoryId;
 
-    @Column(name = "component_id")
-    private UUID componentId;
-
     @Column(name = "metric_id", nullable = false, length = 8)
     private String metricId;
 

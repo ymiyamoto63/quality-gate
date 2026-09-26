@@ -1,20 +1,16 @@
 package com.qualitygate.query;
 
 import com.qualitygate.domain.entity.MonitoredRepository;
-import com.qualitygate.domain.entity.RepositoryComponent;
 import com.qualitygate.domain.entity.RepositorySummary;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
-import com.qualitygate.domain.repo.RepositoryComponentRepository;
 import com.qualitygate.domain.repo.RepositorySummaryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.platform.error.ApiException;
 import com.qualitygate.query.dto.RepositoryResponses;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
-import tools.jackson.databind.ObjectMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -25,27 +21,18 @@ import java.util.UUID;
 @Service
 public class RepositoryQueryService {
 
-    private static final TypeReference<List<String>> STRING_LIST = new TypeReference<>() {
-    };
-
     private final MonitoredRepositoryRepository repositories;
-    private final RepositoryComponentRepository components;
     private final RepositorySummaryRepository summaries;
     private final RunRepository runs;
     private final GateConfigRepository configs;
-    private final ObjectMapper objectMapper;
 
-    @SuppressWarnings("java:S107")
     public RepositoryQueryService(MonitoredRepositoryRepository repositories,
-                                  RepositoryComponentRepository components,
                                   RepositorySummaryRepository summaries, RunRepository runs,
-                                  GateConfigRepository configs, ObjectMapper objectMapper) {
+                                  GateConfigRepository configs) {
         this.repositories = repositories;
-        this.components = components;
         this.summaries = summaries;
         this.runs = runs;
         this.configs = configs;
-        this.objectMapper = objectMapper;
     }
 
     @Transactional(readOnly = true)
@@ -71,8 +58,6 @@ public class RepositoryQueryService {
 
         return new RepositoryResponses.RepositoryDetail(
                 itemOf(repository),
-                components.findByRepositoryIdOrderByDisplayOrderAscNameAsc(repositoryId).stream()
-                        .map(this::componentOf).toList(),
                 latest,
                 summary.map(RepositorySummary::getLastFullRunId).orElse(null),
                 new RepositoryResponses.RepositoryFreshness(lastMeasured, lastFull),
@@ -85,11 +70,6 @@ public class RepositoryQueryService {
                 repository.getOwner(), repository.getName(), repository.getDefaultBranch(),
                 repository.isEnabled(),
                 repository.getCreatedAt());
-    }
-
-    private RepositoryResponses.ComponentItem componentOf(RepositoryComponent component) {
-        return new RepositoryResponses.ComponentItem(component.getName(), component.getLanguage(),
-                objectMapper.readValue(component.getPathPatterns(), STRING_LIST));
     }
 
     private static RepositoryResponses.LatestRunSummary latestOf(Run run) {

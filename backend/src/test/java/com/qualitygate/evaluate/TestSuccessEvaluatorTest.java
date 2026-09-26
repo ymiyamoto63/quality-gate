@@ -2,7 +2,7 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
-import com.qualitygate.domain.report.ContractTally;
+import com.qualitygate.domain.report.TestTally;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.RawFinding;
 import com.qualitygate.domain.report.RawMeasurement;
@@ -103,7 +103,7 @@ class TestSuccessEvaluatorTest {
 
     static RawMeasurement report(String component, long passed, long failed,
                                  long errored, long skipped, long flaky) {
-        ContractTally tally = new ContractTally(passed, failed, errored, skipped, flaky);
+        TestTally tally = new TestTally(passed, failed, errored, skipped, flaky);
         return RawMeasurement.of("M-11", component, tally.successRate(), "percent", tally.toDetail());
     }
 

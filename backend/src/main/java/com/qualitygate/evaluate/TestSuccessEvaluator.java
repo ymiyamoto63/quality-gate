@@ -1,7 +1,7 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.report.ContractTally;
+import com.qualitygate.domain.report.TestTally;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
@@ -17,7 +17,7 @@ import java.util.TreeMap;
 /**
  * M-11 テスト成功率（docs/initial/02-metrics-spec.md M-11）。
  *
- * <p>判定の優先順位は M-08 と同じ。上で決まったものは下を見ない。
+ * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
  *   <li>実行件数が最小実行件数（既定 1）未満 → ERROR（検証していないのであって、成功したのではない）</li>
  *   <li>成功率が合格ライン未満 → FAIL</li>
@@ -27,7 +27,7 @@ import java.util.TreeMap;
  * <p>スキップは M-12 で判定するため、ここでは WARN にしない。同じスキップで 2 つの指標が
  * 黄色くなると、どちらを直せばよいかが読めない。
  *
- * <p>M-08 と違い、<strong>コンポーネントごとに判定する</strong>（M-01 と同じ）。
+ * <p><strong>コンポーネントごとに判定する</strong>（M-01 と同じ）。
  * 単体テストはコンポーネントに閉じており、合算すると件数の多い側が少ない側の失敗を薄める。
  */
 @Component
@@ -72,16 +72,16 @@ public class TestSuccessEvaluator implements MetricEvaluator {
      * コンポーネントごとの件数。テストのレポートはファイル単位で届くため、同じコンポーネントの分を合算する。
      * null（コンポーネント宣言なし）は "" に寄せる。TreeMap は null キーを持てない。
      */
-    static Map<String, ContractTally> tallyByComponent(EvaluationContext context) {
-        Map<String, ContractTally> byComponent = new TreeMap<>();
+    static Map<String, TestTally> tallyByComponent(EvaluationContext context) {
+        Map<String, TestTally> byComponent = new TreeMap<>();
         for (RawMeasurement measurement : context.input().measurementsOf(GateThresholds.M_TEST_SUCCESS)) {
             byComponent.merge(Objects.requireNonNullElse(measurement.componentName(), ""),
-                    ContractTally.fromDetail(measurement.detail()), ContractTally::plus);
+                    TestTally.fromDetail(measurement.detail()), TestTally::plus);
         }
         return byComponent;
     }
 
-    private static String tooFewReason(ContractTally tally, int minimum) {
+    private static String tooFewReason(TestTally tally, int minimum) {
         if (tally.executed() == 0) {
             String skipped = tally.skipped() == 0 ? ""
                     : "（%d 件はすべてスキップされています）".formatted(tally.skipped());
@@ -93,7 +93,7 @@ public class TestSuccessEvaluator implements MetricEvaluator {
                 + "。送信したレポートが一部に限られていないか確認してください";
     }
 
-    private static Judgement judge(ContractTally tally, BigDecimal minimum) {
+    private static Judgement judge(TestTally tally, BigDecimal minimum) {
         if (!tally.meets(minimum)) {
             return new Judgement(MeasurementStatus.FAIL,
                     "テストの失敗 %d 件・エラー %d 件（実行 %d 件中）。成功率 %s%% は合格ライン %s%% 未満です"

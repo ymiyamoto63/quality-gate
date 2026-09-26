@@ -58,6 +58,7 @@ class ReleaseReportApiIT {
               vulnerabilities: { enabled: false }
               cyclomatic_complexity: { enabled: false }
               api_contract: { enabled: false }
+              test_results: { enabled: false }
               accessibility: { enabled: false }
             """;
 
@@ -73,6 +74,7 @@ class ReleaseReportApiIT {
               vulnerabilities: { enabled: false }
               cyclomatic_complexity: { enabled: false }
               api_contract: { enabled: false }
+              test_results: { enabled: false }
               accessibility: { enabled: false }
             """;
 

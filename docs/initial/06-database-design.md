@@ -37,14 +37,13 @@
 users ──┐
         │ (created_by / actor)
         ▼
-repositories ──┬──▶ components
-     │         ├──▶ ingest_tokens
+repositories ──┬──▶ ingest_tokens
      │         ├──▶ gate_configs
      │         └──▶ repository_summaries (1:1 読み取りモデル)
      │
      └──▶ runs ──┬──▶ artifacts
                  ├──▶ run_skipped_metrics
-                 ├──▶ measurements ──▶ (component)
+                 ├──▶ measurements
                  └──▶ findings
 
 jobs            （独立。payload で他テーブルを参照）
@@ -102,19 +101,11 @@ CREATE TABLE repositories (
 PR を計測する設定（`measure_pull_requests`）は、どこからも読まれていなかったため V018 で削除した。
 PR を計測するかは、収集ランナーの手動実行で PR 番号を指定するかどうかで決まる。
 
-### 3.3 `components` — リポジトリ内の構成単位
+### 3.3 `components` — リポジトリ内の構成単位（V019 で削除）
 
-```sql
-CREATE TABLE components (
-    id              uuid        PRIMARY KEY,
-    repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-    name            varchar(64) NOT NULL,          -- 'backend' / 'frontend'
-    language        varchar(32) NOT NULL,          -- 'java' / 'typescript'
-    path_patterns   jsonb       NOT NULL,          -- ["backend/**"]
-    display_order   int         NOT NULL DEFAULT 0,
-    CONSTRAINT components_name_key UNIQUE (repository_id, name)
-);
-```
+画面に表示するだけで判定に使っていなかったため、V019 でテーブルごと削除した（D-25）。
+コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まり、成果物に付いた名前
+（`measurements.component_name` / `findings.component_name`）で扱う。
 
 ### 3.4 `ingest_tokens` — 取り込み用トークン
 
@@ -246,7 +237,6 @@ CREATE TABLE measurements (
     id              uuid        PRIMARY KEY,
     run_id          uuid        NOT NULL REFERENCES runs(id) ON DELETE CASCADE,
     repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-    component_id    uuid        REFERENCES components(id) ON DELETE SET NULL,
     metric_id       varchar(8)  NOT NULL,
     component_name  varchar(64),                -- 'backend' / 'frontend'（V008 で追加）
     scenario        varchar(64),                -- M-03 のシナリオ単位判定用
@@ -277,9 +267,7 @@ CREATE UNIQUE INDEX ux_measurements_key ON measurements
 `detail`（jsonb）に入れず列にするのは、トレンド検索で系列の軸として使うためである。
 
 `component_name` を持たせるのは、表示とトレンドの絞り込みで常に必要になるためである。
-`findings` が既に `component_name` を非正規化して持っており、
-片方は FK を辿り片方は文字列という不整合な扱いを避ける。
-`component_id` は将来のコンポーネント管理機能のために残す。
+設計時に置いた `components` への外部キー（`component_id`）は一度も値が入らず、V019 で削除した。
 
 一意性を UNIQUE 制約ではなく式インデックスで担保するのは、
 **SQL の UNIQUE 制約が NULL 同士を重複と見なさない**ためである。
@@ -579,6 +567,7 @@ DELETE FROM runs
 | `V016__collector_only_ingest.sql` | 取り込み経路を収集ランナーに絞ったため、`runs.runner_type` と Check Run のジョブ、設定の削除したキーを取り除く（D-19） |
 | `V017__drop_waivers_and_notifications.sql` | 免除と通知を廃止したため、`waivers` / `notifications` / `notification_settings`・`findings.waiver_id`・`repository_summaries.active_waiver_count`・`runs.previous_verdict` と、処理する側の無いジョブ、保存済みの設定の `notifications` / `full_measurement_interval_days` を削除する（D-22） |
 | `V018__drop_repository_measure_pull_requests.sql` | どこからも読まれていなかった `repositories.measure_pull_requests`（PR を計測する設定）を削除する |
+| `V019__remove_duplicated_and_unused_definitions.sql` | 表示にしか使っていなかった `components` と `measurements.component_id`、廃止した M-08 の計測値・違反・スキップ申告・成果物（`junit-xml`）、保存済みの設定の `components` と `api_contract` の `min_success_rate` / `min_test_count` を削除する（D-25） |
 
 `findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 

@@ -41,7 +41,6 @@ public class ConfigQueryService {
     /** 設定版が無いリポジトリの表示（既定値）。 */
     static final String DEFAULT_YAML = """
             version: 1
-            on_missing_report: fail
 
             execution:
               skippable_metrics: [mutation_score, performance]
@@ -49,7 +48,7 @@ public class ConfigQueryService {
             metrics:
               branch_coverage:
                 threshold: 75
-                diff_threshold: 80
+                warn_below: 80
               mutation_score:
                 threshold: 60
               performance:
@@ -63,9 +62,11 @@ public class ConfigQueryService {
                 max_complexity: 15
                 warn_from: 11
               api_contract:
+                breaking_changes: 0
+              test_results:
                 min_success_rate: 100
                 min_test_count: 1
-                breaking_changes: 0
+                max_skipped_increase: 0
               accessibility:
                 standard: wcag22aa
                 max_critical: 0

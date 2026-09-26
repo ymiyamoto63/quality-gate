@@ -192,11 +192,13 @@ class EvaluationPipelineIT {
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
                         // ベース比較ができないため新規関数数は 0 で合格
                         org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
-                        // 契約テストはすべて成功し、破壊的変更も無い
-                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.PASS),
+                        // 破壊的変更は無い
                         org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
                         // 重大なアクセシビリティ違反は無い
-                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS),
+                        // テストはすべて成功し、スキップも無い
+                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.PASS));
 
         // 初回 Run なので違反はすべて INITIAL。NEW にすると
         // 「この変更が問題を持ち込んだ」という誤った表示になる
@@ -242,7 +244,7 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-08", "M-09", "M-10");
+                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-09", "M-10", "M-11", "M-12");
     }
 
     @Test
@@ -361,6 +363,8 @@ class EvaluationPipelineIT {
                   accessibility:
                     enabled: false
                   api_contract:
+                    enabled: false
+                  test_results:
                     enabled: false
                   performance:
                     enabled: false
@@ -482,24 +486,15 @@ class EvaluationPipelineIT {
     }
 
     @Test
-    void 契約テストの失敗と破壊的変更は不合格になり違反として残る() {
+    void 破壊的変更は不合格になり違反として残る() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
-        // provider（backend）は成功し、consumer（frontend）が 1 件失敗した
-        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
                 JUNIT_CLEAN);
-        attach(run, ArtifactType.JUNIT_XML, "junit.xml", "frontend", null, """
-                <testsuites><testsuite name="src/api/client.contract.spec.ts">
-                  <testcase classname="src/api/client.contract.spec.ts" name="GET /runs/{runId}"/>
-                  <testcase classname="src/api/client.contract.spec.ts" name="GET /runs">
-                    <failure message="expected 200 but was 500"/>
-                  </testcase>
-                </testsuite></testsuites>
-                """);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, """
                 [{ "id": "api-path-removed-without-deprecation",
                    "text": "api path removed without deprecation",
@@ -510,59 +505,19 @@ class EvaluationPipelineIT {
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08") || m.getMetricId().equals("M-09"))
-                .extracting(Measurement::getMetricId, Measurement::getStatus)
-                .containsExactlyInAnyOrder(
-                        // 3 / 4 = 75%。consumer と provider を合算して判定する
-                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.FAIL),
-                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.FAIL));
-        assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .filteredOn(m -> m.getMetricId().equals("M-09"))
                 .singleElement()
-                .satisfies(m -> assertThat(m.getValue()).isEqualByComparingTo("75"));
-        // テストクラス名や API のパスはファイルではない。GitHub へのリンクを作らない
+                .satisfies(m -> assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL));
+        // API のパスはファイルではない。GitHub へのリンクを作らない
         assertThat(findings.findByRunId(run.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-08") || f.getMetricId().equals("M-09"))
-                .hasSize(2)
-                .allSatisfy(f -> {
+                .filteredOn(f -> f.getMetricId().equals("M-09"))
+                .singleElement()
+                .satisfies(f -> {
                     assertThat(f.getFilePath()).isNull();
                     assertThat(f.getSeverity()).isEqualTo(Severity.HIGH);
                 });
-        // 契約テストの失敗はダッシュボードの脆弱性件数に数えない
+        // 破壊的変更はダッシュボードの脆弱性件数に数えない
         assertThat(summaries.findById(repositoryId).orElseThrow().getOpenHighCount()).isZero();
-    }
-
-    @Test
-    void 契約テストが1件も実行されていなければ計測エラー() {
-        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attachAllMetrics(run);
-        attachPit(run, "changed");
-        attach(run, ArtifactType.JUNIT_XML, "TEST-Skipped.xml", "frontend", null, """
-                <testsuite name="A"><testcase classname="A" name="t"><skipped/></testcase></testsuite>
-                """);
-
-        Run evaluated = evaluate(run);
-
-        // 実行 0 件を「すべて成功」とは読まない。同じ Run に成功した成果物があれば合算される
-        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS_WITH_WARNINGS);
-        assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08"))
-                .singleElement()
-                .satisfies(m -> assertThat(m.getStatus()).isEqualTo(MeasurementStatus.WARN));
-
-        Run onlySkipped = createRun(Instant.parse("2026-09-23T00:00:00Z"));
-        attach(onlySkipped, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(onlySkipped, ArtifactType.JUNIT_XML, "TEST-Skipped.xml", "frontend", null, """
-                <testsuite name="A"><testcase classname="A" name="t"><skipped/></testcase></testsuite>
-                """);
-        evaluate(onlySkipped);
-        assertThat(measurements.findByRunId(onlySkipped.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08"))
-                .singleElement()
-                .satisfies(m -> {
-                    assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
-                    assertThat(m.getValue()).isNull();
-                });
     }
 
     @Test
@@ -655,6 +610,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   api_contract:
                     enabled: false
+                  test_results:
+                    enabled: false
                   performance:
                     enabled: false
                   secrets:
@@ -720,6 +677,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   api_contract:
                     enabled: false
+                  test_results:
+                    enabled: false
                   performance:
                     enabled: false
                   secrets:
@@ -752,6 +711,8 @@ class EvaluationPipelineIT {
                   accessibility:
                     enabled: false
                   api_contract:
+                    enabled: false
+                  test_results:
                     enabled: false
                   performance:
                     enabled: false
@@ -800,7 +761,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
-        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
                 JUNIT_CLEAN);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, "[]",
                 "{\"baseSpecMissing\":true}");
@@ -836,6 +797,8 @@ class EvaluationPipelineIT {
                   accessibility:
                     enabled: false
                   api_contract:
+                    enabled: false
+                  test_results:
                     enabled: false
                   performance:
                     enabled: false
@@ -958,6 +921,8 @@ class EvaluationPipelineIT {
                     enabled: false
                   api_contract:
                     enabled: false
+                  test_results:
+                    enabled: false
                   performance:
                     enabled: false
                 """);
@@ -1018,7 +983,7 @@ class EvaluationPipelineIT {
     }
 
     private void attachContract(Run run) {
-        attach(run, ArtifactType.JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
                 JUNIT_CLEAN);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, OASDIFF_CLEAN);
     }

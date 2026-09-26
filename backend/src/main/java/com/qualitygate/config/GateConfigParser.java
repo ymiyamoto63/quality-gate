@@ -3,7 +3,6 @@ package com.qualitygate.config;
 import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.gate.GateConfigDocument;
-import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.model.WcagStandard;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.LoaderOptions;
@@ -17,7 +16,6 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
@@ -35,24 +33,19 @@ public class GateConfigParser {
     private static final int SUPPORTED_VERSION = 1;
 
     private static final Set<String> ROOT_KEYS = Set.of(
-            "version", "on_missing_report", "execution",
-            "components", "exclusions", "metrics");
+            "version", "execution", "exclusions", "metrics");
 
     private static final Set<String> EXECUTION_KEYS = Set.of("skippable_metrics");
 
-    private static final Set<String> ON_MISSING_REPORT_VALUES = Set.of("fail", "warn");
-
     /** 指標名（YAML のキー）と、それぞれに書ける項目。 */
     private static final Map<String, Set<String>> METRIC_KEYS = Map.ofEntries(
-            Map.entry("branch_coverage", Set.of("enabled", "threshold", "scope", "per_component",
-                    "diff_threshold")),
-            Map.entry("mutation_score", Set.of("enabled", "threshold", "scope", "components")),
+            Map.entry("branch_coverage", Set.of("enabled", "threshold", "warn_below")),
+            Map.entry("mutation_score", Set.of("enabled", "threshold", "components")),
             Map.entry("performance", Set.of("enabled", "p95_ms", "arrival_rate_rps", "error_rate_pct",
                     "scenarios")),
-            Map.entry("vulnerabilities", Set.of("enabled", "max_critical", "max_high", "max_medium")),
-            Map.entry("cyclomatic_complexity", Set.of("enabled", "max_complexity", "scope", "warn_from")),
-            Map.entry("api_contract", Set.of("enabled", "min_success_rate", "min_test_count",
-                    "breaking_changes")),
+            Map.entry("vulnerabilities", Set.of("enabled", "max_critical", "max_high")),
+            Map.entry("cyclomatic_complexity", Set.of("enabled", "max_complexity", "warn_from")),
+            Map.entry("api_contract", Set.of("enabled", "breaking_changes")),
             Map.entry("accessibility", Set.of("enabled", "standard", "max_critical", "pages")),
             Map.entry("test_results", Set.of("enabled", "min_success_rate", "min_test_count",
                     "max_skipped", "max_skipped_increase")),
@@ -74,8 +67,6 @@ public class GateConfigParser {
 
         checkUnknownKeys(root, ROOT_KEYS, "", lines, errors);
         int version = versionOf(root, lines, errors);
-        String onMissingReport = enumValue(root, "on_missing_report", ON_MISSING_REPORT_VALUES,
-                "fail", lines, errors);
 
         GateConfigDocument.Execution execution = executionOf(root, lines, errors);
         List<String> exclusions = stringList(root.get("exclusions"));
@@ -84,8 +75,7 @@ public class GateConfigParser {
         if (!errors.isEmpty()) {
             throw new ConfigValidationException(errors);
         }
-        return new GateConfigDocument(version, onMissingReport,
-                execution, exclusions, metrics);
+        return new GateConfigDocument(version, execution, exclusions, metrics);
     }
 
     @SuppressWarnings("unchecked")
@@ -178,8 +168,8 @@ public class GateConfigParser {
             if ("accessibility".equals(entry.getKey())) {
                 validateAccessibility(values, path, lines, errors);
             }
-            if ("api_contract".equals(entry.getKey()) || "test_results".equals(entry.getKey())) {
-                validateContract(values, path, lines, errors);
+            if ("test_results".equals(entry.getKey())) {
+                validateTestResults(values, path, lines, errors);
             }
 
             boolean enabled = !Boolean.FALSE.equals(values.get("enabled"));
@@ -189,20 +179,13 @@ public class GateConfigParser {
     }
 
     /**
-     * M-02 の実行範囲と対象コンポーネント。
+     * M-02 の対象コンポーネント。
      *
      * <p>{@code components} を文字列 1 つで書かれたまま読み流すと「限定なし」になり、
      * frontend まで判定対象に入って ERROR が並ぶ。書いた意図と逆に効くため拒否する。
      */
     private void validateMutation(Map<String, Object> values, String path, YamlLineIndex lines,
                                   List<ConfigValidationError> errors) {
-        Object scope = values.get("scope");
-        Set<String> scopes = Arrays.stream(MutationScope.values()).map(MutationScope::wire)
-                .collect(Collectors.toSet());
-        if (scope != null && !scopes.contains(String.valueOf(scope))) {
-            errors.add(error(lines, path + ".scope", "指定できるのは %s のいずれかです（受信値: %s）"
-                    .formatted(String.join(" / ", sorted(scopes)), quote(scope))));
-        }
         Object components = values.get("components");
         boolean listOfNames = components instanceof List<?> list
                 && list.stream().allMatch(c -> c instanceof String s && !s.isBlank());
@@ -239,12 +222,12 @@ public class GateConfigParser {
     }
 
     /**
-     * M-08 / M-11 の最小実行件数。
+     * M-11 の最小実行件数。
      *
-     * <p>0 を許すと、契約テストが 1 件も動かなかった Run が合格になる。
+     * <p>0 を許すと、テストが 1 件も動かなかった Run が合格になる。
      * 「検証していない」を「すべて成功」と読み違える設定は受け付けない。
      */
-    private void validateContract(Map<String, Object> values, String path, YamlLineIndex lines,
+    private void validateTestResults(Map<String, Object> values, String path, YamlLineIndex lines,
                                   List<ConfigValidationError> errors) {
         Object minTestCount = values.get("min_test_count");
         if (minTestCount instanceof Number number
@@ -330,22 +313,6 @@ public class GateConfigParser {
             System.arraycopy(current, 0, previous, 0, current.length);
         }
         return previous[b.length()];
-    }
-
-    private String enumValue(Map<String, Object> root, String key, Set<String> allowed,
-                             String fallback, YamlLineIndex lines,
-                             List<ConfigValidationError> errors) {
-        Object value = root.get(key);
-        if (value == null) {
-            return fallback;
-        }
-        String text = String.valueOf(value).toLowerCase(Locale.ROOT);
-        if (!allowed.contains(text)) {
-            errors.add(error(lines, key, "指定できるのは %s のいずれかです（受信値: %s）"
-                    .formatted(String.join(" / ", sorted(allowed)), quote(value))));
-            return fallback;
-        }
-        return text;
     }
 
     private static ConfigValidationError error(YamlLineIndex lines, String path, String message) {

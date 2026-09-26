@@ -20,7 +20,7 @@ import java.util.Map;
  *
  * <p>重複率はレポートの {@code percentage} ではなく、<strong>行数から計算し直す</strong>
  * （{@code duplicatedLines / lines × 100}）。同じコンポーネントのレポートが複数届いたときに、
- * 割合どうしを平均せず行数で合算できるようにするため（M-08 の件数の合算と同じ考え方）。
+ * 割合どうしを平均せず行数で合算できるようにするため（M-11 の件数の合算と同じ考え方）。
  */
 @Component
 public class JscpdJsonAdapter implements ArtifactAdapter {

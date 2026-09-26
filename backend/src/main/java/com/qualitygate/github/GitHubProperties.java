@@ -12,11 +12,11 @@ import java.time.Duration;
  * インストールトークンを使う）か、トークン（{@code token}）のどちらか。両方あれば App を使う。
  * どちらも無ければ認証なしで呼ぶ（public リポジトリだけ。1 時間 60 回まで）。
  *
- * @param enabled    GitHub API を呼ぶか。false なら merge-base を解決しない
+ * @param enabled    GitHub API を呼ぶか。false ならリネームを検出せず、タグを解決しない
  * @param apiUrl     API の URL（GitHub Enterprise Server なら {@code https://<host>/api/v3}）
  * @param appId      GitHub App の App ID
  * @param privateKey GitHub App の秘密鍵（PEM。PKCS#1 / PKCS#8 のどちらでもよい）
- * @param token      App を使わない場合のトークン（Contents: Read-only と Pull requests: Read-only）
+ * @param token      App を使わない場合のトークン（Contents: Read-only）
  * @param timeout    1 回の呼び出しのタイムアウト
  */
 @ConfigurationProperties(prefix = "quality-gate.github")

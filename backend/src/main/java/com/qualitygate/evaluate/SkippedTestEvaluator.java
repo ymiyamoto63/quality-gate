@@ -1,7 +1,7 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.report.ContractTally;
+import com.qualitygate.domain.report.TestTally;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import org.springframework.stereotype.Component;
 
@@ -68,7 +68,7 @@ public class SkippedTestEvaluator implements MetricEvaluator {
         return results;
     }
 
-    private static Judgement judge(ContractTally tally, Optional<BigDecimal> previous,
+    private static Judgement judge(TestTally tally, Optional<BigDecimal> previous,
                                    GateThresholds.TestResults thresholds) {
         long skipped = tally.skipped();
         if (thresholds.maxSkipped() != null && skipped > thresholds.maxSkipped()) {

@@ -27,7 +27,6 @@ public final class MetricCatalog {
             new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false),
             new MetricDefinition("M-07", "循環的複雑度 15 超の新規関数数",
                     MetricCategory.STRUCTURE, false),
-            new MetricDefinition("M-08", "API 契約テスト成功率", MetricCategory.CONTRACT, true),
             new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false),
             new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false),
             // 要件定義の後に追加した指標。カテゴリは既存の表に合わせる

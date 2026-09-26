@@ -107,14 +107,7 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/backend/pmd-base.xml" ]; then
     upload pmd-xml "$REPORTS/backend/pmd-base.xml" "$BACKEND" base
   fi
-  found=0
-  for junit in "$REPORTS"/contract/TEST-*.xml; do
-    [ -e "$junit" ] || continue
-    upload junit-xml "$junit" "$BACKEND"
-    found=1
-  done
-  [ "$found" -eq 1 ] || warn "成果物がありません（type=junit-xml）: $REPORTS/contract/"
-  # M-11 / M-12 はすべてのテストの結果（test-junit-xml）。M-08 の契約テスト（junit-xml）とは型で分ける
+  # M-11 / M-12 はすべてのテストの結果（test-junit-xml）
   found=0
   for junit in "$REPORTS"/tests/backend/TEST-*.xml; do
     [ -e "$junit" ] || continue
