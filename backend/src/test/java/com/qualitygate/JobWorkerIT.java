@@ -9,7 +9,6 @@ import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.JobStatus;
 import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
@@ -156,7 +155,7 @@ class JobWorkerIT {
 
     private Run newRun(String commitSha) {
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main",
-                RunnerType.SELF_HOSTED, "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
+                "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
         run.finalizeIngest();
         return runs.save(run);
     }

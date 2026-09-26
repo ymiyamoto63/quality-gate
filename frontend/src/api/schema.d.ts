@@ -712,11 +712,6 @@ export interface components {
        * @example ymiyamoto63/quality-gate
        */
       repository: string
-      /**
-       * @description 計測を実行したランナー種別。性能指標の判定可否がこれで決まる
-       * @enum {string}
-       */
-      runnerType: 'self-hosted' | 'github-hosted'
       /** @description CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う */
       skippedMetrics?: components['schemas']['SkippedMetricRequest'][]
       triggeredBy: string
@@ -1174,8 +1169,6 @@ export interface components {
       repository: components['schemas']['RepositoryRef']
       /** Format: uuid */
       runId: string
-      /** @enum {string} */
-      runnerType: 'self-hosted' | 'github-hosted'
       skippedMetrics: components['schemas']['SkippedMetricView'][]
       /** @enum {string} */
       status:
@@ -1290,8 +1283,6 @@ export interface components {
       /** Format: uuid */
       runId: string
       /** @enum {string} */
-      runnerType: 'self-hosted' | 'github-hosted'
-      /** @enum {string} */
       status:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
       /** @enum {string|null} */
@@ -1303,7 +1294,7 @@ export interface components {
       metricId: string
       /**
        * @description なぜ計測しなかったか。Run 詳細にそのまま表示される
-       * @example GitHub ホストランナーのため PIT を実行しない
+       * @example PR の計測では PIT を実行しない
        */
       reason: string
     }

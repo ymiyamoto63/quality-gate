@@ -1292,12 +1292,6 @@ components:
           example: ymiyamoto63/quality-gate
           minLength: 1
           pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
-        runnerType:
-          type: string
-          description: 計測を実行したランナー種別。性能指標の判定可否がこれで決まる
-          enum:
-          - self-hosted
-          - github-hosted
         skippedMetrics:
           type: array
           description: CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う
@@ -1311,7 +1305,6 @@ components:
       - commitSha
       - measuredAt
       - repository
-      - runnerType
       - triggeredBy
     CreateRunResponse:
       type: object
@@ -2352,11 +2345,6 @@ components:
         runId:
           type: string
           format: uuid
-        runnerType:
-          type: string
-          enum:
-          - self-hosted
-          - github-hosted
         skippedMetrics:
           type: array
           items:
@@ -2399,7 +2387,6 @@ components:
       - pullRequestNumber
       - repository
       - runId
-      - runnerType
       - skippedMetrics
       - status
       - verdict
@@ -2657,11 +2644,6 @@ components:
         runId:
           type: string
           format: uuid
-        runnerType:
-          type: string
-          enum:
-          - self-hosted
-          - github-hosted
         status:
           type: string
           enum:
@@ -2688,7 +2670,6 @@ components:
       - measuredAt
       - pullRequestNumber
       - runId
-      - runnerType
       - status
       - verdict
     SkippedMetricRequest:
@@ -2703,7 +2684,7 @@ components:
         reason:
           type: string
           description: なぜ計測しなかったか。Run 詳細にそのまま表示される
-          example: GitHub ホストランナーのため PIT を実行しない
+          example: PR の計測では PIT を実行しない
           minLength: 1
       required:
       - metricId

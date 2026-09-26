@@ -106,7 +106,6 @@ public class RunQueryService {
                 run.getBranch(),
                 run.getPullRequestNumber(),
                 run.getAttempt(),
-                run.getRunnerType(),
                 run.getStatus(),
                 run.getVerdict(),
                 run.getCompleteness(),
@@ -182,7 +181,7 @@ public class RunQueryService {
 
     private static RunListResponse.RunSummary toListItem(Run run) {
         return new RunListResponse.RunSummary(run.getId(), run.getCommitSha(), run.getBranch(),
-                run.getPullRequestNumber(), run.getRunnerType(), run.getStatus(),
+                run.getPullRequestNumber(), run.getStatus(),
                 run.getVerdict(), run.getCompleteness(), run.getMeasuredAt(),
                 run.getEvaluatedAt());
     }

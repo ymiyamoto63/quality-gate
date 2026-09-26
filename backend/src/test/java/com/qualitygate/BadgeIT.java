@@ -4,7 +4,6 @@ import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.Completeness;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
@@ -99,7 +98,7 @@ class BadgeIT {
         // Run は（リポジトリ, コミット, 試行）で一意のため、コミットを Run ごとに変える
         String commit = (Uuid7.generate().toString() + Uuid7.generate()).replace("-", "").substring(0, 40);
         Run run = new Run(Uuid7.generate(), repository.getId(), commit, branch,
-                RunnerType.SELF_HOSTED, "it", Instant.parse(measuredAt), 1);
+                "it", Instant.parse(measuredAt), 1);
         run.markEvaluated(verdict, Completeness.FULL, Instant.parse(measuredAt));
         runs.save(run);
     }

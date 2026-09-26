@@ -171,7 +171,6 @@ CREATE TABLE runs (
     branch              varchar(255) NOT NULL,
     pull_request_number int,
     attempt             int         NOT NULL DEFAULT 1,
-    runner_type         varchar(16) NOT NULL,
     triggered_by        varchar(64) NOT NULL,
     ci_run_url          varchar(512),
     measured_at         timestamptz NOT NULL,
@@ -191,10 +190,11 @@ CREATE TABLE runs (
     CONSTRAINT runs_verdict_check CHECK (verdict IS NULL OR verdict IN
         ('PASS','PASS_WITH_WARNINGS','FAIL')),
     CONSTRAINT runs_completeness_check CHECK (completeness IS NULL OR completeness IN
-        ('FULL','PARTIAL')),
-    CONSTRAINT runs_runner_check CHECK (runner_type IN ('self-hosted','github-hosted'))
+        ('FULL','PARTIAL'))
 );
 ```
+
+ランナー種別の列（`runner_type`）は、計測を収集ランナーに絞ったため V016 で削除した（D-19）。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。

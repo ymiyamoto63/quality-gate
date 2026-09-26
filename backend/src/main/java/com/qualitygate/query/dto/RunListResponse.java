@@ -2,7 +2,6 @@ package com.qualitygate.query.dto;
 
 import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -27,7 +26,6 @@ public record RunListResponse(
             @NotNull String commitSha,
             @NotNull String branch,
             @NotNull @Schema(nullable = true) Integer pullRequestNumber,
-            @NotNull RunnerType runnerType,
             @NotNull RunStatus status,
             @NotNull @Schema(nullable = true) Verdict verdict,
             @NotNull @Schema(nullable = true) Completeness completeness,

@@ -1,6 +1,5 @@
 package com.qualitygate.ingest.dto;
 
-import com.qualitygate.domain.model.RunnerType;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
@@ -33,10 +32,6 @@ public record CreateRunRequest(
         String branch,
 
         Integer pullRequestNumber,
-
-        @Schema(description = "計測を実行したランナー種別。性能指標の判定可否がこれで決まる")
-        @NotNull
-        RunnerType runnerType,
 
         @NotBlank
         String triggeredBy,

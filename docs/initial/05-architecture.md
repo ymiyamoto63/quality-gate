@@ -340,17 +340,14 @@ record RawFinding(
 | `JUnitXmlAdapter` | `junit-xml` | M-08 |
 | `OasdiffJsonAdapter` | `oasdiff-json` | M-09 |
 | `AxeJsonAdapter` | `axe-json` | M-10 |
-| `IstanbulJsonAdapter` | `istanbul-json` | M-01 |
-| `GatlingLogAdapter` | `gatling-log` | M-03 / M-04 / M-05 |
-| `OsvJsonAdapter` | `osv-json` | M-06 |
 | `EslintJsonAdapter` | `eslint-json` | M-07 |
-| `LizardCsvAdapter` | `lizard-csv` | M-07 |
-| `PactVerificationAdapter` | `pact-verification` | M-08 |
 
 形式ごとの読み方は [02](02-metrics-spec.md) 0.5。
+収集ランナーが送らない形式（istanbul-json / gatling-log / osv-json / lizard-csv / pact-verification）のアダプタは D-19 で削除した。
+その後に追加した指標（M-11〜M-17）のアダプタは [02](02-metrics-spec.md) 0.5 を参照。
 
 `SarifAdapter` は M-06 だけを供給する。SARIF は複雑度も運びうるが、ツール名（`driver.name`）が
-複雑度ツール（PMD / ESLint / lizard）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
+複雑度ツール（PMD / ESLint など）の run は読み飛ばし、M-06 の件数に複雑度違反を混ぜない。
 ツール名の判定表は `SarifAdapter` の定数にまとめ、ツールの追加でロジックを変えずに済むようにしている。
 
 ---
@@ -389,7 +386,7 @@ record MetricResult(
 ```
 
 指標ごとに 1 実装。指標の追加は `MetricEvaluator` の実装追加のみで完結する。
-スキップ申告（6.2 の 2）と免除の適用は評価器ではなく `RunEvaluationService` が行い、計測条件統制外の `REFERENCE`（6.2 の 4）は性能の評価器が判定する。
+スキップ申告（6.2 の 2）と免除の適用は評価器ではなく `RunEvaluationService` が行う。
 
 ### 6.2 判定の優先順位
 
@@ -400,13 +397,11 @@ record MetricResult(
 2. CI がスキップを申告                 → SKIP（skippable_metrics に含まれる場合）
    　　　　〃                          → ERROR（含まれない場合）
 3. 成果物が未提出、または形式不正       → ERROR
-4. 計測条件が統制外                     → REFERENCE
-5. しきい値に照らして判定               → PASS / WARN / FAIL
+4. しきい値に照らして判定               → PASS / WARN / FAIL
 ```
 
-4 を 5 より前に置くのは、**計測条件が統制外の値をしきい値と比べない**ため。
-比べてしまうと、GitHub ホストランナーで計測した性能値が FAIL になり、
-実際には劣化していないのに不合格が記録される。
+計測条件が統制外の性能値を `REFERENCE` にする段（旧 4。GitHub ホストランナーでの計測）は、
+計測を専有のセルフホストランナーで動く収集ランナーに絞ったため削除した（D-19）。
 
 ### 6.3 差分算出（NEW / CONTINUING / RESOLVED）
 
@@ -633,7 +628,7 @@ CI 側のスクリプトがこれらに依存しないようにする。
 
 | 悪い例 | 良い例 |
 | --- | --- |
-| `Invalid request` | `runnerType は self-hosted / github-hosted のいずれかである必要があります（受信値: selfhosted）` |
+| `Invalid request` | `commitSha は 40 桁の 16 進数で指定してください（受信値: 6ab1e37）` |
 | `File too large` | `ファイルサイズが上限 50MB を超えています（受信: 68MB）。JaCoCo のレポートは XML のみを送信してください` |
 
 ### 9.3 例外の分類

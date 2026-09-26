@@ -41,7 +41,7 @@ export default defineConfig({
       include: ['src/**/*.{ts,vue}'],
       reporter: ['text', 'lcov'],
       reportsDirectory: '../reports/frontend-coverage',
-      // 生成物と設定ファイルは計測対象から外す（.quality-gate.yml の exclusions と揃える）
+      // 生成物と設定ファイルは計測対象から外す
       exclude: ['src/api/schema.d.ts', '**/*.config.ts', 'src/main.ts', 'e2e/**'],
     },
   },

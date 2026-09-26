@@ -73,10 +73,6 @@ function formatBytes(bytes: number): string {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
   return `${(bytes / 1024 / 1024).toFixed(1)} MB`
 }
-
-const runnerLabel = computed(() =>
-  detail.value?.runnerType === 'self-hosted' ? '専有ランナー' : 'GitHub ホストランナー',
-)
 </script>
 
 <template>
@@ -117,7 +113,7 @@ const runnerLabel = computed(() =>
         <p class="qg-muted" aria-live="polite">{{ reevaluateMessage }}</p>
 
         <p class="qg-muted">
-          {{ detail.branch }} · {{ formatDateTime(detail.measuredAt) }} · {{ runnerLabel }}
+          {{ detail.branch }} · {{ formatDateTime(detail.measuredAt) }}
           <span v-if="detail.attempt > 1"> · 試行 {{ detail.attempt }} 回目</span>
         </p>
 

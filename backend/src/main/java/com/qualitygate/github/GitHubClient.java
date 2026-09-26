@@ -65,41 +65,15 @@ public class GitHubClient {
     public Optional<JsonNode> getRepositoryResource(String owner, String name, String path) {
         String repositoryPath = "/repos/%s/%s".formatted(encode(owner), encode(name));
         HttpRequest.Builder request = request(repositoryPath + path).GET();
-        authorization(owner, name, READ).ifPresent(value -> request.header("Authorization", value));
+        authorization(owner, name).ifPresent(value -> request.header("Authorization", value));
         return send(request.build(), owner + "/" + name + path);
-    }
-
-    /**
-     * {@code /repos/<owner>/<name><path>} に JSON を POST する。GitHub App での認証が必要（Check Run の作成など）。
-     *
-     * @param permissions インストールトークンに付ける権限（例: {@code "checks": "write"}）。必要なものだけに絞る
-     */
-    public JsonNode postRepositoryResource(String owner, String name, String path, Object body,
-                                           Map<String, String> permissions) {
-        if (appJwt == null) {
-            throw new GitHubApiException("この操作には GitHub App（QG_GITHUB_APP_ID / QG_GITHUB_APP_PRIVATE_KEY）が必要です");
-        }
-        String repositoryPath = "/repos/%s/%s".formatted(encode(owner), encode(name));
-        HttpRequest request = request(repositoryPath + path)
-                .header("Authorization", "Bearer " + installationToken(owner, name, permissions))
-                .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(objectMapper.writeValueAsString(body)))
-                .build();
-        return send(request, owner + "/" + name + path)
-                .orElseThrow(() -> new GitHubApiException("GitHub API が 404 を返しました（%s/%s%s）"
-                        .formatted(owner, name, path)));
-    }
-
-    /** GitHub App を使うか（Check Run のように App でしか呼べない API の可否）。 */
-    public boolean usesApp() {
-        return appJwt != null;
     }
 
     private static final Map<String, String> READ = Map.of("contents", "read", "pull_requests", "read");
 
-    private Optional<String> authorization(String owner, String name, Map<String, String> permissions) {
+    private Optional<String> authorization(String owner, String name) {
         if (appJwt != null) {
-            return Optional.of("Bearer " + installationToken(owner, name, permissions));
+            return Optional.of("Bearer " + installationToken(owner, name));
         }
         if (properties.usesToken()) {
             return Optional.of("Bearer " + properties.token().strip());
@@ -107,9 +81,9 @@ public class GitHubClient {
         return Optional.empty();
     }
 
-    /** 対象リポジトリにインストールされた App のトークン。リポジトリと権限の組ごとにキャッシュする。 */
-    private String installationToken(String owner, String name, Map<String, String> permissions) {
-        String key = owner + "/" + name + " " + new java.util.TreeMap<>(permissions);
+    /** 対象リポジトリにインストールされた App の読み取り用トークン。リポジトリごとにキャッシュする。 */
+    private String installationToken(String owner, String name) {
+        String key = owner + "/" + name;
         CachedToken cached = installationTokens.get(key);
         Instant now = clock.instant();
         if (cached != null && cached.expiresAt().minus(TOKEN_MARGIN).isAfter(now)) {
@@ -124,7 +98,7 @@ public class GitHubClient {
 
         // 対象リポジトリだけ・必要な権限だけに絞って発行する
         String body = objectMapper.writeValueAsString(Map.of("repositories", java.util.List.of(name),
-                "permissions", permissions));
+                "permissions", READ));
         JsonNode token = send(request("/app/installations/%d/access_tokens".formatted(installationId))
                 .header("Authorization", jwt)
                 .header("Content-Type", "application/json")

@@ -54,13 +54,11 @@ public class ConfigQueryService {
     /** 設定ファイルが無いリポジトリの表示と、UI 編集の初期値。 */
     static final String DEFAULT_YAML = """
             version: 1
-            enforcement: report-only
             on_missing_report: fail
 
             execution:
               skippable_metrics: [mutation_score, performance]
               full_measurement_interval_days: 7
-              reference_only_environments: [github-hosted]
 
             metrics:
               branch_coverage:

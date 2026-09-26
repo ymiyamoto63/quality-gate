@@ -35,15 +35,11 @@ public class GateConfigParser {
     private static final int SUPPORTED_VERSION = 1;
 
     private static final Set<String> ROOT_KEYS = Set.of(
-            "version", "enforcement", "on_missing_report", "execution",
+            "version", "on_missing_report", "execution",
             "components", "exclusions", "metrics", "notifications");
 
     private static final Set<String> EXECUTION_KEYS = Set.of(
-            "skippable_metrics", "full_measurement_interval_days",
-            "reference_only_environments");
-
-    private static final Set<String> ENFORCEMENT_VALUES =
-            Set.of("report-only", "check-run", "blocking");
+            "skippable_metrics", "full_measurement_interval_days");
 
     private static final Set<String> ON_MISSING_REPORT_VALUES = Set.of("fail", "warn");
 
@@ -79,8 +75,6 @@ public class GateConfigParser {
 
         checkUnknownKeys(root, ROOT_KEYS, "", lines, errors);
         int version = versionOf(root, lines, errors);
-        String enforcement = enumValue(root, "enforcement", ENFORCEMENT_VALUES,
-                "report-only", lines, errors);
         String onMissingReport = enumValue(root, "on_missing_report", ON_MISSING_REPORT_VALUES,
                 "fail", lines, errors);
 
@@ -91,7 +85,7 @@ public class GateConfigParser {
         if (!errors.isEmpty()) {
             throw new ConfigValidationException(errors);
         }
-        return new GateConfigDocument(version, enforcement, onMissingReport,
+        return new GateConfigDocument(version, onMissingReport,
                 execution, exclusions, metrics);
     }
 
@@ -160,11 +154,7 @@ public class GateConfigParser {
 
         int interval = intOf(execution.get("full_measurement_interval_days"),
                 fallback.fullMeasurementIntervalDays());
-        Set<String> referenceOnly = new LinkedHashSet<>(
-                stringList(execution.get("reference_only_environments")));
-
-        return new GateConfigDocument.Execution(skippable, interval,
-                referenceOnly.isEmpty() ? fallback.referenceOnlyEnvironments() : referenceOnly);
+        return new GateConfigDocument.Execution(skippable, interval);
     }
 
     private Map<String, GateConfigDocument.MetricConfig> metricsOf(

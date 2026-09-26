@@ -14,15 +14,11 @@ public enum ArtifactType implements WireValued {
 
     JACOCO_XML("jacoco-xml", "M-01"),
     LCOV("lcov", "M-01"),
-    ISTANBUL_JSON("istanbul-json", "M-01"),
     PIT_XML("pit-xml", "M-02"),
     K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
-    GATLING_LOG("gatling-log", "M-03", "M-04", "M-05"),
     SARIF("sarif", "M-06", "M-07", "M-13", "M-14"),
-    OSV_JSON("osv-json", "M-06"),
     PMD_XML("pmd-xml", "M-07"),
     ESLINT_JSON("eslint-json", "M-07"),
-    LIZARD_CSV("lizard-csv", "M-07"),
     JUNIT_XML("junit-xml", "M-08"),
     /**
      * すべてのテストの結果（JUnit XML）。形式は {@link #JUNIT_XML} と同じで、供給する指標だけが違う。
@@ -31,7 +27,6 @@ public enum ArtifactType implements WireValued {
      * 同じ型にすると、単体テストの結果が契約テストの成功率に混ざる。
      */
     TEST_JUNIT_XML("test-junit-xml", "M-11", "M-12"),
-    PACT_VERIFICATION("pact-verification", "M-08"),
     OASDIFF_JSON("oasdiff-json", "M-09"),
     AXE_JSON("axe-json", "M-10"),
     /** jscpd の JSON レポート（{@code jscpd-report.json}）。参考値の M-15。 */
@@ -77,7 +72,7 @@ public enum ArtifactType implements WireValued {
 
     /** 性能計測の成果物か（environment メタデータが必須になる）。 */
     public boolean requiresEnvironmentMetadata() {
-        return this == K6_SUMMARY || this == GATLING_LOG;
+        return this == K6_SUMMARY;
     }
 
     /** 指標の計測結果ではなく、判定の設定を運ぶ成果物か。 */

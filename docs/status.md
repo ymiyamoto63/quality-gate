@@ -18,15 +18,14 @@ M-13 シークレット検出件数 / M-14 ライセンス違反件数（`secret
 | 免除・再評価・日次バッチ・メール通知・監査ログ | 完了 |
 | API と画面（S-01〜S-10） | 完了 |
 | 収集ランナー（対象リポジトリに何も置かない計測。D-16） | 段階 1〜4 を実装（M-01 / M-02 / M-06〜M-17。M-07 は backend と frontend。手動実行と 15 分ごとの定期実行、PR の先頭も計測。M-02 は既定ブランチのみ。M-10 は対象アプリを起動して検査。対象のコードは計測用のコンテナの中で動かす。[収集ランナーで計測する](operations/collector.md)） |
-| 対象の CI からの送信（`quality-gate-action` / CLI） | 完了（GitHub Actions の composite action と、他の CI 向けの CLI `qg-submit`。[CI から送る](operations/ci-submit.md)） |
+| 取り込み経路の一本化（D-19） | 完了（対象の CI から送るための action / CLI、ランナー種別、Check Run の出力、使われていない成果物の形式を削除） |
 
 ## 動くもの
 
-- Flyway による全スキーマ（V001〜V014）の適用
+- Flyway による全スキーマ（V001〜V016）の適用
 - Ingest API（Run 作成 / 成果物アップロード / 確定 / 状態取得）とトークン認証
 - GitHub OAuth ログインと許可リストによる入口制御
 - ジョブキュー（DB ベース、`FOR UPDATE SKIP LOCKED`）
-- GitHub の Check Run の出力（`enforcement: check-run` は neutral、`blocking` は success / failure。判定の後に別のジョブで出す）
 - 設定変更のドライラン（FR-02-5）— S-06 の編集中の設定で、既定ブランチの直近の Run を保存せずに判定し直す
 - 品質レポート（S-10。FR-08-4）— 期間とリポジトリを選んで既定ブランチの判定をまとめ、明細は CSV、PDF はブラウザの印刷で出す
 - README 用のバッジ（`/badges/{owner}/{name}.svg`。認証不要で、既定ブランチの最新の合否だけを返す。FR-08-5）
@@ -37,18 +36,18 @@ M-13 シークレット検出件数 / M-14 ライセンス違反件数（`secret
 - ファイルの移動・リネームを判定ジョブの中で GitHub の compare API により求めて Run に保持し、移動しただけの
   M-07 の違反を新規・解消として扱わない（指標仕様書 0.4）
 - **取り込み → 正規化 → 判定 → 読み取りモデル更新**の一連の流れ
-  - M-01 ブランチカバレッジ（JaCoCo XML / lcov / istanbul の coverage-final.json）
+  - M-01 ブランチカバレッジ（JaCoCo XML / lcov）
   - M-02 ミューテーションスコア（PIT `mutations.xml`）— status を数え直して仕様の式で計算し、
     実行範囲（変更範囲 / 全量）ごとに前回比とトレンドの系列を分ける。
     frontend は「未計測」ではなく「対象外」と表示する
-  - M-03 応答時間 p95 / M-04 スループット / M-05 エラー率（k6 の summary JSON / Gatling のテキスト形式の simulation.log）— 3 回実行の中央値で判定し、
-    計測環境（`environment.name`）ごとに前回比とトレンドの系列を分ける。GitHub ホストランナーの値は参考値。
+  - M-03 応答時間 p95 / M-04 スループット / M-05 エラー率（k6 の summary JSON）— 3 回実行の中央値で判定し、
+    計測環境（`environment.name`）ごとに前回比とトレンドの系列を分ける。
     シナリオ単位の p95 も判定し、エラー率 5% 超は負荷試験が成立していないとして ERROR。
     対象リポジトリは収集ランナーが k6 で計測する（既定ブランチのみ）。quality-gate 自身の性能は計測しない（D-17）
-  - M-06 重大・高 脆弱性件数（SARIF / OSV-Scanner の JSON）
-  - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON / lizard の CSV）— 比較元は base スコープの解析結果、
+  - M-06 重大・高 脆弱性件数（SARIF）
+  - M-07 循環的複雑度 15 超の新規関数数（PMD XML / ESLint の JSON）— 比較元は base スコープの解析結果、
     無ければ比較元コミットで判定済みの過去の Run。収集ランナーは frontend も quality-gate 側の ESLint の設定で解析する
-  - M-08 API 契約テスト成功率（JUnit XML / Pact の検証結果 JSON）— `<testcase>` を数え直し、consumer と provider を
+  - M-08 API 契約テスト成功率（JUnit XML）— `<testcase>` を数え直し、consumer と provider を
     合算して判定する。実行 0 件は「すべて成功」ではなく ERROR、スキップと再実行での成功は WARN
   - M-09 OpenAPI の破壊的変更件数（oasdiff の JSON）— level 3 を破壊的変更として数え、level 2 は WARN。
     比較元に OpenAPI 定義が無い新規 API は「対象外」
@@ -101,6 +100,8 @@ M-13 シークレット検出件数 / M-14 ライセンス違反件数（`secret
 
 ## 未実装のもの・実装しないと決めたもの
 
-- 要件定義書の機能で未実装のものは無い。必須チェック化によるマージブロック（Phase 3）はスコープ外で、
-  `enforcement: blocking` の Check Run をブランチ保護で必須にするかどうかは対象リポジトリの設定に委ねる
+- 要件定義書の機能で未実装のものは無い。必須チェック化によるマージブロック（Phase 3）はスコープ外
+- 取り込み経路は収集ランナーに絞った（D-19 / V016）。対象の CI から送るための `quality-gate-action` と CLI、
+  ランナー種別（D-13）と `reference_only_environments`、Check Run の出力（`enforcement`）、
+  収集ランナーが送らない成果物の形式（istanbul-json / gatling-log / osv-json / lizard-csv / pact-verification）は削除した
 - 通知は**メールのみ**とした（Slack・PR コメントは運用上不要と判断し削除。D-15 / V014）

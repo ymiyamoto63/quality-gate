@@ -2,7 +2,6 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.gate.GateConfigDocument;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -26,7 +25,7 @@ final class EvaluatorTestSupport {
     static Run run() {
         return new Run(Uuid7.generate(), Uuid7.generate(),
                 "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main",
-                RunnerType.SELF_HOSTED, "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
+                "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
     }
 
     static EvaluationContext context(NormalizedInput input) {
@@ -47,7 +46,7 @@ final class EvaluatorTestSupport {
                 new LinkedHashMap<>(defaults.metrics());
         metrics.put(metric, new GateConfigDocument.MetricConfig(true, values));
         return GateThresholds.from(new GateConfigDocument(defaults.version(),
-                defaults.enforcement(), defaults.onMissingReport(), defaults.execution(),
+                defaults.onMissingReport(), defaults.execution(),
                 defaults.exclusions(), metrics));
     }
 

@@ -19,28 +19,27 @@ import java.util.Map;
 public final class MetricCatalog {
 
     private static final List<MetricDefinition> ALL = List.of(
-            new MetricDefinition("M-01", "ブランチカバレッジ", MetricCategory.FUNCTIONAL, true, false),
-            new MetricDefinition("M-02", "ミューテーションスコア", MetricCategory.FUNCTIONAL, true, false),
-            // 性能はランナーの性能に左右されるため、計測環境ごとに別系列にする（FR-08-2）
-            new MetricDefinition("M-03", "応答時間 p95", MetricCategory.PERFORMANCE, false, true),
-            new MetricDefinition("M-04", "スループット", MetricCategory.PERFORMANCE, true, true),
-            new MetricDefinition("M-05", "エラー率", MetricCategory.PERFORMANCE, false, true),
-            new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false, false),
+            new MetricDefinition("M-01", "ブランチカバレッジ", MetricCategory.FUNCTIONAL, true),
+            new MetricDefinition("M-02", "ミューテーションスコア", MetricCategory.FUNCTIONAL, true),
+            new MetricDefinition("M-03", "応答時間 p95", MetricCategory.PERFORMANCE, false),
+            new MetricDefinition("M-04", "スループット", MetricCategory.PERFORMANCE, true),
+            new MetricDefinition("M-05", "エラー率", MetricCategory.PERFORMANCE, false),
+            new MetricDefinition("M-06", "重大・高 脆弱性件数", MetricCategory.SECURITY, false),
             new MetricDefinition("M-07", "循環的複雑度 15 超の新規関数数",
-                    MetricCategory.STRUCTURE, false, false),
-            new MetricDefinition("M-08", "API 契約テスト成功率", MetricCategory.CONTRACT, true, false),
-            new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false, false),
-            new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false, false),
+                    MetricCategory.STRUCTURE, false),
+            new MetricDefinition("M-08", "API 契約テスト成功率", MetricCategory.CONTRACT, true),
+            new MetricDefinition("M-09", "破壊的変更件数", MetricCategory.CONTRACT, false),
+            new MetricDefinition("M-10", "アクセシビリティ違反", MetricCategory.USABILITY, false),
             // 要件定義の後に追加した指標。カテゴリは既存の表に合わせる
-            new MetricDefinition("M-11", "テスト成功率", MetricCategory.FUNCTIONAL, true, false),
-            new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false, false),
-            new MetricDefinition("M-13", "シークレット検出件数", MetricCategory.SECURITY, false, false),
-            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false, false),
+            new MetricDefinition("M-11", "テスト成功率", MetricCategory.FUNCTIONAL, true),
+            new MetricDefinition("M-12", "スキップされたテスト数", MetricCategory.FUNCTIONAL, false),
+            new MetricDefinition("M-13", "シークレット検出件数", MetricCategory.SECURITY, false),
+            new MetricDefinition("M-14", "ライセンス違反件数", MetricCategory.SECURITY, false),
             // 参考値の指標。合格ラインを持たず、値とトレンドだけを残す
-            new MetricDefinition("M-15", "コード重複率", MetricCategory.STRUCTURE, false, false, true),
+            new MetricDefinition("M-15", "コード重複率", MetricCategory.STRUCTURE, false, true),
             new MetricDefinition("M-16", "Lighthouse パフォーマンススコア", MetricCategory.PERFORMANCE,
-                    true, false, true),
-            new MetricDefinition("M-17", "バンドルサイズ（gzip）", MetricCategory.PERFORMANCE, false, false, true));
+                    true, true),
+            new MetricDefinition("M-17", "バンドルサイズ（gzip）", MetricCategory.PERFORMANCE, false, true));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 
@@ -68,7 +67,7 @@ public final class MetricCatalog {
 
     public static MetricDefinition of(String metricId) {
         return BY_ID.getOrDefault(metricId,
-                new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true, false));
+                new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true));
     }
 
     /**

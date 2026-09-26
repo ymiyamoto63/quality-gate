@@ -23,8 +23,6 @@ import java.util.Set;
  * @param contractMinTestCount       M-08 の最小実行件数。下回れば値を確定できない（ERROR）
  * @param maxBreakingChanges         M-09 の合格ライン（破壊的変更の件数）
  * @param performance                M-03 / M-04 / M-05 の合格ライン
- * @param referenceOnlyEnvironments  ここで計測した性能値は参考値（REFERENCE）とする環境。
- *        ランナー種別（github-hosted など）または計測環境の名前で書く
  * @param testResults                M-11 / M-12 の合格ライン
  * @param maxSecrets                 M-13 の合格ライン（シークレットの件数）
  * @param licenses                   M-14 の合格ライン
@@ -48,7 +46,6 @@ public record GateThresholds(
         int contractMinTestCount,
         int maxBreakingChanges,
         Performance performance,
-        Set<String> referenceOnlyEnvironments,
         TestResults testResults,
         int maxSecrets,
         Licenses licenses) {
@@ -191,7 +188,6 @@ public record GateThresholds(
                         performance.number("arrival_rate_rps").orElse(BigDecimal.valueOf(50)),
                         performance.number("error_rate_pct").orElse(new BigDecimal("0.1")),
                         List.copyOf(performance.list("scenarios"))),
-                Set.copyOf(document.execution().referenceOnlyEnvironments()),
                 new TestResults(
                         tests.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
                         // M-08 と同じく、0 を書かれても 1 件は求める

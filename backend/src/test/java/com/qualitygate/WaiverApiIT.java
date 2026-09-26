@@ -10,7 +10,6 @@ import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.JobType;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
@@ -288,7 +287,7 @@ class WaiverApiIT {
     @Test
     void finalizeされないまま滞留したRunは終端にされる() {
         Run stale = runs.save(new Run(Uuid7.generate(), repositoryId, "f".repeat(40), "main",
-                RunnerType.SELF_HOSTED, "ci", Instant.now().minus(Duration.ofDays(2)), 1));
+                "ci", Instant.now().minus(Duration.ofDays(2)), 1));
         jdbc.update("UPDATE runs SET created_at = now() - interval '2 days' WHERE id = ?",
                 stale.getId());
 
@@ -315,7 +314,7 @@ class WaiverApiIT {
     private Run evaluatedRun(Instant measuredAt) {
         Run run = new Run(Uuid7.generate(), repositoryId,
                 String.format("%040x", Math.abs(measuredAt.hashCode())), "main",
-                RunnerType.SELF_HOSTED, "github-actions", measuredAt, 1);
+                "github-actions", measuredAt, 1);
         run.finalizeIngest();
         runs.save(run);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", ONLY_VULNERABILITIES);

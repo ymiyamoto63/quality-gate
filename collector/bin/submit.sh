@@ -59,7 +59,7 @@ REQUEST=$(jq -n \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --argjson skippedMetrics "$(skipped_json)" \
   '{repository: $repository, commitSha: $commitSha, branch: $branch,
-    runnerType: "self-hosted", triggeredBy: $triggeredBy, measuredAt: $measuredAt,
+    triggeredBy: $triggeredBy, measuredAt: $measuredAt,
     skippedMetrics: $skippedMetrics}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)

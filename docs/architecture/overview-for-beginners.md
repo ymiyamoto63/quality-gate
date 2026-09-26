@@ -433,7 +433,7 @@ Run 全体の判定（verdict）は次のように決まります。
 | PASS_WITH_WARNINGS（注意つき合格） | FAIL・ERROR は無いが、WARN がある |
 | PASS（合格） | それ以外（対象外の指標は影響しない） |
 
-いまは `enforcement: report-only` なので、FAIL になっても like-chatgpt の開発は何も止まりません。結果を見て判断するための情報です。
+quality-gate はマージを止めないので（D-4）、FAIL になっても like-chatgpt の開発は何も止まりません。結果を見て判断するための情報です。
 
 同じコミットを何度測っても、前の結果は上書きされず、新しい Run（attempt 2、3…）として残ります。
 収集ランナーが作った Run は、Run 詳細の CI 実行へのリンクが quality-gate リポジトリの collect ワークフローを指します。

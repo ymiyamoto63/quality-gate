@@ -2,7 +2,7 @@
 
 quality-gate リポジトリの**収集ランナー**（`collect.yml` / `collect-target.yml` の `plan` / `fetch` / `measure` / `submit` のすべて）が、
 **セルフホストランナー**（`runs-on: self-hosted`）で動きます。15 分ごとの定期実行と手動実行で対象リポジトリを計測します
-（[収集ランナーで計測する](collector.md)）。ランナー種別の切り替え（D-13）の対象外で、常にセルフホストランナーで動きます。
+（[収集ランナーで計測する](collector.md)）。常にセルフホストランナーで動きます。
 
 Pull Request の CI（`ci.yml`）は GitHub ホストランナー（`ubuntu-latest`）で動き、セルフホストランナーを使いません。
 ランナーが止まっていても PR の CI は止まりません。quality-gate 自身を計測するワークフローはありません（D-18）。

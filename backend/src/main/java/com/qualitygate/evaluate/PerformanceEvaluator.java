@@ -22,11 +22,8 @@ import java.util.TreeMap;
  * <ol>
  *   <li>エラー率が 5% を超える → ERROR（負荷試験そのものが成立していない）</li>
  *   <li>指標固有の値の確定条件（M-03 のシナリオ欠落など） → ERROR</li>
- *   <li>統制外の環境（{@code execution.reference_only_environments}）で計測 → REFERENCE</li>
  *   <li>しきい値に照らして PASS / WARN / FAIL</li>
  * </ol>
- * ERROR を REFERENCE より先に置くのは、参考値としてすら信用できない値を
- * トレンドに載せないためである。
  */
 abstract class PerformanceEvaluator implements MetricEvaluator {
 
@@ -73,11 +70,6 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
         if (undeterminable != null) {
             return result(key, MeasurementStatus.ERROR, null, threshold, undeterminable, detail);
         }
-        if (isReferenceOnly(key, context)) {
-            return result(key, MeasurementStatus.REFERENCE, value, threshold,
-                    "計測環境（%s）が統制外のため参考値として記録し、判定には用いません"
-                            .formatted(environmentLabel(key, context)), detail);
-        }
 
         Judgement judgement = judge(value, runs, limits);
         if (judgement.status() == MeasurementStatus.PASS && runs.size() < EXPECTED_RUNS) {
@@ -86,23 +78,6 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
                     .formatted(runs.size(), EXPECTED_RUNS));
         }
         return result(key, judgement.status(), value, threshold, judgement.reason(), detail);
-    }
-
-    /**
-     * 統制外の環境か。ランナー種別（Run のメタデータ）と計測環境の名前の
-     * どちらで書かれていても一致させる。
-     */
-    private static boolean isReferenceOnly(Key key, EvaluationContext context) {
-        var referenceOnly = context.thresholds().referenceOnlyEnvironments();
-        return referenceOnly.contains(context.run().getRunnerType().wire())
-                || (key.variant() != null && referenceOnly.contains(key.variant()));
-    }
-
-    private static String environmentLabel(Key key, EvaluationContext context) {
-        String runner = context.run().getRunnerType().wire();
-        return key.variant() == null || key.variant().equals(runner)
-                ? runner
-                : runner + " / " + key.variant();
     }
 
     private MetricResult result(Key key, MeasurementStatus status, BigDecimal value,

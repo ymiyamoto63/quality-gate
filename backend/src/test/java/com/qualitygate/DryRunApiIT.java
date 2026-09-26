@@ -6,7 +6,6 @@ import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.RunnerType;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.model.Verdict;
@@ -174,8 +173,7 @@ class DryRunApiIT {
     private UUID evaluated(String measuredAt, String branch, int covered) {
         Instant at = Instant.parse(measuredAt);
         String commitSha = String.format("%040x", Math.abs((measuredAt + branch).hashCode()));
-        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, branch, RunnerType.SELF_HOSTED,
-                "github-actions", at, 1);
+        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, branch, "github-actions", at, 1);
         run.finalizeIngest();
         runs.save(run);
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, CONFIG.formatted(80));

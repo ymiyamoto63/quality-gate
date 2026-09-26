@@ -15,7 +15,6 @@ import java.util.Set;
  */
 public record GateConfigDocument(
         int version,
-        String enforcement,
         String onMissingReport,
         Execution execution,
         List<String> exclusions,
@@ -29,8 +28,7 @@ public record GateConfigDocument(
      */
     public record Execution(
             Set<String> skippableMetrics,
-            int fullMeasurementIntervalDays,
-            Set<String> referenceOnlyEnvironments) {
+            int fullMeasurementIntervalDays) {
     }
 
     /**
@@ -91,9 +89,8 @@ public record GateConfigDocument(
         metrics.put("lighthouse", new MetricConfig(false, Map.of()));
         metrics.put("bundle_size", new MetricConfig(false, Map.of()));
 
-        return new GateConfigDocument(1, "report-only", "fail",
-                new Execution(Set.of("mutation_score", "performance"), 7,
-                        Set.of("github-hosted")),
+        return new GateConfigDocument(1, "fail",
+                new Execution(Set.of("mutation_score", "performance"), 7),
                 List.of(), metrics);
     }
 }

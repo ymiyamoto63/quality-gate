@@ -1,7 +1,6 @@
 package com.qualitygate.domain.repo;
 
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.RunnerType;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -21,7 +20,6 @@ public record TrendRow(
         Instant measuredAt,
         String componentName,
         String variant,
-        RunnerType runnerType,
         MeasurementStatus status,
         BigDecimal value,
         String unit,

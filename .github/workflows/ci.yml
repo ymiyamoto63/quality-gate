@@ -101,7 +101,7 @@ jobs:
       # 429 Too Many Requests で止まる。先に Maven でローカルのリポジトリ（~/.m2）に揃え、Trivy はそれだけを読む
       - name: 依存関係の取得（Maven）
         run: ./backend/mvnw -f backend/pom.xml -B -ntp -q dependency:resolve
-      # .quality-gate.yml の合格ライン（重大・高 0 件）と同じ基準で失敗させる。
+      # 収集ランナーの合格ライン（重大・高 0 件）と同じ基準で失敗させる。
       # 修正版の無い脆弱性は依存の更新で直せないため、ここでは止めない
       - name: Trivy（依存関係）
         uses: aquasecurity/trivy-action@master
