@@ -68,6 +68,11 @@ quality-gate:
   base-url: ${QG_BASE_URL:http://localhost:8080}
   # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-20）
   ingest-tokens: ${QG_INGEST_TOKEN:}
+  # データ保持期間（日。FR-13-1）。短くすると、翌日の保持期間バッチで古いデータが削除される
+  retention:
+    run-days: ${QG_RETENTION_RUN_DAYS:730}
+    artifact-days: ${QG_RETENTION_ARTIFACT_DAYS:90}
+    audit-log-days: ${QG_RETENTION_AUDIT_LOG_DAYS:730}
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
 

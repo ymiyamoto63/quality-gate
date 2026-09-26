@@ -26,11 +26,9 @@ tags:
   name: Ingest
 - description: リリース判定（UC-06）
   name: Release
-- description: 保持期間などのシステム設定（管理者のみ）
-  name: Settings
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
-- description: 設定の表示・検証結果・版履歴
+- description: 設定の表示・検証結果
   name: Config
 - description: リポジトリ単位の参照
   name: Repositories
@@ -208,7 +206,7 @@ paths:
               schema:
                 $ref: "#/components/schemas/RepositoryConfig"
           description: OK
-      summary: 現在の設定と版の履歴、直近の検証結果を取得する
+      summary: 現在の設定と直近の検証結果を取得する
       tags:
       - Config
   /api/v1/repositories/{repositoryId}/release-report:
@@ -578,38 +576,6 @@ paths:
       summary: Run を再評価する
       tags:
       - Operations
-  /api/v1/settings/retention:
-    get:
-      operationId: retention
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RetentionSettings"
-          description: OK
-      summary: データ保持期間を取得する
-      tags:
-      - Settings
-    put:
-      description: 翌日の保持期間バッチから効く。短くすると古いデータが削除される。
-      operationId: updateRetention
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/RetentionSettings"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RetentionSettings"
-          description: OK
-      summary: データ保持期間を変更する
-      tags:
-      - Settings
   /api/v1/users:
     get:
       operationId: list
@@ -776,30 +742,6 @@ components:
       - hasMore
       - items
       - nextCursor
-    ConfigHistoryItem:
-      type: object
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        gateConfigId:
-          type: string
-          format: uuid
-        sourceCommitSha:
-          type:
-          - string
-          - "null"
-        sourceType:
-          type: string
-        version:
-          type: integer
-          format: int32
-      required:
-      - createdAt
-      - gateConfigId
-      - sourceCommitSha
-      - sourceType
-      - version
     ConfigValidation:
       type: object
       description: 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる
@@ -1562,7 +1504,7 @@ components:
           format: uuid
     RepositoryConfig:
       type: object
-      description: 現在の設定と版の履歴。validation は直近に届いた設定ファイルの検証結果
+      description: 現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る
       properties:
         current:
           type: "null"
@@ -1571,16 +1513,11 @@ components:
         defaultYaml:
           type: string
           description: 既定値の YAML。設定版が無いときの表示
-        history:
-          type: array
-          items:
-            $ref: "#/components/schemas/ConfigHistoryItem"
         validation:
           $ref: "#/components/schemas/ConfigValidation"
       required:
       - current
       - defaultYaml
-      - history
       - validation
     RepositoryDetail:
       type: object
@@ -1678,32 +1615,6 @@ components:
       required:
       - fullName
       - repositoryId
-    RetentionSettings:
-      type: object
-      description: データ保持期間（日）
-      properties:
-        artifactDays:
-          type: integer
-          format: int32
-          description: 成果物のファイル実体。既定 90 日
-          maximum: 3650
-          minimum: 1
-        auditLogDays:
-          type: integer
-          format: int32
-          description: 監査ログ。既定 730 日。削除は管理ロールのバッチが行う
-          maximum: 3650
-          minimum: 365
-        runDays:
-          type: integer
-          format: int32
-          description: Run・指標値・違反。既定 730 日（2 年）
-          maximum: 3650
-          minimum: 30
-      required:
-      - artifactDays
-      - auditLogDays
-      - runDays
     RunCategory:
       type: object
       properties:

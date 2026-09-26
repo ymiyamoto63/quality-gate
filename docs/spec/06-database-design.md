@@ -40,7 +40,6 @@ repositories ──▶ gate_configs
                  └──▶ findings
 
 audit_logs      （独立。追記のみ）
-system_settings （独立。保持期間などのシステム設定）
 ```
 
 ---
@@ -112,7 +111,7 @@ CREATE TABLE gate_configs (
 ```
 
 `content_hash` に一意制約を置くことで、**内容が同じ設定は版を増やさない**。
-毎回の Run で新しい版が作られると、変更履歴がノイズで埋まる。
+毎回の Run で新しい版が作られると、同じ合格ラインの版が Run の数だけ増える。
 
 ### 3.4 `runs` — 計測・判定の単位
 
@@ -304,20 +303,7 @@ REVOKE UPDATE, DELETE ON audit_logs FROM quality_gate_app;
 `actor_login` を非正規化しているのは、利用者を削除しても
 「誰が操作したか」が失われないようにするため。
 
-### 3.10 `system_settings` — システム全体の設定
-
-```sql
-CREATE TABLE system_settings (
-    key        varchar(64) PRIMARY KEY,
-    value      jsonb       NOT NULL,
-    updated_by uuid        REFERENCES users(id) ON DELETE SET NULL,
-    updated_at timestamptz NOT NULL DEFAULT now()
-);
-```
-
-保持期間（7 章）をキーごとに JSON で持つ。行が無ければ 7 章の既定値を使う。
-
-### 3.11 Spring Session
+### 3.10 Spring Session
 
 `spring-session-jdbc` が提供する `SPRING_SESSION` / `SPRING_SESSION_ATTRIBUTES` を使う。
 DDL は Spring Session の配布物をそのまま Flyway マイグレーションに取り込む
@@ -381,8 +367,10 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 
 ## 7. 保持期間と削除
 
-下表の保持期間は既定値である。Run・成果物・監査ログの日数は管理画面（S-08）から変更でき、
-`system_settings` に保存する。
+下表の保持期間は既定値である。Run・成果物・監査ログの日数は環境変数
+（`QG_RETENTION_RUN_DAYS` / `QG_RETENTION_ARTIFACT_DAYS` / `QG_RETENTION_AUDIT_LOG_DAYS`）で変えられる。
+変える頻度がほとんど無いため、画面からは変更しない。誤って短い日数を設定すると大半のデータが消えるため、
+下限（Run 30 日・成果物 1 日・監査ログ 365 日）を下回る値ではアプリが起動しない。
 
 | 対象 | 保持期間 | 削除方法 |
 | --- | --- | --- |

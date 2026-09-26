@@ -37,7 +37,7 @@ class FlywayMigrationIT {
                 "flyway_schema_history");
         // マイグレーションで削除したテーブルが残っていない
         assertThat(tables).doesNotContain("waivers", "notifications", "notification_settings", "components",
-                "jobs", "ingest_tokens", "repository_summaries");
+                "jobs", "ingest_tokens", "repository_summaries", "system_settings");
     }
 
     @Test

@@ -14,11 +14,10 @@ public final class ConfigResponses {
     private ConfigResponses() {
     }
 
-    @Schema(description = "現在の設定と版の履歴。validation は直近に届いた設定ファイルの検証結果")
+    @Schema(description = "現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る")
     public record RepositoryConfig(
             @NotNull @Schema(nullable = true, description = "設定版が 1 つも無ければ null（既定値で判定）")
             ConfigVersion current,
-            @NotNull List<ConfigHistoryItem> history,
             @NotNull ConfigValidation validation,
             @NotNull @Schema(description = "既定値の YAML。設定版が無いときの表示")
             String defaultYaml) {
@@ -32,14 +31,6 @@ public final class ConfigResponses {
             @NotNull Instant createdAt,
             @NotNull String rawYaml,
             @NotNull Map<String, Object> parsed) {
-    }
-
-    public record ConfigHistoryItem(
-            @NotNull UUID gateConfigId,
-            @NotNull int version,
-            @NotNull String sourceType,
-            @NotNull @Schema(nullable = true) String sourceCommitSha,
-            @NotNull Instant createdAt) {
     }
 
     @Schema(description = "設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる")

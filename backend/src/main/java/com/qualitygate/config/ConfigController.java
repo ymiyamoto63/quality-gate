@@ -12,7 +12,7 @@ import java.util.UUID;
 /** 設定（S-06）。表示のみ。設定は collector/targets/*.gate.yml を Git で管理する（DD-13）。 */
 @RestController
 @RequestMapping("/api/v1/repositories/{repositoryId}/config")
-@Tag(name = "Config", description = "設定の表示・検証結果・版履歴")
+@Tag(name = "Config", description = "設定の表示・検証結果")
 public class ConfigController {
 
     private final ConfigQueryService service;
@@ -22,7 +22,7 @@ public class ConfigController {
     }
 
     @GetMapping
-    @Operation(summary = "現在の設定と版の履歴、直近の検証結果を取得する",
+    @Operation(summary = "現在の設定と直近の検証結果を取得する",
             description = "検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。")
     public ConfigResponses.RepositoryConfig get(@PathVariable UUID repositoryId) {
         return service.get(repositoryId);

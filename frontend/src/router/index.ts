@@ -79,12 +79,6 @@ const routes: RouteRecordRaw[] = [
     component: AdminView,
     meta: { title: '監査ログ', adminOnly: true },
   },
-  {
-    path: '/admin/retention',
-    name: 'retention',
-    component: AdminView,
-    meta: { title: '保持期間', adminOnly: true },
-  },
 
   {
     path: '/:pathMatch(.*)*',

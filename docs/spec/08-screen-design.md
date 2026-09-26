@@ -15,7 +15,7 @@
 | S-05 | トレンド | `/repositories/:repositoryId/trends` | 全員 | — |
 | S-06 | 設定 | `/repositories/:repositoryId/config` | 全員 | 表示のみ |
 | S-07 | リポジトリ管理 | `/admin/repositories` | ADMIN | ADMIN |
-| S-08 | 管理 | `/admin/users`, `/admin/audit-logs`, `/admin/retention` | ADMIN | ADMIN |
+| S-08 | 管理 | `/admin/users`, `/admin/audit-logs` | ADMIN | ADMIN |
 | S-09 | リリース判定 | `/repositories/:repositoryId/release?ref=` | 全員 | CSV（証跡）の取り出し・PDF の印刷 |
 | — | ログイン | `/login` | 認証不要 | — |
 | — | アクセス拒否 | `/forbidden` | 認証不要 | — |
@@ -443,8 +443,6 @@ canvas は描画内容がスクリーンリーダーから読めず、そのた�
 │ 設定 — ymiyamoto63/quality-gate                                   │
 │ 現在: v3（設定ファイル · 2026-09-20）                             │
 ├───────────────────────────────────────────────────────────────────┤
-│ [ファイルの内容] [しきい値一覧] [変更履歴]                        │
-│                                                                   │
 │  1 │ version: 1                                                   │
 │  2 │ execution:                                                   │
 │ ...                                                               │
@@ -459,6 +457,8 @@ canvas は描画内容がスクリーンリーダーから読めず、そのた�
 
 S-06 は表示だけである。設定は quality-gate リポジトリの `collector/targets/<owner>__<name>.gate.yml` で管理し、
 収集ランナーが Run ごとに送る。画面にはその旨と、変更はプルリクエストで行い main にマージした後の計測から使われることを示す。
+版の履歴は表示しない。合格ラインの変更の履歴（誰が・いつ・なぜ）は Git に残っており、画面に同じものを持たない。
+各 Run の判定に使った版は Run 詳細（S-03）に示す。
 
 ### 4.8 S-07 リポジトリ管理
 
@@ -477,7 +477,6 @@ Ingest Token は環境変数 `QG_INGEST_TOKEN` で設定し、画面では扱わ
 | --- | --- |
 | 利用者 | 許可リスト。GitHub ログイン名、ロール、状態、最終ログイン。追加・ロール変更・無効化 |
 | 監査ログ | 日時・実行者・操作・対象・変更内容。期間と操作種別で絞り込み |
-| 保持期間 | Run・成果物・監査ログの保持日数 |
 
 
 利用者一覧では、**自分自身のロールを VIEWER に変更できない**ようにする。

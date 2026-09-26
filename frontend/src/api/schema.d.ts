@@ -105,7 +105,7 @@ export interface paths {
       cookie?: never
     }
     /**
-     * 現在の設定と版の履歴、直近の検証結果を取得する
+     * 現在の設定と直近の検証結果を取得する
      * @description 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
      */
     get: operations['get']
@@ -319,27 +319,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/settings/retention': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** データ保持期間を取得する */
-    get: operations['retention']
-    /**
-     * データ保持期間を変更する
-     * @description 翌日の保持期間バッチから効く。短くすると古いデータが削除される。
-     */
-    put: operations['updateRetention']
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/users': {
     parameters: {
       query?: never
@@ -427,16 +406,6 @@ export interface components {
       hasMore: boolean
       items: components['schemas']['AuditLogItem'][]
       nextCursor: string | null
-    }
-    ConfigHistoryItem: {
-      /** Format: date-time */
-      createdAt: string
-      /** Format: uuid */
-      gateConfigId: string
-      sourceCommitSha: string | null
-      sourceType: string
-      /** Format: int32 */
-      version: number
     }
     /** @description 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる */
     ConfigValidation: {
@@ -769,13 +738,12 @@ export interface components {
       /** Format: uuid */
       repositoryId?: string
     }
-    /** @description 現在の設定と版の履歴。validation は直近に届いた設定ファイルの検証結果 */
+    /** @description 現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る */
     RepositoryConfig: {
       /** @description 設定版が 1 つも無ければ null（既定値で判定） */
       current: components['schemas']['ConfigVersion']
       /** @description 既定値の YAML。設定版が無いときの表示 */
       defaultYaml: string
-      history: components['schemas']['ConfigHistoryItem'][]
       validation: components['schemas']['ConfigValidation']
     }
     /** @description リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く */
@@ -818,24 +786,6 @@ export interface components {
       fullName: string | null
       /** Format: uuid */
       repositoryId: string
-    }
-    /** @description データ保持期間（日） */
-    RetentionSettings: {
-      /**
-       * Format: int32
-       * @description 成果物のファイル実体。既定 90 日
-       */
-      artifactDays: number
-      /**
-       * Format: int32
-       * @description 監査ログ。既定 730 日。削除は管理ロールのバッチが行う
-       */
-      auditLogDays: number
-      /**
-       * Format: int32
-       * @description Run・指標値・違反。既定 730 日（2 年）
-       */
-      runDays: number
     }
     RunCategory: {
       /** @description カテゴリ名（機能テスト など） */
@@ -1565,50 +1515,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ReevaluateResponse']
-        }
-      }
-    }
-  }
-  retention: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RetentionSettings']
-        }
-      }
-    }
-  }
-  updateRetention: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['RetentionSettings']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RetentionSettings']
         }
       }
     }

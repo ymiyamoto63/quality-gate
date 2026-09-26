@@ -20,7 +20,7 @@ com.qualitygate
 ├ config/       設定ファイル（*.gate.yml）の検証・版管理と、複数モジュールを組み立てる合成点（SecurityConfig など）
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
 ├ release/      リリース判定（UC-06）と CSV
-├ admin/        管理系の操作 API（利用者・リポジトリ・再評価・監査ログ・保持期間）
+├ admin/        管理系の操作 API（利用者・リポジトリ・再評価・監査ログ）
 ├ auth/         GitHub ログイン時の許可リスト照合、セッションのロール更新
 ├ maintenance/  日次バッチ（保持期間の削除・滞留した Run の後始末）
 ├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値

@@ -14,7 +14,6 @@ const repositoryId = computed(() => String(route.params.repositoryId))
 const state = ref<'loading' | 'ready' | 'error'>('loading')
 const errorMessage = ref<string | null>(null)
 const config = ref<Schemas['RepositoryConfig'] | null>(null)
-const tab = ref<'file' | 'history'>('file')
 
 async function load(): Promise<void> {
   state.value = 'loading'
@@ -87,75 +86,35 @@ function sourceLabel(sourceType: string): string {
         設定は quality-gate リポジトリの
         <code>collector/targets/&lt;owner&gt;__&lt;name&gt;.gate.yml</code>
         で管理し、収集ランナーが計測のたびに送ります。変更はプルリクエストで行い、main
-        にマージした後の計測から使われます。この画面は表示だけです。
+        にマージした後の計測から使われます。この画面は表示だけで、変更の履歴は Git で確認します。
       </p>
 
-      <div class="qg-tabs" role="tablist" aria-label="設定の表示">
-        <button type="button" role="tab" :aria-selected="tab === 'file'" @click="tab = 'file'">
-          ファイルの内容
-        </button>
-        <button
-          type="button"
-          role="tab"
-          :aria-selected="tab === 'history'"
-          @click="tab = 'history'"
+      <div v-if="!config.validation.valid" class="qg-panel qg-invalid" role="alert">
+        直近に届いた設定ファイルに {{ config.validation.errors.length }} 件の誤りがあり、 その Run
+        は判定されていません（処理失敗）。誤りは該当する行の下に表示しています。
+        <RouterLink
+          v-if="config.validation.runId"
+          :to="{ name: 'run', params: { runId: config.validation.runId } }"
         >
-          変更履歴（{{ config.history.length }}）
-        </button>
-      </div>
-
-      <div v-if="tab === 'file'" role="tabpanel">
-        <div v-if="!config.validation.valid" class="qg-panel qg-invalid" role="alert">
-          直近に届いた設定ファイルに {{ config.validation.errors.length }} 件の誤りがあり、 その Run
-          は判定されていません（処理失敗）。誤りは該当する行の下に表示しています。
-          <RouterLink
-            v-if="config.validation.runId"
-            :to="{ name: 'run', params: { runId: config.validation.runId } }"
-          >
-            Run を見る
-          </RouterLink>
-          <ul v-if="unplacedErrors.length > 0">
-            <li v-for="error in unplacedErrors" :key="error.message">
-              {{ error.path }} {{ error.message }}
-            </li>
-          </ul>
-        </div>
-
-        <ol class="qg-yaml" aria-label="設定ファイルの内容">
-          <li v-for="(line, index) in lines" :key="index">
-            <code>{{ line || ' ' }}</code>
-            <p v-for="error in errorsAt(index + 1)" :key="error.message" class="qg-yaml__error">
-              <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-              <span class="qg-visually-hidden">{{ index + 1 }} 行目の誤り: </span>
-              {{ error.message }}
-            </p>
+          Run を見る
+        </RouterLink>
+        <ul v-if="unplacedErrors.length > 0">
+          <li v-for="error in unplacedErrors" :key="error.message">
+            {{ error.path }} {{ error.message }}
           </li>
-        </ol>
+        </ul>
       </div>
 
-      <div v-else-if="tab === 'history'" role="tabpanel">
-        <p v-if="config.history.length === 0" class="qg-empty">変更履歴はまだありません。</p>
-        <table v-else class="qg-table qg-table--stack">
-          <thead>
-            <tr>
-              <th scope="col">版</th>
-              <th scope="col">取得元</th>
-              <th scope="col">コミット</th>
-              <th scope="col">登録日時</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr v-for="item in config.history" :key="item.gateConfigId">
-              <td data-label="版">v{{ item.version }}</td>
-              <td data-label="取得元">{{ sourceLabel(item.sourceType) }}</td>
-              <td data-label="コミット">
-                {{ item.sourceCommitSha ? shortSha(item.sourceCommitSha) : '—' }}
-              </td>
-              <td data-label="登録日時">{{ formatDateTime(item.createdAt) }}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
+      <ol class="qg-yaml" aria-label="設定ファイルの内容">
+        <li v-for="(line, index) in lines" :key="index">
+          <code>{{ line || ' ' }}</code>
+          <p v-for="error in errorsAt(index + 1)" :key="error.message" class="qg-yaml__error">
+            <i class="pi pi-exclamation-triangle" aria-hidden="true" />
+            <span class="qg-visually-hidden">{{ index + 1 }} 行目の誤り: </span>
+            {{ error.message }}
+          </p>
+        </li>
+      </ol>
     </template>
   </section>
 </template>
