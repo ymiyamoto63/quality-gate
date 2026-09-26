@@ -21,7 +21,6 @@ export default defineConfig({
       // 本番は SPA フォールバックの除外が 'login/' のため /login は SPA に届く。
       '/login/oauth2': backend,
       '/logout': backend,
-      '/badges': backend,
       '/actuator': backend,
     },
   },

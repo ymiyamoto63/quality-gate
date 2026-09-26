@@ -11,7 +11,7 @@ import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 @Configuration
 public class ObservabilityConfig implements WebMvcConfigurer {
 
-    /** 認証より前（Spring Security のフィルタより前）に置き、認証の失敗や 429 のログにも ID が付くようにする。 */
+    /** 認証より前（Spring Security のフィルタより前）に置き、認証の失敗のログにも ID が付くようにする。 */
     @Bean
     FilterRegistrationBean<RequestIdFilter> requestIdFilter() {
         FilterRegistrationBean<RequestIdFilter> registration = new FilterRegistrationBean<>(new RequestIdFilter());

@@ -31,7 +31,7 @@ GATE_CONFIG="${COLLECTOR_DIR}/targets/${QG_REPOSITORY/\//__}.gate.yml"
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
-# curl の --retry は、レート制限（429）と一時的な障害（5xx）を Retry-After に従って再試行する
+# curl の --retry は、一時的な障害（5xx など）を再試行する
 
 # スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
 skipped_json() {

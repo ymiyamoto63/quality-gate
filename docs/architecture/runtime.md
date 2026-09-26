@@ -54,7 +54,7 @@ DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` �
   2. 出力された `frontend/dist/` を `maven-resources-plugin` が `target/classes/static/` にコピーし、jar に含める
   3. Spring Boot が `classpath:/static/` から SPA を配信する。`/runs/xxx` のように
      静的ファイルとして存在しないパスは `SpaForwardingConfig` が `index.html` を返し、
-     ルーティングを Vue Router に任せる。ただし `api/` `actuator/` `v3/` `swagger-ui` `badges/` `oauth2/` `login/` `logout` は
+     ルーティングを Vue Router に任せる。ただし `api/` `actuator/` `v3/` `swagger-ui` `oauth2/` `login/` `logout` は
      対象外で、存在しない API には正しく 404 を返す
 
 - **開発時（パターン A）**
@@ -66,7 +66,6 @@ DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` �
     | `/oauth2` | ログイン開始（`/oauth2/authorization/github`） |
     | `/login/oauth2` | GitHub からの折り返し（`/login/oauth2/code/github`）。`/login` 全体ではない点に注意（SPA のログイン画面 `/login` は Vite が返す） |
     | `/logout` | ログアウト |
-    | `/badges` | バッジ（将来用。現時点でバックエンドに実装はない） |
     | `/actuator` | ヘルスチェックなど |
 
   - `changeOrigin: false` にしているため、バックエンドから見ても Host は `localhost:5173` のままで、
