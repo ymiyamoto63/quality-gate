@@ -25,13 +25,13 @@ public enum ErrorCode {
     REPOSITORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じリポジトリが既に登録されています"),
     RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
     ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),
-    ARTIFACT_TOO_LARGE(HttpStatus.PAYLOAD_TOO_LARGE, "成果物のサイズが上限を超えています"),
+    ARTIFACT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "成果物のサイズが上限を超えています"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "本文の形式（Content-Type）に対応していません"),
-    ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_ENTITY, "未知の成果物種別です"),
-    ARTIFACT_FORMAT_INVALID(HttpStatus.UNPROCESSABLE_ENTITY, "成果物の形式が不正です"),
-    PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "性能計測のメタデータが不足しています"),
-    MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "ミューテーションテストの実行範囲が指定されていません"),
-    CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "設定ファイルの内容が不正です"),
+    ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_CONTENT, "未知の成果物種別です"),
+    ARTIFACT_FORMAT_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "成果物の形式が不正です"),
+    PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "性能計測のメタデータが不足しています"),
+    MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "ミューテーションテストの実行範囲が指定されていません"),
+    CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "設定ファイルの内容が不正です"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 
     private final HttpStatus status;

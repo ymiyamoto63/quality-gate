@@ -13,6 +13,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +31,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class ObservabilityIT {
 
     private static final String TOKEN = IntegrationCleanup.INGEST_TOKEN;
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {};
 
     @Value("${local.server.port}")
     int port;
@@ -59,12 +62,12 @@ class ObservabilityIT {
 
     @Test
     void エラー応答のtraceIdは要求のIDと一致する() {
-        ResponseEntity<Map> response = client.post().uri("/api/v1/runs")
+        ResponseEntity<Map<String, Object>> response = client.post().uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .header("X-Request-Id", "trace-me-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "ymiyamoto63/quality-gate"))
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getHeaders().getFirst("X-Request-Id")).isEqualTo("trace-me-1");
         assertThat(response.getBody()).containsEntry("traceId", "trace-me-1");

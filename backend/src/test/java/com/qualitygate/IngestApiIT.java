@@ -16,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -41,6 +42,8 @@ class IngestApiIT {
     private static final String REPOSITORY = "ymiyamoto63/quality-gate";
     private static final String COMMIT = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
     private static final String TOKEN = IntegrationCleanup.INGEST_TOKEN;
+    private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
+            new ParameterizedTypeReference<>() {};
 
     @Value("${local.server.port}")
     int port;
@@ -79,7 +82,7 @@ class IngestApiIT {
     @Test
     void Run作成から確定までが通る() {
         // Run を作成する
-        ResponseEntity<Map> created = client.post()
+        ResponseEntity<Map<String, Object>> created = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
@@ -93,7 +96,7 @@ class IngestApiIT {
                         "skippedMetrics", java.util.List.of(
                                 Map.of("metricId", "M-02", "reason", "PR の計測では PIT を実行しない"),
                                 Map.of("metricId", "M-06", "reason", "理由なくスキップを申告した場合"))))
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID runId = UUID.fromString(String.valueOf(created.getBody().get("runId")));
@@ -120,21 +123,21 @@ class IngestApiIT {
         form.add("type", "jacoco-xml");
         form.add("component", "backend");
 
-        ResponseEntity<Map> uploaded = client.post()
+        ResponseEntity<Map<String, Object>> uploaded = client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(uploaded.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(artifacts.findByRunId(runId)).hasSize(1);
 
         // 確定すると、その場で判定して結果を返す
-        ResponseEntity<Map> finalized = client.post()
+        ResponseEntity<Map<String, Object>> finalized = client.post()
                 .uri("/api/v1/runs/{runId}/finalize", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(finalized.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(finalized.getBody()).containsEntry("status", "EVALUATED")
@@ -142,12 +145,12 @@ class IngestApiIT {
         assertThat(runs.findById(runId).orElseThrow().getStatus()).isEqualTo(RunStatus.EVALUATED);
 
         // 確定後の成果物追加は 409
-        ResponseEntity<Map> afterFinalize = client.post()
+        ResponseEntity<Map<String, Object>> afterFinalize = client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(afterFinalize.getStatusCode()).isEqualTo(HttpStatus.CONFLICT);
         assertThat(afterFinalize.getBody()).containsEntry("errorCode", "RUN_ALREADY_FINALIZED");
@@ -169,14 +172,14 @@ class IngestApiIT {
     @Test
     void タグ名に使えない文字を含むタグは拒否される() {
         for (String tag : java.util.List.of("a b", "v1..2", "/v1", "v1/", "x:y")) {
-            ResponseEntity<Map> response = client.post()
+            ResponseEntity<Map<String, Object>> response = client.post()
                     .uri("/api/v1/runs")
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
                             "triggeredBy", "ci", "measuredAt", "2026-09-21T02:10:00Z",
                             "tags", java.util.List.of(tag)))
-                    .retrieve().toEntity(Map.class);
+                    .retrieve().toEntity(JSON_OBJECT);
 
             assertThat(response.getStatusCode()).as(tag).isEqualTo(HttpStatus.BAD_REQUEST);
         }
@@ -199,14 +202,14 @@ class IngestApiIT {
 
     @Test
     void 登録していないリポジトリへは送信できない() {
-        ResponseEntity<Map> response = client.post()
+        ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
                         "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
         assertThat(runs.findAll()).isEmpty();
@@ -225,12 +228,12 @@ class IngestApiIT {
         });
         form.add("type", "unknown-format");
 
-        ResponseEntity<Map> response = client.post()
+        ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getBody()).containsEntry("errorCode", "ARTIFACT_TYPE_UNKNOWN");
@@ -251,12 +254,12 @@ class IngestApiIT {
         });
         form.add("type", "k6-summary");
 
-        ResponseEntity<Map> response = client.post()
+        ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
@@ -276,12 +279,12 @@ class IngestApiIT {
         form.add("type", "k6-summary");
         form.add("metadata", "{\"environment\":{\"runner\":\"self-hosted\"}}");
 
-        ResponseEntity<Map> response = client.post()
+        ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs/{runId}/artifacts", runId)
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getBody()).containsEntry("errorCode", "PERFORMANCE_METADATA_MISSING");
@@ -294,7 +297,7 @@ class IngestApiIT {
      */
     @Test
     void PITの成果物に実行範囲が無ければ拒否される() {
-        ResponseEntity<Map> response = uploadPit(createRun(), null);
+        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
         assertThat(response.getBody()).containsEntry("errorCode", "MUTATION_SCOPE_MISSING");
@@ -304,7 +307,7 @@ class IngestApiIT {
 
     @Test
     void PITの実行範囲が選択肢に無ければ拒否される() {
-        ResponseEntity<Map> response = uploadPit(createRun(), "{\"mutationScope\":\"diff\"}");
+        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "{\"mutationScope\":\"diff\"}");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(response.getBody()).containsEntry("errorCode", "VALIDATION_FAILED");
@@ -312,7 +315,7 @@ class IngestApiIT {
 
     @Test
     void metadataがJSONオブジェクトでなければ拒否される() {
-        ResponseEntity<Map> response = uploadPit(createRun(), "[\"changed\"]");
+        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "[\"changed\"]");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
         assertThat(String.valueOf(response.getBody().get("detail"))).contains("JSON オブジェクト");
@@ -320,12 +323,12 @@ class IngestApiIT {
 
     @Test
     void 実行範囲つきのPITの成果物は受理される() {
-        ResponseEntity<Map> response = uploadPit(createRun(), "{\"mutationScope\":\"changed\"}");
+        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "{\"mutationScope\":\"changed\"}");
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
     }
 
-    private ResponseEntity<Map> uploadPit(UUID runId, String metadata) {
+    private ResponseEntity<Map<String, Object>> uploadPit(UUID runId, String metadata) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("file", new ByteArrayResource("<mutations/>".getBytes(StandardCharsets.UTF_8)) {
             @Override
@@ -343,7 +346,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
     }
 
     @Test
@@ -352,7 +355,7 @@ class IngestApiIT {
         assertThat(upload(runId, "sarif", "report.json", "{\"runs\": [1]}").getStatusCode())
                 .isEqualTo(HttpStatus.ACCEPTED);
 
-        ResponseEntity<Map> again = upload(runId, "sarif", "report.json", "{\"runs\": [1, 2]}");
+        ResponseEntity<Map<String, Object>> again = upload(runId, "sarif", "report.json", "{\"runs\": [1, 2]}");
 
         assertThat(again.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
         assertThat(artifacts.findByRunId(runId)).singleElement().satisfies(record -> {
@@ -378,7 +381,7 @@ class IngestApiIT {
         });
     }
 
-    private ResponseEntity<Map> upload(UUID runId, String type, String filename, String content) {
+    private ResponseEntity<Map<String, Object>> upload(UUID runId, String type, String filename, String content) {
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
         form.add("file", new ByteArrayResource(content.getBytes(StandardCharsets.UTF_8)) {
             @Override
@@ -392,7 +395,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.MULTIPART_FORM_DATA)
                 .body(form)
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
     }
 
     @Test
@@ -402,14 +405,14 @@ class IngestApiIT {
     }
 
     private UUID createRun() {
-        ResponseEntity<Map> created = client.post()
+        ResponseEntity<Map<String, Object>> created = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
                         "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
-                .retrieve().toEntity(Map.class);
+                .retrieve().toEntity(JSON_OBJECT);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return UUID.fromString(String.valueOf(created.getBody().get("runId")));
     }
