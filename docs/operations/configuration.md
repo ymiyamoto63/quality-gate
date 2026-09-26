@@ -6,7 +6,7 @@
 | `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。`compose.yaml` の `db` と一致している |
 | `QG_ARTIFACT_ROOT` | `./data/artifacts` | 成果物の保存先（起動したディレクトリからの相対パス） |
 | `QG_BASE_URL` | `http://localhost:8080` | 取り込み API の応答に含める Run 詳細画面の URL の組み立てに使う |
-| `QG_GITHUB_API_ENABLED` | `true` | `baseCommitSha` を省略した Run の比較元（merge-base）を GitHub API で求めるか（FR-05-4）。求められなくても判定は続く（比較元なし） |
+| `QG_GITHUB_API_ENABLED` | `true` | `baseCommitSha` を省略した Run の比較元（merge-base）を GitHub API で求めるか（FR-05-4）。求められなくても判定は続く（比較元なし）。リリース判定（S-11）でタグをコミットに解決するのにも使う（`false` ならタグは指定できず、コミット SHA で指定する） |
 | `QG_GITHUB_APP_ID` / `QG_GITHUB_APP_PRIVATE_KEY` | なし | 比較元を求めるときの認証に使う GitHub App の App ID と秘密鍵（PEM。改行は `\n` でもよい）。App は対象リポジトリにインストールし、Contents と Pull requests の読み取り権限を付ける。収集ランナーの App と同じものでよい |
 | `QG_GITHUB_TOKEN` | なし | App を使わない場合のトークン（fine-grained で Contents / Pull requests: Read-only）。App もトークンも無ければ認証なしで呼ぶ（public リポジトリのみ） |
 | `QG_GITHUB_API_URL` | `https://api.github.com` | GitHub Enterprise Server なら `https://<host>/api/v3` |

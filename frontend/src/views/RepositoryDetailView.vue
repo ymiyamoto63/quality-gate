@@ -80,6 +80,7 @@ function metricLabel(metric: Schemas['RunMetric']): string {
         <nav class="qg-repo-head__links" aria-label="このリポジトリの画面">
           <RouterLink :to="{ name: 'config', params: { repositoryId } }">設定</RouterLink>
           <RouterLink :to="{ name: 'trends', params: { repositoryId } }">トレンド</RouterLink>
+          <RouterLink :to="{ name: 'release', params: { repositoryId } }">リリース判定</RouterLink>
         </nav>
       </header>
 

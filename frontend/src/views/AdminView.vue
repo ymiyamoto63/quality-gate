@@ -61,6 +61,7 @@ const ACTION_LABELS: Record<string, string> = {
   RUN_REEVALUATION_REQUESTED: '再評価の依頼',
   NOTIFICATION_SETTINGS_UPDATED: '通知設定の更新',
   RETENTION_SETTINGS_UPDATED: '保持期間の変更',
+  RELEASE_REPORT_EXPORTED: 'リリース判定の CSV 出力',
 }
 
 async function loadTab(): Promise<void> {

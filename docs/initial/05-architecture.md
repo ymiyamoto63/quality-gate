@@ -24,13 +24,14 @@ com.qualitygate
 ├ evaluate/     しきい値適用、指標判定、Run 集約、差分（新規 / 継続 / 解消）算出
 ├ config/       .quality-gate.yml の検証・版管理と、複数モジュールを組み立てる合成点（SecurityConfig など）
 ├ query/        参照系ユースケース（ダッシュボード・トレンド・一覧）
+├ release/      リリース判定（UC-10。タグの解決に github を使うため query から分ける）
 ├ admin/        管理系の操作 API（利用者・リポジトリ・トークン・監査ログ・保持期間・ジョブの再実行）
 ├ auth/         GitHub ログイン時の許可リスト照合、セッションのロール更新
 ├ job/          ジョブキューとスケジューラ
 ├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値
 └ platform/     監査ログ、ArtifactStore、共通例外、設定
 
-github/（GitHub API クライアント）は将来用で、現時点ではパッケージ自体が無い。
+github/（GitHub API クライアント）は判定ジョブ（比較元・リネームの解決）と release（タグの解決）だけが使う。
 ```
 
 ### 依存規則

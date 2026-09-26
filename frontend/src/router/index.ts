@@ -12,6 +12,7 @@ import RunDetailView from '@/views/RunDetailView.vue'
 import FindingListView from '@/views/FindingListView.vue'
 import TrendView from '@/views/TrendView.vue'
 import ReportView from '@/views/ReportView.vue'
+import ReleaseView from '@/views/ReleaseView.vue'
 
 /** 画面一覧は docs/initial/08-screen-design.md 1 章と対応する。 */
 const routes: RouteRecordRaw[] = [
@@ -41,6 +42,12 @@ const routes: RouteRecordRaw[] = [
     name: 'trends',
     component: TrendView,
     meta: { title: 'トレンド' },
+  },
+  {
+    path: '/repositories/:repositoryId/release',
+    name: 'release',
+    component: ReleaseView,
+    meta: { title: 'リリース判定' },
   },
   {
     path: '/repositories/:repositoryId/config',

@@ -53,4 +53,12 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
             + "and r.measuredAt >= :from and r.measuredAt < :to order by r.measuredAt, r.id")
     List<Run> findEvaluatedBetween(@Param("repositoryIds") java.util.Collection<UUID> repositoryIds,
                                    @Param("from") Instant from, @Param("to") Instant to);
+
+    /** リリース判定（UC-10）。短い SHA の前方一致で、このリポジトリで計測したコミットを探す。 */
+    @Query("select distinct r.commitSha from Run r where r.repositoryId = :repositoryId "
+            + "and r.commitSha like :prefix")
+    List<String> findCommitShasLike(@Param("repositoryId") UUID repositoryId, @Param("prefix") String prefix);
+
+    /** リリース判定（UC-10）。同じコミットの Run を新しい順に返す。 */
+    List<Run> findByRepositoryIdAndCommitShaOrderByMeasuredAtDescAttemptDesc(UUID repositoryId, String commitSha);
 }
