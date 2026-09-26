@@ -81,7 +81,7 @@ public class SecurityConfig {
                                        AllowlistOAuth2UserService userService,
                                        UserAccountRepository users) throws Exception {
         return http
-                // Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で免除登録や
+                // Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で利用者の追加や
                 // 設定変更が実行できてしまう。SPA は XSRF-TOKEN Cookie の値を
                 // X-XSRF-TOKEN ヘッダで送り返す（frontend/src/api/client.ts）
                 .csrf(csrf -> csrf.spa())

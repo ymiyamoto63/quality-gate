@@ -71,8 +71,6 @@ public class RunQueryController {
             @Parameter(description = "省略時は NEW / CONTINUING / INITIAL")
             @RequestParam(required = false) List<String> state,
             @RequestParam(required = false) List<String> severity,
-            @Parameter(description = "true=免除中のみ / false=免除でないもののみ / 省略=両方")
-            @RequestParam(required = false) Boolean waived,
             @RequestParam(required = false, defaultValue = "0") int limit,
             @RequestParam(required = false) String cursor) {
 
@@ -83,8 +81,7 @@ public class RunQueryController {
         FindingCriteria criteria = new FindingCriteria(runId,
                 metricId == null ? Set.of() : Set.copyOf(metricId),
                 states,
-                severity == null ? Set.of() : parseAll(severity, Severity::valueOf, "severity"),
-                waived);
+                severity == null ? Set.of() : parseAll(severity, Severity::valueOf, "severity"));
 
         return service.findings(runId, criteria, limit, cursor);
     }

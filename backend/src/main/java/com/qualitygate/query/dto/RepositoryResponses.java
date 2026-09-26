@@ -39,7 +39,6 @@ public final class RepositoryResponses {
             LatestRunSummary latestRun,
             @NotNull @Schema(nullable = true) UUID lastFullRunId,
             @NotNull RepositoryFreshness freshness,
-            @NotNull int activeWaiverCount,
             @NotNull @Schema(nullable = true, description = "判定に使われている設定の版。既定値なら null")
             Integer configVersion) {
     }
@@ -60,12 +59,9 @@ public final class RepositoryResponses {
             @NotNull Instant measuredAt) {
     }
 
-    @Schema(description = "データの鮮度（FR-06-2 / FR-06-3）。基準日数はサーバが持つ")
+    @Schema(description = "最後の計測と最後の完全計測の日時（FR-06-2 / FR-06-3）")
     public record RepositoryFreshness(
             @NotNull @Schema(nullable = true) Instant lastMeasuredAt,
-            @NotNull @Schema(nullable = true) Instant lastFullMeasuredAt,
-            @NotNull boolean staleMeasurement,
-            @NotNull boolean staleFullMeasurement,
-            @NotNull int fullMeasurementIntervalDays) {
+            @NotNull @Schema(nullable = true) Instant lastFullMeasuredAt) {
     }
 }

@@ -43,6 +43,7 @@ const retentionError = ref<string | null>(null)
 // 失敗したジョブ
 const deadJobs = ref<Schemas['DeadJobItem'][]>([])
 
+// 削除した機能（免除・通知設定・設定の編集）の操作も、過去の監査ログを読めるよう残す
 const ACTION_LABELS: Record<string, string> = {
   BOOTSTRAP_ADMIN: '初期管理者の登録',
   USER_ADDED: '利用者の追加',
@@ -175,7 +176,7 @@ async function retry(jobId: string): Promise<void> {
         {{ t.label }}
       </RouterLink>
       <RouterLink class="qg-tabs__link" :to="{ name: 'admin-repositories' }">
-        リポジトリ・通知 →
+        リポジトリ →
       </RouterLink>
     </nav>
 
@@ -349,16 +350,6 @@ async function retry(jobId: string): Promise<void> {
           <span class="qg-form__hint"
             >削除は DB の管理ロールで行います（アプリには削除権限がありません）</span
           >
-        </label>
-        <label>
-          通知の送信履歴（日）
-          <input
-            v-model.number="retention.notificationDays"
-            type="number"
-            min="30"
-            max="3650"
-            required
-          />
         </label>
         <p v-if="retentionError" class="qg-form__error" role="alert">{{ retentionError }}</p>
         <div class="qg-form__actions">

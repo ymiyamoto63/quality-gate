@@ -45,7 +45,6 @@ public class ConfigQueryService {
 
             execution:
               skippable_metrics: [mutation_score, performance]
-              full_measurement_interval_days: 7
 
             metrics:
               branch_coverage:

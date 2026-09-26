@@ -9,26 +9,10 @@ import {
   type FindingItem,
 } from '@/stores/findings'
 import { shortSha } from '@/api/format'
-import { useAuthStore } from '@/stores/auth'
 
 const route = useRoute()
 const router = useRouter()
 const store = useFindingsStore()
-const auth = useAuthStore()
-
-/** 免除の登録は免除管理の画面で行う。対象の違反を渡して登録ダイアログを開く。 */
-function waiverLink(item: FindingItem) {
-  return {
-    name: 'waivers',
-    query: {
-      register: 'finding',
-      repositoryId: store.repositoryId ?? '',
-      metricId: item.metricId,
-      fingerprint: item.fingerprint,
-      title: item.title,
-    },
-  }
-}
 
 const runId = computed(() => String(route.params.runId))
 
@@ -208,25 +192,6 @@ function detailLine(item: FindingItem): string | null {
               <i class="pi pi-external-link" aria-hidden="true" />
             </a>
           </p>
-
-          <!--
-            免除中の違反を薄く表示しない。免除は解決ではないため、期限が切れて
-            不合格に戻ったときに「急に問題が増えた」と受け取られる。
-          -->
-          <p v-if="item.waiver" class="qg-waiver">
-            {{
-              item.waiver.status === 'ACTIVE' ? '免除中' : '判定時は免除中（現在は失効・期限切れ）'
-            }}
-            （期限 {{ item.waiver.expiresOn }} · 理由: {{ item.waiver.reason }}）
-            <RouterLink
-              :to="{ name: 'waivers', query: { repositoryId: store.repositoryId ?? '' } }"
-            >
-              免除管理で見る
-            </RouterLink>
-          </p>
-          <p v-else-if="item.state !== 'RESOLVED'" class="qg-finding__links">
-            <RouterLink v-if="auth.isAdmin" :to="waiverLink(item)">免除を登録</RouterLink>
-          </p>
         </li>
       </ul>
 
@@ -315,13 +280,6 @@ function detailLine(item: FindingItem): string | null {
 
 .qg-tag[data-state='RESOLVED'] {
   border-color: var(--status-pass);
-}
-
-.qg-waiver {
-  margin: 0.35rem 0 0;
-  font-size: 0.875rem;
-  border-left: 3px solid var(--status-warn);
-  padding-left: 0.5rem;
 }
 
 .qg-muted {

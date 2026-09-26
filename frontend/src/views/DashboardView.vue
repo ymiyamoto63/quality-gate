@@ -15,18 +15,14 @@ interface Card {
   } | null
   openCriticalCount: number
   openHighCount: number
-  activeWaiverCount: number
   freshness: {
     lastMeasuredAt: string | null
     lastFullMeasuredAt: string | null
-    staleMeasurement: boolean
-    staleFullMeasurement: boolean
   }
 }
 
 const store = useDashboardStore()
 const cards = computed(() => store.repositories as Card[])
-const alerts = computed(() => store.alerts as { code: string; message: string }[])
 
 onMounted(async () => {
   await store.load()
@@ -43,17 +39,6 @@ function formatDateTime(value: string | null): string {
 <template>
   <section>
     <h1>ダッシュボード</h1>
-
-    <!-- 計測途絶の警告。判定はサーバが行い、画面は表示するだけ。 -->
-    <div
-      v-for="alert in alerts"
-      :key="`${alert.code}/${alert.message}`"
-      class="qg-alert"
-      role="status"
-    >
-      <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-      {{ alert.message }}
-    </div>
 
     <p v-if="store.state === 'loading'" class="qg-muted">読み込み中…</p>
 
@@ -93,10 +78,7 @@ function formatDateTime(value: string | null): string {
           <span v-if="card.latestRun?.completeness === 'PARTIAL'"> · 部分計測</span>
         </p>
 
-        <p>
-          重大 {{ card.openCriticalCount }} 件 ・ 高 {{ card.openHighCount }} 件 ・ 免除中
-          {{ card.activeWaiverCount }} 件
-        </p>
+        <p>重大 {{ card.openCriticalCount }} 件 ・ 高 {{ card.openHighCount }} 件</p>
 
         <!--
           部分計測が続くと判定が実態より良く見えるため、
@@ -157,14 +139,6 @@ function formatDateTime(value: string | null): string {
   font-size: 0.875rem;
   display: flex;
   gap: 1rem;
-}
-
-.qg-alert {
-  background: var(--surface-1);
-  border: 1px solid var(--status-warn);
-  border-radius: var(--radius);
-  padding: 0.75rem 1rem;
-  margin-bottom: 1rem;
 }
 
 .qg-empty {

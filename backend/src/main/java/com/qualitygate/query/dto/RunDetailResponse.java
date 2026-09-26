@@ -138,8 +138,7 @@ public record RunDetailResponse(
 
     @Schema(description = "違反の内訳。解消（RESOLVED）も件数に含めて「直った数」を示す")
     public record RunFindingSummary(@NotNull long newCount, @NotNull long continuing,
-                                    @NotNull long resolved, @NotNull long initial,
-                                    @NotNull long waived) {
+                                    @NotNull long resolved, @NotNull long initial) {
     }
 
     @Schema(description = "CI からのスキップ申告。受理されなかった申告も残す")

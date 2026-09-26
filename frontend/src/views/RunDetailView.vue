@@ -212,7 +212,7 @@ function formatBytes(bytes: number): string {
       <footer v-if="!detail.failure" class="qg-section qg-muted">
         違反の内訳: 新規 {{ detail.findingSummary.newCount }} ・ 継続
         {{ detail.findingSummary.continuing }} ・ 解消 {{ detail.findingSummary.resolved }} ・ 初回
-        {{ detail.findingSummary.initial }} ・ 免除中 {{ detail.findingSummary.waived }}
+        {{ detail.findingSummary.initial }}
         <br />
         取り込んだ成果物: {{ detail.artifactCount }} 件
         <button

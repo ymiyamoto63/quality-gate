@@ -40,7 +40,7 @@
 同一オリジン構成のため CORS 設定は行わない。
 **状態変更を伴う操作には CSRF トークンを要求する**（Spring Security の既定）。
 Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で
-免除登録や設定変更が実行できてしまう。
+利用者の追加や設定変更が実行できてしまう。
 
 Ingest API は Cookie を用いないため CSRF の対象外とし、当該パスのみ除外する。
 
@@ -135,8 +135,6 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/runs/{runId}/artifacts` | 成果物の一覧 | — |
 | GET | `/api/v1/runs/{runId}/artifacts/{artifactId}/content` | 成果物のダウンロード | — |
 | GET | `/api/v1/repositories/{id}/config` | 現在の設定と版履歴（S-06） | — |
-| GET | `/api/v1/waivers` | 免除の一覧（S-07） | — |
-| GET | `/api/v1/repositories/{id}/notification-settings` | 通知設定 | — |
 
 ### 2.3 操作 API
 
@@ -148,14 +146,11 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | POST | `/api/v1/repositories/{id}/ingest-tokens` | トークン発行（平文は応答時のみ） | ADMIN |
 | DELETE | `/api/v1/ingest-tokens/{id}` | トークン失効 | ADMIN |
 | POST | `/api/v1/runs/{runId}/reevaluate` | 再評価の実行 | ADMIN |
-| POST | `/api/v1/waivers` | 免除の登録 | ADMIN |
-| DELETE | `/api/v1/waivers/{id}` | 免除の失効 | ADMIN |
 | GET | `/api/v1/users` | 利用者（許可リスト）一覧 | ADMIN |
 | POST | `/api/v1/users` | 許可リストへの追加 | ADMIN |
 | PATCH | `/api/v1/users/{id}` | ロール変更・無効化 | ADMIN |
 | GET | `/api/v1/audit-logs` | 監査ログ | ADMIN |
 | GET | `/api/v1/repositories/{id}/ingest-tokens` | トークン一覧（平文もハッシュも返さない） | ADMIN |
-| PUT | `/api/v1/repositories/{id}/notification-settings` | 通知条件とメール宛先の更新 | ADMIN |
 | GET / PUT | `/api/v1/settings/retention` | 保持期間の取得・更新 | ADMIN |
 | GET | `/api/v1/jobs/dead` | 恒久的に失敗したジョブの一覧 | ADMIN |
 | POST | `/api/v1/jobs/{id}/retry` | 失敗したジョブの再実行 | ADMIN |
@@ -310,24 +305,18 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
       ],
       "openCriticalCount": 1,
       "openHighCount": 1,
-      "activeWaiverCount": 2,
       "freshness": {
         "lastMeasuredAt": "2026-09-21T02:12:30Z",
-        "lastFullMeasuredAt": "2026-09-14T02:11:00Z",
-        "staleMeasurement": false,
-        "staleFullMeasurement": true
+        "lastFullMeasuredAt": "2026-09-14T02:11:00Z"
       }
     }
-  ],
-  "alerts": [
-    { "code": "FULL_MEASUREMENT_STALE", "repositoryId": "018f...", "days": 7 }
   ]
 }
 ```
 
-`freshness` を応答に含めるのは、FR-06-2（計測途絶）と FR-06-3（完全計測途絶）を
-**画面側で計算させない**ため。基準日数は設定値であり、
-サーバが判定してブール値で返すほうが、設定変更が画面に確実に反映される。
+`freshness` は最終計測と最後の完全計測の日時だけを返す（FR-06-2 / FR-06-3）。
+計測途絶・完全計測途絶の判定（`staleMeasurement` / `staleFullMeasurement`）と `alerts`、
+免除の件数（`activeWaiverCount`）は D-22 で削除した。
 
 ### 4.2 `GET /api/v1/runs/{runId}`
 
@@ -402,7 +391,6 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
 | `metricId` | `M-06` など |
 | `state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL`（複数可） |
 | `severity` | `CRITICAL` / `HIGH` / ...（複数可） |
-| `waived` | `true` / `false` |
 | `limit` / `cursor` | ページング |
 
 ```json
@@ -423,8 +411,7 @@ CI からのポーリング用。Run 詳細より軽量な応答を返す。
         "fixedVersion": "1.2.5",
         "cvssScore": 8.1,
         "advisoryUrl": "https://..."
-      },
-      "waiver": null
+      }
     }
   ],
   "nextCursor": null,
@@ -653,45 +640,19 @@ API のパスはリポジトリ上のファイルではない。
 | リポジトリ | 大文字小文字を問わず同じ `owner/name` は `409 REPOSITORY_ALREADY_EXISTS`。無効化したリポジトリへの Run 作成は `403 FORBIDDEN` |
 | トークン | 一覧は平文もハッシュも返さない。監査ログにも平文を残さない |
 | 設定 | `GET .../config` は表示だけ（更新の API は無い。設定は `collector/targets/*.gate.yml` を Git で管理する。D-20）。`defaultYaml` を返す。直近の Run が設定の検証エラーで失敗していれば、その設定ファイルを検証し直して行番号つきのエラーと内容（`validation.rawYaml`）を返す |
-| 免除 | 違反の免除（`scope: FINDING`）は、そのリポジトリで検出されたことのある違反だけを対象にできる（無ければ 404）。登録時点の違反の見出しを `title` に複製する。指標の免除（`scope: METRIC`）は判定を `REFERENCE` にして本来の判定を理由に残し、ダッシュボードの `alerts` に `METRIC_WAIVED` を常に出す。違反の免除は違反を数える指標（M-06 / M-07 / M-09 / M-10）に効く。M-08 は件数の集計で判定するため、指標の免除を使う |
-| 違反一覧 | 各違反に `fingerprint`、応答に `repositoryId` を返す（免除の登録に使う）。`waiver.status` は判定後に失効・期限切れになっていれば `ACTIVE` 以外 |
+| 違反一覧 | 各違反に `fingerprint` を返す（免除と、その登録に使っていた `repositoryId` / `waiver` は D-22 で削除） |
 | 再評価 | `POST /api/v1/runs/{id}/reevaluate` の `status` は受付時点の Run の状態。取り込みが確定していない Run は `409 RUN_NOT_EVALUABLE` |
 | ジョブ | 恒久的失敗（`DEAD`）の確認と手動再実行（[05](05-architecture.md) 4.3） |
-| 保持期間 | Run・成果物・監査ログ・通知の日数を扱う |
-| 通知設定 | 通知条件とメールの宛先（D-15 でメールのみ） |
+| 保持期間 | Run・成果物・監査ログの日数を扱う |
 | 成果物 | `GET /api/v1/runs/{id}/artifacts` と `.../content`。実体が削除済みなら `409 ARTIFACTS_DELETED`。必ずダウンロードとして返す（`Content-Disposition: attachment`） |
 
 ---
 
 ## 5. 操作 API の詳細
 
-### 5.1 `POST /api/v1/waivers`
+### 5.1 ~~`POST /api/v1/waivers`~~（D-22 で削除）
 
-```json
-{
-  "repositoryId": "018f...",
-  "scope": "FINDING",
-  "metricId": "M-06",
-  "fingerprint": "e3b0c44298fc1c14...",
-  "reasonCategory": "NO_FIX_AVAILABLE",
-  "reason": "上流に修正版が未提供。リバースプロキシ側で該当パスを遮断済み（PR #456）",
-  "expiresAt": "2026-10-21T00:00:00Z"
-}
-```
-
-| 検証 | 内容 |
-| --- | --- |
-| `reason` | 必須。20 文字以上（「対応済み」のような実質のない理由を防ぐ） |
-| `expiresAt` | 必須。現在時刻より後、かつ最大 90 日先まで |
-| 重複 | 同一 `(repositoryId, metricId, fingerprint)` に有効な免除が既にある場合 409 |
-
-**応答（201）** で登録された免除を返す。同時に:
-
-1. 監査ログに `WAIVER_CREATED` を記録
-2. 当該リポジトリの最新 Run の再評価ジョブを登録（免除の効果を即座に反映する）
-
-2 を自動で行うのは、免除を登録したのにダッシュボードが
-不合格のままだと、登録が効いたのか分からないためである。
+免除の登録・一覧・失効の API は、免除の廃止とともに削除した。
 
 ### 5.2 `POST /api/v1/repositories/{id}/ingest-tokens`
 
@@ -739,11 +700,9 @@ API のパスはリポジトリ上のファイルではない。
 | --- | :---: | :---: | :---: |
 | ダッシュボード・Run・Finding・トレンドの閲覧 | ○ | ○ | — |
 | 設定の閲覧 | ○ | ○ | — |
-| 免除の閲覧 | ○ | ○ | — |
 | 成果物のダウンロード | ○ | ○ | — |
 | Run の作成・成果物の送信・finalize | — | — | ○ |
 | 再評価の実行 | — | ○ | — |
-| 免除の登録・失効 | — | ○ | — |
 | リポジトリ登録・設定変更 | — | ○ | — |
 | トークンの発行・失効 | — | ○ | — |
 | 利用者・ロールの管理 | — | ○ | — |
@@ -774,7 +733,6 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `ADMIN_REQUIRED` | 409 | 自分自身の降格・無効化、または有効な管理者が 0 人になる変更 |
 | `REPOSITORY_ALREADY_EXISTS` | 409 | 同じリポジトリが既に登録されている |
 | `RUN_NOT_EVALUABLE` | 409 | 取り込みが確定していない Run の再評価 |
-| `WAIVER_ALREADY_EXISTS` | 409 | 同一対象に有効な免除が存在する |
 | `ARTIFACTS_DELETED` | 409 | 成果物が保持期間経過で削除済み（再評価不可） |
 | `ARTIFACT_TOO_LARGE` | 413 | ファイルまたは Run 合計のサイズ超過 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | 本文の形式（`Content-Type`）に対応していない |
@@ -783,7 +741,6 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
-| `WAIVER_EXPIRY_TOO_FAR` | 422 | 免除期限が 90 日を超える |
 | `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害（定義のみ。GitHub API を呼ぶのは判定ジョブの比較元の解決だけで、失敗しても比較元なしで判定を続けるため、API の応答としては返さない） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 

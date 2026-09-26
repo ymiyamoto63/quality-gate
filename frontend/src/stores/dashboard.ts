@@ -8,7 +8,6 @@ export type LoadState = 'idle' | 'loading' | 'ready' | 'error'
 export const useDashboardStore = defineStore('dashboard', () => {
   const state = ref<LoadState>('idle')
   const repositories = ref<unknown[]>([])
-  const alerts = ref<unknown[]>([])
   const errorMessage = ref<string | null>(null)
 
   let pollTimer: ReturnType<typeof setInterval> | null = null
@@ -26,9 +25,8 @@ export const useDashboardStore = defineStore('dashboard', () => {
       useUiStore().notify('error', errorMessage.value)
       return
     }
-    const payload = (data ?? {}) as { repositories?: unknown[]; alerts?: unknown[] }
+    const payload = (data ?? {}) as { repositories?: unknown[] }
     repositories.value = payload.repositories ?? []
-    alerts.value = payload.alerts ?? []
     errorMessage.value = null
     state.value = 'ready'
   }
@@ -50,5 +48,5 @@ export const useDashboardStore = defineStore('dashboard', () => {
     }
   }
 
-  return { state, repositories, alerts, errorMessage, load, startPolling, stopPolling }
+  return { state, repositories, errorMessage, load, startPolling, stopPolling }
 })

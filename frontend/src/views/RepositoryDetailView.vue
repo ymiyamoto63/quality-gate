@@ -80,27 +80,12 @@ function metricLabel(metric: Schemas['RunMetric']): string {
         <nav class="qg-repo-head__links" aria-label="このリポジトリの画面">
           <RouterLink :to="{ name: 'config', params: { repositoryId } }">設定</RouterLink>
           <RouterLink :to="{ name: 'trends', params: { repositoryId } }">トレンド</RouterLink>
-          <RouterLink :to="{ name: 'waivers', query: { repositoryId } }">
-            免除（{{ detail.activeWaiverCount }} 件）
-          </RouterLink>
         </nav>
       </header>
 
       <p v-if="!detail.repository.enabled" class="qg-panel" role="status">
         このリポジトリは無効化されています。計測結果は受け付けず、ダッシュボードにも表示されません。
       </p>
-
-      <div
-        v-if="detail.freshness.staleMeasurement || detail.freshness.staleFullMeasurement"
-        class="qg-panel qg-alert"
-        role="status"
-      >
-        <i class="pi pi-exclamation-triangle" aria-hidden="true" />
-        <span v-if="detail.freshness.staleMeasurement">計測が 48 時間以上届いていません。</span>
-        <span v-if="detail.freshness.staleFullMeasurement">
-          完全計測が {{ detail.freshness.fullMeasurementIntervalDays }} 日以上行われていません。
-        </span>
-      </div>
 
       <section class="qg-panel" aria-labelledby="latest-heading">
         <h2 id="latest-heading">最新の判定</h2>
@@ -256,8 +241,5 @@ function metricLabel(metric: Schemas['RunMetric']): string {
 h2 {
   font-size: 1.0625rem;
   margin-top: 0;
-}
-.qg-alert {
-  border-color: var(--status-warn);
 }
 </style>

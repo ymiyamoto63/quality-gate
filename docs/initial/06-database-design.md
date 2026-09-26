@@ -40,15 +40,12 @@ users ──┐
 repositories ──┬──▶ components
      │         ├──▶ ingest_tokens
      │         ├──▶ gate_configs
-     │         ├──▶ waivers
-     │         ├──▶ notification_settings (1:1 通知設定)
      │         └──▶ repository_summaries (1:1 読み取りモデル)
      │
      └──▶ runs ──┬──▶ artifacts
                  ├──▶ run_skipped_metrics
                  ├──▶ measurements ──▶ (component)
-                 ├──▶ findings ──────▶ (waiver)
-                 └──▶ notifications
+                 └──▶ findings
 
 jobs            （独立。payload で他テーブルを参照）
 audit_logs      （独立。追記のみ）
@@ -178,7 +175,6 @@ CREATE TABLE runs (
     baseline_run_id     uuid        REFERENCES runs(id) ON DELETE SET NULL,
     status              varchar(16) NOT NULL,
     verdict             varchar(24),
-    previous_verdict    varchar(24),                -- 再評価の直前の判定（V013。通知の遷移判定用）
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
@@ -309,7 +305,6 @@ CREATE TABLE findings (
     line            int,
     component_name  varchar(64),
     detail          jsonb,                      -- CVE ID、CC 値、axe の impact など
-    waiver_id       uuid        REFERENCES waivers(id) ON DELETE SET NULL,
     CONSTRAINT findings_state_check CHECK (state IN
         ('NEW','CONTINUING','RESOLVED','INITIAL')),
     CONSTRAINT findings_severity_check CHECK (severity IN
@@ -318,71 +313,15 @@ CREATE TABLE findings (
 );
 ```
 
-`waiver_id` が設定された Finding は判定の件数から除外されるが、
-**行としては残る**。免除中の件数を UI に併記する要件（FR-10-3）を、
-別テーブルを作らずに満たせる。
+V017 で `waiver_id`（免除の紐付け）を削除した（D-22）。
 
-### 3.11 `waivers` — 免除
+### 3.11 `waivers` — 免除（V017 で削除）
 
-```sql
-CREATE TABLE waivers (
-    id              uuid        PRIMARY KEY,
-    repository_id   uuid        NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-    scope           varchar(12) NOT NULL,       -- 'FINDING' / 'METRIC'
-    metric_id       varchar(8)  NOT NULL,
-    fingerprint     char(64),                   -- scope=FINDING のとき必須
-    reason_category varchar(32) NOT NULL,       -- 'UNREACHABLE' / 'FALSE_POSITIVE' / ...
-    reason          text        NOT NULL,
-    title           varchar(512),               -- 登録時点の違反の見出し（V013）
-    status          varchar(12) NOT NULL DEFAULT 'ACTIVE',
-    created_by      uuid        NOT NULL REFERENCES users(id),
-    approved_by     uuid        REFERENCES users(id),   -- Phase 1 では created_by と同値
-    created_at      timestamptz NOT NULL DEFAULT now(),
-    expires_at      timestamptz NOT NULL,
-    revoked_at      timestamptz,
-    revoked_by      uuid        REFERENCES users(id),
-    CONSTRAINT waivers_scope_check  CHECK (scope IN ('FINDING','METRIC')),
-    CONSTRAINT waivers_status_check CHECK (status IN ('ACTIVE','EXPIRED','REVOKED')),
-    CONSTRAINT waivers_fingerprint_required
-        CHECK (scope <> 'FINDING' OR fingerprint IS NOT NULL),
-    CONSTRAINT waivers_expiry_required CHECK (expires_at > created_at)
-);
-CREATE UNIQUE INDEX ux_waivers_active
-    ON waivers (repository_id, metric_id, fingerprint)
-    WHERE status = 'ACTIVE' AND scope = 'FINDING';
-```
+免除（D-12）を廃止したため、V017 でテーブルごと削除した（D-22）。
 
-`expires_at` を **NOT NULL** にすることで、無期限の免除を
-データ構造のレベルで作れなくしている（FR-10-2）。
-運用ルールではなく制約で守る。
+### 3.12 `notifications` — 通知の送信履歴（V017 で削除）
 
-部分一意インデックスにより、同じ違反に対する有効な免除は常に 1 件に保たれる。
-
-### 3.12 `notifications` — 通知の送信履歴
-
-```sql
-CREATE TABLE notifications (
-    id          uuid        PRIMARY KEY,
-    run_id      uuid        REFERENCES runs(id) ON DELETE CASCADE,
-    repository_id uuid      NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
-    event       varchar(32) NOT NULL,       -- 'VERDICT_TRANSITION' / 'WAIVER_EXPIRING' / ...
-    channel     varchar(16) NOT NULL,       -- 'EMAIL'（D-15 でメールのみ）
-    status      varchar(16) NOT NULL,       -- 'SENT' / 'FAILED'
-    target      varchar(255),               -- 宛先
-    external_id varchar(255),               -- 未使用（PR コメント用に設けたが D-15 で不採用）
-    error_detail text,
-    sent_at     timestamptz NOT NULL DEFAULT now(),
-    dedup_key   varchar(255),               -- Run を持たない通知の重複抑止（V012）
-    CONSTRAINT notifications_unique_key UNIQUE (run_id, event, channel, target),
-    CONSTRAINT notifications_status_check CHECK (status IN ('SENT','FAILED'))
-);
-CREATE UNIQUE INDEX ux_notifications_dedup ON notifications (event, channel, target, dedup_key)
-    WHERE dedup_key IS NOT NULL;
-```
-
-一意制約が再送の抑止そのものになる（[05](05-architecture.md) 4.5）。
-免除の期限接近や計測途絶のように Run を持たない通知は `run_id` が NULL で一意制約が効かないため、
-`dedup_key` で抑止する。
+メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
 
 ### 3.13 `jobs` — ジョブキュー
 
@@ -433,17 +372,16 @@ CREATE TABLE repository_summaries (
     category_status     jsonb,      -- {"機能テスト":"PASS","性能テスト":"REFERENCE",...}
     open_critical_count int         NOT NULL DEFAULT 0,
     open_high_count     int         NOT NULL DEFAULT 0,
-    active_waiver_count int         NOT NULL DEFAULT 0,
     version             bigint      NOT NULL DEFAULT 0,   -- 楽観ロック（9 章）
     updated_at          timestamptz NOT NULL DEFAULT now()
 );
 ```
 
-判定完了時と、免除・保持期間バッチの実行時に更新する。
+判定完了時に更新する。
 ダッシュボードはこの 1 テーブルを読むだけで描画でき、
 Run や Measurement を走査しない（[05](05-architecture.md) 11 章）。
 
-`last_full_measured_at` が**完全計測の鮮度監視**（FR-06-3）の判定元になる。
+`last_full_measured_at` は最後の完全計測の日時として画面に常に表示する（FR-06-3）。
 
 ### 3.15 `audit_logs` — 監査ログ
 
@@ -452,7 +390,7 @@ CREATE TABLE audit_logs (
     id            uuid        PRIMARY KEY,
     actor_user_id uuid        REFERENCES users(id) ON DELETE SET NULL,
     actor_login   varchar(39),                -- ユーザー削除後も誰の操作か残す
-    action        varchar(64) NOT NULL,       -- 'WAIVER_CREATED' / 'CONFIG_CHANGED' / ...
+    action        varchar(64) NOT NULL,       -- 'REPOSITORY_CREATED' / 'USER_ADDED' / ...
     target_type   varchar(32) NOT NULL,
     target_id     varchar(64),
     before_value  jsonb,
@@ -478,23 +416,11 @@ V006 はロール `quality_gate_app` が存在する場合だけこれを実行�
 アプリの実装ミスで監査ログが書き換わる経路を、権限の側で塞ぐ。
 
 `actor_login` を非正規化しているのは、利用者を削除しても
-「誰が免除を登録したか」が失われないようにするため。
+「誰が操作したか」が失われないようにするため。
 
-### 3.16 `notification_settings` — リポジトリごとの通知設定
+### 3.16 `notification_settings` — リポジトリごとの通知設定（V017 で削除）
 
-```sql
-CREATE TABLE notification_settings (
-    repository_id    uuid        PRIMARY KEY REFERENCES repositories(id) ON DELETE CASCADE,
-    condition        varchar(16) NOT NULL DEFAULT 'TRANSITION',
-    email_recipients jsonb       NOT NULL DEFAULT '[]'::jsonb,
-    updated_by       uuid        REFERENCES users(id) ON DELETE SET NULL,
-    updated_at       timestamptz NOT NULL DEFAULT now(),
-    CONSTRAINT notification_settings_condition_check CHECK (condition IN
-        ('EVERY_RUN','TRANSITION','FAIL_ONLY','DISABLED'))
-);
-```
-
-V012 で Slack の Webhook と PR コメントの列も作ったが、V014 で削除した（D-15）。
+メール通知を廃止したため、V017 でテーブルごと削除した（D-22）。
 
 ### 3.17 `system_settings` — システム全体の設定
 
@@ -527,10 +453,7 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | `measurements.status` | `PASS` / `WARN` / `FAIL` / `SKIP` / `REFERENCE` / `ERROR` / `NOT_APPLICABLE` |
 | `findings.state` | `NEW` / `CONTINUING` / `RESOLVED` / `INITIAL` |
 | `findings.severity` | `CRITICAL` / `HIGH` / `MEDIUM` / `LOW` / `INFO` |
-| `waivers.status` | `ACTIVE` / `EXPIRED` / `REVOKED` |
-| `waivers.reason_category` | `UNREACHABLE` / `FALSE_POSITIVE` / `NO_FIX_AVAILABLE` / `PLANNED` |
 | `users.role` | `ADMIN` / `VIEWER` |
-| `notification_settings.condition` | `EVERY_RUN` / `TRANSITION` / `FAIL_ONLY` / `DISABLED` |
 | `jobs.status` | `PENDING` / `RUNNING` / `SUCCEEDED` / `FAILED` / `DEAD` |
 
 ---
@@ -546,11 +469,9 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 | 3 | Run 詳細の指標一覧 | `ix_measurements_run ON measurements (run_id)` |
 | 4 | **トレンド**（リポジトリ × 指標 × 期間） | `ix_measurements_trend ON measurements (repository_id, metric_id, measured_at DESC)` |
 | 5 | Finding 一覧（Run 内・状態や深刻度で絞る） | `ix_findings_run ON findings (run_id, metric_id, state)` |
-| 6 | 免除の突き合わせ（判定時） | `ux_waivers_active`（3.11） |
-| 7 | 期限切れ免除の抽出（日次） | `ix_waivers_expiry ON waivers (expires_at) WHERE status = 'ACTIVE'` |
-| 8 | ジョブ取得 | `ix_jobs_poll`（3.13） |
-| 9 | Ingest Token 照合 | `token_prefix` の UNIQUE 制約 |
-| 10 | 保持期間の削除対象抽出 | `ix_runs_retention ON runs (measured_at)` |
+| 6 | ジョブ取得 | `ix_jobs_poll`（3.13） |
+| 7 | Ingest Token 照合 | `token_prefix` の UNIQUE 制約 |
+| 8 | 保持期間の削除対象抽出 | `ix_runs_retention ON runs (measured_at)` |
 
 4 のインデックスが最も重要である。トレンドは 30 日 × 1 指標で
 数十〜数百行を返すだけだが、`measurements` は 3 年で数百万行になる。
@@ -563,8 +484,6 @@ DDL は Spring Session の配布物をそのまま Flyway マイグレーショ�
 CREATE INDEX ix_ingest_tokens_repo ON ingest_tokens (repository_id) WHERE revoked_at IS NULL;
 -- 実行待ちジョブだけを対象にする
 CREATE INDEX ix_jobs_poll ON jobs (run_after) WHERE status = 'PENDING';
--- 有効な免除だけを対象にする
-CREATE INDEX ix_waivers_expiry ON waivers (expires_at) WHERE status = 'ACTIVE';
 ```
 
 いずれも「大半が対象外」のテーブルであり、部分インデックスにすることで
@@ -597,7 +516,7 @@ CREATE INDEX ix_waivers_expiry ON waivers (expires_at) WHERE status = 'ACTIVE';
 
 ## 7. 保持期間と削除
 
-下表の保持期間は既定値である。Run・成果物・監査ログ・通知の日数は管理画面（S-09）から変更でき、
+下表の保持期間は既定値である。Run・成果物・監査ログの日数は管理画面（S-09）から変更でき、
 `system_settings` に保存する。
 
 | 対象 | 保持期間 | 削除方法 |
@@ -608,7 +527,6 @@ CREATE INDEX ix_waivers_expiry ON waivers (expires_at) WHERE status = 'ACTIVE';
 | `audit_logs` | 2 年 | 管理ロールのバッチで削除 |
 | `jobs`（`SUCCEEDED`） | 30 日 | |
 | `jobs`（`DEAD`） | 無期限 | 手動で確認・削除する |
-| `notifications` | 1 年 | |
 
 削除は日次バッチで**少量ずつ**実行する（1 回あたり最大 10,000 行）。
 一括削除は長時間のロックと WAL の急増を招き、その間アプリが停止する。
@@ -655,9 +573,11 @@ DELETE FROM runs
 | `V012__create_notification_and_system_settings.sql` | `notification_settings`（リポジトリごとの通知条件と宛先）・`system_settings`（保持期間など）の追加、`notifications.dedup_key`（Run を持たない通知の重複抑止） |
 | `V013__waiver_title_and_run_status.sql` | `waivers.title`（登録時点の違反の見出し）、`runs.previous_verdict`（再評価の直前の判定。通知の遷移判定に使う） |
 | `V014__email_only_notifications.sql` | 通知をメールのみにしたため、V012 の Slack・PR コメントの列を削除（D-15） |
+| `V015__run_renamed_files.sql` | `runs.renamed_files`（ファイルの移動・リネームの対応表） |
+| `V016__collector_only_ingest.sql` | 取り込み経路を収集ランナーに絞ったため、`runs.runner_type` と Check Run のジョブ、設定の削除したキーを取り除く（D-19） |
+| `V017__drop_waivers_and_notifications.sql` | 免除と通知を廃止したため、`waivers` / `notifications` / `notification_settings`・`findings.waiver_id`・`repository_summaries.active_waiver_count`・`runs.previous_verdict` と、処理する側の無いジョブ、保存済みの設定の `notifications` / `full_measurement_interval_days` を削除する（D-22） |
 
-`waivers` と `findings` は相互に参照するため、
-`findings.waiver_id` の外部キーは `V004` の末尾で `ALTER TABLE` により追加する。
+`findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 
 ---
 

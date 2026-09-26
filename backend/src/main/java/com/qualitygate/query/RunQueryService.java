@@ -6,8 +6,6 @@ import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.entity.RunSkippedMetric;
-import com.qualitygate.domain.entity.Waiver;
-import com.qualitygate.domain.repo.WaiverRepository;
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricCategory;
 import com.qualitygate.domain.metric.MetricDefinition;
@@ -68,7 +66,6 @@ public class RunQueryService {
     private final RunSkippedMetricRepository skippedMetrics;
     private final ArtifactRecordRepository artifacts;
     private final GateConfigRepository gateConfigs;
-    private final WaiverRepository waivers;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
@@ -76,8 +73,7 @@ public class RunQueryService {
                            MeasurementRepository measurements, FindingRepository findings,
                            RunSkippedMetricRepository skippedMetrics,
                            ArtifactRecordRepository artifacts, GateConfigRepository gateConfigs,
-                           WaiverRepository waivers, ObjectMapper objectMapper) {
-        this.waivers = waivers;
+                           ObjectMapper objectMapper) {
         this.runs = runs;
         this.repositories = repositories;
         this.measurements = measurements;
@@ -135,18 +131,11 @@ public class RunQueryService {
         boolean hasMore = page.size() > pageSize;
         List<Finding> items = hasMore ? page.subList(0, pageSize) : page;
 
-        Map<UUID, Waiver> waiverById = new HashMap<>();
-        waivers.findAllById(items.stream().map(Finding::getWaiverId)
-                        .filter(java.util.Objects::nonNull).distinct().toList())
-                .forEach(w -> waiverById.put(w.getId(), w));
-
         return new FindingListResponse(
-                items.stream().map(f -> toItem(f, fullName, run.getCommitSha(),
-                        waiverById.get(f.getWaiverId()))).toList(),
+                items.stream().map(f -> toItem(f, fullName, run.getCommitSha())).toList(),
                 hasMore ? PageCursor.ofOffset(offset + pageSize) : null,
                 hasMore,
-                findings.count(criteria),
-                run.getRepositoryId());
+                findings.count(criteria));
     }
 
     @Transactional(readOnly = true)
@@ -306,8 +295,7 @@ public class RunQueryService {
                 byState.getOrDefault(FindingState.NEW, 0L),
                 byState.getOrDefault(FindingState.CONTINUING, 0L),
                 byState.getOrDefault(FindingState.RESOLVED, 0L),
-                byState.getOrDefault(FindingState.INITIAL, 0L),
-                findings.countByRunIdAndWaiverIdIsNotNull(runId));
+                byState.getOrDefault(FindingState.INITIAL, 0L));
     }
 
     private List<RunDetailResponse.SkippedMetricView> skippedMetricsOf(UUID runId) {
@@ -375,8 +363,7 @@ public class RunQueryService {
         };
     }
 
-    private FindingListResponse.FindingItem toItem(Finding finding, String fullName, String commitSha,
-                                                   Waiver waiver) {
+    private FindingListResponse.FindingItem toItem(Finding finding, String fullName, String commitSha) {
         return new FindingListResponse.FindingItem(
                 finding.getId(),
                 finding.getMetricId(),
@@ -390,10 +377,7 @@ public class RunQueryService {
                 finding.getLine(),
                 finding.getComponentName(),
                 SourceLinks.blob(fullName, commitSha, finding.getFilePath(), finding.getLine()),
-                toMap(finding.getDetail()),
-                waiver == null ? null : new FindingListResponse.Waiver(waiver.getId(),
-                        waiver.getExpiresAt().atOffset(java.time.ZoneOffset.UTC).toLocalDate(),
-                        waiver.getReason(), waiver.getReasonCategory(), waiver.getStatus()));
+                toMap(finding.getDetail()));
     }
 
     /** jsonb 列を JSON のオブジェクトとして返す。文字列のまま返すと画面側で再パースになる。 */

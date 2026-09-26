@@ -58,7 +58,7 @@ public class RunOperationController {
 
     @PostMapping("/api/v1/runs/{runId}/reevaluate")
     @Operation(summary = "Run を再評価する",
-            description = "保存済みの成果物を読み直し、最新の設定・免除・脆弱性情報で判定し直す。"
+            description = "保存済みの成果物と、その Run とともに送られた設定を読み直して判定し直す。"
                     + "成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。")
     @Transactional
     public ResponseEntity<ReevaluateResponse> reevaluate(@PathVariable UUID runId) {

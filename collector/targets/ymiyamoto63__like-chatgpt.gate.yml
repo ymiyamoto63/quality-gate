@@ -13,7 +13,6 @@ on_missing_report: fail
 
 execution:
   skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03〜05 をスキップする
-  full_measurement_interval_days: 7
 
 components:
   - name: backend
@@ -91,6 +90,3 @@ metrics:
     # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-10 は ERROR
     pages:
       - "/"
-
-notifications:
-  on: transition_to_fail

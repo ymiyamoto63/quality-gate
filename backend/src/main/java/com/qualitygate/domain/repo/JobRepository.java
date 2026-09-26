@@ -30,7 +30,7 @@ public interface JobRepository extends JpaRepository<Job, UUID> {
      * 同じ鍵の実行待ち・実行中のジョブが無ければ登録する。あれば何もしない（0 を返す）。
      *
      * <p>一意制約違反を例外で受けると、呼び出し元の業務トランザクションごと
-     * ロールバック専用になる。免除の登録と同時に再評価を積むような場面で、
+     * ロールバック専用になる。業務の変更と同時に再評価を積むような場面で、
      * 「再評価が既に積まれていた」ことが登録の失敗になってはならない。
      */
     @org.springframework.data.jpa.repository.Modifying

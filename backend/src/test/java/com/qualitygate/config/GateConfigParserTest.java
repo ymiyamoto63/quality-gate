@@ -25,7 +25,6 @@ class GateConfigParserTest {
         // 未指定の指標は既定値で埋まる。利用側が常に値がある前提で書けるようにする。
         assertThat(document.metric("vulnerabilities").number("max_critical"))
                 .contains(java.math.BigDecimal.ZERO);
-        assertThat(document.execution().fullMeasurementIntervalDays()).isEqualTo(7);
     }
 
     @Test

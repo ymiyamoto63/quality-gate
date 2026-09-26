@@ -16,8 +16,6 @@ import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-import java.time.Clock;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -35,24 +33,19 @@ public class RepositoryQueryService {
     private final RepositorySummaryRepository summaries;
     private final RunRepository runs;
     private final GateConfigRepository configs;
-    private final FreshnessPolicy freshness;
     private final ObjectMapper objectMapper;
-    private final Clock clock;
 
     @SuppressWarnings("java:S107")
     public RepositoryQueryService(MonitoredRepositoryRepository repositories,
                                   RepositoryComponentRepository components,
                                   RepositorySummaryRepository summaries, RunRepository runs,
-                                  GateConfigRepository configs, FreshnessPolicy freshness,
-                                  ObjectMapper objectMapper, Clock clock) {
+                                  GateConfigRepository configs, ObjectMapper objectMapper) {
         this.repositories = repositories;
         this.components = components;
         this.summaries = summaries;
         this.runs = runs;
         this.configs = configs;
-        this.freshness = freshness;
         this.objectMapper = objectMapper;
-        this.clock = clock;
     }
 
     @Transactional(readOnly = true)
@@ -73,10 +66,8 @@ public class RepositoryQueryService {
                 .map(RepositoryQueryService::latestOf)
                 .orElse(null);
 
-        Instant now = clock.instant();
         Instant lastMeasured = summary.map(RepositorySummary::getLatestMeasuredAt).orElse(null);
         Instant lastFull = summary.map(RepositorySummary::getLastFullMeasuredAt).orElse(null);
-        int intervalDays = freshness.fullIntervalDays(repositoryId);
 
         return new RepositoryResponses.RepositoryDetail(
                 itemOf(repository),
@@ -84,11 +75,7 @@ public class RepositoryQueryService {
                         .map(this::componentOf).toList(),
                 latest,
                 summary.map(RepositorySummary::getLastFullRunId).orElse(null),
-                new RepositoryResponses.RepositoryFreshness(lastMeasured, lastFull,
-                        FreshnessPolicy.isStale(lastMeasured, now, FreshnessPolicy.STALE_MEASUREMENT),
-                        FreshnessPolicy.isStale(lastFull, now, Duration.ofDays(intervalDays)),
-                        intervalDays),
-                summary.map(RepositorySummary::getActiveWaiverCount).orElse(0),
+                new RepositoryResponses.RepositoryFreshness(lastMeasured, lastFull),
                 configs.findFirstByRepositoryIdOrderByVersionDesc(repositoryId)
                         .map(c -> c.getVersion()).orElse(null));
     }

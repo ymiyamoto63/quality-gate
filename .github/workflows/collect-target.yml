@@ -1,5 +1,5 @@
 # 収集ランナー: 1 つの対象の 1 コミットを取得・計測し、Ingest API に送る（再利用ワークフロー）。
-# collect.yml（手動実行と定期実行）から呼ばれる。単独では起動しない。
+# collect.yml（手動実行）から呼ばれる。単独では起動しない。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
 # 計測する指標は M-01〜M-10。M-02（PIT）と M-03〜05（k6 の負荷試験）は既定ブランチのみ。
@@ -12,7 +12,6 @@
 #
 # ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh。計測プロファイルの ISOLATION）。
-# 送信まで終わったコミットはランナー上に記録し（collector/bin/state.sh）、定期実行で再計測しない。
 name: collect-target
 
 on:
@@ -51,7 +50,6 @@ jobs:
       isolation: ${{ steps.profile.outputs.isolation }}
       node_version: ${{ steps.node.outputs.node_version }}
       token_secret: ${{ steps.profile.outputs.token_secret }}
-      state_key: ${{ steps.key.outputs.state_key }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,30 +92,6 @@ jobs:
           QG_PR_NUMBER: ${{ inputs.pull_request }}
           QG_BASE_BRANCH: ${{ inputs.base_branch }}
         run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
-
-      # 計測済みの記録に使うキー。取得に失敗しても、コミットが指定されていれば失敗として記録できるようにする
-      - name: 記録用のキー
-        id: key
-        if: always()
-        env:
-          QG_TARGET: ${{ inputs.repository }}
-          QG_BRANCH: ${{ inputs.branch }}
-          QG_COMMIT: ${{ inputs.commit }}
-          QG_PR_NUMBER: ${{ inputs.pull_request }}
-        run: |
-          META="$RUNNER_TEMP/qg-collector/meta.env"
-          if [ -f "$META" ]; then
-            source collector/bin/lib.sh
-            load_env "$META"
-            KEY=$(./collector/bin/state.sh key "$QG_REPOSITORY" "$BRANCH" "$PR_NUMBER" "$COMMIT_SHA")
-          elif [ -n "$QG_COMMIT" ]; then
-            source collector/bin/lib.sh
-            load_profile "$QG_TARGET"
-            KEY=$(./collector/bin/state.sh key "$QG_TARGET" "${QG_BRANCH:-$DEFAULT_BRANCH}" "$QG_PR_NUMBER" "$QG_COMMIT")
-          else
-            KEY=""
-          fi
-          echo "state_key=$KEY" >> "$GITHUB_OUTPUT"
 
       - name: Node.js の版の解決
         id: node
@@ -208,23 +182,3 @@ jobs:
           fi
           ./collector/bin/submit.sh "$RUNNER_TEMP/qg-reports"
 
-      - name: 計測済みとして記録
-        env:
-          STATE_KEY: ${{ needs.fetch.outputs.state_key }}
-        run: ./collector/bin/state.sh record "$STATE_KEY" ok
-
-  # 失敗した回数を数え、同じコミットで失敗し続けないようにする（上限は detect.sh）。
-  # 取り消し（cancelled）は記録しない。ランナーの停止などで中断したものは次回やり直す
-  record-failure:
-    needs: [fetch, measure, submit]
-    if: failure() && needs.fetch.outputs.state_key != ''
-    runs-on: self-hosted
-    timeout-minutes: 5
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: 失敗として記録
-        env:
-          STATE_KEY: ${{ needs.fetch.outputs.state_key }}
-        run: ./collector/bin/state.sh record "$STATE_KEY" failed

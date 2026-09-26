@@ -43,10 +43,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Import;
-import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.servlet.assertj.MockMvcTester;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
@@ -55,9 +51,7 @@ import org.springframework.web.context.WebApplicationContext;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
-import java.time.Clock;
 import java.time.Instant;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
@@ -74,23 +68,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AbstractIntegrationTest
-@Import(RunQueryApiIT.FixedClock.class)
 class RunQueryApiIT {
-
-    /**
-     * 現在時刻を固定する。計測の鮮度（staleMeasurement など）は現在時刻で変わるため、
-     * 固定しないと、書き出す応答例（repository-detail.json）が実行した日によって変わる。
-     * 計測日時（2026-09-22T02:10:00Z）から 7 時間後とし、鮮度は「新しい」になる。
-     */
-    @TestConfiguration(proxyBeanMethods = false)
-    static class FixedClock {
-
-        @Bean
-        @Primary
-        Clock fixedClock() {
-            return Clock.fixed(Instant.parse("2026-09-22T09:00:00Z"), ZoneOffset.UTC);
-        }
-    }
 
     private static final String JACOCO = """
             <?xml version="1.0" encoding="UTF-8"?>
@@ -363,7 +341,7 @@ class RunQueryApiIT {
     void 違反は状態と深刻度の順に返り並びはページをまたいでも保たれる() {
         Run run = evaluated(Instant.parse("2026-09-22T00:00:00Z"));
 
-        FindingCriteria all = new FindingCriteria(run.getId(), Set.of(), Set.of(), Set.of(), null);
+        FindingCriteria all = new FindingCriteria(run.getId(), Set.of(), Set.of(), Set.of());
 
         FindingListResponse page1 = queryService.findings(run.getId(), all, 2, null);
         assertThat(page1.items()).hasSize(2);
@@ -392,7 +370,7 @@ class RunQueryApiIT {
 
         FindingListResponse critical = queryService.findings(run.getId(),
                 new FindingCriteria(run.getId(), Set.of("M-06"), Set.of(),
-                        Set.of(Severity.CRITICAL), null), 20, null);
+                        Set.of(Severity.CRITICAL)), 20, null);
 
         assertThat(critical.totalCount()).isEqualTo(1);
         assertThat(critical.items()).singleElement().satisfies(item -> {
@@ -402,8 +380,6 @@ class RunQueryApiIT {
             assertThat(item.sourceUrl()).isEqualTo(
                     "https://github.com/ymiyamoto63/quality-gate/blob/"
                             + run.getCommitSha() + "/backend/pom.xml");
-            // 免除機能は未実装のため常に null
-            assertThat(item.waiver()).isNull();
         });
     }
 
@@ -412,7 +388,7 @@ class RunQueryApiIT {
         Run run = evaluated(Instant.parse("2026-09-22T00:00:00Z"));
 
         FindingListResponse complexity = queryService.findings(run.getId(),
-                new FindingCriteria(run.getId(), Set.of("M-07"), Set.of(), Set.of(), null),
+                new FindingCriteria(run.getId(), Set.of("M-07"), Set.of(), Set.of()),
                 20, null);
 
         // PMD の絶対パスは /build/backend/src/... なので、
@@ -439,7 +415,7 @@ class RunQueryApiIT {
         FindingListResponse defaults = queryService.findings(second.getId(),
                 new FindingCriteria(second.getId(), Set.of(),
                         Set.of(FindingState.NEW, FindingState.CONTINUING, FindingState.INITIAL),
-                        Set.of(), null), 20, null);
+                        Set.of()), 20, null);
 
         assertThat(defaults.items()).extracting(FindingListResponse.FindingItem::state)
                 .containsOnly(FindingState.CONTINUING);
@@ -447,7 +423,7 @@ class RunQueryApiIT {
         // 解消は明示的に選んだときだけ出す
         FindingListResponse resolved = queryService.findings(second.getId(),
                 new FindingCriteria(second.getId(), Set.of(), Set.of(FindingState.RESOLVED),
-                        Set.of(), null), 20, null);
+                        Set.of()), 20, null);
         assertThat(resolved.totalCount()).isEqualTo(2);
     }
 
@@ -472,7 +448,7 @@ class RunQueryApiIT {
     @Test
     void 壊れたカーソルは400で返す() {
         Run run = evaluated(Instant.parse("2026-09-22T00:00:00Z"));
-        FindingCriteria all = new FindingCriteria(run.getId(), Set.of(), Set.of(), Set.of(), null);
+        FindingCriteria all = new FindingCriteria(run.getId(), Set.of(), Set.of(), Set.of());
 
         // 原因はリクエスト側にあり、サーバの異常として警報を上げる対象ではない
         assertThatThrownBy(() -> queryService.findings(run.getId(), all, 20, "not-a-cursor"))

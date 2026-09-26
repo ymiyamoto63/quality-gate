@@ -32,29 +32,11 @@ class FlywayMigrationIT {
         assertThat(tables).contains(
                 "users", "repositories", "components", "ingest_tokens",
                 "gate_configs", "runs", "run_skipped_metrics", "artifacts",
-                "waivers", "measurements", "findings",
-                "jobs", "notifications",
+                "measurements", "findings", "jobs",
                 "repository_summaries", "audit_logs",
                 "flyway_schema_history");
-    }
-
-    @Test
-    void 無期限の免除は登録できない() {
-        // expires_at は NOT NULL。運用ルールではなく制約で守る。
-        List<String> nullable = jdbcTemplate.queryForList(
-                "select is_nullable from information_schema.columns "
-                        + "where table_name = 'waivers' and column_name = 'expires_at'",
-                String.class);
-
-        assertThat(nullable).containsExactly("NO");
-    }
-
-    @Test
-    void 有効な免除の重複を防ぐ部分一意インデックスがある() {
-        List<String> indexes = jdbcTemplate.queryForList(
-                "select indexname from pg_indexes where tablename = 'waivers'", String.class);
-
-        assertThat(indexes).contains("ux_waivers_active");
+        // 免除と通知は廃止した（D-22）
+        assertThat(tables).doesNotContain("waivers", "notifications", "notification_settings");
     }
 
     @Test
