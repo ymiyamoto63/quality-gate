@@ -16,24 +16,26 @@ servers:
 tags:
 - description: 全リポジトリのサマリ
   name: Dashboard
-- description: Run の参照
-  name: Runs
 - description: ログイン中の利用者
   name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
-- description: 保持期間などのシステム設定（管理者のみ）
-  name: Settings
 - description: リポジトリ登録・コンポーネント・Ingest Token（管理者のみ）
   name: RepositoryAdmin
+- description: 設定の表示・検証結果・版履歴
+  name: Config
+- description: Run の参照
+  name: Runs
+- description: 保持期間などのシステム設定（管理者のみ）
+  name: Settings
 - description: 監査ログの閲覧（管理者のみ）
   name: AuditLogs
 - description: 再評価とジョブの運用（管理者のみ）
   name: Operations
 - description: 品質レポート（FR-08-4）
   name: Reports
-- description: 設定の表示・検証結果・版履歴
-  name: Config
+- description: リリース判定（UC-10）
+  name: Release
 - description: リポジトリ単位の参照
   name: Repositories
 - description: 許可リストとロールの管理（管理者のみ）
@@ -390,6 +392,55 @@ paths:
       summary: Ingest Token を発行する
       tags:
       - RepositoryAdmin
+  /api/v1/repositories/{repositoryId}/release-report:
+    get:
+      description: 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは GitHub API でコミットに解決する。ブランチ名は受け付けない
+      operationId: releaseReport
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - description: タグ名、またはコミット SHA（7〜40 桁）
+        in: query
+        name: ref
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReleaseReportResponse"
+          description: OK
+      summary: リリース判定を取得する
+      tags:
+      - Release
+  /api/v1/repositories/{repositoryId}/release-report.csv:
+    get:
+      description: 1 行が 1 指標。判定の前提（コミット・Run・合格ラインの版）と出力日時・出力者を各行に含む。UTF-8（BOM つき）。出力したことを監査ログに残す
+      operationId: releaseReportCsv
+      parameters:
+      - in: path
+        name: repositoryId
+        required: true
+        schema:
+          type: string
+          format: uuid
+      - in: query
+        name: ref
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          description: OK
+      summary: リリース判定を CSV で取得する
+      tags:
+      - Release
   /api/v1/repositories/{repositoryId}/trends:
     get:
       description: 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
@@ -1539,6 +1590,257 @@ components:
       - jobId
       - runId
       - status
+    ReleaseCounts:
+      type: object
+      description: 合否に使った指標の件数（参考値・対象外を除く）
+      properties:
+        errored:
+          type: integer
+          format: int32
+        failed:
+          type: integer
+          format: int32
+        judged:
+          type: integer
+          format: int32
+        passed:
+          type: integer
+          format: int32
+        skipped:
+          type: integer
+          format: int32
+        warned:
+          type: integer
+          format: int32
+      required:
+      - errored
+      - failed
+      - judged
+      - passed
+      - skipped
+      - warned
+    ReleaseGateConfig:
+      type: object
+      description: 合格ラインの版。しきい値を変えた理由は、この版のコミットに残る
+      properties:
+        exclusions:
+          type: array
+          description: 計測の対象から外したパス
+          items:
+            type: string
+        sourceCommitSha:
+          type:
+          - string
+          - "null"
+        sourceType:
+          type: string
+        version:
+          type: integer
+          format: int32
+      required:
+      - exclusions
+      - sourceCommitSha
+      - sourceType
+      - version
+    ReleaseGuide:
+      type: object
+      properties:
+        basis:
+          type: string
+        basisLabel:
+          type: string
+          description: 根拠の種類の表示名（外部基準 など）
+        definition:
+          type: string
+          description: 技術的な定義
+        metricId:
+          type: string
+        name:
+          type: string
+        rationale:
+          type: string
+          description: 既定の合格ラインにした理由
+        risk:
+          type: string
+          description: 不合格のまま出すと何が起きるか
+        summary:
+          type: string
+          description: 何を見る指標か
+      required:
+      - basis
+      - basisLabel
+      - definition
+      - metricId
+      - name
+      - rationale
+      - risk
+      - summary
+    ReleaseMetric:
+      type: object
+      properties:
+        category:
+          type: string
+        componentName:
+          type:
+          - string
+          - "null"
+        metricId:
+          type: string
+        name:
+          type: string
+        reason:
+          type:
+          - string
+          - "null"
+        referenceOnly:
+          type: boolean
+        scenario:
+          type:
+          - string
+          - "null"
+        status:
+          type: string
+          enum:
+          - PASS
+          - WARN
+          - FAIL
+          - SKIP
+          - REFERENCE
+          - ERROR
+          - NOT_APPLICABLE
+        threshold:
+          type:
+          - string
+          - "null"
+          description: 合格ラインを表示用にした文字列（≥ 75% など）
+        unit:
+          type:
+          - string
+          - "null"
+        value:
+          type:
+          - number
+          - "null"
+          description: 実測値。未計測は null
+        variantLabel:
+          type:
+          - string
+          - "null"
+      required:
+      - category
+      - componentName
+      - metricId
+      - name
+      - reason
+      - referenceOnly
+      - scenario
+      - status
+      - threshold
+      - unit
+      - value
+      - variantLabel
+    ReleaseReportResponse:
+      type: object
+      description: リリース判定。指定したタグ・コミットで判定済みの Run から組み立てる
+      properties:
+        commitSha:
+          type: string
+        commitUrl:
+          type: string
+        counts:
+          $ref: "#/components/schemas/ReleaseCounts"
+        decision:
+          type: string
+          enum:
+          - RELEASABLE
+          - RELEASABLE_WITH_WARNINGS
+          - NOT_RELEASABLE
+          - UNDETERMINED
+        decisionReason:
+          type: string
+          description: 判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する
+        gateConfig:
+          type: "null"
+          $ref: "#/components/schemas/ReleaseGateConfig"
+          description: 判定に使った合格ライン。既定値で判定した場合と未計測では null
+        guides:
+          type: array
+          description: 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）
+          items:
+            $ref: "#/components/schemas/ReleaseGuide"
+        metrics:
+          type: array
+          description: 指標ごとの結果。不合格・計測エラー・注意を先に、参考値を最後に並べる
+          items:
+            $ref: "#/components/schemas/ReleaseMetric"
+        otherRunCount:
+          type: integer
+          format: int32
+          description: 同じコミットのほかの Run の件数（判定には使っていない）
+        ref:
+          type: string
+          description: 指定したタグ・コミット（前後の空白を除いたもの）
+        refType:
+          type: string
+          enum:
+          - TAG
+          - COMMIT
+        repositoryFullName:
+          type: string
+        repositoryId:
+          type: string
+          format: uuid
+        run:
+          type: "null"
+          $ref: "#/components/schemas/ReleaseRun"
+          description: 判定に使った Run。未計測なら null
+      required:
+      - commitSha
+      - commitUrl
+      - counts
+      - decision
+      - decisionReason
+      - gateConfig
+      - guides
+      - metrics
+      - otherRunCount
+      - ref
+      - refType
+      - repositoryFullName
+      - repositoryId
+      - run
+    ReleaseRun:
+      type: object
+      properties:
+        attempt:
+          type: integer
+          format: int32
+        branch:
+          type: string
+        completeness:
+          type: string
+          enum:
+          - FULL
+          - PARTIAL
+        measuredAt:
+          type: string
+          format: date-time
+        runId:
+          type: string
+          format: uuid
+        verdict:
+          type: string
+          enum:
+          - PASS
+          - PASS_WITH_WARNINGS
+          - FAIL
+      required:
+      - attempt
+      - branch
+      - completeness
+      - measuredAt
+      - runId
+      - verdict
     ReportResponse:
       type: object
       description: 品質レポート（FR-08-4）

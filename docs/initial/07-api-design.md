@@ -129,6 +129,8 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | GET | `/api/v1/repositories/{id}/trends` | 指標の時系列（S-05） | — |
 | GET | `/api/v1/reports` | 品質レポート（S-10。FR-08-4）。`from` / `to`（日付）と `repositoryId`（複数可）で絞る | — |
 | GET | `/api/v1/reports/measurements.csv` | 品質レポートの明細（CSV） | — |
+| GET | `/api/v1/repositories/{id}/release-report` | リリース判定（S-11。UC-10）。`ref` にタグかコミット SHA（7〜40 桁）を指定する | — |
+| GET | `/api/v1/repositories/{id}/release-report.csv` | リリース判定の CSV（証跡）。出力を監査ログ（`RELEASE_REPORT_EXPORTED`）に残す | — |
 | GET | `/api/v1/runs` | Run 一覧 | — |
 | GET | `/api/v1/runs/{runId}` | Run 詳細（S-03） | — |
 | GET | `/api/v1/runs/{runId}/findings` | Finding 一覧（S-04） | — |
@@ -627,6 +629,17 @@ M-09 の `detail` は破壊的変更 `breaking`（oasdiff の level 3）、破�
 M-08 / M-09 の違反も `filePath` / `line` / `sourceUrl` が `null` である。テストクラス名や
 API のパスはリポジトリ上のファイルではない。
 
+### リリース判定（`release-report`）
+
+- `ref` が 16 進数 7〜40 桁ならコミット SHA とみなし、計測済みの Run から前方一致で探す（複数のコミットに一致すれば 400）。
+  それ以外はタグ名とみなし、GitHub API（`/git/ref/tags/{tag}`。注釈付きタグはタグオブジェクトをたどる）で解決する。
+  ブランチ名は受け付けない（先頭が動くため証跡にならない）。GitHub API が無効・失敗なら 502 `GITHUB_UNAVAILABLE`、タグが無ければ 404
+- 結論 `decision` は `RELEASABLE` / `RELEASABLE_WITH_WARNINGS` / `NOT_RELEASABLE` / `UNDETERMINED`。理由の文 `decisionReason` はサーバが持つ
+- 未計測でも 200 を返す（`decision: UNDETERMINED`、`run: null`）。判定できなかったことも証跡として残せるようにするため
+- `metrics` は不合格・計測エラー・注意を先に、参考値を最後に並べる。`threshold` は表示用の文字列（`≥ 80%`）
+- `guides` は結果に現れた指標の説明（`summary` / `basis` / `basisLabel` / `rationale` / `risk` / `definition`）。文言は `MetricGuide` が持つ
+- CSV は 1 行 1 指標。列名は日本語。未計測なら判定できなかったことを 1 行で残す。ファイル名は `release_<owner>_<repo>[_<tag>]_<短い SHA>.csv`
+
 ### 操作 API で確定した仕様
 
 本書 2.3 の操作 API はすべて実装した。設計から変わった点・足した点を記す。
@@ -700,6 +713,7 @@ API のパスはリポジトリ上のファイルではない。
 | --- | :---: | :---: | :---: |
 | ダッシュボード・Run・Finding・トレンドの閲覧 | ○ | ○ | — |
 | 設定の閲覧 | ○ | ○ | — |
+| リリース判定の閲覧・CSV の出力 | ○ | ○ | — |
 | 成果物のダウンロード | ○ | ○ | — |
 | Run の作成・成果物の送信・finalize | — | — | ○ |
 | 再評価の実行 | — | ○ | — |

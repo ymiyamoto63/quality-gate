@@ -246,6 +246,46 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/repositories/{repositoryId}/release-report': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * リリース判定を取得する
+     * @description 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは GitHub API でコミットに解決する。ブランチ名は受け付けない
+     */
+    get: operations['releaseReport']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
+  '/api/v1/repositories/{repositoryId}/release-report.csv': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * リリース判定を CSV で取得する
+     * @description 1 行が 1 指標。判定の前提（コミット・Run・合格ラインの版）と出力日時・出力者を各行に含む。UTF-8（BOM つき）。出力したことを監査ログに残す
+     */
+    get: operations['releaseReportCsv']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/repositories/{repositoryId}/trends': {
     parameters: {
       query?: never
@@ -781,6 +821,105 @@ export interface components {
        */
       status:
         'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+    }
+    /** @description 合否に使った指標の件数（参考値・対象外を除く） */
+    ReleaseCounts: {
+      /** Format: int32 */
+      errored: number
+      /** Format: int32 */
+      failed: number
+      /** Format: int32 */
+      judged: number
+      /** Format: int32 */
+      passed: number
+      /** Format: int32 */
+      skipped: number
+      /** Format: int32 */
+      warned: number
+    }
+    /** @description 合格ラインの版。しきい値を変えた理由は、この版のコミットに残る */
+    ReleaseGateConfig: {
+      /** @description 計測の対象から外したパス */
+      exclusions: string[]
+      sourceCommitSha: string | null
+      sourceType: string
+      /** Format: int32 */
+      version: number
+    }
+    ReleaseGuide: {
+      basis: string
+      /** @description 根拠の種類の表示名（外部基準 など） */
+      basisLabel: string
+      /** @description 技術的な定義 */
+      definition: string
+      metricId: string
+      name: string
+      /** @description 既定の合格ラインにした理由 */
+      rationale: string
+      /** @description 不合格のまま出すと何が起きるか */
+      risk: string
+      /** @description 何を見る指標か */
+      summary: string
+    }
+    ReleaseMetric: {
+      category: string
+      componentName: string | null
+      metricId: string
+      name: string
+      reason: string | null
+      referenceOnly: boolean
+      scenario: string | null
+      /** @enum {string} */
+      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'REFERENCE' | 'ERROR' | 'NOT_APPLICABLE'
+      /** @description 合格ラインを表示用にした文字列（≥ 75% など） */
+      threshold: string | null
+      unit: string | null
+      /** @description 実測値。未計測は null */
+      value: number | null
+      variantLabel: string | null
+    }
+    /** @description リリース判定。指定したタグ・コミットで判定済みの Run から組み立てる */
+    ReleaseReportResponse: {
+      commitSha: string
+      commitUrl: string
+      counts: components['schemas']['ReleaseCounts']
+      /** @enum {string} */
+      decision: 'RELEASABLE' | 'RELEASABLE_WITH_WARNINGS' | 'NOT_RELEASABLE' | 'UNDETERMINED'
+      /** @description 判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する */
+      decisionReason: string
+      /** @description 判定に使った合格ライン。既定値で判定した場合と未計測では null */
+      gateConfig: components['schemas']['ReleaseGateConfig']
+      /** @description 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び） */
+      guides: components['schemas']['ReleaseGuide'][]
+      /** @description 指標ごとの結果。不合格・計測エラー・注意を先に、参考値を最後に並べる */
+      metrics: components['schemas']['ReleaseMetric'][]
+      /**
+       * Format: int32
+       * @description 同じコミットのほかの Run の件数（判定には使っていない）
+       */
+      otherRunCount: number
+      /** @description 指定したタグ・コミット（前後の空白を除いたもの） */
+      ref: string
+      /** @enum {string} */
+      refType: 'TAG' | 'COMMIT'
+      repositoryFullName: string
+      /** Format: uuid */
+      repositoryId: string
+      /** @description 判定に使った Run。未計測なら null */
+      run: components['schemas']['ReleaseRun']
+    }
+    ReleaseRun: {
+      /** Format: int32 */
+      attempt: number
+      branch: string
+      /** @enum {string} */
+      completeness: 'FULL' | 'PARTIAL'
+      /** Format: date-time */
+      measuredAt: string
+      /** Format: uuid */
+      runId: string
+      /** @enum {string} */
+      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
     }
     /** @description 品質レポート（FR-08-4） */
     ReportResponse: {
@@ -1548,6 +1687,53 @@ export interface operations {
         content: {
           '*/*': components['schemas']['IssuedToken']
         }
+      }
+    }
+  }
+  releaseReport: {
+    parameters: {
+      query: {
+        /** @description タグ名、またはコミット SHA（7〜40 桁） */
+        ref: string
+      }
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['ReleaseReportResponse']
+        }
+      }
+    }
+  }
+  releaseReportCsv: {
+    parameters: {
+      query: {
+        ref: string
+      }
+      header?: never
+      path: {
+        repositoryId: string
+      }
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content?: never
       }
     }
   }

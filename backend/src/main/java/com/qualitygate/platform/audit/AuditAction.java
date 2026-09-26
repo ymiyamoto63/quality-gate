@@ -18,5 +18,7 @@ public enum AuditAction {
     INGEST_TOKEN_ISSUED,
     INGEST_TOKEN_REVOKED,
     RUN_REEVALUATION_REQUESTED,
-    RETENTION_SETTINGS_UPDATED
+    RETENTION_SETTINGS_UPDATED,
+    /** リリース判定（UC-10）を CSV で出力した。判定の証跡として、いつ誰が出したかを残す。 */
+    RELEASE_REPORT_EXPORTED
 }
