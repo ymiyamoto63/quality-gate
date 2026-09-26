@@ -618,6 +618,8 @@ export interface components {
       repository: string
       /** @description CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う */
       skippedMetrics?: components['schemas']['SkippedMetricRequest'][]
+      /** @description 計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。リリース判定でタグをコミットに解決するのに使う */
+      tags?: string[]
       triggeredBy: string
     }
     CreateRunResponse: {

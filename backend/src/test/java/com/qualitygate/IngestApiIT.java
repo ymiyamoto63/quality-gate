@@ -99,6 +99,7 @@ class IngestApiIT {
                         "branch", "main",
                         "triggeredBy", "github-actions",
                         "measuredAt", "2026-09-21T02:10:00Z",
+                        "tags", java.util.List.of("v1.2.0", "release/2026-09"),
                         "skippedMetrics", java.util.List.of(
                                 Map.of("metricId", "M-02", "reason", "PR の計測では PIT を実行しない"),
                                 Map.of("metricId", "M-06", "reason", "理由なくスキップを申告した場合"))))
@@ -108,6 +109,7 @@ class IngestApiIT {
         UUID runId = UUID.fromString(String.valueOf(created.getBody().get("runId")));
         assertThat(created.getBody()).containsEntry("attempt", 1);
         assertThat(String.valueOf(created.getBody().get("detailUrl"))).endsWith(runId.toString());
+        assertThat(runs.findById(runId).orElseThrow().getTags()).containsExactly("v1.2.0", "release/2026-09");
 
         // 申告は受け取るが、受理するかは判定時に決める。
         // 取り込み時点では設定（execution.skippable_metrics）が未解決である。
@@ -171,6 +173,23 @@ class IngestApiIT {
                 .retrieve().toBodilessEntity();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
+    void タグ名に使えない文字を含むタグは拒否される() {
+        for (String tag : java.util.List.of("a b", "v1..2", "/v1", "v1/", "x:y")) {
+            ResponseEntity<Map> response = client.post()
+                    .uri("/api/v1/runs")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
+                            "triggeredBy", "ci", "measuredAt", "2026-09-21T02:10:00Z",
+                            "tags", java.util.List.of(tag)))
+                    .retrieve().toEntity(Map.class);
+
+            assertThat(response.getStatusCode()).as(tag).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+        assertThat(runs.findAll()).isEmpty();
     }
 
     @Test

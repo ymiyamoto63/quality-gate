@@ -41,6 +41,7 @@ fail() { warn "$1"; FAILED+=("$1"); }
 skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 は計測しません: $2"; }
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
+cp "$WORK/renames.json" "$REPORTS/renames.json"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
 mkdir -p "$REPORTS/backend" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
 rm -f "$REPORTS/skipped-metrics.tsv"

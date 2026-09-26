@@ -33,7 +33,6 @@ public enum ErrorCode {
     PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "性能計測のメタデータが不足しています"),
     MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_ENTITY, "ミューテーションテストの実行範囲が指定されていません"),
     CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_ENTITY, "設定ファイルの内容が不正です"),
-    GITHUB_UNAVAILABLE(HttpStatus.BAD_GATEWAY, "GitHub API に接続できません"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 
     private final HttpStatus status;

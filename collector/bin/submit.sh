@@ -61,9 +61,11 @@ REQUEST=$(jq -n \
   --arg triggeredBy "${QG_TRIGGERED_BY:-collector}" \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
+  --arg tags "${TAGS:-}" \
   --argjson skippedMetrics "$(skipped_json)" \
   '{repository: $repository, commitSha: $commitSha, branch: $branch,
     triggeredBy: $triggeredBy, measuredAt: $measuredAt,
+    tags: ($tags | split(" ") | map(select(. != ""))),
     skippedMetrics: $skippedMetrics}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
@@ -91,6 +93,8 @@ upload() {
 }
 
 upload quality-gate-config "$GATE_CONFIG"
+# ファイルの移動・リネーム。移動しただけのファイルの違反を新規・解消として扱わないために使われる
+upload git-renames "$REPORTS/renames.json"
 
 # コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
 BACKEND=${BACKEND_DIR##*/}

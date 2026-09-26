@@ -38,7 +38,14 @@ public enum ArtifactType implements WireValued {
      *
      * <p>指標を供給しないが、判定に使う合格ラインを運ぶ。
      */
-    QUALITY_GATE_CONFIG("quality-gate-config");
+    QUALITY_GATE_CONFIG("quality-gate-config"),
+
+    /**
+     * ファイルの移動・リネーム（収集ランナーの {@code collector/bin/renames.sh} の出力）。
+     *
+     * <p>指標を供給しないが、移動しただけのファイルの違反を新規・解消として扱わないために使う（指標仕様書 0.4）。
+     */
+    GIT_RENAMES("git-renames");
 
     private final String wire;
     private final List<String> metricIds;
@@ -67,6 +74,11 @@ public enum ArtifactType implements WireValued {
     /** 性能計測の成果物か（environment メタデータが必須になる）。 */
     public boolean requiresEnvironmentMetadata() {
         return this == K6_SUMMARY;
+    }
+
+    /** 指標の計測結果を運ぶ成果物か。 */
+    public boolean carriesMetrics() {
+        return !metricIds.isEmpty();
     }
 
     /** 指標の計測結果ではなく、判定の設定を運ぶ成果物か。 */

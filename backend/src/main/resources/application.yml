@@ -69,15 +69,6 @@ quality-gate:
   job-poll-interval: 1000
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
-  # 判定でのリネーム検出と、リリース判定（S-11）でのタグの解決に GitHub API を使う。
-  # 認証は GitHub App（App ID と秘密鍵）かトークン。どちらも無ければ認証なし（public リポジトリのみ）
-  github:
-    enabled: ${QG_GITHUB_API_ENABLED:true}
-    api-url: ${QG_GITHUB_API_URL:https://api.github.com}
-    app-id: ${QG_GITHUB_APP_ID:}
-    private-key: ${QG_GITHUB_APP_PRIVATE_KEY:}
-    token: ${QG_GITHUB_TOKEN:}
-    timeout: 10s
 
 springdoc:
   api-docs:

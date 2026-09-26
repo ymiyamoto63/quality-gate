@@ -171,6 +171,8 @@ CREATE TABLE runs (
     completeness        varchar(8),
     error_code          varchar(64),
     error_detail        text,
+    renamed_files       jsonb,                   -- ファイルの移動の対応表（新しいパス → 移動前のパス。V015）
+    tags                text[]      NOT NULL DEFAULT '{}',  -- 計測したコミットを指すタグ（V020）
     created_at          timestamptz NOT NULL DEFAULT now(),
     evaluated_at        timestamptz,
     CONSTRAINT runs_attempt_key UNIQUE (repository_id, commit_sha, attempt),
@@ -184,6 +186,10 @@ CREATE TABLE runs (
 ```
 
 ランナー種別の列（`runner_type`）は、計測を収集ランナーに絞ったため V016 で削除した（D-19）。
+
+`tags` は収集ランナーが計測時に対象の履歴から求めて送る（`git tag --points-at`）。リリース判定（S-11）でタグを
+コミットに解決するのに使い、GIN 索引（`ix_runs_tags`）で引く。V020 より前の Run は空（D-26）。
+`renamed_files` は収集ランナーが送る `git-renames` から判定ジョブが求める（以前は GitHub の compare API で求めていた）。
 
 `baseline_run_id` を**保存する**のが要点である。差分（NEW / CONTINUING / RESOLVED）が
 どの Run との比較で出たものかを後から追えるようにし、判定の再現性を保つ。
@@ -568,6 +574,7 @@ DELETE FROM runs
 | `V017__drop_waivers_and_notifications.sql` | 免除と通知を廃止したため、`waivers` / `notifications` / `notification_settings`・`findings.waiver_id`・`repository_summaries.active_waiver_count`・`runs.previous_verdict` と、処理する側の無いジョブ、保存済みの設定の `notifications` / `full_measurement_interval_days` を削除する（D-22） |
 | `V018__drop_repository_measure_pull_requests.sql` | どこからも読まれていなかった `repositories.measure_pull_requests`（PR を計測する設定）を削除する |
 | `V019__remove_duplicated_and_unused_definitions.sql` | 表示にしか使っていなかった `components` と `measurements.component_id`、廃止した M-08 の計測値・違反・スキップ申告・成果物（`junit-xml`）、保存済みの設定の `components` と `api_contract` の `min_success_rate` / `min_test_count` を削除する（D-25） |
+| `V020__run_tags.sql` | `runs.tags`（計測したコミットを指すタグ）と GIN 索引。リリース判定のタグの解決を GitHub API から Run に移した（D-26） |
 
 `findings.waiver_id` の外部キーは `V004` で `waivers` を先に作って張った（V017 で列ごと削除）。
 

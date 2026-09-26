@@ -181,6 +181,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
   "triggeredBy": "collector",
   "ciRunUrl": "https://github.com/ymiyamoto63/quality-gate/actions/runs/123456",
   "measuredAt": "2026-09-21T02:10:00Z",
+  "tags": ["v1.2.0"],
   "skippedMetrics": [
     { "metricId": "M-02", "reason": "PR の計測では PIT を実行しない" },
     { "metricId": "M-03", "reason": "PR の計測では k6 を実行しない" }
@@ -196,6 +197,7 @@ GET /api/v1/runs?repositoryId=...&limit=20&cursor=eyJtIjoiMjAy...
 | `branch` | ○ | |
 | `pullRequestNumber` | | |
 | `measuredAt` | ○ | |
+| `tags` | | 計測したコミットを指すタグ。収集ランナーが clone した履歴から求めて送る（`git tag --points-at`）。リリース判定でタグをコミットに解決するのに使う（D-26）。git のタグ名に使えない文字を含めば 400 |
 | `skippedMetrics` | | 省略時は「全指標を計測した」とみなす |
 
 **応答（201）**
@@ -628,8 +630,9 @@ API のパスはリポジトリ上のファイルではない。
 ### リリース判定（`release-report`）
 
 - `ref` が 16 進数 7〜40 桁ならコミット SHA とみなし、計測済みの Run から前方一致で探す（複数のコミットに一致すれば 400）。
-  それ以外はタグ名とみなし、GitHub API（`/git/ref/tags/{tag}`。注釈付きタグはタグオブジェクトをたどる）で解決する。
-  ブランチ名は受け付けない（先頭が動くため証跡にならない）。GitHub API が無効・失敗なら 502 `GITHUB_UNAVAILABLE`、タグが無ければ 404
+  それ以外はタグ名とみなし、そのタグを付けて計測した Run（`POST /api/v1/runs` の `tags`）のコミットに解決する。
+  タグが付け替えられていれば、最も新しい計測のコミット。GitHub API は使わない（D-26）。
+  ブランチ名は受け付けない（先頭が動くため証跡にならない）。タグを付けて計測した Run が無ければ 404（タグを指定して計測するか、コミット SHA で指定する）
 - 結論 `decision` は `RELEASABLE` / `RELEASABLE_WITH_WARNINGS` / `NOT_RELEASABLE` / `UNDETERMINED`。理由の文 `decisionReason` はサーバが持つ
 - 未計測でも 200 を返す（`decision: UNDETERMINED`、`run: null`）。判定できなかったことも証跡として残せるようにするため
 - `metrics` は不合格・計測エラー・注意を先に、参考値を最後に並べる。`threshold` は表示用の文字列（`≥ 80%`）
@@ -751,7 +754,6 @@ CI に置かれる認証情報であるため、漏洩時の影響を
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能成果物の `environment` が欠落 |
 | `MUTATION_SCOPE_MISSING` | 422 | PIT の成果物の `mutationScope` が欠落 |
 | `CONFIG_VALIDATION_FAILED` | 422 | `.quality-gate.yml` の検証エラー |
-| `GITHUB_UNAVAILABLE` | 502 | GitHub API の障害。リリース判定（S-11）でタグをコミットに解決できなかったときに返す |
 | `INTERNAL_ERROR` | 500 | 想定外の例外。Spring MVC が要求の誤りとして投げる例外（4xx の状態コードを持つもの）はここに含めず、上の該当するコードで返す |
 
 ---
