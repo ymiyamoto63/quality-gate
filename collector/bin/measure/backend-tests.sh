@@ -29,8 +29,8 @@ measure_backend() {
 
   # M-09 / M-10 はすべてのテストの結果で判定する。
   # パターンは空白区切り。read は glob を展開しない
-  local copied=0 file patterns pattern
-  read -ra patterns <<< "${TEST_REPORTS:-surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml}"
+  local copied=0 file patterns pattern reports=${TEST_REPORTS:-surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml}
+  read -ra patterns <<< "$reports"
   for pattern in "${patterns[@]}"; do
     for file in "$dir"/target/$pattern; do
       [ -e "$file" ] || continue
@@ -38,5 +38,5 @@ measure_backend() {
       copied=$((copied + 1))
     done
   done
-  [ "$copied" -gt 0 ] || fail "M-09/M-10: バックエンドのテストの結果がありません（target/${TEST_REPORTS:-surefire-reports/TEST-*.xml}）"
+  [ "$copied" -gt 0 ] || fail "M-09/M-10: バックエンドのテストの結果がありません（target/ の $reports）"
 }

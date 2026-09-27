@@ -41,7 +41,9 @@ spring:
 
   servlet:
     multipart:
-      max-file-size: 50MB
+      # 通信としての上限。成果物の大きさの判定は quality-gate.max-artifact-bytes（既定 50MB）で行い、
+      # 理由のわかるエラーを返す。ここはそれより少し大きくしておく
+      max-file-size: 60MB
       max-request-size: 60MB
 
   security:
@@ -61,20 +63,22 @@ server:
   compression:
     enabled: true
 
+# 既定値は QualityGateProperties が持つ。環境変数が未設定（空・0）なら既定値になる
 quality-gate:
-  artifact-root: ${QG_ARTIFACT_ROOT:./data/artifacts}
-  max-artifact-bytes: 52428800      # 50MB
-  max-run-bytes: 209715200          # 200MB
-  base-url: ${QG_BASE_URL:http://localhost:8080}
+  artifact-root: ${QG_ARTIFACT_ROOT:}
+  base-url: ${QG_BASE_URL:}
   # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-20）
   ingest-tokens: ${QG_INGEST_TOKEN:}
   # データ保持期間（日。FR-13-1）。短くすると、翌日の保持期間バッチで古いデータが削除される
   retention:
-    run-days: ${QG_RETENTION_RUN_DAYS:730}
-    artifact-days: ${QG_RETENTION_ARTIFACT_DAYS:90}
-    audit-log-days: ${QG_RETENTION_AUDIT_LOG_DAYS:730}
+    run-days: ${QG_RETENTION_RUN_DAYS:0}
+    artifact-days: ${QG_RETENTION_ARTIFACT_DAYS:0}
+    audit-log-days: ${QG_RETENTION_AUDIT_LOG_DAYS:0}
+  # 日次バッチの時刻（cron）。"-" で無効になる
   schedule:
     zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
+    cleanup-retention: "0 0 3 * * *"
+    abandon-stale-runs: "0 10 3 * * *"
 
 springdoc:
   api-docs:
@@ -97,10 +101,10 @@ logging:
   level:
     com.qualitygate: INFO
   # JSON 構造化ログ（docs/spec/05-architecture.md）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
-  # 標準出力が 1 行 1 JSON になり、MDC の相関 ID（requestId / runId / jobId）が項目として載る。未指定なら従来のテキスト形式
+  # 標準出力が 1 行 1 JSON になり、MDC の相関 ID（requestId / runId）が項目として載る。未指定なら従来のテキスト形式
   structured:
     format:
       console: ${QG_LOG_FORMAT:}
   pattern:
     # テキスト形式でも相関 ID を出す（値があるときだけ）
-    correlation: "%replace(req=%X{requestId} ){'^req= $', ''}%replace(run=%X{runId} ){'^run= $', ''}%replace(job=%X{jobId} ){'^job= $', ''}"
+    correlation: "%replace(req=%X{requestId} ){'^req= $', ''}%replace(run=%X{runId} ){'^run= $', ''}"

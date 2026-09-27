@@ -6,7 +6,7 @@ import java.nio.file.Path;
 import java.util.List;
 
 /**
- * quality-gate 固有の設定。
+ * quality-gate 固有の設定。既定値はここだけに持つ（application.yml は環境変数を対応づけるだけ）。
  *
  * @param artifactRoot   成果物ストアのルートディレクトリ
  * @param maxArtifactBytes   1 ファイルあたりの上限

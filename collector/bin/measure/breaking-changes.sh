@@ -2,17 +2,8 @@
 # M-07（oasdiff）: コミットされている OpenAPI 定義を head と base で比べる。
 # measure.sh が source する（単独では実行しない）。
 
-# コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす
-oasdiff() {
-  if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
-    command oasdiff "$@"
-  else
-    docker run --rm -v "$PWD:/w:ro" -w /w "$OASDIFF_IMAGE" "$@"
-  fi
-}
-
 measure_breaking_changes() {
-  group "OpenAPI の破壊的変更（${OASDIFF_IMAGE}）"
+  group "OpenAPI の破壊的変更（oasdiff ${OASDIFF_VERSION}）"
   rm -f "$REPORTS/oasdiff-base-spec-missing"
   if ! git -C "$SRC" show "$COMMIT_SHA:$OPENAPI_PATH" > "$REPORTS/openapi-head.yml" 2>/dev/null; then
     rm -f "$REPORTS/openapi-head.yml"

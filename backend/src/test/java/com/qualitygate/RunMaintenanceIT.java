@@ -14,6 +14,7 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.maintenance.ScheduledMaintenance;
 import com.qualitygate.pipeline.RunEvaluationPipeline;
+import com.qualitygate.platform.error.ApiException;
 import com.qualitygate.platform.id.Uuid7;
 import com.qualitygate.platform.storage.ArtifactStore;
 import com.qualitygate.platform.storage.StoredArtifact;
@@ -33,6 +34,7 @@ import java.util.UUID;
 
 import static com.qualitygate.TestSessions.as;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 /** Run の再評価（手動）と、日次の後始末（保持期間の削除・滞留した Run の終端化）。 */
 @SpringBootTest
@@ -130,7 +132,7 @@ class RunMaintenanceIT {
         assertThat(artifacts.findByRunId(recent.getId()))
                 .allSatisfy(a -> assertThat(a.getDeletedAt() == null)
                         .isEqualTo(a.getType() == ArtifactType.QUALITY_GATE_CONFIG));
-        assertThat(artifactStore.exists(recentKey)).isFalse();
+        assertThatThrownBy(() -> artifactStore.open(recentKey)).isInstanceOf(ApiException.class);
         assertThat(runs.findById(recent.getId())).isPresent();
     }
 

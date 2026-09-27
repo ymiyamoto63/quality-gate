@@ -85,12 +85,12 @@ describe('MetricRow', () => {
       metric({
         metricId: 'M-02',
         name: 'ミューテーションスコア',
-        variant: 'changed',
-        variantLabel: '変更範囲',
+        variant: 'all',
+        variantLabel: '全量',
       }),
     ).text()
 
-    expect(text).toContain('ミューテーションスコア（backend・変更範囲）')
+    expect(text).toContain('ミューテーションスコア（backend・全量）')
   })
 
   it('対象外は未計測と出さない', () => {

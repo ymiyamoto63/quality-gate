@@ -83,7 +83,7 @@ public class TrendQueryService {
      *
      * <p>分割の軸は「同じ条件で比較できるか」である。コンポーネントは常に別物
      * （backend と frontend のカバレッジを 1 本の線にしても意味がない）。
-     * 計測条件（M-02 の実行範囲、性能の計測環境など）も軸になる。変更範囲だけの値と全量の値を
+     * 計測条件（M-02 の実行範囲、性能の計測環境など）も軸になる。範囲や環境の違う値を
      * 1 本の線で結ぶと、範囲が切り替わるたびに品質が乱高下して見える。
      */
     private List<TrendResponse.TrendSeries> seriesOf(List<TrendRow> rows,
@@ -211,7 +211,7 @@ public class TrendQueryService {
                     + (variant == null ? "" : "/" + variant);
         }
 
-        /** 例: 「backend」「backend（変更範囲）」「全量」 */
+        /** 例: 「backend」「backend（全量）」「全量」 */
         String label(MetricDefinition definition) {
             String condition = variant == null ? "" : MetricCatalog.variantLabel(definition.metricId(), variant);
             if (componentName == null) {

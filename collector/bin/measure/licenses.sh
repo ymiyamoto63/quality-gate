@@ -5,7 +5,7 @@
 # 深刻度で絞らない。1 つのパッケージに並ぶ緩いライセンス（MIT など）まで見ないと、
 # デュアルライセンスのパッケージを厳しいほうのライセンスで数えてしまう（選べるものは緩いほうを採る）
 measure_licenses() {
-  group "ライセンスの走査（${TRIVY_IMAGE}）"
+  group "ライセンスの走査（Trivy ${TRIVY_VERSION}）"
   if ! (cd "$SRC" && trivy fs --quiet --scanners license --format sarif .) > "$REPORTS/trivy-license.sarif"; then
     rm -f "$REPORTS/trivy-license.sarif"
     fail "M-12: Trivy（ライセンス）の実行に失敗しました"

@@ -24,14 +24,12 @@ public class ScheduledMaintenance {
         this.staleRuns = staleRuns;
     }
 
-    @Scheduled(cron = "${quality-gate.schedule.cleanup-retention:0 0 3 * * *}",
-            zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
+    @Scheduled(cron = "${quality-gate.schedule.cleanup-retention}", zone = "${quality-gate.schedule.zone}")
     public void cleanupRetention() {
         runSafely("保持期間の削除", retention::run);
     }
 
-    @Scheduled(cron = "${quality-gate.schedule.abandon-stale-runs:0 10 3 * * *}",
-            zone = "${quality-gate.schedule.zone:Asia/Tokyo}")
+    @Scheduled(cron = "${quality-gate.schedule.abandon-stale-runs}", zone = "${quality-gate.schedule.zone}")
     public void abandonStaleRuns() {
         runSafely("滞留した Run の後始末", staleRuns::run);
     }

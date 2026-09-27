@@ -48,6 +48,6 @@ quality-gate/
 ├ api/openapi.yml   バックエンドから生成（コミットする）
 ├ collector/        収集ランナー（計測スクリプト・対象ごとの計測プロファイル・ツールの版）
 ├ docs/             ドキュメント（spec/ は要件定義・設計、operations/ は運用手順）
-├ .github/workflows/ collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
+├ .github/workflows/ collect.yml（収集ランナー）/ ci.yml（PR の CI）
 └ compose.yaml      PostgreSQL（+ プロファイル full でアプリ）
 ```

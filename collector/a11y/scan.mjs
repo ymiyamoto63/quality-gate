@@ -11,7 +11,6 @@
 //   A11Y_PAGES           検査する画面のパス（空白区切り）
 //   A11Y_OUTPUT          書き出すファイル
 //   A11Y_READY_SELECTOR  描画が済んだと判断できる要素（任意）。無ければ通信が落ち着くまで待つ
-//   A11Y_CHROMIUM        使う Chromium の実行ファイル（任意。Playwright が取得したものを使わない場合）
 import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { AxeBuilder } from '@axe-core/playwright'
@@ -33,9 +32,8 @@ const baseUrl = required('A11Y_BASE_URL')
 const pages = required('A11Y_PAGES').split(/\s+/)
 const output = required('A11Y_OUTPUT')
 const readySelector = process.env.A11Y_READY_SELECTOR?.trim()
-const executablePath = process.env.A11Y_CHROMIUM?.trim() || undefined
 
-const browser = await chromium.launch({ executablePath })
+const browser = await chromium.launch()
 const results = []
 let failures = 0
 try {

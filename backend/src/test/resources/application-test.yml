@@ -7,7 +7,6 @@ spring:
 
 quality-gate:
   artifact-root: ${java.io.tmpdir}/quality-gate-test-artifacts
-  base-url: http://localhost:8080
   ingest-tokens: test-ingest-token-0123456789abcdef   # IntegrationCleanup.INGEST_TOKEN と一致させる
   schedule:                  # 日次バッチはテストから明示的に呼ぶ
     cleanup-retention: "-"

@@ -36,9 +36,9 @@ jobs:
           cache: npm
           cache-dependency-path: frontend/package-lock.json
       # verify フェーズまで実行し、結合テスト（*IT。Testcontainers で PostgreSQL を起動する）も動かす。
-      # api/openapi.yml はこのとき再生成される。フロントエンドの同梱ビルドと JaCoCo の計測は行わない
+      # api/openapi.yml はこのとき再生成される。フロントエンドの同梱ビルドは行わない（frontend ジョブで検査する）
       - name: ユニットテストと結合テスト（JUnit）
-        run: ./backend/mvnw -f backend/pom.xml -B -ntp verify -DskipFrontend=true -Djacoco.skip=true
+        run: ./backend/mvnw -f backend/pom.xml -B -ntp verify -DskipFrontend=true
       - name: 生成物の同期検証
         run: |
           cd frontend && npm ci && npm run generate:api && cd ..
@@ -46,7 +46,7 @@ jobs:
             || { echo '::error::openapi.yml または schema.d.ts が最新ではありません。再生成してコミットしてください'; exit 1; }
 
   frontend:
-    name: フロントエンドのユニットテスト
+    name: フロントエンドの検査とユニットテスト
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -56,11 +56,18 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: ユニットテスト（Vitest）
+      - name: 依存関係の取得
+        working-directory: frontend
+        run: npm ci
+      - name: 静的検査（ESLint / Prettier / vue-tsc）
         working-directory: frontend
         run: |
-          npm ci
-          npm test
+          npm run lint
+          npm run format:check
+          npm run typecheck
+      - name: ユニットテスト（Vitest）
+        working-directory: frontend
+        run: npm test
 
   accessibility:
     name: アクセシビリティ検査
@@ -80,11 +87,6 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium
           npm run test:a11y
-      - uses: actions/upload-artifact@v4
-        if: failure()
-        with:
-          name: accessibility-results
-          path: reports/
 
   vulnerabilities:
     name: 脆弱性スキャン

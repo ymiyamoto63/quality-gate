@@ -35,7 +35,7 @@ class LocalFileArtifactStoreTest {
         assertThat(stored.sizeBytes()).isEqualTo(9);
         // echo -n '<report/>' | sha256sum
         assertThat(stored.sha256()).hasSize(64);
-        assertThat(store.exists(stored.storageKey())).isTrue();
+        assertThat(tempDir.resolve(stored.storageKey())).exists();
     }
 
     @Test
@@ -54,7 +54,7 @@ class LocalFileArtifactStoreTest {
 
         store.delete(stored.storageKey());
 
-        assertThat(store.exists(stored.storageKey())).isFalse();
+        assertThat(tempDir.resolve(stored.storageKey())).doesNotExist();
     }
 
     @Test

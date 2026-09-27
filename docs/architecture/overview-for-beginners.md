@@ -41,8 +41,8 @@ like-chatgpt そのものには一切手を加えません。
 | --- | --- | --- |
 | リポジトリ | GitHub 上のプロジェクトの置き場 | 本書では quality-gate と like-chatgpt の 2 つ |
 | GitHub Actions | GitHub の自動実行の仕組み | 「このボタンを押したら、この手順を実行する」を定義できる |
-| ワークフロー | 自動実行の手順書 | `.github/workflows/*.yml` に書く。収集ランナーは `collect.yml`（入り口）と `collect-target.yml`（1 コミットの計測） |
-| ジョブ | ワークフローの中の作業のまとまり | `collect-target.yml` は `fetch` → `measure` → `submit` の 3 つのジョブを順に実行する |
+| ワークフロー | 自動実行の手順書 | `.github/workflows/*.yml` に書く。収集ランナーは `collect.yml` |
+| ジョブ | ワークフローの中の作業のまとまり | `collect.yml` は `fetch` → `measure` → `submit` の 3 つのジョブを順に実行する |
 | ステップ | ジョブの中の 1 つ 1 つの命令 | 「clone する」「テストを実行する」など |
 | **ランナー** | ジョブを**実際に実行するコンピューター** | GitHub が貸してくれるもの（GitHub ホスト）と、自分で用意するもの（セルフホスト）がある |
 | シークレット / 変数 | ワークフローに渡す設定値 | シークレットは暗号化され、ログでは `***` に伏せられる |

@@ -4,9 +4,19 @@
 # 起動は手動実行だけ（DD-7）。対象とブランチ（またはコミット・タグ・PR）を指定して計測する。
 # リリース判定（DD-16）に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
-# 1 コミットの計測は collect-target.yml（fetch → measure → submit）が行う。
-# 必要な設定は collect-target.yml の先頭を参照。
+# 計測する指標は M-01〜M-12。M-02（PIT）と M-03 / M-04（k6 の負荷試験）は PR 以外の計測でだけ実行する。
+#
+# 必要な設定（Settings → Secrets and variables → Actions）:
+#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
+#              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
+#   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
+#              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
+#
+# ジョブを 3 つ（fetch → measure → submit）に分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
+# measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect
+# 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14 / ymiyamoto63/like-chatgpt v1.2.0）
+run-name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.commit || inputs.branch || 'default' }}
 
 on:
   workflow_dispatch:
@@ -35,15 +45,112 @@ permissions:
   contents: read
 
 jobs:
-  collect:
-    # 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14 / ymiyamoto63/like-chatgpt v1.2.0）
-    name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.commit || inputs.branch || 'default' }}
-    uses: ./.github/workflows/collect-target.yml
-    with:
-      repository: ${{ inputs.repository }}
-      branch: ${{ inputs.branch }}
-      commit: ${{ inputs.commit }}
-      pull_request: ${{ inputs.pull_request }}
-      base_branch: ${{ inputs.base_branch }}
-      base: ${{ inputs.base }}
-    secrets: inherit
+  fetch:
+    runs-on: self-hosted
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: 計測プロファイルの読み込み
+        id: profile
+        env:
+          QG_TARGET: ${{ inputs.repository }}
+        run: |
+          source collector/bin/lib.sh
+          load_profile "$QG_TARGET"
+          {
+            echo "owner=${QG_TARGET%%/*}"
+            echo "name=${QG_TARGET#*/}"
+          } >> "$GITHUB_OUTPUT"
+
+      # 対象リポジトリだけを読める、1 時間で失効するトークン。
+      # App が未設定なら発行しない（public リポジトリはトークン無しで取得できる）
+      - name: 読み取り用トークンの発行
+        id: app-token
+        if: vars.QG_COLLECTOR_APP_ID != ''
+        uses: actions/create-github-app-token@v2
+        with:
+          app-id: ${{ vars.QG_COLLECTOR_APP_ID }}
+          private-key: ${{ secrets.QG_COLLECTOR_APP_PRIVATE_KEY }}
+          owner: ${{ steps.profile.outputs.owner }}
+          repositories: ${{ steps.profile.outputs.name }}
+
+      - name: 対象リポジトリの取得
+        env:
+          GH_TOKEN: ${{ steps.app-token.outputs.token }}
+          QG_TARGET: ${{ inputs.repository }}
+          QG_BRANCH: ${{ inputs.branch }}
+          QG_COMMIT: ${{ inputs.commit }}
+          QG_PR_NUMBER: ${{ inputs.pull_request }}
+          QG_BASE_BRANCH: ${{ inputs.base_branch }}
+          QG_BASE: ${{ inputs.base }}
+        run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
+
+      - name: 受け渡し用にまとめる
+        run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: collector-source
+          path: ${{ runner.temp }}/qg-collector-source.tgz
+          retention-days: 1
+
+  measure:
+    needs: fetch
+    runs-on: self-hosted
+    # PR 以外の計測は、ビルド・テストに加えて PIT と負荷試験（約 18 分）を実行する
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: collector-source
+          path: ${{ runner.temp }}
+      - name: 展開
+        run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
+
+      - name: 計測
+        env:
+          QG_TARGET: ${{ inputs.repository }}
+        run: ./collector/bin/measure-isolated.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: collector-reports
+          path: ${{ runner.temp }}/qg-reports/
+          retention-days: 7
+
+      # セルフホストランナーに対象のソースを残さない
+      - name: 作業領域の削除
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-collector-source.tgz" "$RUNNER_TEMP/qg-reports"
+
+  submit:
+    needs: [fetch, measure]
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: collector-reports
+          path: ${{ runner.temp }}/qg-reports
+      - name: quality-gate へ送信
+        env:
+          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
+          QG_CI_RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
+            echo "::error::QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です"
+            exit 1
+          fi
+          ./collector/bin/submit.sh "$RUNNER_TEMP/qg-reports"
+

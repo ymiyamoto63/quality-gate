@@ -38,7 +38,7 @@ public class ReleaseReportController {
     private final ZoneId zone;
 
     public ReleaseReportController(ReleaseReportService service, CurrentUser currentUser,
-                                   @Value("${quality-gate.schedule.zone:Asia/Tokyo}") String zone) {
+                                   @Value("${quality-gate.schedule.zone}") String zone) {
         this.service = service;
         this.currentUser = currentUser;
         this.zone = ZoneId.of(zone);

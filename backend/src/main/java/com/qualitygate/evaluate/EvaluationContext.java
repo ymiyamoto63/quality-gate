@@ -25,7 +25,7 @@ public record EvaluationContext(
 
     /**
      * 前回値を引くキー。計測条件（{@code variant}）を含めるのは、条件の違う値どうしを
-     * 比べないため。変更範囲だけの M-02 と全量の M-02 を比べた「前回比」は意味を持たない。
+     * 比べないため。実行範囲の違う M-02 を比べた「前回比」は意味を持たない。
      */
     public static String key(String metricId, String componentName, String variant) {
         String base = metricId + "/" + (componentName == null ? "" : componentName);
