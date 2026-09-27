@@ -27,7 +27,6 @@
 
   /* ステータス色はライト/ダークで同じ。判定の意味は環境で変わらないため。 */
   --status-pass: #0ca30c;
-  --status-warn: #fab219;
   --status-error: #ec835a;
   --status-fail: #d03b3b;
   --status-neutral: #898781;

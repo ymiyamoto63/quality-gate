@@ -2,19 +2,12 @@ import { defineStore } from 'pinia'
 import { ref } from 'vue'
 
 export type Theme = 'light' | 'dark' | 'system'
-export interface Toast {
-  id: number
-  severity: 'success' | 'info' | 'warn' | 'error'
-  message: string
-}
 
 const THEME_KEY = 'qg.theme'
 
-/** テーマとトーストなど、画面横断の状態。 */
+/** テーマなど、画面横断の状態。 */
 export const useUiStore = defineStore('ui', () => {
   const theme = ref<Theme>(readStoredTheme())
-  const toasts = ref<Toast[]>([])
-  let nextToastId = 1
 
   function setTheme(next: Theme) {
     theme.value = next
@@ -35,15 +28,7 @@ export const useUiStore = defineStore('ui', () => {
     }
   }
 
-  function notify(severity: Toast['severity'], message: string) {
-    toasts.value.push({ id: nextToastId++, severity, message })
-  }
-
-  function dismiss(id: number) {
-    toasts.value = toasts.value.filter((t) => t.id !== id)
-  }
-
-  return { theme, toasts, setTheme, applyTheme, notify, dismiss }
+  return { theme, setTheme, applyTheme }
 })
 
 function readStoredTheme(): Theme {

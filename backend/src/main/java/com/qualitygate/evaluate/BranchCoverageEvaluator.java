@@ -68,6 +68,6 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
         }
         return "。前回より %s ポイント低下しています（%s%% → %s%%）".formatted(
                 previous.subtract(value).setScale(2, RoundingMode.HALF_UP).toPlainString(),
-                previous.toPlainString(), value.toPlainString());
+                previous.setScale(2, RoundingMode.HALF_UP).toPlainString(), value.toPlainString());
     }
 }

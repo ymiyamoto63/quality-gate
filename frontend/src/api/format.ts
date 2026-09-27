@@ -33,49 +33,8 @@ export function formatValue(
   return `${trimZeros(numeric)}${unitSuffix(unit)}`
 }
 
-/** 前回比。符号を必ず付け、増減の向きを一目で判るようにする。 */
-export function formatDelta(
-  delta: number | string | null | undefined,
-  unit: string | null | undefined,
-): string | null {
-  if (delta === null || delta === undefined) return null
-  const numeric = typeof delta === 'string' ? Number(delta) : delta
-  if (Number.isNaN(numeric) || numeric === 0) return null
-  const sign = numeric > 0 ? '+' : '−'
-  return `${sign}${trimZeros(Math.abs(numeric))}${unitSuffix(unit)}`
-}
-
-/** 合格ラインを「≥ 75%」のような 1 つの文字列にする。 */
-export function formatThreshold(
-  threshold: Record<string, unknown> | null | undefined,
-  unit: string | null | undefined,
-): string | null {
-  if (!threshold) return null
-  const operator = threshold.operator
-  const value = threshold.value
-  if (typeof operator !== 'string' || value === null || value === undefined) return null
-  const numeric = Number(value)
-  if (Number.isNaN(numeric)) return null
-  return `${operatorSymbol(operator)} ${trimZeros(numeric)}${unitSuffix(unit)}`
-}
-
 export function shortSha(commitSha: string | null | undefined): string {
   return commitSha ? commitSha.slice(0, 7) : NOT_MEASURED
-}
-
-function operatorSymbol(operator: string): string {
-  switch (operator) {
-    case '>=':
-      return '≥'
-    case '<=':
-      return '≤'
-    case '>':
-      return '>'
-    case '<':
-      return '<'
-    default:
-      return operator
-  }
 }
 
 function unitSuffix(unit: string | null | undefined): string {

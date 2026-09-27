@@ -42,14 +42,4 @@ describe('UI ストア', () => {
       Storage.prototype.setItem = original
     }
   })
-
-  it('トーストを追加・削除できる', () => {
-    const ui = useUiStore()
-
-    ui.notify('error', '取得に失敗しました')
-    expect(ui.toasts).toHaveLength(1)
-
-    ui.dismiss(ui.toasts[0]!.id)
-    expect(ui.toasts).toHaveLength(0)
-  })
 })

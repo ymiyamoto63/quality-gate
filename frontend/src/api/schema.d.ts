@@ -4,43 +4,6 @@
  */
 
 export interface paths {
-  '/api/v1/audit-logs': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 監査ログを新しい順に一覧する */
-    get: operations['list_3']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/dashboard': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * ダッシュボードを取得する
-     * @description 不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。
-     */
-    get: operations['dashboard']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/me': {
     parameters: {
       query?: never
@@ -48,7 +11,10 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** ログイン中の利用者とロールを返す */
+    /**
+     * ログイン中の利用者を返す
+     * @description 未ログインなら 401
+     */
     get: operations['me']
     put?: never
     post?: never
@@ -58,47 +24,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/repositories/{repositoryId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * リポジトリ詳細を取得する
-     * @description 指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立てを 2 箇所に持たないため。
-     */
-    get: operations['detail_1']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/repositories/{repositoryId}/config': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * 現在の設定と直近の検証結果を取得する
-     * @description 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
-     */
-    get: operations['get']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/repositories/{repositoryId}/release-report': {
+  '/api/v1/release': {
     parameters: {
       query?: never
       header?: never
@@ -107,7 +33,7 @@ export interface paths {
     }
     /**
      * リリース判定を取得する
-     * @description 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは、そのタグを付けて計測した Run からコミットを探す。ブランチ名は受け付けない
+     * @description 指定したタグ・コミットで判定済みの計測から、リリースしてよいかと全指標の合否を返す。指定が無ければ最新の判定済みの計測を使う。ブランチ名は受け付けない
      */
     get: operations['releaseReport']
     put?: never
@@ -118,7 +44,7 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/repositories/{repositoryId}/release-report.csv': {
+  '/api/v1/release/history': {
     parameters: {
       query?: never
       header?: never
@@ -126,30 +52,10 @@ export interface paths {
       cookie?: never
     }
     /**
-     * リリース判定を CSV で取得する
-     * @description 1 行が 1 指標。判定の前提（コミット・Run・合格ラインの版）と出力日時・出力者を各行に含む。UTF-8（BOM つき）。出力したことを監査ログに残す
+     * 判定の履歴を取得する
+     * @description 判定済みの計測を新しい順に最大 50 件（同じコミットは最後の判定だけ）
      */
-    get: operations['releaseReportCsv']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/repositories/{repositoryId}/trends': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * 指標の時系列を取得する
-     * @description 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
-     */
-    get: operations['trends']
+    get: operations['history']
     put?: never
     post?: never
     delete?: never
@@ -165,34 +71,13 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** Run を新しい順に一覧する */
-    get: operations['list_1']
+    get?: never
     put?: never
     /**
      * Run を作成する
      * @description 計測開始時に呼ぶ。同一コミットへの再送信は attempt を増やした新しい Run になる。
      */
     post: operations['createRun']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/runs/{runId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Run の判定結果を取得する
-     * @description 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
-     */
-    get: operations['detail']
-    put?: never
-    post?: never
     delete?: never
     options?: never
     head?: never
@@ -206,34 +91,13 @@ export interface paths {
       path?: never
       cookie?: never
     }
-    /** Run に取り込んだ成果物を一覧する */
-    get: operations['list_2']
+    get?: never
     put?: never
     /**
      * 成果物をアップロードする
      * @description この時点ではパースしない。受領・検証・保存のみを行い、パースは確定時の判定で行う。
      */
     post: operations['uploadArtifact']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/runs/{runId}/artifacts/{artifactId}/content': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * 成果物をダウンロードする
-     * @description 保持期間を過ぎて実体を削除済みなら 409 ARTIFACTS_DELETED。
-     */
-    get: operations['content']
-    put?: never
-    post?: never
     delete?: never
     options?: never
     head?: never
@@ -251,7 +115,7 @@ export interface paths {
     put?: never
     /**
      * 取り込み完了を宣言し、判定する
-     * @description その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は Run 詳細に表示される）。
+     * @description その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は errorCode とサーバのログで確かめる）。
      */
     post: operations['finalizeRun']
     delete?: never
@@ -260,134 +124,10 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/runs/{runId}/findings': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /**
-     * Run に紐づく違反を一覧する
-     * @description state を省略すると新規・継続・初回のみを返す。解消済みは明示指定が必要。
-     */
-    get: operations['findings']
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/runs/{runId}/reevaluate': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    /**
-     * Run を再評価する
-     * @description 保存済みの成果物と、その Run とともに送られた設定を読み直して、その場で判定し直す。成果物が保持期間を過ぎて削除されていれば 409 ARTIFACTS_DELETED。判定に失敗した場合も 200 で、status が FAILED になる。
-     */
-    post: operations['reevaluate']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/users': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 許可リストの利用者を一覧する */
-    get: operations['list']
-    put?: never
-    /**
-     * 許可リストに利用者を追加する
-     * @description GitHub ログイン名の実在は確認しない。存在しない名前はログインできないだけで害がない。
-     */
-    post: operations['add']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
-  '/api/v1/users/{userId}': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    get?: never
-    put?: never
-    post?: never
-    delete?: never
-    options?: never
-    head?: never
-    /**
-     * ロールの変更・無効化
-     * @description 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
-     */
-    patch: operations['update']
-    trace?: never
-  }
 }
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
-    ArtifactItem: {
-      /** Format: uuid */
-      artifactId: string
-      component: string | null
-      /** @description 保持期間を過ぎて実体を削除済みなら true。ダウンロードできない */
-      deleted: boolean
-      filename: string
-      sha256: string
-      /** Format: int64 */
-      sizeBytes: number
-      type: string
-      /** Format: date-time */
-      uploadedAt: string
-    }
-    /** @description Run に取り込んだ成果物の一覧（RUN-5） */
-    ArtifactListResponse: {
-      items: components['schemas']['ArtifactItem'][]
-    }
-    AuditLogItem: {
-      action: string
-      /** @description 日次バッチの操作は system */
-      actorLogin: string | null
-      /** @description 変更後の値 */
-      after: {
-        [key: string]: unknown
-      } | null
-      /** Format: uuid */
-      auditLogId: string
-      /** @description 変更前の値 */
-      before: {
-        [key: string]: unknown
-      } | null
-      /** Format: date-time */
-      occurredAt: string
-      targetId: string | null
-      targetType: string
-    }
-    /** @description 監査ログ。新しいものから返す */
-    AuditLogListResponse: {
-      hasMore: boolean
-      items: components['schemas']['AuditLogItem'][]
-      nextCursor: string | null
-    }
     /** @description Run の作成要求。CI が計測開始時に送信する。 */
     CreateRunRequest: {
       /** @description 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する */
@@ -396,21 +136,15 @@ export interface components {
       ciRunUrl?: string
       /** @description 計測対象のコミット SHA（40 桁） */
       commitSha: string
-      /** @description 合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット */
-      configCommitSha?: string
-      /** @description 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。トレンドの既定の系列に使う。省略すると登録済みの値のまま（新規は main） */
+      /** @description 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。省略すると登録済みの値のまま（新規は main） */
       defaultBranch?: string
       /** Format: date-time */
       measuredAt: string
-      /** Format: int32 */
-      pullRequestNumber?: number
       /**
-       * @description owner/name 形式。初めて送られたリポジトリは登録される
+       * @description owner/name 形式。quality-gate の計測対象（QG_REPOSITORY）と一致しなければ拒否する
        * @example ymiyamoto63/quality-gate
        */
       repository: string
-      /** @description CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う */
-      skippedMetrics?: components['schemas']['SkippedMetricRequest'][]
       /** @description 計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。リリース判定でタグをコミットに解決するのに使う */
       tags?: string[]
       triggeredBy: string
@@ -418,33 +152,16 @@ export interface components {
     CreateRunResponse: {
       /** Format: int32 */
       attempt?: number
-      /** @description Run 詳細画面への直リンク。CI のログに出して、不合格時にその場から飛べるようにする */
+      /** @description リリース判定の画面（このコミット）への直リンク。CI のログに出して、その場から飛べるようにする */
       detailUrl?: string
       /** Format: uuid */
       runId?: string
       /** @enum {string} */
-      status?:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-    }
-    CreateUserRequest: {
-      githubLogin: string
-      /**
-       * @description 省略時は VIEWER
-       * @enum {string|null}
-       */
-      role?: 'ADMIN' | 'VIEWER' | null
-    }
-    /** @description ダッシュボード。リポジトリごとの最新の判定済み Run と、最後の完全計測。 */
-    DashboardResponse: {
-      repositories?: components['schemas']['RepositoryCard'][]
+      status?: 'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED'
     }
     /** @description 確定と判定の結果。収集ランナーはこれをログに出す */
     FinalizeResponse: {
-      /**
-       * @description 完全計測か部分計測か。処理失敗なら null
-       * @enum {string}
-       */
-      completeness?: 'FULL' | 'PARTIAL'
+      /** @description リリース判定の画面（このコミット）への直リンク */
       detailUrl?: string
       /** @description 処理失敗の理由のコード。判定済みなら null */
       errorCode?: string
@@ -454,134 +171,33 @@ export interface components {
        * @description EVALUATED（判定済み）か FAILED（処理失敗）
        * @enum {string}
        */
-      status?:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
+      status?: 'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED'
       /**
        * @description 判定結果。処理失敗なら null
        * @enum {string}
        */
-      verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
+      verdict?: 'PASS' | 'FAIL'
     }
-    FindingItem: {
-      componentName: string | null
-      /** @description ツール固有の付加情報。無ければ空オブジェクト */
-      detail: {
-        [key: string]: unknown
-      }
-      filePath: string | null
-      /** Format: uuid */
-      findingId: string
-      /** @description Run をまたいで違反を同定するキー */
-      fingerprint: string
-      /** Format: int32 */
-      line: number | null
-      metricId: string
-      metricName: string
-      ruleId: string | null
-      /** @enum {string} */
-      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
-      /** @description 該当箇所へのリンク。ホスティング先の URL 形式はサーバが持つ。パスを持たない違反（依存パッケージの脆弱性など）では null */
-      sourceUrl: string | null
-      /** @enum {string} */
-      state: 'NEW' | 'CONTINUING' | 'RESOLVED' | 'INITIAL'
-      title: string
-    }
-    /** @description Run に紐づく違反の一覧 */
-    FindingListResponse: {
-      hasMore: boolean
-      items: components['schemas']['FindingItem'][]
-      /** @description 次ページのカーソル。最終ページでは null */
-      nextCursor: string | null
-      /**
-       * Format: int64
-       * @description 絞り込み後の総件数。件数表示と「全部見た」の判断に使う
-       */
-      totalCount: number
-    }
-    /** @description 最後の計測と最後の完全計測の日時 */
-    Freshness: {
-      /** Format: date-time */
-      lastFullMeasuredAt?: string
-      /** Format: date-time */
-      lastMeasuredAt?: string
-    }
-    LatestRun: {
-      /** @enum {string} */
-      completeness?: 'FULL' | 'PARTIAL'
-      /** Format: date-time */
-      measuredAt?: string
-      /** Format: uuid */
-      runId?: string
-      /**
-       * @description 判定結果。未判定なら null
-       * @enum {string}
-       */
-      verdict?: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-    }
-    LatestRunSummary: {
-      branch: string
-      commitSha: string
-      /** @enum {string|null} */
-      completeness: 'FULL' | 'PARTIAL' | null
-      /** Format: date-time */
-      measuredAt: string
-      /** Format: uuid */
-      runId: string
-      /** @enum {string} */
-      status:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-      /** @enum {string|null} */
-      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
-    }
-    /** @description ログイン中の利用者。フロントエンドはこの role で表示を制御する（防御は API 側）。 */
     MeResponse: {
-      avatarUrl?: string
-      displayName?: string
-      githubLogin?: string
-      /** @enum {string} */
-      role?: 'ADMIN' | 'VIEWER'
-      /** Format: uuid */
-      userId?: string
+      username: string
     }
-    /** @description 再評価の結果 */
-    ReevaluateResponse: {
-      /** @description 処理失敗の理由のコード */
-      errorCode: string | null
-      /** Format: uuid */
-      runId: string
-      /**
-       * @description EVALUATED（判定済み）か FAILED（処理失敗）
-       * @enum {string}
-       */
-      status:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-      /**
-       * @description 判定結果。処理失敗なら null
-       * @enum {string|null}
-       */
-      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
-    }
-    /** @description 合否に使った指標の件数（参考値・対象外を除く） */
+    /** @description 合否に使った指標の件数 */
     ReleaseCounts: {
-      /** Format: int32 */
-      errored: number
       /** Format: int32 */
       failed: number
       /** Format: int32 */
       judged: number
       /** Format: int32 */
       passed: number
-      /** Format: int32 */
-      skipped: number
-      /** Format: int32 */
-      warned: number
     }
-    /** @description 判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る */
-    ReleaseGateConfig: {
-      /** @description 合格ラインを送った quality-gate リポジトリのコミット */
-      commitSha: string | null
-      /** @description 計測の対象から外したパス */
-      exclusions: string[]
+    ReleaseFinding: {
+      /** @description ファイルと行（backend/src/Foo.java:42 など） */
+      location: string | null
+      /** @enum {string} */
+      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
+      title: string
+      /** @description GitHub の該当箇所 */
+      url: string | null
     }
     ReleaseGuide: {
       basis: string
@@ -600,318 +216,80 @@ export interface components {
       /** @description 計測に使うライブラリ・ソフトウェア */
       tools: string
     }
+    ReleaseHistoryItem: {
+      branch: string
+      commitSha: string
+      /** Format: date-time */
+      measuredAt: string
+      /** @description リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA） */
+      ref: string
+      /** @description 計測したコミットを指すタグ */
+      tags: string[]
+      /** @enum {string} */
+      verdict: 'PASS' | 'FAIL'
+    }
+    ReleaseHistoryResponse: {
+      items: components['schemas']['ReleaseHistoryItem'][]
+    }
     ReleaseMetric: {
       category: string
       componentName: string | null
+      /**
+       * Format: int32
+       * @description 不合格のときの違反の総数。合格なら 0
+       */
+      findingCount: number
+      /** @description 不合格のときの主な違反（深刻な順に最大 10 件）。合格なら空 */
+      findings: components['schemas']['ReleaseFinding'][]
       metricId: string
       name: string
       reason: string | null
-      scenario: string | null
-      /** @enum {string} */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'ERROR' | 'NOT_APPLICABLE'
+      /**
+       * @description PASS（合格）/ FAIL（不合格）/ ERROR（計測できなかった。不合格として扱う）
+       * @enum {string}
+       */
+      status: 'PASS' | 'FAIL' | 'ERROR' | 'NOT_APPLICABLE'
       /** @description 合格ラインを表示用にした文字列（≥ 75% など） */
       threshold: string | null
       unit: string | null
-      /** @description 実測値。未計測は null */
+      /** @description 実測値。計測エラーは null */
       value: number | null
       variantLabel: string | null
     }
-    /** @description リリース判定。指定したタグ・コミットで判定済みの Run から組み立てる */
+    /** @description リリース判定。判定済みの計測（Run）から組み立てる */
     ReleaseReportResponse: {
-      commitSha: string
-      commitUrl: string
+      /** @description 判定したコミット。計測が 1 件も無ければ null */
+      commitSha: string | null
+      commitUrl: string | null
       counts: components['schemas']['ReleaseCounts']
       /** @enum {string} */
-      decision: 'RELEASABLE' | 'RELEASABLE_WITH_WARNINGS' | 'NOT_RELEASABLE' | 'UNDETERMINED'
+      decision: 'RELEASABLE' | 'NOT_RELEASABLE' | 'NOT_MEASURED'
       /** @description 判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する */
       decisionReason: string
-      /** @description 判定に使った合格ライン。設定ファイルの無い Run と未計測では null */
-      gateConfig: components['schemas']['ReleaseGateConfig']
       /** @description 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び） */
       guides: components['schemas']['ReleaseGuide'][]
-      /** @description 指標ごとの結果。不合格・計測エラー・注意を先に、参考値を最後に並べる */
+      /** @description 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない */
       metrics: components['schemas']['ReleaseMetric'][]
-      /**
-       * Format: int32
-       * @description 同じコミットのほかの Run の件数（判定には使っていない）
-       */
-      otherRunCount: number
-      /** @description 指定したタグ・コミット（前後の空白を除いたもの） */
-      ref: string
-      /** @enum {string} */
-      refType: 'TAG' | 'COMMIT'
+      /** @description 指定したタグ・コミット。最新の計測を見ているときは null */
+      ref: string | null
       repositoryFullName: string
-      /** Format: uuid */
-      repositoryId: string
-      /** @description 判定に使った Run。未計測なら null */
+      /** @description 判定に使った計測。未計測なら null */
       run: components['schemas']['ReleaseRun']
     }
     ReleaseRun: {
-      /** Format: int32 */
-      attempt: number
-      /** @description 比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。タグで計測したときは前のタグ */
+      /** @description 比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ */
       baseCommitSha: string | null
       branch: string
-      /** @enum {string} */
-      completeness: 'FULL' | 'PARTIAL'
-      /** Format: date-time */
-      measuredAt: string
-      /** Format: uuid */
-      runId: string
-      /** @enum {string} */
-      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-    }
-    RepositoryCard: {
-      freshness?: components['schemas']['Freshness']
-      fullName?: string
-      latestRun?: components['schemas']['LatestRun']
-      /** Format: int32 */
-      openCriticalCount?: number
-      /** Format: int32 */
-      openHighCount?: number
-      /** Format: uuid */
-      repositoryId?: string
-    }
-    /** @description 直近の Run に送られた合格ラインと、その検証結果。版の履歴は Git で見る */
-    RepositoryConfig: {
-      /** @description 合格ラインを送った quality-gate リポジトリのコミット */
-      configCommitSha: string | null
-      /** @description 検証エラー。不正なら判定されず、Run は処理失敗になる */
-      errors: components['schemas']['ValidationErrorItem'][]
-      /** Format: date-time */
-      measuredAt: string | null
-      /** @description 設定ファイルの内容。設定ファイルの無い Run（既定値で判定）では null */
-      rawYaml: string | null
-      /**
-       * Format: uuid
-       * @description 直近の Run。まだ計測が無ければ null
-       */
-      runId: string | null
-    }
-    /** @description リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く */
-    RepositoryDetail: {
-      freshness: components['schemas']['RepositoryFreshness']
-      /** Format: uuid */
-      lastFullRunId: string | null
-      /** @description 判定済みの最新 Run。まだ無ければ null */
-      latestRun: components['schemas']['LatestRunSummary']
-      repository: components['schemas']['RepositoryItem']
-    }
-    /** @description 最後の計測と最後の完全計測の日時（DASH-2） */
-    RepositoryFreshness: {
-      /** Format: date-time */
-      lastFullMeasuredAt: string | null
-      /** Format: date-time */
-      lastMeasuredAt: string | null
-    }
-    RepositoryItem: {
-      /** Format: date-time */
-      createdAt: string
-      defaultBranch: string
-      fullName: string
-      name: string
-      owner: string
-      /** Format: uuid */
-      repositoryId: string
-    }
-    RepositoryRef: {
-      fullName: string | null
-      /** Format: uuid */
-      repositoryId: string
-    }
-    RunCategory: {
-      /** @description カテゴリ名（機能テスト など） */
-      category: string
-      /** @description 不合格・注意を含むカテゴリは画面の初期状態で展開する */
-      expandByDefault: boolean
-      metrics: components['schemas']['RunMetric'][]
-      /**
-       * @description カテゴリ内で最も重いステータス
-       * @enum {string}
-       */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'ERROR' | 'NOT_APPLICABLE'
-    }
-    /** @description Run 1 件の判定結果 */
-    RunDetailResponse: {
-      /** Format: int32 */
-      artifactCount: number
-      /** Format: int32 */
-      attempt: number
-      baseCommitSha: string | null
-      /**
-       * Format: uuid
-       * @description 差分算出に使った比較対象 Run。初回 Run では null
-       */
-      baselineRunId: string | null
-      branch: string
-      categories: components['schemas']['RunCategory'][]
+      /** @description 計測したワークフローの実行 URL */
       ciRunUrl: string | null
-      commitSha: string
-      /** @description コミットへのリンク。URL の組み立てはサーバが持つ */
-      commitUrl: string | null
-      /** @enum {string|null} */
-      completeness: 'FULL' | 'PARTIAL' | null
-      /** @description 判定に使った合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット。合格ライン自体は Run の成果物に残る */
-      configCommitSha: string | null
-      /** Format: date-time */
-      evaluatedAt: string | null
-      /** @description 処理そのものが失敗した場合のみ。判定結果 FAIL とは別物 */
-      failure: components['schemas']['RunFailure']
-      findingSummary: components['schemas']['RunFindingSummary']
-      /** Format: date-time */
-      measuredAt: string
-      /** Format: int32 */
-      pullRequestNumber: number | null
-      repository: components['schemas']['RepositoryRef']
-      /** Format: uuid */
-      runId: string
-      skippedMetrics: components['schemas']['SkippedMetricView'][]
-      /** @enum {string} */
-      status:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-      /**
-       * @description 判定結果。判定前・処理失敗では null
-       * @enum {string|null}
-       */
-      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
-    }
-    /** @description 処理失敗の内容。errorCode で分岐し、hint で対処を示す */
-    RunFailure: {
-      detail: string | null
-      errorCode: string | null
-      hint: string
-      title: string
-    }
-    /** @description 違反の内訳。解消（RESOLVED）も件数に含めて「直った数」を示す */
-    RunFindingSummary: {
-      /** Format: int64 */
-      continuing: number
-      /** Format: int64 */
-      initial: number
-      /** Format: int64 */
-      newCount: number
-      /** Format: int64 */
-      resolved: number
-    }
-    /** @description Run の一覧。新しいものから返す */
-    RunListResponse: {
-      hasMore: boolean
-      items: components['schemas']['RunSummary'][]
-      nextCursor: string | null
-    }
-    RunMetric: {
-      /** @description コンポーネント名（backend / frontend）。全体値の指標では null */
-      componentName: string | null
-      /** @description 前回比。前回値か今回値が無ければ null */
-      delta: number | null
-      /** @description 差分が良い方向か。null は前回比なし */
-      deltaImproved: boolean | null
-      detail: {
-        [key: string]: unknown
-      } | null
-      /**
-       * Format: int64
-       * @description この指標に紐づく未解消の違反件数
-       */
-      findingCount: number
-      metricId: string
-      name: string
-      previousValue: number | null
-      /** @description 判定理由。文言はサーバが持ち、画面はそのまま表示する */
-      reason: string | null
-      /** @enum {string} */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'ERROR' | 'NOT_APPLICABLE'
-      /** @description 合格ライン。例: {"operator": ">=", "value": 75} */
-      threshold: {
-        [key: string]: unknown
-      } | null
-      unit: string | null
-      /** @description 実測値。未計測は null。0 は「計測して 0 だった」を意味し別物 */
-      value: number | null
-      /** @description 計測条件（M-02 の実行範囲 all、性能の計測環境など）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null */
-      variant: string | null
-      /** @description 計測条件の表示名（全量 など） */
-      variantLabel: string | null
-    }
-    RunSummary: {
-      branch: string
-      commitSha: string
-      /** @enum {string|null} */
-      completeness: 'FULL' | 'PARTIAL' | null
-      /** Format: date-time */
-      evaluatedAt: string | null
-      /** Format: date-time */
-      measuredAt: string
-      /** Format: int32 */
-      pullRequestNumber: number | null
-      /** Format: uuid */
-      runId: string
-      /** @enum {string} */
-      status:
-        'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED' | 'ABANDONED'
-      /** @enum {string|null} */
-      verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL' | null
-    }
-    /** @description スキップの申告。申告のない未提出は ERROR として扱われる。 */
-    SkippedMetricRequest: {
-      /** @example M-02 */
-      metricId: string
-      /**
-       * @description なぜ計測しなかったか。Run 詳細にそのまま表示される
-       * @example PR の計測では PIT を実行しない
-       */
-      reason: string
-    }
-    /** @description CI からのスキップ申告。受理されなかった申告も残す */
-    SkippedMetricView: {
-      /** @description 設定で許容されているか。false なら当該指標は ERROR */
-      accepted: boolean
-      metricId: string
-      name: string
-      reason: string
-    }
-    TrendPoint: {
-      commitSha: string
       /** Format: date-time */
       measuredAt: string
       /** Format: uuid */
       runId: string
+      /** @description 計測したコミットを指すタグ */
+      tags: string[]
       /** @enum {string} */
-      status: 'PASS' | 'WARN' | 'FAIL' | 'SKIP' | 'ERROR' | 'NOT_APPLICABLE'
-      /** @description 実測値。未計測は null。0 を返さない。0 を返すと、グラフ上で「極めて良い値」に見えてしまう */
-      value: number | null
-    }
-    /** @description 指標の時系列。計測環境ごとに系列を分ける */
-    TrendResponse: {
-      branch: string
-      /** Format: date-time */
-      from: string
-      metricId: string
-      name: string
-      series: components['schemas']['TrendSeries'][]
-      /** @description 重畳表示する合格ライン。期間内で最後に適用された値。期間中にしきい値が変わった場合は thresholdChanged が true になる */
-      threshold: {
-        [key: string]: unknown
-      } | null
-      /** @description 期間内でしきい値が変わったか。true のとき、1 本の線では過去の判定を説明できない */
-      thresholdChanged: boolean
-      /** Format: date-time */
-      to: string
-      unit: string | null
-    }
-    TrendSeries: {
-      /** Format: int32 */
-      colorIndex: number
-      componentName: string | null
-      label: string
-      points: components['schemas']['TrendPoint'][]
-      seriesId: string
-    }
-    UpdateUserRequest: {
-      /** @enum {string|null} */
-      role?: 'ADMIN' | 'VIEWER' | null
-      /** @enum {string|null} */
-      status?: 'ACTIVE' | 'DISABLED' | null
+      verdict: 'PASS' | 'FAIL'
     }
     UploadArtifactResponse: {
       /** Format: uuid */
@@ -919,39 +297,6 @@ export interface components {
       sha256?: string
       /** Format: int64 */
       sizeBytes?: number
-    }
-    /** @description 利用者の一覧 */
-    UserList: {
-      items: components['schemas']['UserResponse'][]
-    }
-    /** @description 許可リストの利用者。ここに無い GitHub ユーザーはログインできない */
-    UserResponse: {
-      avatarUrl: string | null
-      /** Format: date-time */
-      createdAt: string
-      /** @description 初回ログインまでは null */
-      displayName: string | null
-      githubLogin: string
-      /**
-       * Format: date-time
-       * @description 一度もログインしていなければ null
-       */
-      lastLoginAt: string | null
-      /** @enum {string} */
-      role: 'ADMIN' | 'VIEWER'
-      /** @enum {string} */
-      status: 'ACTIVE' | 'DISABLED'
-      /** Format: uuid */
-      userId: string
-    }
-    ValidationErrorItem: {
-      /**
-       * Format: int32
-       * @description 1 始まりの行番号
-       */
-      line: number | null
-      message: string
-      path: string
     }
   }
   responses: never
@@ -962,55 +307,6 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
-  list_3: {
-    parameters: {
-      query?: {
-        /** @description 省略時は to の 30 日前 */
-        from?: string
-        /** @description 省略時は現在時刻 */
-        to?: string
-        /** @description 操作種別（USER_ROLE_CHANGED など） */
-        action?: string
-        limit?: number
-        cursor?: string
-      }
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['AuditLogListResponse']
-        }
-      }
-    }
-  }
-  dashboard: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['DashboardResponse']
-        }
-      }
-    }
-  }
   me: {
     parameters: {
       query?: never
@@ -1031,60 +327,14 @@ export interface operations {
       }
     }
   }
-  detail_1: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryDetail']
-        }
-      }
-    }
-  }
-  get: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryConfig']
-        }
-      }
-    }
-  }
   releaseReport: {
     parameters: {
-      query: {
-        /** @description タグ名、またはコミット SHA（7〜40 桁） */
-        ref: string
+      query?: {
+        /** @description タグ名、またはコミット SHA（7〜40 桁）。省略すると最新 */
+        ref?: string
       }
       header?: never
-      path: {
-        repositoryId: string
-      }
+      path?: never
       cookie?: never
     }
     requestBody?: never
@@ -1100,66 +350,9 @@ export interface operations {
       }
     }
   }
-  releaseReportCsv: {
+  history: {
     parameters: {
-      query: {
-        ref: string
-      }
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content?: never
-      }
-    }
-  }
-  trends: {
-    parameters: {
-      query: {
-        /** @description 指標 ID（M-01 など） */
-        metricId: string
-        /** @description 省略時はリポジトリの既定ブランチ */
-        branch?: string
-        /** @description 省略時は to の 30 日前 */
-        from?: string
-        /** @description 省略時は現在時刻 */
-        to?: string
-      }
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['TrendResponse']
-        }
-      }
-    }
-  }
-  list_1: {
-    parameters: {
-      query: {
-        repositoryId: string
-        limit?: number
-        cursor?: string
-      }
+      query?: never
       header?: never
       path?: never
       cookie?: never
@@ -1172,7 +365,7 @@ export interface operations {
           [name: string]: unknown
         }
         content: {
-          '*/*': components['schemas']['RunListResponse']
+          '*/*': components['schemas']['ReleaseHistoryResponse']
         }
       }
     }
@@ -1197,50 +390,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['CreateRunResponse']
-        }
-      }
-    }
-  }
-  detail: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        runId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RunDetailResponse']
-        }
-      }
-    }
-  }
-  list_2: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        runId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ArtifactListResponse']
         }
       }
     }
@@ -1278,29 +427,6 @@ export interface operations {
       }
     }
   }
-  content: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        runId: string
-        artifactId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': string
-        }
-      }
-    }
-  }
   finalizeRun: {
     parameters: {
       query?: never
@@ -1319,128 +445,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['FinalizeResponse']
-        }
-      }
-    }
-  }
-  findings: {
-    parameters: {
-      query?: {
-        /** @description 指標 ID。複数指定可 */
-        metricId?: string[]
-        /** @description 省略時は NEW / CONTINUING / INITIAL */
-        state?: string[]
-        severity?: string[]
-        limit?: number
-        cursor?: string
-      }
-      header?: never
-      path: {
-        runId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['FindingListResponse']
-        }
-      }
-    }
-  }
-  reevaluate: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        runId: string
-      }
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['ReevaluateResponse']
-        }
-      }
-    }
-  }
-  list: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['UserList']
-        }
-      }
-    }
-  }
-  add: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateUserRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['UserResponse']
-        }
-      }
-    }
-  }
-  update: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        userId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateUserRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['UserResponse']
         }
       }
     }

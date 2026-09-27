@@ -1,14 +1,21 @@
 <script setup lang="ts">
+import { useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useUiStore } from '@/stores/ui'
 
 const auth = useAuthStore()
 const ui = useUiStore()
+const router = useRouter()
 
 function cycleTheme() {
   const order = ['system', 'light', 'dark'] as const
   const next = order[(order.indexOf(ui.theme) + 1) % order.length]
   ui.setTheme(next ?? 'system')
+}
+
+async function logout(): Promise<void> {
+  await auth.logout()
+  await router.replace({ name: 'login' })
 }
 </script>
 
@@ -16,11 +23,6 @@ function cycleTheme() {
   <header class="qg-header">
     <a class="qg-skip" href="#main">本文へスキップ</a>
     <RouterLink class="qg-brand" to="/">quality-gate</RouterLink>
-
-    <nav aria-label="メインナビゲーション">
-      <RouterLink to="/">ダッシュボード</RouterLink>
-      <RouterLink v-if="auth.isAdmin" to="/admin/users">管理</RouterLink>
-    </nav>
 
     <div class="qg-header__right">
       <button
@@ -30,10 +32,7 @@ function cycleTheme() {
       >
         <i class="pi pi-palette" aria-hidden="true" />
       </button>
-      <span v-if="auth.user" class="qg-user">
-        {{ auth.user.displayName ?? auth.user.githubLogin }}
-        <small>{{ auth.user.role }}</small>
-      </span>
+      <button v-if="auth.isAuthenticated" type="button" @click="logout">ログアウト</button>
     </div>
   </header>
 </template>
@@ -63,31 +62,18 @@ function cycleTheme() {
   text-decoration: none;
 }
 
-/* 品質レポートを PDF として印刷するとき、ナビゲーションは要らない */
+/* リリース判定を PDF として印刷するとき、ヘッダは要らない */
 @media print {
   .qg-header {
     display: none;
   }
 }
 
-nav {
-  display: flex;
-  gap: 1rem;
-}
-nav a {
-  color: var(--text-secondary);
-  text-decoration: none;
-}
-nav a.router-link-active {
-  color: var(--text-primary);
-  font-weight: 600;
-}
-
 .qg-header__right {
   margin-left: auto;
   display: flex;
   align-items: center;
-  gap: 1rem;
+  gap: 0.75rem;
 }
 
 button {
@@ -95,13 +81,10 @@ button {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   padding: 0.35rem 0.6rem;
+  font: inherit;
+  font-size: 0.875rem;
   color: var(--text-primary);
   cursor: pointer;
-}
-
-.qg-user small {
-  color: var(--text-muted);
-  margin-left: 0.35rem;
 }
 
 @media (max-width: 767px) {
