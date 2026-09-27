@@ -45,7 +45,7 @@ public class Measurement {
     private String componentName;
 
     /**
-     * 計測条件（M-02 の実行範囲 all、性能の計測環境など）。条件の違う値は比較できないため、
+     * 計測条件（性能の計測環境）。条件の違う値は比較できないため、
      * 前回比とトレンドの系列はこの値ごとに分ける。条件の区別が無い指標では null。
      */
     @Column

@@ -227,7 +227,7 @@ public class RunQueryService {
                 definition.name(),
                 measurement.getComponentName(),
                 measurement.getVariant(),
-                MetricCatalog.variantLabel(measurement.getMetricId(), measurement.getVariant()),
+                measurement.getVariant(),
                 measurement.getStatus(),
                 measurement.getValue(),
                 measurement.getUnit(),

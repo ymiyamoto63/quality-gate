@@ -75,7 +75,7 @@ public class TrendQueryService {
 
         return new TrendResponse(metricId, definition.name(), unitOf(rows),
                 thresholdOf(rows), thresholdChanged(rows), targetBranch,
-                range.from(), range.to(), seriesOf(rows, definition));
+                range.from(), range.to(), seriesOf(rows));
     }
 
     /**
@@ -83,11 +83,10 @@ public class TrendQueryService {
      *
      * <p>分割の軸は「同じ条件で比較できるか」である。コンポーネントは常に別物
      * （backend と frontend のカバレッジを 1 本の線にしても意味がない）。
-     * 計測条件（M-02 の実行範囲、性能の計測環境など）も軸になる。範囲や環境の違う値を
-     * 1 本の線で結ぶと、範囲が切り替わるたびに品質が乱高下して見える。
+     * 計測条件（性能の計測環境）も軸になる。環境の違う値を 1 本の線で結ぶと、
+     * 環境が切り替わるたびに品質が乱高下して見える。
      */
-    private List<TrendResponse.TrendSeries> seriesOf(List<TrendRow> rows,
-                                                MetricDefinition definition) {
+    private List<TrendResponse.TrendSeries> seriesOf(List<TrendRow> rows) {
         Map<Key, List<TrendRow>> grouped = new LinkedHashMap<>();
         List<TrendRow> componentLess = new ArrayList<>();
 
@@ -114,7 +113,7 @@ public class TrendQueryService {
                     .sorted(java.util.Comparator.comparing(TrendRow::measuredAt))
                     .map(TrendQueryService::pointOf)
                     .toList();
-            series.add(new TrendResponse.TrendSeries(key.id(), key.label(definition),
+            series.add(new TrendResponse.TrendSeries(key.id(), key.label(),
                     key.componentName(), i % MAX_COLORED_SERIES, points));
         }
         return series;
@@ -211,13 +210,12 @@ public class TrendQueryService {
                     + (variant == null ? "" : "/" + variant);
         }
 
-        /** 例: 「backend」「backend（全量）」「全量」 */
-        String label(MetricDefinition definition) {
-            String condition = variant == null ? "" : MetricCatalog.variantLabel(definition.metricId(), variant);
+        /** 例: 「backend」「全体」「collector-container」 */
+        String label() {
             if (componentName == null) {
-                return condition.isEmpty() ? "全体" : condition;
+                return variant == null ? "全体" : variant;
             }
-            return condition.isEmpty() ? componentName : componentName + "（" + condition + "）";
+            return variant == null ? componentName : componentName + "（" + variant + "）";
         }
 
         @Override

@@ -65,14 +65,6 @@ class LicenseEvaluatorTest {
     }
 
     @Test
-    void restrictedの上限を設定すれば超えた分は不合格() {
-        MetricResult result = evaluate(Map.of("max_restricted", 0), List.of(
-                license("some-lib", "GPL-3.0-only", "restricted")));
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
-    }
-
-    @Test
     void 分類の分かるライセンスがあれば分類不明より優先する() {
         MetricResult result = evaluate(Map.of(), List.of(
                 license("lib", "Custom", "unknown"), license("lib", "MIT", "notice")));

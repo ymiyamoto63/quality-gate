@@ -48,11 +48,11 @@ class BranchCoverageEvaluatorTest {
     }
 
     @Test
-    void 注意ラインは設定で変えられる() {
+    void 注意水準は合格ラインの5ポイント上() {
         GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith("branch_coverage",
-                Map.of("threshold", 75, "warn_below", 90));
+                Map.of("threshold", 85));
         List<MetricResult> results = evaluator.evaluate(new EvaluationContext(EvaluatorTestSupport.run(),
-                thresholds, input(List.of(coverage("backend", "85")), List.of(), Set.of("M-01")),
+                thresholds, input(List.of(coverage("backend", "89")), List.of(), Set.of("M-01")),
                 Map.of(), false));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);

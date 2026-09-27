@@ -83,14 +83,14 @@ describe('MetricRow', () => {
   it('計測条件をコンポーネント名と並べて名前に添える', () => {
     const text = render(
       metric({
-        metricId: 'M-02',
-        name: 'ミューテーションスコア',
-        variant: 'all',
-        variantLabel: '全量',
+        metricId: 'M-03',
+        name: '応答時間 p95',
+        variant: 'perf-staging',
+        variantLabel: 'perf-staging',
       }),
     ).text()
 
-    expect(text).toContain('ミューテーションスコア（backend・全量）')
+    expect(text).toContain('応答時間 p95（backend・perf-staging）')
   })
 
   it('対象外は未計測と出さない', () => {

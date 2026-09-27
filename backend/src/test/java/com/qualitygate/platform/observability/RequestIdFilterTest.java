@@ -15,35 +15,19 @@ class RequestIdFilterTest {
     private final RequestIdFilter filter = new RequestIdFilter();
 
     @Test
-    void 呼び出し側のIDを使い応答とMDCに載せる() throws Exception {
+    void 採番したIDを応答とMDCに載せる() throws Exception {
         MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/runs");
-        request.addHeader("X-Request-Id", "ci-run-42");
+        // 呼び出し側の値は使わない
+        request.addHeader("X-Request-Id", "evil\nlog-injection");
         MockHttpServletResponse response = new MockHttpServletResponse();
         AtomicReference<String> seen = new AtomicReference<>();
 
         filter.doFilter(request, response, capture(seen));
 
-        assertThat(seen.get()).isEqualTo("ci-run-42");
-        assertThat(response.getHeader("X-Request-Id")).isEqualTo("ci-run-42");
+        assertThat(seen.get()).matches("[0-9a-f-]{36}");
+        assertThat(response.getHeader("X-Request-Id")).isEqualTo(seen.get());
         // 要求が終われば MDC から消す（スレッドは使い回される）
         assertThat(MDC.get(CorrelationIds.REQUEST_ID)).isNull();
-    }
-
-    @Test
-    void IDが無いか形が怪しければ採番する() throws Exception {
-        for (String given : new String[] {null, "evil\nlog-injection", "x".repeat(65)}) {
-            MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/runs");
-            if (given != null) {
-                request.addHeader("X-Request-Id", given);
-            }
-            MockHttpServletResponse response = new MockHttpServletResponse();
-            AtomicReference<String> seen = new AtomicReference<>();
-
-            filter.doFilter(request, response, capture(seen));
-
-            assertThat(seen.get()).matches("[0-9a-f-]{36}");
-            assertThat(response.getHeader("X-Request-Id")).isEqualTo(seen.get());
-        }
     }
 
     private static FilterChain capture(AtomicReference<String> seen) {

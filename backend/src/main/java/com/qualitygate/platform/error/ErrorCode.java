@@ -29,7 +29,6 @@ public enum ErrorCode {
     ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_CONTENT, "未知の成果物種別です"),
     ARTIFACT_FORMAT_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "成果物の形式が不正です"),
     PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "性能計測のメタデータが不足しています"),
-    MUTATION_SCOPE_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "ミューテーションテストの実行範囲が指定されていません"),
     CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "設定ファイルの内容が不正です"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 

@@ -41,7 +41,6 @@
 | `type` | メタデータ | 無いとき |
 | --- | --- | --- |
 | `k6-summary` | `environment`（`name` 必須。CPU・メモリ・k6 の版など）。異常終了した回は `aborted: true` | `422 PERFORMANCE_METADATA_MISSING` |
-| `pit-xml` | `mutationScope`（`all` のみ） | `422 MUTATION_SCOPE_MISSING`（値が不正なら `400`） |
 | `oasdiff-json` | 比較元に定義が無かったことを `baseSpecMissing: true` で申告できる | — |
 | `sarif` | 走査した対象を `scanners`（`vuln` / `misconfig` / `secret` / `license`）で申告する | すべて M-05 として読む |
 

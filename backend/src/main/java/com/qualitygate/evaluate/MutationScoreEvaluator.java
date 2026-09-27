@@ -1,7 +1,6 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
@@ -140,16 +139,6 @@ public class MutationScoreEvaluator implements MetricEvaluator {
     private MetricResult evaluateComponent(String component, List<RawMeasurement> measurements,
                                            EvaluationContext context,
                                            GateThresholds thresholds) {
-        Set<String> scopes = new TreeSet<>();
-        measurements.forEach(m -> scopes.add(Objects.requireNonNullElse(m.variant(), "")));
-        if (scopes.size() > 1) {
-            // 変更範囲と全量を件数で足すと、どちらでもない値になる
-            return new MetricResult(metricId(), component, MeasurementStatus.ERROR, null, null,
-                    Map.of(), "実行範囲の異なる成果物が混在しています（%s）。同じ Run では範囲を揃えてください"
-                            .formatted(String.join(" / ", scopes)), Map.of(), List.of(), null);
-        }
-        String scope = measurements.getFirst().variant();
-
         MutationTally tally = MutationTally.EMPTY;
         long excludedFiles = 0;
         for (RawMeasurement measurement : measurements) {
@@ -164,19 +153,15 @@ public class MutationScoreEvaluator implements MetricEvaluator {
         Map<String, Object> detail = new LinkedHashMap<>(tally.toDetail());
         detail.put("excludedFiles", excludedFiles);
         detail.put("reports", measurements.size());
-        if (scope != null) {
-            detail.put(MutationScope.METADATA_KEY, scope);
-        }
 
-        Judgement judgement = judge(tally, component, scope, context, thresholds);
+        Judgement judgement = judge(tally, component, context, thresholds);
         BigDecimal value = judgement.status() == MeasurementStatus.ERROR
                 ? null : scaled(tally.score());
         return new MetricResult(metricId(), component, judgement.status(), value, UNIT,
-                threshold, judgement.reason(), detail, List.of(), scope);
+                threshold, judgement.reason(), detail, List.of(), null);
     }
 
-    private Judgement judge(MutationTally tally, String component, String scope,
-                            EvaluationContext context, GateThresholds thresholds) {
+    private Judgement judge(MutationTally tally, String component, EvaluationContext context, GateThresholds thresholds) {
         if (tally.total() == 0) {
             return new Judgement(MeasurementStatus.PASS,
                     "ミューテーションが生成されませんでした（変更にロジックが含まれていない可能性があります）");
@@ -219,7 +204,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
                             .formatted(timeoutRatio.toPlainString(), value.toPlainString()));
         }
 
-        BigDecimal previous = context.previousValue(metricId(), component, scope).orElse(null);
+        BigDecimal previous = context.previousValue(metricId(), component).orElse(null);
         if (previous != null && previous.subtract(value).compareTo(DROP_WARN_POINTS) >= 0) {
             return new Judgement(MeasurementStatus.WARN,
                     "前回より %s ポイント低下しています（%s%% → %s%%）".formatted(

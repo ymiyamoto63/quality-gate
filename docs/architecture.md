@@ -138,10 +138,9 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 比較元（`baseCommitSha`）は `fetch.sh` が次の順に決める。
 
-1. 実行時に `base`（コミットかタグ）を指定したときは、それ
-2. `commit` に**タグ**を指定し、既定ブランチ上の計測なら、その前のタグ（`git describe --tags`）。前のタグが無ければ直前のコミット
-3. PR でなく、計測するブランチが比較先のブランチ（`base_branch`。既定は既定ブランチ）と同じなら、直前のコミット
-4. それ以外（PR や別のブランチ）は比較先のブランチとの merge-base
+1. `commit` に**タグ**を指定し、既定ブランチ上の計測なら、その前のタグ（`git describe --tags`）。前のタグが無ければ直前のコミット
+2. PR でなく、既定ブランチ上の計測なら、直前のコミット
+3. それ以外（PR や別のブランチ）は既定ブランチとの merge-base
 
 あわせて、計測するコミットを指すタグ（`git tag --points-at`）を Run の `tags` として送る。リリース判定でタグをコミットに解決するのに使う。
 
@@ -294,7 +293,7 @@ SPRING_SESSION / SPRING_SESSION_ATTRIBUTES
 
 **`measurements` の要点**
 
-- `variant` は値どうしを比べられるかを分ける計測条件（M-02 の実行範囲、性能の計測環境名）。前回値は `variant` の一致する行からだけ引き、トレンドの系列も分ける
+- `variant` は値どうしを比べられるかを分ける計測条件（性能の計測環境名）。前回値は `variant` の一致する行からだけ引き、トレンドの系列も分ける
 - `component_name` / `scenario` / `variant` は NULL を取りうるため、一意性は `COALESCE` を挟んだ式インデックス（`ux_measurements_key`）で守る
 - `repository_id` と `measured_at` を `runs` から意図的に複製し、トレンドを結合なしで引く（更新されない値に限る）
 - 前回値（`previous_value`）は判定時に焼き付ける。比較対象 Run が消えても前回比の表示が壊れない
@@ -396,7 +395,7 @@ API の仕様は起動中のアプリの `/swagger-ui.html` でも見られる�
 | `ARTIFACT_TOO_LARGE` | 413 | 1 ファイル 50MB、または Run 合計 200MB の超過 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | 本文の形式に対応していない |
 | `ARTIFACT_TYPE_UNKNOWN` / `ARTIFACT_FORMAT_INVALID` | 422 | 未知の成果物種別 / 形式が不正 |
-| `PERFORMANCE_METADATA_MISSING` / `MUTATION_SCOPE_MISSING` | 422 | 性能の `environment` / PIT の `mutationScope` が無い |
+| `PERFORMANCE_METADATA_MISSING` | 422 | 性能の `environment` が無い |
 | `CONFIG_VALIDATION_FAILED` | 422 | 合格ラインの検証エラー（Run の処理失敗の理由にも使う） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
 

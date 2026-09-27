@@ -28,30 +28,30 @@ exclusions:                       # 計測から外すファイル（glob。指�
   - "**/generated/**"
 
 metrics:
-  branch_coverage:        { enabled: true, threshold: 75, warn_below: 80 }
+  branch_coverage:        { enabled: true, threshold: 75 }
   mutation_score:         { enabled: true, threshold: 60, components: [backend] }
   performance:            { enabled: true, p95_ms: 500, arrival_rate_rps: 50, error_rate_pct: 0.1, scenarios: [login, search] }
   vulnerabilities:        { enabled: true, max_critical: 0, max_high: 0 }
-  cyclomatic_complexity:  { enabled: true, max_complexity: 15, warn_from: 11 }
+  cyclomatic_complexity:  { enabled: true, max_complexity: 15 }
   api_contract:           { enabled: true, breaking_changes: 0 }
-  accessibility:          { enabled: true, standard: wcag22aa, max_critical: 0, pages: ["/", "/login"] }
-  test_results:           { enabled: true, min_success_rate: 100, min_test_count: 1, max_skipped_increase: 0 }   # max_skipped も書ける
+  accessibility:          { enabled: true, max_critical: 0, pages: ["/", "/login"] }
+  test_results:           { enabled: true, min_success_rate: 100, min_test_count: 1, max_skipped_increase: 0 }
   secrets:                { enabled: false, max_secrets: 0 }
-  licenses:               { enabled: false, max_forbidden: 0 }   # max_restricted / max_unknown も書ける
+  licenses:               { enabled: false, max_forbidden: 0 }
 ```
 
 | 指標名（キー） | 指標 | 書ける項目 |
 | --- | --- | --- |
-| `branch_coverage` | M-01 | `threshold`・`warn_below` |
+| `branch_coverage` | M-01 | `threshold` |
 | `mutation_score` | M-02 | `threshold`・`components` |
 | `performance` | M-03 / M-04 | `p95_ms`・`arrival_rate_rps`・`error_rate_pct`・`scenarios` |
 | `vulnerabilities` | M-05 | `max_critical`・`max_high` |
-| `cyclomatic_complexity` | M-06 | `max_complexity`・`warn_from` |
+| `cyclomatic_complexity` | M-06 | `max_complexity` |
 | `api_contract` | M-07 | `breaking_changes` |
-| `accessibility` | M-08 | `standard`・`max_critical`・`pages` |
-| `test_results` | M-09 / M-10 | `min_success_rate`・`min_test_count`・`max_skipped`・`max_skipped_increase` |
+| `accessibility` | M-08 | `max_critical`・`pages` |
+| `test_results` | M-09 / M-10 | `min_success_rate`・`min_test_count`・`max_skipped_increase` |
 | `secrets` | M-11 | `max_secrets` |
-| `licenses` | M-12 | `max_forbidden`・`max_restricted`・`max_unknown` |
+| `licenses` | M-12 | `max_forbidden` |
 
 どの指標にも `enabled` を書ける。書かなかった指標・項目は既定値（上の例の値）になり、**`secrets` と `licenses` だけは既定で無効**。
 
@@ -65,11 +65,11 @@ YAML 1.1 として読むため、引用符の無い `no` / `off` も false に�
 
 | 規則 | 理由 |
 | --- | --- |
-| 未知のキーはエラー。綴りの近い候補を添える | typo を黙って無視すると、設定したつもりの値が効かないまま合格が出続ける |
+| 未知のキーはエラー。書けるキーを添える | typo を黙って無視すると、設定したつもりの値が効かないまま合格が出続ける |
 | 重複したキーはエラー | 後勝ちにすると、消したはずの設定が効き続ける |
 | 割合は 0〜100、件数は 0 以上。文字列で書いた数値（`"75%"`）はエラー | 暗黙の変換を通すと、書いた値と効く値がずれる |
 | `skippable_metrics` は既知の指標名だけ | 綴りを間違えた指標のスキップが受理されず、原因の分かりにくい ERROR になる |
-| `components` はコンポーネント名の配列、`pages` は `/` で始まるパスの配列、`standard` は既知の基準だけ | |
+| `components` はコンポーネント名の配列、`pages` は `/` で始まるパスの配列 | |
 | `min_test_count` は 1 以上 | 実行 0 件を合格にしない |
 
 ## 4. 設定の画面（S-06）

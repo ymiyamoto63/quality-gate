@@ -173,7 +173,7 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 | `MUTATION_THREADS` | `2` | PIT のスレッド数 |
 | `OPENAPI_PATH` | 空 | M-07 で比べる OpenAPI 定義（リポジトリ相対）。空なら M-07 を計測しない |
 | `FRONTEND_DIR` | 空 | フロントエンド（npm + Vitest）のディレクトリ。空ならフロントエンドを計測しない |
-| `NODE_VERSION_FILE` | 空（Node.js 22） | Node.js の版を書いたファイル（`.nvmrc` など。`22` / `v22.21.1` / `lts/*` の形に対応） |
+| `NODE_VERSION_FILE` | 空（Node.js 22） | Node.js の版を書いたファイル（`.nvmrc` など。`22` / `v22.21.1` の形に対応） |
 | `FRONTEND_COVERAGE_INCLUDE` / `FRONTEND_COVERAGE_EXCLUDE` | 空 | M-01 のカバレッジの分母に含める / 除くファイル（`FRONTEND_DIR` 相対、空白区切り）。含めるファイルを指定しないと、テストが触れたファイルだけの数字になり実態より良く見えます |
 | `FRONTEND_COMPLEXITY_SOURCES` / `FRONTEND_COMPLEXITY_EXCLUDE` | `src` / `**/*.spec.ts **/*.test.ts **/*.d.ts` | M-06 で解析するディレクトリ / 除くファイル |
 | `A11Y_PAGES` | 空 | M-08 で検査する画面のパス（空白区切り）。合格ラインの `accessibility.pages` と一致させる。空なら M-08 を計測しない |
@@ -271,8 +271,8 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
    | branch | （空） | 空なら既定ブランチ。PR の場合は PR のブランチ名 |
    | commit | （空）/ `v1.2.0` | 特定のコミット（40 桁）かタグを測るときに指定する |
    | pull_request | （空） | PR を計測するときの番号 |
-   | base_branch | （空） | 比較元を決めるブランチ。空なら既定ブランチ。PR のマージ先が既定ブランチ以外のときに指定する |
-   | base | （空）/ `v1.1.0` | 比較元のコミット（40 桁）かタグ。空なら自動（[アーキテクチャ](architecture.md#34-比較元とタグ)） |
+
+   比較元は自動で決まります（[アーキテクチャ](architecture.md#34-比較元とタグ)）。
 
 3. 実行画面に `ymiyamoto63/like-chatgpt main` のような名前の実行ができる。`submit` ジョブのログに `Run を作成しました: <runId>`・送信したファイル・判定結果（`判定: PASS` など）が出る。処理失敗（合格ラインの誤りなど）なら `submit` ジョブが失敗する
 4. quality-gate の Run 詳細で結果を見る（`triggeredBy` は `collector`）
@@ -321,7 +321,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
   ./collector/bin/submit.sh "$WORK/reports"
 ```
 
-- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` / `QG_PR_NUMBER` / `QG_BASE_BRANCH` / `QG_BASE` でワークフローの入力と同じ指定ができます
+- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` / `QG_PR_NUMBER` でワークフローの入力と同じ指定ができます
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - PR 以外の計測では負荷試験（約 18 分）も動きます。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 
@@ -332,9 +332,8 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 | 環境変数 | 既定 | 説明 |
 | --- | --- | --- |
 | `QG_COLLECTOR_MEMORY` | `6g` | コンテナのメモリ上限 |
-| `QG_COLLECTOR_CPUS` | 制限しない | コンテナの CPU 上限 |
 | `QG_COLLECTOR_BASE_IMAGE` | `eclipse-temurin:<JAVA_VERSION>-jdk-noble` | ベースのイメージ。社内のミラーや社内の CA を入れたイメージを使うときに指定する |
-| `QG_COLLECTOR_DOCKER_ARGS` | 空 | `docker run` に足す引数（空白区切り。例: `--env HTTPS_PROXY --env JAVA_TOOL_OPTIONS`）。**ソケットやホストのディレクトリを見せる引数は足さない**（隔離の意味が無くなる） |
+| `QG_COLLECTOR_DOCKER_ARGS` | 空 | `docker run` に足す引数（空白区切り。例: `--env HTTPS_PROXY --env JAVA_TOOL_OPTIONS`、CPU の上限なら `--cpus 4`）。**ソケットやホストのディレクトリを見せる引数は足さない**（隔離の意味が無くなる） |
 
 - イメージのタグは `quality-gate-collector:java<版>-node<版>-...`。古いイメージは `docker image prune` で消せます
 - Maven・npm・PMD・k6・Trivy の DB のキャッシュは Docker のボリューム `quality-gate-collector-home` に残り、対象の間で共有されます。消すと（`docker volume rm quality-gate-collector-home`）次の計測で取り直します
@@ -349,7 +348,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 | `fetch` が `could not read Username` / `Repository not found` | App が対象にインストールされていない、Contents の権限が無い、または `QG_COLLECTOR_APP_ID` が未設定で private を取得しようとした |
 | `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
-| `measure` で `Node.js の版を解決できませんでした` | `NODE_VERSION_FILE` の書き方が解釈できない（`22` / `v22.21.1` / `lts/*` の形に対応）、または nodejs.org に届かない |
+| `measure` で `Node.js の版を解決できませんでした` | `NODE_VERSION_FILE` の書き方が解釈できない（`22` / `v22.21.1` の形に対応）、または nodejs.org に届かない |
 | `measure` / `submit` で `合格ラインがありません` | `collector/targets/<owner>__<name>.gate.yml` が無い |
 | `measure` で `合格ラインを読めませんでした` | 合格ラインが YAML として読めない（yq のエラーがログに出る） |
 | `measure` で `バックエンドのビルドに失敗しました` | 対象がコンパイルできない、または `JAVA_VERSION` が対象の要求と合っていない |

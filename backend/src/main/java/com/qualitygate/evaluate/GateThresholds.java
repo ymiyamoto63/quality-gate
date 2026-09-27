@@ -1,7 +1,6 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.gate.GateConfigDocument;
-import com.qualitygate.domain.model.WcagStandard;
 
 import java.math.BigDecimal;
 import java.util.LinkedHashSet;
@@ -16,14 +15,15 @@ import java.util.Set;
  * @param skippableMetrics  スキップ申告を受理してよい指標（指標 ID）
  * @param exclusions        計測除外の glob パターン
  * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
+ * @param branchCoverageWarnBelow    M-01 の注意水準。合格ラインの 5 ポイント上
+ * @param complexityWarnFrom         M-06 の注意水準。上限の 4 つ手前から
  * @param maxAccessibilityViolations M-08 の合格ライン（critical + serious の件数）
- * @param accessibilityStandard      M-08 の判定基準
  * @param accessibilityPages         M-08 で検査されているべきページ。空なら限定しない
  * @param maxBreakingChanges         M-07 の合格ライン（破壊的変更の件数）
  * @param performance                M-03 / M-04 の合格ライン
  * @param testResults                M-09 / M-10 の合格ライン
  * @param maxSecrets                 M-11 の合格ライン（シークレットの件数）
- * @param licenses                   M-12 の合格ライン
+ * @param maxForbiddenLicenses       M-12 の合格ライン（分類が forbidden のパッケージの数）
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -38,23 +38,12 @@ public record GateThresholds(
         BigDecimal mutationThreshold,
         Set<String> mutationComponents,
         int maxAccessibilityViolations,
-        WcagStandard accessibilityStandard,
         List<String> accessibilityPages,
         int maxBreakingChanges,
         Performance performance,
         TestResults testResults,
         int maxSecrets,
-        Licenses licenses) {
-
-    /**
-     * ライセンスの合格ライン（docs/metrics.md M-12）。件数はパッケージの数。
-     *
-     * @param maxForbidden  分類が forbidden のパッケージの上限
-     * @param maxRestricted 分類が restricted のパッケージの上限。null なら件数では問わない（WARN にとどめる）
-     * @param maxUnknown    分類が分からないパッケージの上限。null なら件数では問わない（WARN にとどめる）
-     */
-    public record Licenses(int maxForbidden, Integer maxRestricted, Integer maxUnknown) {
-    }
+        int maxForbiddenLicenses) {
 
     /**
      * 性能指標の合格ライン（docs/metrics.md M-03）。
@@ -74,11 +63,9 @@ public record GateThresholds(
      *
      * @param minSuccessRate     M-09 の合格ライン（成功率 %）
      * @param minTestCount       M-09 の最小実行件数。下回れば値を確定できない（ERROR）
-     * @param maxSkipped         M-10 のスキップ件数の上限。null なら件数そのものは問わない
      * @param maxSkippedIncrease M-10 の比較対象 Run からの増加の上限（件）
      */
-    public record TestResults(BigDecimal minSuccessRate, int minTestCount, Integer maxSkipped,
-                              int maxSkippedIncrease) {
+    public record TestResults(BigDecimal minSuccessRate, int minTestCount, int maxSkippedIncrease) {
     }
 
     public static final String M_BRANCH_COVERAGE = "M-01";
@@ -150,21 +137,20 @@ public record GateThresholds(
         BigDecimal p95 = performance.number("p95_ms").orElse(BigDecimal.valueOf(500));
 
         BigDecimal threshold = coverage.number("threshold").orElse(new BigDecimal("75"));
+        int maxComplexity = complexity.number("max_complexity").orElse(BigDecimal.valueOf(15)).intValue();
         return new GateThresholds(
                 Set.copyOf(enabled),
                 skippableMetricIdsOf(document),
                 document.exclusions(),
                 threshold,
-                coverage.number("warn_below").orElse(threshold.add(new BigDecimal("5"))),
+                threshold.add(new BigDecimal("5")),
                 vulnerabilities.number("max_critical").orElse(BigDecimal.ZERO).intValue(),
                 vulnerabilities.number("max_high").orElse(BigDecimal.ZERO).intValue(),
-                complexity.number("max_complexity").orElse(BigDecimal.valueOf(15)).intValue(),
-                complexity.number("warn_from").orElse(BigDecimal.valueOf(11)).intValue(),
+                maxComplexity,
+                maxComplexity - 4,
                 mutation.number("threshold").orElse(BigDecimal.valueOf(60)),
                 Set.copyOf(mutation.list("components")),
                 accessibility.number("max_critical").orElse(BigDecimal.ZERO).intValue(),
-                accessibility.text("standard").flatMap(WcagStandard::find)
-                        .orElse(WcagStandard.DEFAULT),
                 List.copyOf(accessibility.list("pages")),
                 contract.number("breaking_changes").orElse(BigDecimal.ZERO).intValue(),
                 new Performance(p95,
@@ -176,13 +162,9 @@ public record GateThresholds(
                         tests.number("min_success_rate").orElse(BigDecimal.valueOf(100)),
                         // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
                         Math.max(1, tests.number("min_test_count").orElse(BigDecimal.ONE).intValue()),
-                        tests.number("max_skipped").map(BigDecimal::intValue).orElse(null),
                         tests.number("max_skipped_increase").orElse(BigDecimal.ZERO).intValue()),
                 secrets.number("max_secrets").orElse(BigDecimal.ZERO).intValue(),
-                new Licenses(
-                        licenses.number("max_forbidden").orElse(BigDecimal.ZERO).intValue(),
-                        licenses.number("max_restricted").map(BigDecimal::intValue).orElse(null),
-                        licenses.number("max_unknown").map(BigDecimal::intValue).orElse(null)));
+                licenses.number("max_forbidden").orElse(BigDecimal.ZERO).intValue());
     }
 
     /** {@code execution.skippable_metrics} は指標名で書かれるため、指標 ID に直す。 */
