@@ -43,7 +43,7 @@ public final class RepositoryResponses {
             @NotNull Instant measuredAt) {
     }
 
-    @Schema(description = "最後の計測と最後の完全計測の日時（FR-06-2 / FR-06-3）")
+    @Schema(description = "最後の計測と最後の完全計測の日時（DASH-2）")
     public record RepositoryFreshness(
             @NotNull @Schema(nullable = true) Instant lastMeasuredAt,
             @NotNull @Schema(nullable = true) Instant lastFullMeasuredAt) {

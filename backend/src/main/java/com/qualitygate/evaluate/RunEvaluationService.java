@@ -115,7 +115,7 @@ public class RunEvaluationService {
     }
 
     /**
-     * 指標 1 件の判定。優先順位は docs/spec/05-architecture.mdに従う。
+     * 指標 1 件の判定。優先順位は docs/features/evaluation/design.md 5 章に従う。
      *
      * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
      * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。

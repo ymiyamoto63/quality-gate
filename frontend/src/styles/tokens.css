@@ -1,5 +1,5 @@
 /*
- * 配色トークン（docs/spec/08-screen-design.md 3.4）。
+ * 配色トークン（docs/architecture.md 7.3）。
  * ダーク値は 2 つのスコープに書く。OS 設定とアプリ内のテーマ切替の両方を効かせ、
  * かつ利用者が明示的に選んだライトが OS のダークに勝つようにするため。
  */
@@ -101,7 +101,7 @@ a {
   text-underline-offset: 0.15em;
 }
 
-/* フォーカスリングを消さない（WCAG 2.2 AA / docs/08 A-2） */
+/* フォーカスリングを消さない（WCAG 2.2 AA / docs/architecture.md 7.7 A-2） */
 :focus-visible {
   outline: 2px solid var(--series-1);
   outline-offset: 2px;
@@ -255,7 +255,7 @@ a {
   font-weight: 600;
 }
 
-/* 表はモバイル幅でカード形式に変形する（docs/spec/08-screen-design.md 6 章） */
+/* 表はモバイル幅でカード形式に変形する（docs/architecture.md 7.5） */
 @media (max-width: 767px) {
   .qg-table--stack thead {
     position: absolute;

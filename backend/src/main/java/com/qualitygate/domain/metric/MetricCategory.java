@@ -1,7 +1,7 @@
 package com.qualitygate.domain.metric;
 
 /**
- * 指標のカテゴリ（docs/spec/01-requirements.md 6.1 の指標一覧）。
+ * 指標のカテゴリ（docs/metrics.md 1 章）。
  *
  * <p>宣言順が画面での表示順になる。要件定義の表と同じ並びに保つこと。
  */

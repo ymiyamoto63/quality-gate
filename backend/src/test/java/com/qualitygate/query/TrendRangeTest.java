@@ -37,7 +37,7 @@ class TrendRangeTest {
                 .isInstanceOf(ApiException.class);
     }
 
-    /** 上限を設けるのは、点が増えすぎて応答時間が崩れるのを防ぐため（FR-08-1）。 */
+    /** 上限を設けるのは、点が増えすぎて応答時間が崩れるのを防ぐため（TREND-1）。 */
     @Test
     void 上限を超える期間は拒否する() {
         Instant tooEarly = NOW.minus(TrendQueryService.MAX_RANGE).minus(Duration.ofDays(1));

@@ -6,7 +6,7 @@ import { formatValue, formatDateTime } from '@/api/format'
 /**
  * トレンドグラフ。
  *
- * canvas ではなくインライン SVG で描く（docs/spec/04-tech-stack.md）。
+ * canvas ではなくインライン SVG で描く（docs/features/trends/design.md 3 章）。
  * 読み上げのための代替表現が別途必要にならず、配色トークンがそのまま効き、
  * ダークモードに CSS だけで追従する。
  *

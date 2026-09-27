@@ -112,7 +112,7 @@ function metricLabel(metric: Schemas['RunMetric']): string {
 
           <!--
             前回比は差分そのもので示し、矢印の色に頼らない。増えて良い指標と
-            増えて悪い指標が同じ表に並ぶため、良し悪しは判定列が担う（docs/08 4.2）。
+            増えて悪い指標が同じ表に並ぶため、良し悪しは判定列が担う（docs/features/run-detail/design.md 2 章）。
           -->
           <table v-if="metrics.length > 0" class="qg-table qg-table--stack">
             <caption class="qg-visually-hidden">

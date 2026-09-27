@@ -11,7 +11,7 @@ type Schemas = components['schemas']
 export type Trend = Schemas['TrendResponse']
 export type TrendSeries = Schemas['TrendSeries']
 
-/** 期間の選択肢。最大 2 年はサーバ側の上限と揃える（FR-08-1）。 */
+/** 期間の選択肢。最大 2 年はサーバ側の上限と揃える（TREND-1）。 */
 export const RANGES = [
   { days: 30, label: '直近 30 日' },
   { days: 90, label: '直近 90 日' },

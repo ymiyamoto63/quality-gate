@@ -61,7 +61,7 @@ public record ParseContext(String componentName, List<String> exclusions,
     /**
      * 計測除外に一致するか。
      *
-     * <p>除外はすべての指標で共通に適用する（docs/spec/02-metrics-spec.md 0.2）。
+     * <p>除外はすべての指標で共通に適用する（docs/metrics.md 2.3）。
      */
     public boolean isExcluded(String path) {
         if (path == null || exclusions == null || exclusions.isEmpty()) {

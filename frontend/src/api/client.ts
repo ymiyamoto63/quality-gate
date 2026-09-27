@@ -19,7 +19,7 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  *
  * サーバは XSRF-TOKEN Cookie でトークンを渡し、X-XSRF-TOKEN ヘッダで送り返すことを求める。
  * Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で利用者の追加や設定変更が
- * 実行できてしまう（docs/spec/07-api-design.md）。
+ * 実行できてしまう（docs/architecture.md 6.1）。
  */
 api.use({
   onRequest({ request }) {

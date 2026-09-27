@@ -1,67 +1,79 @@
 # quality-gate
 
-リポジトリの品質指標を計測・取り込みし、合格ラインに対する合格 / 不合格を判定して可視化する社内向け Web アプリケーションです。
-計測は quality-gate 側の**収集ランナー**が対象リポジトリを取得して行うため、対象リポジトリには何も置きません。
+リポジトリの品質指標を計測・蓄積し、あらかじめ決めた合格ラインに対する**合格 / 不合格を判定して可視化する**社内向けの Web アプリケーションです。
+リリース前には、タグかコミットを指定して全指標の合否と結論（リリースしてよいか）を 1 画面で確かめ、CSV を証跡として残せます。
+
+- 計測は quality-gate 側の**収集ランナー**（GitHub Actions + 専有のセルフホストランナー）が対象リポジトリを取得して行います。**対象リポジトリには何も置きません**
+- アプリは送られた成果物（JaCoCo / lcov / PIT / k6 / SARIF / PMD / ESLint / oasdiff / axe-core / JUnit XML）を取り込み、合格ラインで判定して保存します。テストは実行しません
+- 判定は情報として示すだけで、PR のマージは止めません
+
+```
+対象リポジトリ ──clone──▶ 収集ランナー（取得 → 計測 → 送信）──Ingest API──▶ quality-gate（判定・保存・画面）◀── ブラウザ
+```
+
+## 計測する指標
+
+| カテゴリ | 指標（ID） | 既定の合格ライン |
+| --- | --- | --- |
+| 機能テスト | ブランチカバレッジ（M-01）/ ミューテーションスコア（M-02）/ テスト成功率（M-09）/ スキップされたテスト数（M-10） | 75% 以上 / 60% 以上（backend のみ）/ 100% / 前回から増やさない |
+| 性能 | 応答時間 p95（M-03）/ エラー率（M-04） | 到達率 50 req/s の負荷の下で 500ms 以内 / 0.1% 以下 |
+| セキュリティ | 重大・高 脆弱性件数（M-05）/ シークレット（M-11）/ ライセンス違反（M-12） | 0 件 / 0 件 / forbidden 0 件（M-11 / M-12 は有効にしたときだけ） |
+| コード構造 | 循環的複雑度 15 超の関数数（M-06） | 0 件 |
+| 契約・互換性 | OpenAPI の破壊的変更件数（M-07） | 0 件 |
+| 使いやすさ | アクセシビリティ重大違反件数（M-08） | 0 件 |
+
+対象は **Java / Spring Boot（Maven）+ Vue 3（npm + Vitest）のモノレポ**を想定しています。詳しくは [指標](docs/metrics.md)。
+
+## 利用者とできること
+
+| ロール | できること |
+| --- | --- |
+| Viewer | ダッシュボード・リポジトリ詳細・Run 詳細・違反一覧・トレンド・合格ライン・リリース判定の閲覧と CSV の出力 |
+| Admin | Viewer に加えて、Run の再評価、利用者（許可リスト）とロールの管理、監査ログの閲覧 |
+
+ログインは GitHub アカウントで行い、許可リストに登録された人だけが使えます。
+
+| UC | 利用者 | シナリオ |
+| --- | --- | --- |
+| UC-01 | Admin | `collector/targets/` に計測プロファイルと合格ラインを追加し、対象を計測できるようにする |
+| UC-02 | Admin | 収集ランナーでブランチ・コミット・タグ・PR を指定して計測すると、判定結果が生成される |
+| UC-03 | Admin | PR を計測し、Run 詳細で不合格の原因（どの関数、どの CVE、どのページ）を特定する |
+| UC-04 | 全員 | ダッシュボードで全リポジトリの合否と推移を確かめる |
+| UC-05 | Admin | 合格ラインをプルリクエストで変え、マージ後の計測から反映する |
+| UC-06 | 全員 | リリース判定会議で、タグかコミットを指定して結論と全指標の合否を確かめ、CSV を証跡として残す |
 
 ## クイックスタート
 
 ```bash
-cp .env.example .env                   # QG_GITHUB_CLIENT_ID / QG_GITHUB_CLIENT_SECRET を書き入れる（空のままだと起動に失敗する）
+cp .env.example .env                   # QG_GITHUB_CLIENT_ID / QG_GITHUB_CLIENT_SECRET を書き入れる
 docker compose up -d db
 cd backend && ./mvnw spring-boot:run   # http://localhost:8080
 ```
 
-`.env` を置かずに起動することもできますが、その場合はログインできません。
-
-詳しい手順は [開発環境のセットアップ](docs/development/setup.md) を参照してください。
+詳しくは [開発環境](docs/development.md) を参照してください。
 
 ## ドキュメント
 
-### 概要
-
 | ドキュメント | 内容 |
 | --- | --- |
-| [概要](docs/overview.md) | 目的・対象とする品質指標・技術スタック・ディレクトリ構成 |
-| [はじめての人向け: quality-gate のしくみ](docs/architecture/overview-for-beginners.md) | リポジトリ間の関係、ランナー、認証認可、計測の中身をやさしく解説 |
+| [開発環境](docs/development.md) | セットアップ、ログイン用 GitHub App、コマンド、API の型生成、アクセシビリティ検査、技術スタック、PR の CI、よくある症状 |
+| [運用: 環境設定と計測の実行](docs/operations.md) | アプリの設定値と Ingest Token、セルフホストランナー、計測対象の追加（計測プロファイル・合格ライン）、計測の実行、うまくいかないとき |
+| [アーキテクチャ](docs/architecture.md) | 全体像、設計判断、測定の仕組み（収集ランナー）、バックエンドの構成、DB 設計、API と画面の共通規則、非機能要件、未決事項 |
+| [指標](docs/metrics.md) | 12 の指標の一覧と、それぞれの定義・計測方法・判定の規則 |
 
-### 開発
+### 機能ごとの要件と設計
 
-| ドキュメント | 内容 |
-| --- | --- |
-| [開発環境のセットアップ](docs/development/setup.md) | 前提・起動手順・ログイン用 GitHub App の作成と `.env` |
-| [コマンド一覧](docs/development/commands.md) | Maven / npm / Docker Compose のコマンドと役割 |
-| [起動時のよくある症状](docs/development/troubleshooting.md) | 起動・ログインでつまずいたときの原因と対処 |
-| [API の型生成](docs/development/api-codegen.md) | `api/openapi.yml` とフロントエンドの型・fixture の再生成 |
-| [アクセシビリティ検査](docs/development/accessibility-check.md) | Playwright + axe-core による quality-gate 自身の検査 |
+| 機能 | 要件 | 設計 |
+| --- | --- | --- |
+| 取り込み（Ingest API） | [requirements](docs/features/ingest/requirements.md) | [design](docs/features/ingest/design.md) |
+| 合格ライン（S-06） | [requirements](docs/features/gate-config/requirements.md) | [design](docs/features/gate-config/design.md) |
+| 判定（正規化・判定・再評価） | [requirements](docs/features/evaluation/requirements.md) | [design](docs/features/evaluation/design.md) |
+| ダッシュボード（S-01） | [requirements](docs/features/dashboard/requirements.md) | [design](docs/features/dashboard/design.md) |
+| Run の閲覧（S-02 / S-03 / S-04） | [requirements](docs/features/run-detail/requirements.md) | [design](docs/features/run-detail/design.md) |
+| トレンド（S-05） | [requirements](docs/features/trends/requirements.md) | [design](docs/features/trends/design.md) |
+| リリース判定（S-08） | [requirements](docs/features/release-report/requirements.md) | [design](docs/features/release-report/design.md) |
+| 認証と認可 | [requirements](docs/features/auth/requirements.md) | [design](docs/features/auth/design.md) |
+| 管理（S-07。利用者と監査ログ） | [requirements](docs/features/admin/requirements.md) | [design](docs/features/admin/design.md) |
+| 保持期間と日次バッチ | [requirements](docs/features/retention/requirements.md) | [design](docs/features/retention/design.md) |
 
-### アーキテクチャ
-
-| ドキュメント | 内容 |
-| --- | --- |
-| [起動の仕組み](docs/architecture/runtime.md) | 全体像・起動方法の 3 パターン・フロントエンドとバックエンドの連携 |
-| [認証と GitHub App](docs/architecture/authentication.md) | GitHub App の用途・ログインの流れ・認証の経路 |
-| [収集ランナー方式](docs/architecture/collector-runner.md) | 対象リポジトリを変更せずに計測する方式の構成と考え方 |
-
-### 運用
-
-| ドキュメント | 内容 |
-| --- | --- |
-| [収集ランナーで計測する](docs/operations/collector.md) | **標準の計測方法。** 対象リポジトリに何も置かずに、quality-gate 側で取得・計測・送信する（手動実行） |
-| [取り込み（Ingest API）](docs/operations/ingest.md) | Ingest API の流れ、Ingest Token の作成と交換、ローカルでの取り込みの試し方 |
-| [セルフホストランナー](docs/operations/self-hosted-runner.md) | 収集ランナー用のセルフホストランナーの準備・登録 |
-| [設定値](docs/operations/configuration.md) | 環境変数 / `.env` の一覧と優先順位 |
-
-### 要件定義・設計
-
-quality-gate の仕様の正本です。
-
-| ドキュメント | 内容 |
-| --- | --- |
-| [01 要件定義書](docs/spec/01-requirements.md) | 背景・スコープ・機能要件・非機能要件・アーキテクチャ・受け入れ基準 |
-| [02 指標・判定仕様](docs/spec/02-metrics-spec.md) | 全 12 指標の定義・計算式・入力形式・境界条件 |
-| [03 設計判断と未決事項](docs/spec/03-design-decisions.md) | 構成を決めている設計判断とその理由、未決事項 |
-| [04 技術スタック](docs/spec/04-tech-stack.md) | 構成・OpenAPI 連携・開発環境・採用しなかった選択肢 |
-| [05 方式設計](docs/spec/05-architecture.md) | 状態遷移・判定の実行・正規化・認証認可・エラー処理 |
-| [06 データベース設計](docs/spec/06-database-design.md) | テーブル構成・インデックス・保持期間（列の定義は `V001__init.sql`） |
-| [07 API 設計](docs/spec/07-api-design.md) | エンドポイント・認可マトリクス・エラーコード（型の正本は `api/openapi.yml`） |
-| [08 画面設計](docs/spec/08-screen-design.md) | 画面遷移・ステータス表現・各画面・アクセシビリティ |
+API の型の正本は実装から生成した [`api/openapi.yml`](api/openapi.yml)、DB の列の定義の正本は [`V001__init.sql`](backend/src/main/resources/db/migration/V001__init.sql) です。

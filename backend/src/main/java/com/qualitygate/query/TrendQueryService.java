@@ -25,7 +25,7 @@ import java.util.Objects;
 /**
  * 指標の時系列（S-05）の読み取りモデル。
  *
- * <p>系列の分割はサーバが行う（FR-08-2）。「どの計測が同じ条件で比較できるか」は
+ * <p>系列の分割はサーバが行う（TREND-2）。「どの計測が同じ条件で比較できるか」は
  * 指標の性質に属する判断であり、画面が決めるものではない。
  */
 @Service
@@ -34,15 +34,15 @@ public class TrendQueryService {
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
 
-    /** 既定の期間（FR-08-1）。 */
+    /** 既定の期間（TREND-1）。 */
     static final Duration DEFAULT_RANGE = Duration.ofDays(30);
-    /** 期間の上限（FR-08-1）。点が増えすぎて応答が重くなるのを防ぐ。 */
+    /** 期間の上限（TREND-1）。点が増えすぎて応答が重くなるのを防ぐ。 */
     static final Duration MAX_RANGE = Duration.ofDays(730);
 
     /**
      * 色を割り当てられる系列の数。
      *
-     * <p>検証済みの配色は 3 色（docs/spec/08-screen-design.md 3.5）。色を増やして
+     * <p>検証済みの配色は 3 色（docs/architecture.md 7.3）。色を増やして
      * 系列を増やすことはしない。生成した 4 色目は色覚特性下で既存の色と
      * 見分けがつかなくなり、検証の意味が失われる。
      */
@@ -150,7 +150,7 @@ public class TrendQueryService {
      * <p>スキップと計測エラーはコンポーネント単位では起こらない。指標ごと Run ごとに
      * 起きるため、判定結果にコンポーネント名が付かない。これをそのまま別系列にすると、
      * <strong>欠測が「もう 1 本の線」として現れる</strong>。未計測は線を途切れさせる
-     * ものであって、新しい系列ではない（FR-08-4）。
+     * ものであって、新しい系列ではない（TREND-3）。
      *
      * <p>コンポーネント別の系列が 1 つも無い指標（脆弱性件数など）では、
      * これらがそのまま単一の系列になる。

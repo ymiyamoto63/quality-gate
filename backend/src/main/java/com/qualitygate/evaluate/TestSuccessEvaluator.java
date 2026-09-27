@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * M-09 テスト成功率（docs/spec/02-metrics-spec.md M-09）。
+ * M-09 テスト成功率（docs/metrics.md M-09）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>

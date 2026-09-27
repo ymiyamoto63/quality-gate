@@ -2,7 +2,7 @@
 # measure.sh がまとめた成果物を quality-gate の Ingest API に送る。
 #
 # 流れ: Run 作成 → 成果物のアップロード（あるものだけ） → finalize（その場で判定され、結果が返る）
-# 仕様: docs/operations/ingest.md
+# 仕様: docs/features/ingest/design.md
 #
 # 使い方: submit.sh <reports ディレクトリ>
 #

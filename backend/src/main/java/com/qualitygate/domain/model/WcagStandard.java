@@ -5,7 +5,7 @@ import java.util.Optional;
 import java.util.Set;
 
 /**
- * M-08 の判定基準とする WCAG の版とレベル（docs/spec/02-metrics-spec.md M-08）。
+ * M-08 の判定基準とする WCAG の版とレベル（docs/metrics.md M-08）。
  *
  * <p>{@code tags} は axe-core のルールに付くタグのうち、その基準に含まれるもの。
  * 上位の基準は下位の達成基準をすべて含むため、累積で持つ（2.2 AA は 2.0 A を含む）。
@@ -20,7 +20,7 @@ public enum WcagStandard implements WireValued {
     WCAG21AA("wcag21aa", Set.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa")),
     WCAG22AA("wcag22aa", Set.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"));
 
-    /** 設定で省略された場合の基準（要件定義書 NFR 10.6）。 */
+    /** 設定で省略された場合の基準（docs/metrics.md M-08）。 */
     public static final WcagStandard DEFAULT = WCAG22AA;
 
     private final String wire;

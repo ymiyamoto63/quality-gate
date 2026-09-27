@@ -3,7 +3,7 @@ package com.qualitygate.platform.error;
 import org.springframework.http.HttpStatus;
 
 /**
- * API が返す機械可読なエラー識別子（docs/spec/07-api-design.md）。
+ * API が返す機械可読なエラー識別子（docs/architecture.md 6.3）。
  *
  * <p>クライアントはこの値で分岐する。{@code title} と {@code detail} は
  * 人間向けであり、文言の改善で変わりうるため依存してはならない。

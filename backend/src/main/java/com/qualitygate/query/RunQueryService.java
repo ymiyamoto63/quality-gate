@@ -53,7 +53,7 @@ public class RunQueryService {
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
 
-    /** 1 ページの既定と上限（docs/spec/07-api-design.md）。 */
+    /** 1 ページの既定と上限（docs/architecture.md 6 章）。 */
     static final int DEFAULT_LIMIT = 20;
     static final int MAX_LIMIT = 100;
 
@@ -210,7 +210,7 @@ public class RunQueryService {
      * 初期状態で展開するか。
      *
      * <p>不合格・注意・計測エラーを含むカテゴリだけ開く。全部たたむと必ず探す操作が
-     * 入り、全部開くと問題が他に埋もれる（docs/spec/08-screen-design.md 4.3）。
+     * 入り、全部開くと問題が他に埋もれる（docs/features/run-detail/design.md 3 章）。
      */
     private static boolean expandByDefault(MeasurementStatus worst) {
         return worst == MeasurementStatus.FAIL

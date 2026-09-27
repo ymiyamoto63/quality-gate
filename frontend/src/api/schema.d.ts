@@ -359,7 +359,7 @@ export interface components {
       /** Format: date-time */
       uploadedAt: string
     }
-    /** @description Run に取り込んだ成果物の一覧（FR-07-5） */
+    /** @description Run に取り込んだ成果物の一覧（RUN-5） */
     ArtifactListResponse: {
       items: components['schemas']['ArtifactItem'][]
     }
@@ -697,7 +697,7 @@ export interface components {
       latestRun: components['schemas']['LatestRunSummary']
       repository: components['schemas']['RepositoryItem']
     }
-    /** @description 最後の計測と最後の完全計測の日時（FR-06-2 / FR-06-3） */
+    /** @description 最後の計測と最後の完全計測の日時（DASH-2） */
     RepositoryFreshness: {
       /** Format: date-time */
       lastFullMeasuredAt: string | null

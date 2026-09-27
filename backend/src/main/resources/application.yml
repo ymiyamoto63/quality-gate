@@ -69,7 +69,7 @@ quality-gate:
   base-url: ${QG_BASE_URL:}
   # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-20）
   ingest-tokens: ${QG_INGEST_TOKEN:}
-  # データ保持期間（日。FR-13-1）。短くすると、翌日の保持期間バッチで古いデータが削除される
+  # データ保持期間（日。RET-1）。短くすると、翌日の保持期間バッチで古いデータが削除される
   retention:
     run-days: ${QG_RETENTION_RUN_DAYS:0}
     artifact-days: ${QG_RETENTION_ARTIFACT_DAYS:0}
@@ -100,7 +100,7 @@ management:
 logging:
   level:
     com.qualitygate: INFO
-  # JSON 構造化ログ（docs/spec/05-architecture.md）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
+  # JSON 構造化ログ（docs/architecture.md 4.3）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
   # 標準出力が 1 行 1 JSON になり、MDC の相関 ID（requestId / runId）が項目として載る。未指定なら従来のテキスト形式
   structured:
     format:

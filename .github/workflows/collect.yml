@@ -1,5 +1,5 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
-# 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
+# 対象リポジトリには何も置かない（docs/architecture.md 3 章、手順は docs/operations.md）。
 #
 # 起動は手動実行だけ（DD-7）。対象とブランチ（またはコミット・タグ・PR）を指定して計測する。
 # リリース判定（DD-16）に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。

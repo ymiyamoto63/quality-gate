@@ -7,7 +7,7 @@ import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
-@Schema(description = "Run に取り込んだ成果物の一覧（FR-07-5）")
+@Schema(description = "Run に取り込んだ成果物の一覧（RUN-5）")
 public record ArtifactListResponse(@NotNull List<ArtifactItem> items) {
 
     public record ArtifactItem(
