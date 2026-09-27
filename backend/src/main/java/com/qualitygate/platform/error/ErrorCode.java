@@ -13,23 +13,16 @@ public enum ErrorCode {
     VALIDATION_FAILED(HttpStatus.BAD_REQUEST, "リクエストの内容が不正です"),
     UNAUTHENTICATED(HttpStatus.UNAUTHORIZED, "認証が必要です"),
     TOKEN_INVALID(HttpStatus.UNAUTHORIZED, "Ingest Token が不正または失効しています"),
-    USER_NOT_ALLOWLISTED(HttpStatus.FORBIDDEN, "許可リストに登録されていません"),
-    USER_DISABLED(HttpStatus.FORBIDDEN, "アカウントが無効です"),
     FORBIDDEN(HttpStatus.FORBIDDEN, "この操作を行う権限がありません"),
     RESOURCE_NOT_FOUND(HttpStatus.NOT_FOUND, "対象が見つかりません"),
     METHOD_NOT_ALLOWED(HttpStatus.METHOD_NOT_ALLOWED, "この URL ではこの HTTP メソッドを使えません"),
     NOT_ACCEPTABLE(HttpStatus.NOT_ACCEPTABLE, "要求された形式では応答できません"),
     RUN_ALREADY_FINALIZED(HttpStatus.CONFLICT, "この Run は既に確定しています"),
-    USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ GitHub ログイン名の利用者が既に登録されています"),
-    ADMIN_REQUIRED(HttpStatus.CONFLICT, "管理者が 1 人以上必要です"),
-    RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
-    ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),
     ARTIFACT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "成果物のサイズが上限を超えています"),
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "本文の形式（Content-Type）に対応していません"),
     ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_CONTENT, "未知の成果物種別です"),
     ARTIFACT_FORMAT_INVALID(HttpStatus.UNPROCESSABLE_CONTENT, "成果物の形式が不正です"),
     PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "性能計測のメタデータが不足しています"),
-    CONFIG_VALIDATION_FAILED(HttpStatus.UNPROCESSABLE_CONTENT, "設定ファイルの内容が不正です"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 
     private final HttpStatus status;

@@ -13,24 +13,24 @@ quality-gate の構成、測定の仕組み、バックエンドの構造、デ�
  quality-gate リポジトリの GitHub Actions（collect.yml。専有のセルフホストランナー）
    fetch   取得し、比較元とタグを求める
    measure 計測する（コンテナの中。認証情報を渡さない）
-   submit  Ingest API へ送る（合格ラインも送る）
+   submit  Ingest API へ送る
                                                                         │ HTTPS / Ingest Token
                                                                         ▼
  quality-gate アプリ（Spring Boot 1 プロセス）
    取り込み → 正規化 → 判定 → 保存 ──▶ PostgreSQL 17 / 成果物ストア（ローカル FS）
-   画面（Vue 3 SPA を同梱）・参照 API  ◀── ブラウザ（GitHub でログイン）
+   リリース判定の画面（Vue 3 SPA を同梱）・参照 API  ◀── ブラウザ（共有のユーザー名とパスワードでログイン）
 ```
 
 | 要素 | 役割 |
 | --- | --- |
-| 収集ランナー | 対象を取得して計測し、成果物を Ingest API に送る。計測方法・ツールの版・合格ラインは quality-gate リポジトリの `collector/` に置き、**対象リポジトリには何も置かない** |
-| quality-gate アプリ | 送られた成果物を取り込み、合格ラインで判定して保存する。**テストやスキャンは実行しない**。判定結果・推移・リリース判定を画面で見せる |
-| PostgreSQL | Run・指標値・違反・利用者・監査ログ・セッション |
+| 収集ランナー | 対象を取得して計測し、成果物を Ingest API に送る。計測方法とツールの版は quality-gate リポジトリの `collector/` に置き、**対象リポジトリには何も置かない** |
+| quality-gate アプリ | 送られた成果物を取り込み、環境変数の合格ラインで判定して保存する。**テストやスキャンは実行しない**。リリースしてよいかを 1 つの画面で見せる |
+| PostgreSQL | Run・指標値・違反 |
 | 成果物ストア | 取り込んだ元の成果物（`QG_ARTIFACT_ROOT`） |
 
-- 実行に必要なプロセスは **PostgreSQL と Spring Boot の 2 つだけ**。判定は取り込みの確定の中でその場で行い、日次バッチは `@Scheduled` で動くため、キューやキャッシュは持たない
+- 実行に必要なプロセスは **PostgreSQL と Spring Boot の 2 つだけ**。判定は取り込みの確定の中でその場で行うため、キューやキャッシュ、日次バッチは持たない
 - SPA は Spring Boot に同梱して**同一オリジン**で配信する。CORS が要らず、認証を HttpOnly のセッション Cookie で完結できる（ブラウザに認証トークンを置かない）
-- バックエンドは GitHub API を呼ばない（ログインの OAuth だけ）。比較元とタグは収集ランナーが clone した履歴から求めて送る
+- バックエンドは GitHub API を呼ばない。比較元とタグは収集ランナーが clone した履歴から求めて送る
 
 ---
 
@@ -42,43 +42,44 @@ quality-gate の構成、測定の仕組み、バックエンドの構造、デ�
 
 | # | 項目 | 判断 | 理由 |
 | --- | --- | --- | --- |
+| DD-0 | 目的 | **ソフトウェア品質に詳しくない経営陣に、品質基準をクリアしていることを明確に示す**。機能はこれに必要なものに絞る | 開発者向けの分析（推移・違反の絞り込み・再評価など）まで持つと、見る人にとって画面が重なって見え、運用の手間も増える |
 | DD-1 | 利用形態 | **社内専用・単一テナント**。インターネットには公開しない | 対象は社内のリポジトリで、利用者も社内の少人数に限られる |
-| DD-2 | 対象リポジトリの構成 | **モノレポ**（`backend/` + `frontend/`）を 1 リポジトリ単位で扱う。複数のリポジトリを束ねる上位概念は持たない | backend と frontend の結果が 1 つの Run にまとまり、両者にまたがる指標（M-07 など）を扱いやすい |
+| DD-2 | 対象 | **1 つのアプリ（`QG_REPOSITORY`）だけを見る**。モノレポ（`backend/` + `frontend/`）を 1 リポジトリ単位で扱う | 複数のリポジトリを並べるダッシュボードが要らない。backend と frontend の結果が 1 つの Run にまとまり、両者にまたがる指標（M-07 など）を扱いやすい |
 | DD-3 | 判定結果の扱い | **可視化に徹し、PR のマージをブロックしない** | 合格ラインの妥当性を実績で確かめる前にブロックすると、しきい値の一時緩和やチェックの回避が常態化し、ゲートが形骸化する |
 | DD-4 | 技術スタック | **Spring Boot 4（Java 25・Maven）+ Vue 3**。SPA を同梱して同一オリジンで配信し、API の型は OpenAPI から生成する。成果物はローカルファイルシステムに置く | CORS が不要で、認証をセッション Cookie で完結できる。この規模ではオブジェクトストレージは過剰（[開発環境](development.md#7-技術スタック)） |
 | DD-5 | quality-gate 自身の品質 | **quality-gate 自身は計測対象にせず、PR の CI（`ci.yml`）で確かめる**。単体・結合テスト、フロントエンドの静的検査、生成物の同期、アクセシビリティ（axe-core の critical / serious 0 件）、脆弱性（修正版のある重大・高 0 件）に失敗したらマージしない | 少人数で使う社内ツールで、性能指標（50 req/s の負荷試験）は実際の使われ方とかけ離れている。セルフホストランナーは収集ランナー専用で、自身の計測で占有すると性能計測の条件が崩れる |
-| DD-23 | 画面を持つか | **Web アプリ（バックエンド + DB + 画面）とする** | 推移の表示、開発に詳しくない人も読めるリリース判定、CSV の証跡が要る。判定だけなら収集ランナーの出力で足りるが、履歴を持てない |
+| DD-23 | 画面を持つか | **Web アプリ（バックエンド + DB + 画面）とする。画面はリリース判定の 1 つだけ** | 開発に詳しくない人も読めるリリース判定と、判定の履歴が要る。判定だけなら収集ランナーの出力で足りるが、履歴を持てず、経営陣が Actions のログを読むことになる |
 
 ### 計測
 
 | # | 項目 | 判断 | 理由 |
 | --- | --- | --- | --- |
-| DD-6 | 計測と判定の分担 | **収集ランナーが対象を取得して計測し、Ingest API に送る。バックエンドは取り込みと判定だけを行う**。対象リポジトリには設定・ワークフロー・計測用の依存を置かない。Ingest API の送り手は収集ランナーだけ | バックエンドに Docker・ビルドツール・対象の認証情報を持ち込まずに済む。計測方法と合格ラインを一元管理でき、対象のチームに保守を求めない。代わりに、対象のビルド構成が変わったときの追従は quality-gate の運用者が担う |
-| DD-7 | 計測のきっかけ | **収集ランナーの手動実行**（対象とブランチ・コミット・タグ・PR を指定する） | 計測したい時点（リリース前・PR の確認など）は人が決める |
-| DD-8 | PR の計測とスキップ | **PR の計測では PIT と負荷試験を実行せず、スキップを申告する**。申告できるのは合格ラインの `execution.skippable_metrics` の指標だけで、それ以外の申告と申告の無い未提出は `ERROR` | 時間のかかる計測で PR の確認を待たせない。自由にスキップできると fail-closed が骨抜きになるため、申告制と許容リストで両立させる |
+| DD-6 | 計測と判定の分担 | **収集ランナーが対象を取得して計測し、Ingest API に送る。バックエンドは取り込みと判定だけを行う**。対象リポジトリには設定・ワークフロー・計測用の依存を置かない。Ingest API の送り手は収集ランナーだけ | バックエンドに Docker・ビルドツール・対象の認証情報を持ち込まずに済む。対象のチームに保守を求めない。代わりに、対象のビルド構成が変わったときの追従は quality-gate の運用者が担う |
+| DD-7 | 計測のきっかけ | **収集ランナーの手動実行**（ブランチ・コミット・タグを指定する） | 計測したい時点（リリース前など）は人が決める |
+| DD-8 | PR の計測 | **PR は計測しない。スキップの申告（部分計測）も持たない**。計測する指標はすべて毎回測り、成果物の無い指標は `ERROR`（不合格） | 目的はリリースの可否を示すことで、PR の確認には対象の CI がある。部分計測があると「判定できない」という 3 つ目の結論が生まれ、経営陣に説明しにくい |
 | DD-9 | コンポーネント | **計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）だけで決める**。判定と表示は成果物に付いたコンポーネント名を使う | 定義を他に持つとずれる |
 | DD-10 | GitHub 連携 | **バックエンドは GitHub API を呼ばない**。比較元とタグは収集ランナーが `git merge-base` / `git tag --points-at` で求めて送る | バックエンドに App の秘密鍵を置かずに済み、GitHub の障害で判定が止まらない。代わりに、タグを付ける前に計測したコミットはタグで引けない |
 | DD-11 | 性能計測の条件 | **到達率 50 req/s を負荷条件として固定し、その下で p95 と エラー率を判定する**。到達率は指標にせず M-03 の前提として確かめる。計測は他のジョブと同居しない専有のセルフホストランナーで行う | スループットを結果として測ると合否が負荷のかけ方で変わる。共有の実行環境ではノイズで値が揺れ、絶対値で判定できない |
-| DD-12 | ミューテーションテスト | **PIT を使い、backend だけを対象にする**。frontend は `NOT_APPLICABLE` とし部分計測の理由にしない | PIT は JVM 専用。業務ロジックはバックエンドに寄っている |
-| DD-17 | リリース判定のための計測 | **タグを指定して計測でき、比較元は前のタグにする。PIT と負荷試験は PR 以外のすべての計測で実行する**。比較対象 Run は比較元コミットの Run を優先する | リリースのタグを完全計測にし、前回のリリースからの変更全体で新規の違反を数える。手動の計測は順不同のため、直前に計測した Run がリリースより新しいことがある |
-| DD-22 | 対象の登録 | **計測プロファイル（`collector/targets/<owner>__<name>.env`）を置くことが登録を兼ねる**。バックエンドは初めて計測が届いたリポジトリを登録し、既定ブランチは計測ごとに送られる値で更新する。画面での登録・無効化は持たない | 対象の情報を 2 か所に持つとずれる。送り手は Ingest Token を持つ収集ランナーだけのため、登録の手順を挟んでも守りは強くならない |
+| DD-12 | ミューテーションテスト | **PIT を使い、backend だけを対象にする**。frontend は `NOT_APPLICABLE`（対象外）とし、合否に使わない | PIT は JVM 専用。業務ロジックはバックエンドに寄っている |
+| DD-17 | リリース判定のための計測 | **タグを指定して計測でき、比較元は前のタグにする**。比較対象 Run は比較元コミットの Run を優先する | 前回のリリースからの変更全体で増加（破壊的変更・スキップ）を数える。手動の計測は順不同のため、直前に計測した Run がリリースより新しいことがある |
+| DD-22 | 対象の登録 | **計測プロファイル（`collector/target/profile.env`）とアプリの `QG_REPOSITORY` に同じリポジトリを書く**。バックエンドは初めて計測が届いたときにリポジトリを登録し、`QG_REPOSITORY` と違う送信は拒否する | 取り違えた送信で別のアプリの結果が混ざらないようにする |
 
 ### 判定
 
 | # | 項目 | 判断 | 理由 |
 | --- | --- | --- | --- |
-| DD-13 | 合格ラインの置き場所 | **`collector/targets/<owner>__<name>.gate.yml` だけ**。収集ランナーが Run ごとに送り、その内容で判定する。送られた設定は Run の成果物として Run と同じ期間残し、送った quality-gate のコミットを Run に記録する。DB で版を管理せず、画面は表示だけ | 判定に使った合格ラインと管理している合格ラインがずれない。版と変更理由は Git の履歴が持つ |
+| DD-13 | 合格ラインの置き場所 | **アプリの環境変数（`QG_*`）だけ**。判定のたびに読み、判定に使った合格ラインは指標ごとに `measurements.threshold` へ焼き付ける。画面での編集や DB での版管理は持たない | 設定ファイルの送信・検証・表示の画面が要らなくなる。変えた値はその後の判定から効き、判定済みの結論は変わらない（証跡が崩れない）。変更の記録はデプロイの設定の履歴に残す |
 | DD-14 | しきい値の適用 | **絶対値のしきい値を当初から適用する**（ラチェット方式は採らない） | 対象はベースラインが整っており、マージもブロックしない |
-| DD-15 | 判定の実行方式 | **取り込みの確定（`finalize`）と再評価の中で、その場で判定して結果を返す**。失敗した Run は `FAILED` として残し、管理者が再評価で直す | 判定は保存済みの成果物を読んで DB に書くだけで数秒で終わる。収集ランナーは応答で結果を知れ、単一プロセスのまま運用できる |
-| DD-16 | リリース判定 | **タグかコミットを指定し、そのコミットで判定済みの Run から結論を出す**。同じコミットの最新の完全計測を使い、近くのコミットで代用しない。判定し直さない。根拠の種類（外部基準 / 業界の目安 / チーム判断）を示す | 近くのコミットの結果は別のコードの結果。見るたびに結論が変わると証跡にならない。チームで決めた値を外部の基準と同じ口調で書かない |
+| DD-15 | 判定の実行方式 | **取り込みの確定（`finalize`）の中で、その場で判定して結果を返す**。失敗した Run は `FAILED` として残し、原因を直して計測し直す（再評価は持たない） | 判定は保存済みの成果物を読んで DB に書くだけで数秒で終わる。収集ランナーは応答で結果を知れ、単一プロセスのまま運用できる |
+| DD-16 | リリース判定 | **結論は「リリース可 / リリース不可 / 未計測」の 3 つ。指標の合否は「合格 / 不合格」の 2 値**（計測エラーは不合格として扱う）。「注意」の段階は持たない。指定が無ければ最新の計測、タグかコミットを指定すればそのコミットの最新の判定済み Run を使い、近くのコミットで代用しない。判定し直さない。根拠の種類（外部基準 / 業界の目安 / チーム判断）を示す | 経営陣には中間の段階が伝わりにくい。合格ライン内の気になる点（前回からの低下など）は判定理由に書き添える。見るたびに結論が変わると証跡にならない |
 | DD-21 | M-06 の数え方 | **計測したコミットの、しきい値を超える関数の件数（絶対値）で判定する**。比較元との差分は取らない | リリース判定で見たいのは今のコードの状態。差分を取るには比較元の解析とファイルの移動の追跡が要る |
 
 ### 認証と認可
 
 | # | 項目 | 判断 | 理由 |
 | --- | --- | --- | --- |
-| DD-18 | ログイン | **GitHub App の user-to-server 認可フロー**でログインし、ログインの可否は quality-gate 内の**許可リスト**で決める | Organization を持たない（GitHub Free の個人アカウント）ため、組織のメンバーシップを条件にできない |
-| DD-19 | ロール | **Admin / Viewer の 2 つ** | 対象 1〜数リポジトリ・利用者数名の規模ではこれで足りる |
+| DD-18 | ログイン | **全員で共有する 1 つのアカウント**（`QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD`）でログインする | 経営陣が GitHub のアカウントを持っていなくても見られる。画面から変えられるものが無いため、利用者ごとの権限や監査ログが要らない |
+| DD-19 | ロール | **持たない**。ログインした人は全員、同じリリース判定を見る | 画面は見るだけで、操作の権限を分ける対象が無い |
 | DD-20 | Ingest Token | **収集ランナー用の 1 つを、バックエンドの環境変数と収集ランナーの Actions Secret に置く**。交換は新旧をカンマ区切りで並べて行う | 送り手は収集ランナーだけ。対象ごとに分けても守りは強くならない |
 
 ---
@@ -91,7 +92,7 @@ quality-gate の構成、測定の仕組み、バックエンドの構造、デ�
 
 | ID | 要件 |
 | --- | --- |
-| COL-1 | 対象リポジトリを変更せずに、指定したブランチ・コミット・タグ・PR を取得・計測して Ingest API に送る。PIT と負荷試験は PR 以外の計測で実行する |
+| COL-1 | 対象リポジトリを変更せずに、指定したブランチ・コミット・タグを取得・計測して Ingest API に送る |
 | COL-2 | 「バックエンド」「フロントエンド」のコンポーネント単位で指標を扱う。コンポーネントは計測プロファイル（`BACKEND_DIR` / `FRONTEND_DIR`）で決まる |
 
 計測できる対象は **Maven（JUnit 5）の backend と npm + Vitest の frontend のモノレポ**に限る。構成が決まっているため、ビルド方法の自動検出を作り込まない。
@@ -113,24 +114,23 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 | ファイル | 役割 |
 | --- | --- |
-| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）で対象とコミットを受け取り、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
+| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）でブランチ・コミット・タグを受け取り、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
 | `collector/bin/fetch.sh` | 対象を全履歴ごと clone し、計測するコミット・比較元・タグを決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | 計測用のコンテナを用意し（無ければビルド）、その中で `measure.sh` を実行する |
 | `collector/bin/measure.sh` | 計測の準備と順序。指標ごとの計測は `collector/bin/measure/*.sh` |
-| `collector/bin/submit.sh` | Run の作成 → 成果物と合格ラインのアップロード → 確定 |
+| `collector/bin/submit.sh` | Run の作成 → 成果物のアップロード → 確定 |
 | `collector/bin/lib.sh` | 計測プロファイルの読み込みなどの共通関数 |
-| `collector/versions.env` | ツールの版（JaCoCo・PMD・PIT・oasdiff・Trivy・yq・Maven・k6） |
-| `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・yq・Playwright と Chromium・ESLint） |
+| `collector/versions.env` | ツールの版（JaCoCo・PMD・PIT・oasdiff・Trivy・Maven・k6） |
+| `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium・ESLint） |
 | `collector/a11y/` / `collector/complexity/` / `collector/pit/` / `collector/pmd-ruleset.xml` | M-08 の検査スクリプト、M-06（frontend）の ESLint の設定、PIT の取得用 pom、M-06（backend）のルールセット |
-| `collector/targets/<owner>__<name>.env` | 計測プロファイル（**どう測るか**）。置くことが対象の登録を兼ねる |
-| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン（**何を合格とするか**）。無ければ計測・送信の前に止まる |
-| `collector/targets/<owner>__<name>.k6.js` | 負荷試験のシナリオ（性能を測る場合） |
+| `collector/target/profile.env` | 計測プロファイル（計測対象と、**どう測るか**・何を測らないか） |
+| `collector/target/k6.js` | 負荷試験のシナリオ（性能を測る場合） |
 
 | ジョブ | やること | 認証情報 | 所要時間 |
 | --- | --- | --- | --- |
 | `fetch` | GitHub App から対象だけを読める 1 時間有効のトークンを発行し、clone する。トークンは `.git/config` に残さない | App の秘密鍵 → 読み取り用トークン | 1 分未満 |
-| `measure` | 計測用のコンテナの中でビルド・テスト・解析をし、成果物を `reports/` にまとめる。最後に作業領域を消す | **なし** | 数分（PR 以外で負荷試験を含めると 20 分以上） |
-| `submit` | `reports/` と合格ラインを Ingest API に送り、確定する。処理失敗（`FAILED`）ならジョブを失敗にする。判定結果の不合格ではジョブを失敗にしない | Ingest Token | 1 分未満 |
+| `measure` | 計測用のコンテナの中でビルド・テスト・解析をし、成果物を `reports/` にまとめる。最後に作業領域を消す | **なし** | 数分（負荷試験を含めると 20 分以上） |
+| `submit` | `reports/` を Ingest API に送り、確定する。処理失敗（`FAILED`）ならジョブを失敗にする。判定結果の不合格ではジョブを失敗にしない | Ingest Token | 1 分未満 |
 
 ジョブ間の受け渡しは Actions の成果物で行う（取得したソース `collector-source` は 1 日、計測結果 `collector-reports` は 7 日で消える）。
 
@@ -139,17 +139,15 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 比較元（`baseCommitSha`）は `fetch.sh` が次の順に決める。
 
 1. `commit` に**タグ**を指定し、既定ブランチ上の計測なら、その前のタグ（`git describe --tags`）。前のタグが無ければ直前のコミット
-2. PR でなく、既定ブランチ上の計測なら、直前のコミット
-3. それ以外（PR や別のブランチ）は既定ブランチとの merge-base
+2. 既定ブランチ上の計測なら、直前のコミット
+3. それ以外（別のブランチ）は既定ブランチとの merge-base
 
 あわせて、計測するコミットを指すタグ（`git tag --points-at`）を Run の `tags` として送る。リリース判定でタグをコミットに解決するのに使う。
 
 ### 3.5 何を計測するか
 
-- **何を測るかは合格ラインの `metrics.<指標>.enabled` だけで決める**。`measure.sh` は計測の前に合格ラインを読み（`yq`）、`enabled: false` の指標は計測しない。計測プロファイルは「どう測るか」だけを持つ
+- **計測プロファイルの `DISABLED_METRICS` に書いた指標は計測しない**。アプリの `QG_DISABLED_METRICS` と同じ指標を書く（片方だけだと、判定に残った指標が計測エラーになる）
 - テスト（M-01 / M-09 / M-10）はビルドを兼ね、M-02・M-03 / M-04・M-08 が使う jar も作るため、常に実行する
-- PR の計測では M-02 と M-03 / M-04 を実行せず、`reports/skipped-metrics.tsv` に理由を書く。`submit.sh` がこれを `skippedMetrics` として申告する
-- 計測プロファイルの `SKIP_METRICS` に書いた指標は常にスキップを申告する
 - テストが失敗しても計測は止めない（失敗は M-09 の材料）。成果物が出なかった指標は送られず、quality-gate では ERROR になる
 
 指標ごとの計測方法は [指標](metrics.md) の各節にある。
@@ -174,9 +172,9 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 | 鍵 | 使う場所 | 置き場所 | できること |
 | --- | --- | --- | --- |
-| GitHub App の秘密鍵 → インストールトークン | `fetch` | quality-gate の Actions Secrets | 対象リポジトリを読む（1 時間。書き込み不可）。App はログイン用と同じもので、Contents / Pull requests の Read-only を付けて対象にインストールする |
+| GitHub App の秘密鍵 → インストールトークン | `fetch` | quality-gate の Actions Secrets | 対象リポジトリを読む（1 時間。書き込み不可）。Contents の Read-only を付けて対象にインストールする |
 | Ingest Token | `submit` | quality-gate の Actions Secrets と、アプリの環境変数（同じ値） | Run を作って成果物を送る（参照 API は呼べない） |
-| ログイン用の Client ID / Secret | アプリ | アプリの環境変数（`.env`） | 利用者のログイン |
+| 画面のログインのパスワード | アプリ | アプリの環境変数（`QG_LOGIN_PASSWORD`） | 画面のログイン（全員で共有） |
 
 | リスク | 対策 |
 | --- | --- |
@@ -184,7 +182,6 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | 前回の計測の残骸が次回に影響する / ソースがランナーに残る | 作業領域はジョブの最後に必ず消す |
 | 対象のコードがランナーのマシンに触れる | 計測をコンテナに隔離する（3.6） |
 | private のソースやテスト出力がログから漏れる | quality-gate リポジトリを private に保つ |
-| フォークからの PR で任意のコードが動く | 計測するのは同一リポジトリ内のブランチからの PR だけにする |
 | 性能計測と他のジョブが重なって値が乱れる | ランナーを専有のマシンに 1 台だけ置き、他のランナーや常駐サービスを同居させない |
 
 デプロイキーや個人アクセストークンは、対象ごとの管理や個人への依存が生じるため使わない。
@@ -206,24 +203,22 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 ```
 com.qualitygate
 ├ ingest/       取り込み API、Ingest Token 認証、成果物の受領と保管、リポジトリの登録
-├ pipeline/     合格ラインの解決 → 正規化 → 判定の流れ（確定と再評価から呼ぶ）
+├ pipeline/     正規化 → 判定の流れ（確定から呼ぶ）
 ├ adapter/      ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, eslint, junit, oasdiff, axe）
 ├ normalize/    正規化、fingerprint の生成
-├ evaluate/     しきい値の適用、指標の判定、Run の集約、違反の新規 / 継続 / 解消
-├ config/       合格ラインの検証と解決、複数モジュールを組み立てる設定（SecurityConfig など）
-├ query/        参照系（ダッシュボード・Run・違反・トレンド・成果物）
-├ release/      リリース判定と CSV
-├ admin/        管理系の操作（利用者・再評価・監査ログ）
-├ auth/         GitHub ログイン時の許可リスト照合、セッションのロール更新
-├ maintenance/  日次バッチ（保持期間の削除・滞留した Run の後始末）
+├ evaluate/     合格ラインの適用、指標の判定、Run の集約、違反の新規 / 継続 / 解消
+├ config/       複数モジュールを組み立てる設定（SecurityConfig・SPA の配信）
+├ query/        ログインの状態（/api/v1/me）
+├ release/      リリース判定と判定の履歴
 ├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値
-└ platform/     監査ログ、ArtifactStore、共通例外、設定、可観測性
+└ platform/     設定（合格ラインの環境変数を含む）、ArtifactStore、共通例外、可観測性
 ```
 
 | 規則 | 理由 |
 | --- | --- |
 | `adapter` と `evaluate` は互いを知らない | パーサは読むだけ、判定は正規化モデルだけを入力にする。ツールを差し替えても判定は変わらない |
-| `adapter` と `evaluate` は `config` を知らない | 合格ラインの解決は `pipeline` が行い、解決済みの値だけを渡す |
+| `adapter` は設定（`config` / `platform.config`）を知らない | アダプタは `ParseContext` で渡された情報だけを使う |
+| `evaluate` は `config`（画面・認証の組み立て）を知らない | 判定は合格ラインの値と正規化モデルだけを入力にする |
 | `query` は書き込み系（`ingest` / `normalize` / `evaluate`）を呼ばない | 参照系は保存済みの判定結果を読むだけ |
 | すべてのモジュールが `platform` に依存してよい。逆は不可 | 共通基盤が業務ロジックを知らない状態を保つ |
 
@@ -231,30 +226,30 @@ com.qualitygate
 
 ### 4.2 Run のライフサイクル
 
-Run は「1 つのコミットに対する 1 回の計測・判定」。**確定後は不変**で、再評価は判定結果だけを差し替える。
+Run は「1 つのコミットに対する 1 回の計測・判定」。**確定後は不変**。
 
 ```
 CREATED ─(成果物)→ UPLOADING ─(finalize)→ FINALIZED → PROCESSING ─┬→ EVALUATED
-   │                   │                                          └→ FAILED（処理の失敗。再評価で直せる）
-   └───────────────────┴─(24 時間 finalize されない)→ ABANDONED（終端）
+                                                                  └→ FAILED（処理の失敗。計測し直す）
 ```
 
-- **`FAILED`（処理失敗）と `verdict = FAIL`（不合格）は別物**。前者は quality-gate の処理の失敗（合格ラインの誤りなど）、後者は品質が合格ラインを満たさなかったという判定結果
-- 同じコミットへの再送信は `attempt` を増やした新しい Run になる。画面は最新の attempt を使う
+- **`FAILED`（処理失敗）と `verdict = FAIL`（不合格）は別物**。前者は quality-gate の処理の失敗、後者は品質が合格ラインを満たさなかったという判定結果
+- finalize されないまま残った Run（収集ランナーが途中で止まったなど）は、判定済みではないため画面に出ない
+- 同じコミットへの再送信は `attempt` を増やした新しい Run になる。画面は最新の判定済みの attempt を使う
 - 取り込みから判定までは [取り込み](features/ingest/design.md) と [判定](features/evaluation/design.md) にある
 
 ### 4.3 エラー処理と可観測性
 
 - API のエラーは RFC 9457（Problem Details）に `errorCode` を足して返す。`detail` には**何をどう直せばよいか**を書く（取り込みの失敗は収集ランナーのログにしか残らないため）
-- ログは既定でテキスト、`QG_LOG_FORMAT`（`ecs` / `logstash` / `gelf`）で 1 行 1 JSON。`requestId`（`X-Request-Id`）と `runId` を MDC に載せ、エラー応答の `traceId` と一致させる。Ingest Token・セッション ID・GitHub のトークンは出さない
-- ログのレベル: 判定結果は INFO、成果物の形式不正は WARN（日常的に起こる）、想定外の失敗と日次バッチの失敗は ERROR
+- ログは既定でテキスト、`QG_LOG_FORMAT`（`ecs` / `logstash` / `gelf`）で 1 行 1 JSON。`requestId`（`X-Request-Id`）と `runId` を MDC に載せ、エラー応答の `traceId` と一致させる。Ingest Token・セッション ID・パスワードは出さない
+- ログのレベル: 判定結果は INFO、成果物の形式不正は WARN（日常的に起こる）、想定外の失敗は ERROR
 - メトリクスは Spring Boot の標準（JVM・HTTP・接続プール）を `/actuator/prometheus` で公開する。独自メトリクスは持たない
 
 ---
 
 ## 5. データベース
 
-DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/V001__init.sql`** で、ここでは繰り返さない。
+DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql` と、機能を絞った `V002__simplify.sql`）で、ここでは繰り返さない。
 
 ### 5.1 方針
 
@@ -265,53 +260,42 @@ DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/
 | 列挙 | `varchar` + `CHECK` 制約、JPA は `EnumType.STRING` | `ENUM` 型は値の追加に DDL が要る。序数は値の追加で意味が変わる |
 | 半構造データ | `jsonb`（`@JdbcTypeCode(SqlTypes.JSON)`） | 指標ごとに違う内訳（`detail`）を持つ。検索に使う値は列にする |
 | 数値 | 判定に関わる値は `numeric` | 丸めで境界値（75.0% など）の判定が変わらないようにする |
-| 削除 | 物理削除（保持期間の日次バッチ） | 論理削除フラグは全クエリに条件が増える |
+| 削除 | 自動では消さない（計測は手動で、件数が少ない）。消すときは Run を物理削除する（子の行は CASCADE で消える） | 論理削除フラグは全クエリに条件が増える |
 | 関連 | `OneToMany` はマッピングせず、リポジトリのクエリで明示的に取る | N+1 と意図しない遅延ロードを避ける |
 
 ### 5.2 テーブル
 
 ```
-users
 repositories ──▶ runs ──┬──▶ artifacts
-                        ├──▶ run_skipped_metrics
                         ├──▶ measurements（repository_id も持つ）
                         └──▶ findings
-audit_logs（users を参照）
-SPRING_SESSION / SPRING_SESSION_ATTRIBUTES
 ```
 
 | テーブル | 内容 | 要点 |
 | --- | --- | --- |
-| `users` | 利用者と許可リスト | 行の無い GitHub ユーザーはログインできない。ロールは `ADMIN` / `VIEWER`、状態は `ACTIVE` / `DISABLED` |
-| `repositories` | 計測対象 | 初めて計測が届いたときに作られる。`default_branch` は計測ごとに更新する |
-| `runs` | 1 コミットに対する 1 回の計測・判定 | `(repository_id, commit_sha, attempt)` で一意。`config_commit_sha` は合格ラインを送った quality-gate のコミット、`baseline_run_id` は比較対象 Run、`tags` はリリース判定でタグを解決するのに使う |
-| `run_skipped_metrics` | スキップの申告 | 受理するか（`accepted`）は判定時に合格ラインで決める |
-| `artifacts` | 成果物のメタデータ | 実体はローカルファイル（`ArtifactStore`）。合格ライン（`quality-gate-config`）も成果物として持つ |
+| `repositories` | 計測対象（`QG_REPOSITORY` の 1 行） | 初めて計測が届いたときに作られる。`default_branch` は計測ごとに更新する |
+| `runs` | 1 コミットに対する 1 回の計測・判定 | `(repository_id, commit_sha, attempt)` で一意。`verdict` は `PASS` / `FAIL`。`baseline_run_id` は比較対象 Run、`tags` はリリース判定でタグを解決するのに使う |
+| `artifacts` | 成果物のメタデータ | 実体はローカルファイル（`ArtifactStore`） |
 | `measurements` | 指標ごとの判定結果 | 下記 |
-| `findings` | 違反 | `(run_id, fingerprint)` で一意。解消した違反も `RESOLVED` として今回の Run に保存し、比較対象 Run が消えても表示が壊れないようにする |
-| `audit_logs` | 監査ログ | 追記のみ。ロール `quality_gate_app` があればマイグレーションで `UPDATE` / `DELETE` を剥奪する |
+| `findings` | 違反 | `(run_id, fingerprint)` で一意。リリース判定では、不合格の指標の主な違反（深刻な順に 10 件）を示すのに使う |
 
 **`measurements` の要点**
 
-- `variant` は値どうしを比べられるかを分ける計測条件（性能の計測環境名）。前回値は `variant` の一致する行からだけ引き、トレンドの系列も分ける
+- `status` は `PASS` / `FAIL` / `ERROR` / `NOT_APPLICABLE`。`threshold` に判定に使った合格ラインを残す（環境変数を後から変えても、判定済みの根拠が分かる）
+- `variant` は値どうしを比べられるかを分ける計測条件（性能の計測環境名）。前回値は `variant` の一致する行からだけ引く
 - `component_name` / `scenario` / `variant` は NULL を取りうるため、一意性は `COALESCE` を挟んだ式インデックス（`ux_measurements_key`）で守る
-- `repository_id` と `measured_at` を `runs` から意図的に複製し、トレンドを結合なしで引く（更新されない値に限る）
 - 前回値（`previous_value`）は判定時に焼き付ける。比較対象 Run が消えても前回比の表示が壊れない
 
 ### 5.3 インデックス
 
 | クエリ | インデックス |
 | --- | --- |
-| リポジトリごとの最新の判定済み Run と最後の完全計測 | `ix_runs_latest`（`status = 'EVALUATED'` の部分インデックス） |
-| Run 一覧（リポジトリ・ブランチ・新しい順） | `ix_runs_list` |
-| トレンド（リポジトリ × 指標 × 期間） | `ix_measurements_trend` |
-| Run 詳細の指標・違反 | `ix_measurements_run` / `ix_findings_run` |
-| 保持期間の削除 | `ix_runs_retention` |
+| 最新の判定済み Run と判定の履歴 | `ix_runs_latest`（`status = 'EVALUATED'` の部分インデックス） |
+| 比較対象 Run（同じブランチの直前の Run） | `ix_runs_list` |
+| Run の指標・違反 | `ix_measurements_run` / `ix_findings_run` |
 | タグの解決 | `ix_runs_tags`（GIN） |
-| 監査ログの一覧 | `ix_audit_logs_occurred` / `ix_audit_logs_target` |
 
-3 年後の想定（5 リポジトリ・100 Run/日）で `findings` が約 1,100 万行、`measurements` が約 220 万行。上のインデックスで足りる。
-集計用のテーブルは持たない（判定・再評価・削除のたびに整合させる処理が要るため）。
+計測は手動で 1 つのアプリだけのため、件数は少ない。集計用のテーブルは持たない。
 
 ### 5.4 マイグレーション
 
@@ -321,7 +305,7 @@ SPRING_SESSION / SPRING_SESSION_ATTRIBUTES
 | 適用済みのファイル | コメントも含めて変更しない（Flyway のチェックサムが変わり、適用済みの DB で検証に失敗する）。修正は新しいマイグレーションで行う。そのため `V001__init.sql` の先頭のコメントは旧パス（`docs/spec/06-database-design.md`）を指したままになっている（この章のこと） |
 | 検証 | `FlywayMigrationIT` が空の DB に全マイグレーションを適用する |
 
-本番の運用を始める前に、それまでのマイグレーションを `V001__init.sql` 1 本にまとめた。
+本番の運用を始める前に、それまでのマイグレーションを `V001__init.sql` 1 本にまとめた。機能を絞ったときの変更（利用者・監査ログ・スキップの申告・セッションのテーブルの削除、PR の Run の削除、注意を合格に・未計測を計測エラーに寄せる変換）は `V002__simplify.sql` にある。
 
 ---
 
@@ -336,10 +320,8 @@ SPRING_SESSION / SPRING_SESSION_ATTRIBUTES
 | 形式 | JSON。成果物のアップロードだけ `multipart/form-data` |
 | 日時 | ISO 8601、UTC。表示のタイムゾーン変換は画面が行う |
 | `null` と `0` | `null` は「計測していない」、`0` は「計測して 0 だった」。常に返す項目は `required`、null を返しうる項目は `nullable` を宣言する |
-| 表示用の文字列 | 判定理由（`reason`）や計測条件の表示名（`variantLabel`）はサーバが返し、表現を 1 か所に集める |
-| しきい値の形 | `threshold` は指標によらず `{ "operator", "value" }` を必ず含む。内訳は追加のキーで添える |
-| ページング | カーソル方式（`limit` 既定 20・上限 100、`nextCursor` / `hasMore`）。カーソルは不透明な文字列 |
-| 絞り込みの未知の値 | 400。黙って無視すると「絞り込んだのに全件出た」ように見える |
+| 表示用の文字列 | 結論の理由（`decisionReason`）、判定理由（`reason`）、合格ライン（`threshold`。「≥ 75%」など）、計測条件の表示名（`variantLabel`）はサーバが返し、表現を 1 か所に集める |
+| しきい値の形 | 保存する `threshold` は指標によらず `{ "operator", "value" }` を必ず含む。内訳は追加のキーで添える |
 | エラー | Problem Details に `errorCode`（機械可読）・`traceId`・`violations`（入力検証のみ）を足す。クライアントは `title` / `detail` に依存しない |
 | エンティティ | そのまま返さない（DB の変更が API の破壊的変更に直結するため） |
 
@@ -348,34 +330,25 @@ SPRING_SESSION / SPRING_SESSION_ATTRIBUTES
 | 経路 | 対象 | 方式 |
 | --- | --- | --- |
 | Ingest Token | `POST /api/v1/runs`・`.../artifacts`・`.../finalize` | `Authorization: Bearer <token>`。書き込み専用で参照 API は呼べない。Cookie を使わないため CSRF の対象外 |
-| セッション | それ以外の `/api/**` | GitHub ログイン後の `SESSION` Cookie（HttpOnly / SameSite=Lax）。状態を変える操作には CSRF トークン（`XSRF-TOKEN` Cookie を `X-XSRF-TOKEN` ヘッダで送り返す）を求める |
-| なし | `/actuator/health`・`/actuator/info`、SPA のシェル | 公開。`/actuator/**` のほか（`prometheus` など）は ADMIN |
+| セッション | それ以外の `/api/**` | `POST /api/v1/login`（共有のユーザー名とパスワード）でログインした後の `JSESSIONID` Cookie（HttpOnly）。ログイン・ログアウトなど状態を変える操作には CSRF トークン（`XSRF-TOKEN` Cookie を `X-XSRF-TOKEN` ヘッダで送り返す）を求める |
+| なし | `/actuator/health`・`/actuator/info`、SPA のシェル | 公開。`/actuator/**` のほか（`prometheus` など）はログインが要る |
 
 同一オリジンのため CORS は設定しない。詳細は [認証](features/auth/design.md)。
 
 ### 6.2 エンドポイント
 
-凡例: 認可の「—」はログインしていれば可（VIEWER 以上）。
+凡例: 認可の「—」はログインしていれば可。
 
 | メソッド | パス | 用途 | 認可 | 機能 |
 | --- | --- | --- | --- | --- |
 | POST | `/api/v1/runs` | Run の作成（初めてのリポジトリは登録） | Ingest Token | [取り込み](features/ingest/design.md) |
 | POST | `/api/v1/runs/{runId}/artifacts` | 成果物のアップロード | Ingest Token | 同上 |
 | POST | `/api/v1/runs/{runId}/finalize` | 確定し、その場で判定する | Ingest Token | 同上 |
-| GET | `/api/v1/me` | ログイン中の利用者とロール | — | [認証](features/auth/design.md) |
-| GET | `/api/v1/dashboard` | 全リポジトリのサマリ | — | [ダッシュボード](features/dashboard/design.md) |
-| GET | `/api/v1/repositories/{id}` | リポジトリ詳細 | — | [Run の閲覧](features/run-detail/design.md) |
-| GET | `/api/v1/runs` | Run 一覧（`repositoryId` 必須） | — | 同上 |
-| GET | `/api/v1/runs/{runId}` | Run 詳細 | — | 同上 |
-| GET | `/api/v1/runs/{runId}/findings` | 違反一覧 | — | 同上 |
-| GET | `/api/v1/runs/{runId}/artifacts`、`.../{artifactId}/content` | 成果物の一覧とダウンロード | — | 同上 |
-| GET | `/api/v1/repositories/{id}/trends` | 指標の時系列 | — | [トレンド](features/trends/design.md) |
-| GET | `/api/v1/repositories/{id}/config` | 直近の Run に送られた合格ラインと検証結果 | — | [合格ライン](features/gate-config/design.md) |
-| GET | `/api/v1/repositories/{id}/release-report`、`release-report.csv` | リリース判定と CSV | — | [リリース判定](features/release-report/design.md) |
-| POST | `/api/v1/runs/{runId}/reevaluate` | 再評価 | ADMIN | [判定](features/evaluation/design.md) |
-| GET / POST / PATCH | `/api/v1/users`、`/api/v1/users/{id}` | 許可リスト・ロールの管理 | ADMIN | [管理](features/admin/design.md) |
-| GET | `/api/v1/audit-logs` | 監査ログ | ADMIN | 同上 |
-| GET | `/actuator/health`、`/actuator/prometheus` | ヘルスチェック / メトリクス | 公開 / ADMIN | — |
+| POST | `/api/v1/login`、`/api/v1/logout` | ログイン（`username` / `password` のフォーム）とログアウト | 公開 / — | [認証](features/auth/design.md) |
+| GET | `/api/v1/me` | ログイン中のユーザー名 | — | 同上 |
+| GET | `/api/v1/release?ref=` | リリース判定（`ref` を省くと最新の計測） | — | [リリース判定](features/release-report/design.md) |
+| GET | `/api/v1/release/history` | 判定の履歴（最大 50 件） | — | 同上 |
+| GET | `/actuator/health`、`/actuator/prometheus` | ヘルスチェック / メトリクス | 公開 / — | — |
 
 API の仕様は起動中のアプリの `/swagger-ui.html` でも見られる。
 
@@ -385,18 +358,14 @@ API の仕様は起動中のアプリの `/swagger-ui.html` でも見られる�
 | --- | --- | --- |
 | `VALIDATION_FAILED` | 400 | 入力の検証エラー（`violations` に詳細） |
 | `UNAUTHENTICATED` / `TOKEN_INVALID` | 401 | 未認証 / Ingest Token が不正 |
-| `USER_NOT_ALLOWLISTED` / `USER_DISABLED` / `FORBIDDEN` | 403 | 許可リストに無い / アカウントが無効 / 権限不足 |
+| `FORBIDDEN` | 403 | CSRF トークンが無いなど |
 | `RESOURCE_NOT_FOUND` | 404 | 対象が無い（存在しない URL も含む） |
 | `METHOD_NOT_ALLOWED` / `NOT_ACCEPTABLE` | 405 / 406 | 使えないメソッド / 応答できない形式 |
 | `RUN_ALREADY_FINALIZED` | 409 | 確定済みの Run への操作 |
-| `RUN_NOT_EVALUABLE` | 409 | 確定していない Run の再評価 |
-| `ARTIFACTS_DELETED` | 409 | 成果物が保持期間で削除済み |
-| `USER_ALREADY_EXISTS` / `ADMIN_REQUIRED` | 409 | 同じ利用者がいる / 管理者がいなくなる変更 |
 | `ARTIFACT_TOO_LARGE` | 413 | 1 ファイル 50MB、または Run 合計 200MB の超過 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | 本文の形式に対応していない |
 | `ARTIFACT_TYPE_UNKNOWN` / `ARTIFACT_FORMAT_INVALID` | 422 | 未知の成果物種別 / 形式が不正 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能の `environment` が無い |
-| `CONFIG_VALIDATION_FAILED` | 422 | 合格ラインの検証エラー（Run の処理失敗の理由にも使う） |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
 
 ### 6.4 OpenAPI 仕様の生成
@@ -412,36 +381,21 @@ springdoc がコントローラと DTO から仕様を作り、結合テスト�
 
 ## 7. 画面の共通規則
 
-画面ごとの設計は各機能の design.md にある。
-
 ### 7.1 画面一覧
 
-| # | 画面 | パス | 閲覧 | 機能 |
-| --- | --- | --- | --- | --- |
-| S-01 | ダッシュボード | `/` | 全員 | [ダッシュボード](features/dashboard/design.md) |
-| S-02 | リポジトリ詳細 | `/repositories/:repositoryId` | 全員 | [Run の閲覧](features/run-detail/design.md) |
-| S-03 | Run 詳細 | `/runs/:runId` | 全員（再評価は ADMIN） | 同上 |
-| S-04 | 違反一覧 | `/runs/:runId/findings` | 全員 | 同上 |
-| S-05 | トレンド | `/repositories/:repositoryId/trends` | 全員 | [トレンド](features/trends/design.md) |
-| S-06 | 設定 | `/repositories/:repositoryId/config` | 全員（表示のみ） | [合格ライン](features/gate-config/design.md) |
-| S-07 | 管理 | `/admin/users`・`/admin/audit-logs` | ADMIN | [管理](features/admin/design.md) |
-| S-08 | リリース判定 | `/repositories/:repositoryId/release?ref=` | 全員 | [リリース判定](features/release-report/design.md) |
-| — | ログイン / アクセス拒否 / 見つからない | `/login` / `/forbidden` / その他 | 認証不要 | [認証](features/auth/design.md) |
+| 画面 | パス | 機能 |
+| --- | --- | --- |
+| リリース判定 | `/`（`?ref=<タグかコミット>`） | [リリース判定](features/release-report/design.md) |
+| ログイン / 見つからない | `/login` / その他 | [認証](features/auth/design.md) |
 
-```
-/login ─(GitHub ログイン + 許可リスト)─┬→ S-01 ダッシュボード ─→ S-02 リポジトリ詳細 ─┬→ S-03 Run 詳細 ─→ S-04 違反一覧 ─→ GitHub の該当行
-                                        │         └───────────→ S-03（最新の Run）    ├→ S-05 トレンド
-                                        └→ /forbidden                                  ├→ S-06 設定
-                                                                                       └→ S-08 リリース判定
-```
+画面はリリース判定の 1 つだけ。上から、結論（リリース可 / 不可）→ 品質基準ごとの合否（不合格の指標には理由と主な違反）→ 各指標の説明と基準の根拠 → 判定の履歴 の順に並べる。
 
 ### 7.2 レイアウト
 
 | 要素 | 仕様 |
 | --- | --- |
-| ヘッダ | 固定。ナビは現在地を `aria-current="page"` で示す。管理は ADMIN にだけ出す |
+| ヘッダ | ロゴ、テーマ切替、ログアウト。印刷では出さない |
 | テーマ切替 | ライト / ダーク / OS 追従。選択を `localStorage` に保持し、`<html data-theme>` に反映する |
-| 利用者メニュー | 表示名、ロール、ログアウト |
 | 最大幅 | 1440px。中央寄せ、左右 24px（モバイルは 16px）の余白 |
 
 ### 7.3 ステータスの表現
@@ -451,32 +405,29 @@ springdoc がコントローラと DTO から仕様を作り、結合テスト�
 | ステータス | ラベル | 記号 | アイコン | 色 |
 | --- | --- | :---: | --- | --- |
 | `PASS` | 合格 | ● | `pi-check-circle` | `#0ca30c` |
-| `WARN` | 注意 | ▲ | `pi-exclamation-triangle` | `#fab219` |
 | `FAIL` | 不合格 | ■ | `pi-times-circle` | `#d03b3b` |
-| `ERROR` | 計測エラー | ◆ | `pi-question-circle` | `#ec835a` |
-| `SKIP` | 未計測 | ○ | `pi-minus-circle` | `#898781` |
+| `ERROR` | 計測エラー（不合格として扱う） | ◆ | `pi-question-circle` | `#ec835a` |
+| 未計測（結論が `NOT_MEASURED`） | 未計測 | ○ | `pi-minus-circle` | `#898781` |
 | `NOT_APPLICABLE` | 対象外 | — | `pi-ban` | `#898781` |
 
-- `SKIP` と `NOT_APPLICABLE` は「良い / 悪い」を表さないため中立色にし、記号とラベルで区別する。`NOT_APPLICABLE` の値の欄は「—」にする
-- **色は点・記号・アイコンにだけ使い、文字色には使わない**。`WARN` と `ERROR` はライト面でのコントラストが 3:1 を下回るため、ラベルは常に本文の色で描く
-- **処理失敗（`status = FAILED`）は不合格（`verdict = FAIL`）と同じ赤で出さない**。◆「処理失敗」+「判定できませんでした」と明記する。前者は基盤の管理者が、後者は開発者が直すもので、動くべき人が違う
+- 未計測と対象外は「良い / 悪い」を表さないため中立色にし、記号とラベルで区別する。対象外は合否に使わないため、リリース判定の表には出さない
+- **色は点・記号・アイコンにだけ使い、文字色には使わない**。`ERROR` はライト面でのコントラストが 3:1 を下回るため、ラベルは常に本文の色で描く
+- 不合格と計測エラーは別の色で示す。前者は開発者が品質を直し、後者は計測（収集ランナーや計測プロファイル）を直すもので、動くべき人が違う
 - 色の正本は `frontend/src/styles/tokens.css`。ステータス色はライト / ダークで同じ値。`--text-muted` と `--link` はモードごとに違う値を持つため、アクセシビリティの検査は両モードで行う
-- グラフの系列色は 3 色（色覚特性の下でも見分けられる）。系列の色はサーバが `colorIndex` で固定し、絞り込みで系列が減っても塗り替わらない
 
 ### 7.4 画面の状態
 
 | 状態 | 表示 |
 | --- | --- |
 | 読み込み中 | 「読み込み中…」の文言 |
-| 空 | 何が無いかと、次に取るべき操作 |
-| エラー | 何が起きたかと再試行ボタン（`role="alert"`） |
-| 権限なし | 操作ボタンを隠さず無効化し、理由を示す（機能の存在を知らせ、管理者に依頼する発想を残すため）。ADMIN 専用の画面は `/forbidden` へ移る |
+| 未計測 | 結論を「未計測」とし、何をすればよいか（収集ランナーで計測する）を理由に書く |
+| エラー | 何が起きたか（`role="alert"`） |
 
 ### 7.5 レスポンシブ
 
 | 幅 | レイアウト |
 | --- | --- |
-| 768px 以上 | 指標の表を全列表示 |
+| 768px 以上 | 指標の表・履歴の表を全列表示 |
 | 768px 未満 | 指標の表を**カード形式に変形**する（横スクロールさせると判定列が見えなくなる） |
 
 375px 幅で確認する。
@@ -485,17 +436,11 @@ springdoc がコントローラと DTO から仕様を作り、結合テスト�
 
 | ストア | 保持する状態 |
 | --- | --- |
-| `useAuthStore` | ログイン中の利用者とロール（`isAdmin`） |
-| `useDashboardStore` | ダッシュボードのサマリ、ポーリング |
-| `useRunStore` | 表示中の Run 詳細 |
-| `useFindingsStore` | 表示中の Run の違反一覧と絞り込み条件 |
-| `useTrendStore` | 選択中の指標・期間、取得した系列 |
-| `useUiStore` | テーマ、トースト |
+| `useAuthStore` | ログイン中のユーザー名、ログイン・ログアウト |
+| `useUiStore` | テーマ |
 
-- API はすべて `src/api/client.ts` の `openapi-fetch` クライアント経由で呼ぶ。型は生成された `schema.d.ts` をそのまま使い、再定義しない（手書きの型が混ざると、API の変更で黙って型が合わなくなる箇所が生まれる）
-- キャッシュは持たず、画面遷移のたびに取得する（古い判定結果を表示する事故のほうが重い）
-- 読み込みの失敗はストアの状態として持ち画面内に出す。登録・更新などの操作の失敗はトーストで知らせる
-- 画面側のロール判定は表示の都合だけで、権限の境界はバックエンドの認可が担う
+- API は `src/api/client.ts` の `openapi-fetch` クライアント経由で呼ぶ。型は生成された `schema.d.ts` をそのまま使い、再定義しない。ログイン・ログアウトだけはフォームの送信のため `fetch` で送る
+- リリース判定の画面は表示のたびに取得し、キャッシュしない（古い判定結果を表示する事故のほうが重い）
 
 ### 7.7 アクセシビリティ
 
@@ -506,11 +451,9 @@ quality-gate 自身も WCAG 2.2 AA を満たす。PR の CI で axe-core の cri
 | A-1 | すべての機能をキーボードだけで操作できる |
 | A-2 | フォーカスを常に見えるようにする。PrimeVue の既定のリングを消さない |
 | A-3 | ステータスを色だけで伝えない（7.3） |
-| A-4 | グラフはインライン SVG で描き、`role="img"` と要約の `aria-label` を付け、表形式の代替を DOM に置く |
 | A-5 | 見出しレベルを飛ばさない。各画面に `<h1>` が 1 つ |
 | A-6 | 入力欄に `<label>` を関連付ける。エラーは `aria-describedby` で結び、`aria-invalid` を付ける |
-| A-7 | 非同期の結果（保存完了、再評価の結果）を `aria-live="polite"` で知らせる |
-| A-8 | ダイアログはフォーカスを閉じ込め、閉じたら開いた要素へ戻す |
+| A-7 | ログインの失敗などの結果を `role="alert"` で知らせる |
 | A-9 | スキップリンクでヘッダを飛ばして本文へ移れる |
 | A-10 | 本文のコントラスト比 4.5:1 以上、UI 部品と図形は 3:1 以上 |
 | A-11 | `prefers-reduced-motion` を尊重する |
@@ -524,10 +467,10 @@ quality-gate 自身も WCAG 2.2 AA を満たす。PR の CI で axe-core の cri
 
 | 項目 | 要件 |
 | --- | --- |
-| 規模 | 対象リポジトリ 1〜5、Run は 1 日 10〜100、利用者は数名〜20。**PostgreSQL 1 台 + アプリ 1 プロセス**（Docker Compose）で足り、キュー・キャッシュ・水平スケールは持たない |
-| 性能の目安 | ダッシュボード p95 1.0 秒、Run 詳細 p95 1.5 秒、確定から判定結果の応答まで p95 60 秒（自動では検証しない） |
+| 規模 | 対象リポジトリ 1 つ、Run は手動の計測の分だけ（1 日数件）、利用者は数名〜20。**PostgreSQL 1 台 + アプリ 1 プロセス**（Docker Compose）で足り、キュー・キャッシュ・水平スケールは持たない |
+| 性能の目安 | リリース判定の表示 p95 1.0 秒、確定から判定結果の応答まで p95 60 秒（自動では検証しない） |
 | 可用性 | quality-gate の障害が対象リポジトリの開発を止めない。DB は日次バックアップ |
-| セキュリティ | 通信は TLS。Ingest Token と GitHub のクライアントシークレットは環境変数で渡し、ログに出さない。成果物の閲覧は許可リストの利用者に限る。アップロードはサイズ上限と形式検証を行い、XML の外部実体参照を無効にし、JSON は深さとサイズに上限を設ける。計測中の対象のコードはコンテナの中で動かし、認証情報を渡さない |
+| セキュリティ | 通信は TLS。Ingest Token とログインのパスワードは環境変数で渡し、ログに出さない。判定の閲覧はログインした人に限る（パスワードを知る人は全員同じものを見る）。アップロードはサイズ上限と形式検証を行い、XML の外部実体参照を無効にし、JSON は深さとサイズに上限を設ける。計測中の対象のコードはコンテナの中で動かし、認証情報を渡さない |
 | 運用 | `/actuator/health`、Prometheus のメトリクス、相関 ID 付きのログ |
 | 保守性 | 指標やツール形式の追加がアダプタと判定器の追加で完結する。quality-gate 自身の品質は PR の CI で確かめる（DD-5） |
 
@@ -537,7 +480,7 @@ quality-gate 自身も WCAG 2.2 AA を満たす。PR の CI で axe-core の cri
 | C-2 | 計測できる対象は Maven + npm / Vitest のモノレポに限る |
 | C-3 | ミューテーションテストは backend のみ |
 | C-4 | 自動のアクセシビリティ検査は WCAG 違反の一部しか検出できない |
-| C-5 | 社内専用・単一テナント。GitHub は個人アカウント（Free）のため、ログインの可否は許可リストで制御する |
+| C-5 | 社内専用・単一テナント。ログインは共有の 1 アカウントで、誰が見たかは記録しない |
 
 ---
 
@@ -546,18 +489,17 @@ quality-gate 自身も WCAG 2.2 AA を満たす。PR の CI で axe-core の cri
 | # | リスク | 対策 |
 | --- | --- | --- |
 | R-1 | 性能の値が実行環境のノイズで揺れる | 専有のランナー、ウォームアップの除外、3 回実行の中央値 |
-| R-2 | PIT と負荷試験で計測が長くなる | PR の計測では実行しない（DD-8） |
-| R-3 | 新しい CVE の公開で、コードを変えずに不合格になる | 計測し直すと判定が変わる。修正版が無い間は合格ラインの変更として扱い、理由をコミットに残す |
-| R-4 | 合格ラインの緩和が乱発されゲートが形骸化する | 合格ラインは Git で管理し、変更はプルリクエストを通す（DD-13） |
-| R-5 | スキップが常態化し、M-02 と M-03 / M-04 が測られなくなる | 申告制と許容リスト、部分計測の明示、最後の完全計測の表示、リリース判定は完全計測を求める |
-| R-6 | 許可リストの設定漏れで、意図しないユーザーがログインする | 既定を拒否とし、変更は監査ログに残す |
-| R-7 | 既存コードに複雑度の高い関数が多く、M-06 が不合格のままになる | 許容する関数は `exclusions` で外し、理由をコミットに残す |
+| R-2 | PIT と負荷試験で計測が長くなる | 計測はリリースの前など必要なときだけ手動で行う。負荷試験は `DISABLED_METRICS` / `QG_DISABLED_METRICS` で止められる |
+| R-3 | 新しい CVE の公開で、コードを変えずに不合格になる | 計測し直すと判定が変わる。修正版が無い間は合格ラインの変更として扱い、理由を記録する |
+| R-4 | 合格ラインの緩和が、プルリクエストのレビューを通らずに行われる | 環境変数の変更はデプロイの設定の変更として記録し、判定に使った合格ラインは Run ごとに残る（画面の「合格ライン」列）。緩めた経緯は経営陣への報告に含める |
+| R-6 | 共有のパスワードが広まり、社外の人が見る | 社内ネットワークに閉じて公開する。パスワードは定期的に変え（`QG_LOGIN_PASSWORD` を変えて再起動）、12 文字以上を求める |
+| R-7 | 既存コードに複雑度の高い関数が多く、M-06 が不合格のままになる | 許容する関数は `QG_EXCLUSIONS` で外し、理由を記録する |
 | R-8 | 対象のビルド構成が変わり、収集ランナーが追従できない | 未提出は ERROR として表に出る。計測プロファイルを更新する |
 
 | # | 未決事項 | 現状 |
 | --- | --- | --- |
-| Q-1 | ミューテーションテストの実行時間をどこまで許容するか | PR 以外の計測で全量を実行している（like-chatgpt で約 1 分）。ランナーの占有が問題になったら見直す |
+| Q-1 | ミューテーションテストの実行時間をどこまで許容するか | 毎回全量を実行している（like-chatgpt で約 1 分）。ランナーの占有が問題になったら見直す |
 | Q-2 | 不合格時の是正プロセス | マージを止めないため、不合格を放置しない運用ルール（是正までの目標期間、レビューの場、マージブロックへ移る判断基準）が別に要る |
-| Q-3 | 保持期間とストレージ | 既定は Run 2 年・成果物 90 日・監査ログ 2 年。より長い保持が要るか、成果物の置き場（初期 10GB 程度）を確保できるか |
+| Q-3 | 保持期間とストレージ | 自動の削除は持たない。計測は手動で件数が少ないため当面は問題にならない。増えてきたら古い Run を消す手順を決める |
 | Q-4 | デプロイ先と運用体制 | オンプレミスかクラウドか、監視・バックアップの担当。規模としては Docker Compose の単一ホストで足りる |
 | Q-5 | マージブロックへ進む場合の GitHub プラン | GitHub Free ではプライベートリポジトリの保護ブランチを使えない（Pro 以上が必要） |

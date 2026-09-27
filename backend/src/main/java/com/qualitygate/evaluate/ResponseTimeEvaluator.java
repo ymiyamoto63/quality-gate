@@ -20,7 +20,7 @@ import java.util.TreeMap;
  *
  * <p>到達率（スループット）は達成値を競う指標ではなく、<strong>応答時間を測るための負荷条件</strong>として扱う。
  * 実測の成功スループットが設定到達率の 95% を下回った場合は、アプリが捌けずキューが詰まり
- * p95 が楽観的に出ている疑いがあるため、WARN を付ける。
+ * p95 が楽観的に出ている疑いがあるため、負荷条件を満たしていないとして計測エラーにする。
  */
 @Component
 public class ResponseTimeEvaluator extends PerformanceEvaluator {
@@ -29,7 +29,7 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
     static final BigDecimal UNSTABLE_CV_PCT = BigDecimal.valueOf(20);
 
     /** 実測の成功スループットがこの割合を下回ったら、負荷条件を満たしていないとみなす。 */
-    static final BigDecimal ARRIVAL_WARN_RATIO = new BigDecimal("0.95");
+    static final BigDecimal ARRIVAL_RATIO = new BigDecimal("0.95");
 
     @Override
     public String metricId() {
@@ -46,7 +46,6 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
         Map<String, Object> threshold = new LinkedHashMap<>();
         threshold.put("operator", "<=");
         threshold.put("value", limits.p95Ms());
-        threshold.put("warnAboveMs", limits.p95WarnMs());
         threshold.put("arrivalRateRps", limits.arrivalRateRps());
         return threshold;
     }
@@ -68,12 +67,18 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
         Map<String, BigDecimal> measured = scenarioMedians(runs);
         List<String> missing = limits.scenarios().stream()
                 .filter(name -> !measured.containsKey(name)).toList();
-        if (missing.isEmpty()) {
-            return null;
+        if (!missing.isEmpty()) {
+            return ("設定のシナリオ %s の p95 が summary にありません。"
+                    + "k6 の thresholds に http_req_duration{scenario:<名前>} を定義してください")
+                    .formatted(String.join(", ", missing));
         }
-        return ("設定のシナリオ %s の p95 が summary にありません。"
-                + "k6 の thresholds に http_req_duration{scenario:<名前>} を定義してください")
-                .formatted(String.join(", ", missing));
+        BigDecimal throughput = successRate(runs);
+        if (throughput.compareTo(limits.arrivalRateRps().multiply(ARRIVAL_RATIO)) < 0) {
+            return ("成功スループット %s req/s が設定到達率 %s req/s の 95%% を下回っています。"
+                    + "処理が追いつかず p95 が実態より良く出ている可能性があるため、判定しません")
+                    .formatted(plain(throughput), plain(limits.arrivalRateRps()));
+        }
+        return null;
     }
 
     @Override
@@ -92,32 +97,14 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
                     .formatted(String.join("、", parts), plain(limits.p95Ms())));
         }
 
-        BigDecimal throughput = successRate(runs);
-        BigDecimal floor = limits.arrivalRateRps().multiply(ARRIVAL_WARN_RATIO);
-        if (throughput.compareTo(floor) < 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    ("p95 %sms は合格ラインを満たしますが、成功スループット %s req/s が設定到達率 %s req/s の 95%% を"
-                            + "下回っています。処理が追いつかず、p95 が実態より良く出ている可能性があります")
-                            .formatted(plain(median), plain(throughput), plain(limits.arrivalRateRps())));
-        }
-
+        String note = "";
         BigDecimal cv = PerformanceSample.coefficientOfVariation(
                 runs.stream().map(RawMeasurement::value).toList());
         if (cv.compareTo(UNSTABLE_CV_PCT) > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "p95 %sms は合格ラインを満たしますが、%d 回の変動係数が %s%% で 20%% を超えています（計測環境が不安定です）"
-                            .formatted(plain(median), runs.size(), plain(cv)));
+            note = "（%d 回の変動係数が %s%% で 20%% を超えており、計測環境が不安定です）".formatted(runs.size(), plain(cv));
         }
-        List<String> near = namesAbove(scenarios, limits.p95WarnMs());
-        if (median.compareTo(limits.p95WarnMs()) > 0 || !near.isEmpty()) {
-            String which = median.compareTo(limits.p95WarnMs()) > 0
-                    ? "全体の p95 %sms".formatted(plain(median))
-                    : "シナリオ " + String.join("、", near) + " の p95";
-            return new Judgement(MeasurementStatus.WARN, "%s が注意水準 %sms を超えています（合格ライン %sms）"
-                    .formatted(which, plain(limits.p95WarnMs()), plain(limits.p95Ms())));
-        }
-        return new Judgement(MeasurementStatus.PASS, "p95 %sms は合格ライン %sms 以内です"
-                .formatted(plain(median), plain(limits.p95Ms())));
+        return new Judgement(MeasurementStatus.PASS, "p95 %sms は合格ライン %sms 以内です%s"
+                .formatted(plain(median), plain(limits.p95Ms()), note));
     }
 
     /** 成功スループット（req/s）の中央値。 */

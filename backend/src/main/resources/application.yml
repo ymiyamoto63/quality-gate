@@ -34,11 +34,6 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
-  session:
-    jdbc:
-      initialize-schema: never   # スキーマは Flyway（V001__init.sql）で管理する
-    timeout: 8h
-
   servlet:
     multipart:
       # 通信としての上限。成果物の大きさの判定は quality-gate.max-artifact-bytes（既定 50MB）で行い、
@@ -46,39 +41,51 @@ spring:
       max-file-size: 60MB
       max-request-size: 60MB
 
-  security:
-    oauth2:
-      client:
-        registration:
-          github:
-            # GitHub App の user-to-server 認可フローを使う（OAuth App は別途用意しない）
-            client-id: ${QG_GITHUB_CLIENT_ID:placeholder-client-id}
-            client-secret: ${QG_GITHUB_CLIENT_SECRET:placeholder-client-secret}
-            scope: read:user
-
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 8h            # ログインの有効期間。セッションはメモリに持つ（再起動するとログインし直す）
   error:
     include-message: never   # 例外メッセージの無検閲な露出を防ぐ（応答は ProblemDetail で組む）
   compression:
     enabled: true
 
-# 既定値は QualityGateProperties が持つ。環境変数が未設定（空・0）なら既定値になる
+# 既定値は QualityGateProperties が持つ。環境変数が未設定（空）なら既定値になる
 quality-gate:
+  # 計測対象のリポジトリ（owner/name）。quality-gate は 1 つのアプリだけを見る。必須
+  repository: ${QG_REPOSITORY:}
   artifact-root: ${QG_ARTIFACT_ROOT:}
   base-url: ${QG_BASE_URL:}
   # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-20）
   ingest-tokens: ${QG_INGEST_TOKEN:}
-  # データ保持期間（日。RET-1）。短くすると、翌日の保持期間バッチで古いデータが削除される
-  retention:
-    run-days: ${QG_RETENTION_RUN_DAYS:0}
-    artifact-days: ${QG_RETENTION_ARTIFACT_DAYS:0}
-    audit-log-days: ${QG_RETENTION_AUDIT_LOG_DAYS:0}
-  # 日次バッチの時刻（cron）。"-" で無効になる
-  schedule:
-    zone: ${QG_SCHEDULE_ZONE:Asia/Tokyo}
-    cleanup-retention: "0 0 3 * * *"
-    abandon-stale-runs: "0 10 3 * * *"
+  # 画面のログイン（全員で共有する 1 つのアカウント）。パスワードは必須（12 文字以上）
+  login:
+    username: ${QG_LOGIN_USERNAME:}
+    password: ${QG_LOGIN_PASSWORD:}
+  # 合格ライン（docs/metrics.md）。変えた値は、その後に判定する計測から効く（判定済みの結果は変わらない）。
+  # 一覧をカンマ区切りで書く項目は、空なら限定しない
+  gate:
+    disabled-metrics: ${QG_DISABLED_METRICS:}              # 判定しない指標（例: M-03,M-04）
+    exclusions: ${QG_EXCLUSIONS:}                          # 計測から除くファイル（glob。例: **/Main.java,**/*.d.ts）
+    branch-coverage-min: ${QG_BRANCH_COVERAGE_MIN:}        # M-01 %（既定 75）
+    mutation-score-min: ${QG_MUTATION_SCORE_MIN:}          # M-02 %（既定 60）
+    mutation-components: ${QG_MUTATION_COMPONENTS:}        # M-02 の対象コンポーネント（例: backend）
+    response-time-p95-max-ms: ${QG_RESPONSE_TIME_P95_MAX_MS:}  # M-03 ms（既定 500）
+    arrival-rate-rps: ${QG_ARRIVAL_RATE_RPS:}              # M-03 の負荷条件 req/s（既定 50）
+    error-rate-max-pct: ${QG_ERROR_RATE_MAX_PCT:}          # M-04 %（既定 0.1）
+    perf-scenarios: ${QG_PERF_SCENARIOS:}                  # M-03 / M-04 で結果が必要な k6 のシナリオ
+    critical-vulnerabilities-max: ${QG_CRITICAL_VULNERABILITIES_MAX:}  # M-05 件（既定 0）
+    high-vulnerabilities-max: ${QG_HIGH_VULNERABILITIES_MAX:}          # M-05 件（既定 0）
+    complexity-max: ${QG_COMPLEXITY_MAX:}                  # M-06 循環的複雑度（既定 15）
+    breaking-changes-max: ${QG_BREAKING_CHANGES_MAX:}      # M-07 件（既定 0）
+    accessibility-violations-max: ${QG_ACCESSIBILITY_VIOLATIONS_MAX:}  # M-08 件（既定 0）
+    accessibility-pages: ${QG_ACCESSIBILITY_PAGES:}        # M-08 で検査されているべき画面（例: /,/settings）
+    test-success-rate-min: ${QG_TEST_SUCCESS_RATE_MIN:}    # M-09 %（既定 100）
+    test-count-min: ${QG_TEST_COUNT_MIN:}                  # M-09 件（既定 1）
+    skipped-tests-increase-max: ${QG_SKIPPED_TESTS_INCREASE_MAX:}  # M-10 前回からの増加 件（既定 0）
+    secrets-max: ${QG_SECRETS_MAX:}                        # M-11 件（既定 0）
+    forbidden-licenses-max: ${QG_FORBIDDEN_LICENSES_MAX:}  # M-12 件（既定 0）
 
 springdoc:
   api-docs:

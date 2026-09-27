@@ -6,11 +6,14 @@ spring:
     clean-disabled: false
 
 quality-gate:
+  repository: ymiyamoto63/quality-gate
   artifact-root: ${java.io.tmpdir}/quality-gate-test-artifacts
   ingest-tokens: test-ingest-token-0123456789abcdef   # IntegrationCleanup.INGEST_TOKEN と一致させる
-  schedule:                  # 日次バッチはテストから明示的に呼ぶ
-    cleanup-retention: "-"
-    abandon-stale-runs: "-"
+  login:                     # IntegrationCleanup.LOGIN_* と一致させる
+    username: quality
+    password: test-login-password-0123
+  gate:                      # 既定値のまま。結合テストの前提をそろえるため、判定する指標だけを明示する
+    disabled-metrics: ""
 
 logging:
   level:

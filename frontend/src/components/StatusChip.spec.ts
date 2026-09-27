@@ -10,7 +10,7 @@ describe('StatusChip', () => {
   })
 
   it('記号とアイコンは装飾として扱い、読み上げから除く', () => {
-    const wrapper = mount(StatusChip, { props: { status: 'WARN' } })
+    const wrapper = mount(StatusChip, { props: { status: 'ERROR' } })
 
     // ラベルが読み上げられるため、記号とアイコンの二重読み上げを避ける
     expect(wrapper.find('.qg-status__mark').attributes('aria-hidden')).toBe('true')

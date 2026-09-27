@@ -1,7 +1,7 @@
 package com.qualitygate.release;
 
-import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.MeasurementStatus;
+import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.model.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
@@ -12,59 +12,41 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * リリース判定（UC-06 / S-08）。指定したタグ・コミットの時点の、全指標の合否と説明。
+ * リリース判定。指定したタグ・コミット（指定が無ければ最新の計測）の、全指標の合否と説明。
  *
- * <p>{@code @NotNull} と {@code nullable} の付け方は RunDetailResponse と同じ（必ず返す項目を仕様に明示する）。
+ * <p>必ず返す項目には {@code @NotNull} を付け、null になりうる項目は {@code nullable} を明示する
+ * （画面の型を OpenAPI から生成するため）。
  */
-@Schema(description = "リリース判定。指定したタグ・コミットで判定済みの Run から組み立てる")
+@Schema(description = "リリース判定。判定済みの計測（Run）から組み立てる")
 public record ReleaseReportResponse(
-        @NotNull UUID repositoryId,
         @NotNull String repositoryFullName,
-        @NotNull @Schema(description = "指定したタグ・コミット（前後の空白を除いたもの）") String ref,
-        @NotNull ReleaseRefResolver.RefType refType,
-        @NotNull String commitSha,
-        @NotNull String commitUrl,
+        @NotNull @Schema(nullable = true, description = "指定したタグ・コミット。最新の計測を見ているときは null") String ref,
+        @NotNull @Schema(nullable = true, description = "判定したコミット。計測が 1 件も無ければ null") String commitSha,
+        @NotNull @Schema(nullable = true) String commitUrl,
         @NotNull ReleaseDecision decision,
         @NotNull @Schema(description = "判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する")
         String decisionReason,
-        @NotNull
-        @Schema(nullable = true, description = "判定に使った Run。未計測なら null")
-        ReleaseRun run,
-        @NotNull
-        @Schema(description = "同じコミットのほかの Run の件数（判定には使っていない）")
-        int otherRunCount,
-        @NotNull
-        @Schema(nullable = true, description = "判定に使った合格ライン。設定ファイルの無い Run と未計測では null")
-        ReleaseGateConfig gateConfig,
+        @NotNull @Schema(nullable = true, description = "判定に使った計測。未計測なら null") ReleaseRun run,
         @NotNull ReleaseCounts counts,
-        @NotNull
-        @Schema(description = "指標ごとの結果。不合格・計測エラー・注意を先に、参考値を最後に並べる")
+        @NotNull @Schema(description = "指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない")
         List<ReleaseMetric> metrics,
-        @NotNull
-        @Schema(description = "結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）")
+        @NotNull @Schema(description = "結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）")
         List<ReleaseGuide> guides) {
 
-    public record ReleaseRun(@NotNull UUID runId,
-                         @NotNull Instant measuredAt,
-                         @NotNull String branch,
-                         @NotNull int attempt,
-                         @NotNull Verdict verdict,
-                         @NotNull Completeness completeness,
-                         @NotNull @Schema(nullable = true,
-                                 description = "比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。"
-                                         + "タグで計測したときは前のタグ")
-                         String baseCommitSha) {
+    public record ReleaseRun(
+            @NotNull UUID runId,
+            @NotNull Instant measuredAt,
+            @NotNull String branch,
+            @NotNull @Schema(description = "計測したコミットを指すタグ") List<String> tags,
+            @NotNull Verdict verdict,
+            @NotNull @Schema(nullable = true, description = "計測したワークフローの実行 URL") String ciRunUrl,
+            @NotNull @Schema(nullable = true,
+                    description = "比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ")
+            String baseCommitSha) {
     }
 
-    @Schema(description = "判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る")
-    public record ReleaseGateConfig(@NotNull @Schema(nullable = true,
-                                        description = "合格ラインを送った quality-gate リポジトリのコミット") String commitSha,
-                                @NotNull @Schema(description = "計測の対象から外したパス") List<String> exclusions) {
-    }
-
-    @Schema(description = "合否に使った指標の件数（参考値・対象外を除く）")
-    public record ReleaseCounts(@NotNull int judged, @NotNull int passed, @NotNull int warned,
-                         @NotNull int failed, @NotNull int errored, @NotNull int skipped) {
+    @Schema(description = "合否に使った指標の件数")
+    public record ReleaseCounts(@NotNull int judged, @NotNull int passed, @NotNull int failed) {
     }
 
     public record ReleaseMetric(
@@ -73,14 +55,21 @@ public record ReleaseReportResponse(
             @NotNull String category,
             @NotNull @Schema(nullable = true) String componentName,
             @NotNull @Schema(nullable = true) String variantLabel,
-            @NotNull @Schema(nullable = true) String scenario,
-            @NotNull MeasurementStatus status,
-            @NotNull @Schema(nullable = true, description = "実測値。未計測は null") BigDecimal value,
+            @NotNull @Schema(description = "PASS（合格）/ FAIL（不合格）/ ERROR（計測できなかった。不合格として扱う）")
+            MeasurementStatus status,
+            @NotNull @Schema(nullable = true, description = "実測値。計測エラーは null") BigDecimal value,
             @NotNull @Schema(nullable = true) String unit,
-            @NotNull
-            @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）")
-            String threshold,
-            @NotNull @Schema(nullable = true) String reason) {
+            @NotNull @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）") String threshold,
+            @NotNull @Schema(nullable = true) String reason,
+            @NotNull @Schema(description = "不合格のときの主な違反（深刻な順に最大 10 件）。合格なら空") List<ReleaseFinding> findings,
+            @NotNull @Schema(description = "不合格のときの違反の総数。合格なら 0") int findingCount) {
+    }
+
+    public record ReleaseFinding(
+            @NotNull Severity severity,
+            @NotNull String title,
+            @NotNull @Schema(nullable = true, description = "ファイルと行（backend/src/Foo.java:42 など）") String location,
+            @NotNull @Schema(nullable = true, description = "GitHub の該当箇所") String url) {
     }
 
     public record ReleaseGuide(

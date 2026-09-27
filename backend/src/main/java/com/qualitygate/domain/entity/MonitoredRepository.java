@@ -11,8 +11,8 @@ import java.util.UUID;
 /**
  * 計測対象リポジトリ。Spring Data の Repository と名前が衝突しないよう Monitored を冠する。
  *
- * <p>画面からは登録しない。収集ランナーが初めて計測を送ったときに作られる。
- * 計測の対象と既定ブランチは計測プロファイル（{@code collector/targets/<owner>__<name>.env}）だけで決める。
+ * <p>画面からは登録しない。計測対象（{@code QG_REPOSITORY}）の計測が初めて届いたときに作られる。
+ * 既定ブランチは計測プロファイル（{@code collector/target/profile.env}）の {@code DEFAULT_BRANCH}。
  */
 @Entity
 @Table(name = "repositories")
@@ -27,7 +27,7 @@ public class MonitoredRepository {
     @Column(nullable = false)
     private String name;
 
-    /** 計測プロファイルの DEFAULT_BRANCH。トレンドの既定の系列に使う。計測のたびに送られた値で更新する。 */
+    /** 計測プロファイルの DEFAULT_BRANCH。計測のたびに送られた値で更新する。 */
     @Column(name = "default_branch", nullable = false)
     private String defaultBranch;
 

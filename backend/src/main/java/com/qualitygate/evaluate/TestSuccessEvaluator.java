@@ -21,11 +21,10 @@ import java.util.TreeMap;
  * <ol>
  *   <li>実行件数が最小実行件数（既定 1）未満 → ERROR（検証していないのであって、成功したのではない）</li>
  *   <li>成功率が合格ライン未満 → FAIL</li>
- *   <li>失敗したテストがある（合格ラインを 100% 未満に緩めた場合）、再実行で成功したテストがある → WARN</li>
+ *   <li>それ以外 → PASS（合格ラインを 100% 未満に緩めた場合の失敗件数と、再実行で成功したテストは理由に書き添える）</li>
  * </ol>
  *
- * <p>スキップは M-10 で判定するため、ここでは WARN にしない。同じスキップで 2 つの指標が
- * 黄色くなると、どちらを直せばよいかが読めない。
+ * <p>スキップは M-10 で判定するため、ここでは扱わない。
  *
  * <p><strong>コンポーネントごとに判定する</strong>（M-01 と同じ）。
  * 単体テストはコンポーネントに閉じており、合算すると件数の多い側が少ない側の失敗を薄める。
@@ -102,18 +101,14 @@ public class TestSuccessEvaluator implements MetricEvaluator {
                                     minimum.stripTrailingZeros().toPlainString()));
         }
         long broken = tally.failed() + tally.errored();
-        if (broken > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "成功率は合格ラインを満たしますが、テストが %d 件失敗しています（実行 %d 件中）"
-                            .formatted(broken, tally.executed()));
-        }
+        String reason = broken > 0
+                ? "成功率は合格ラインを満たしますが、テストが %d 件失敗しています（実行 %d 件中）"
+                        .formatted(broken, tally.executed())
+                : "テスト %d 件がすべて成功しました".formatted(tally.executed());
         if (tally.flaky() > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "%d 件は成功しましたが、うち %d 件は再実行で成功しました（不安定なテスト）"
-                            .formatted(tally.executed(), tally.flaky()));
+            reason += "。うち %d 件は再実行で成功しました（不安定なテスト）".formatted(tally.flaky());
         }
-        return new Judgement(MeasurementStatus.PASS,
-                "テスト %d 件がすべて成功しました".formatted(tally.executed()));
+        return new Judgement(MeasurementStatus.PASS, reason);
     }
 
     private record Judgement(MeasurementStatus status, String reason) {

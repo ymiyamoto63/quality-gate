@@ -33,16 +33,16 @@ class ComplexityEvaluatorTest {
                 List.of(function("atLimit", 15)), Set.of("M-06"))));
 
         assertThat(results.getFirst().value()).isEqualByComparingTo("0");
-        assertThat(results.getFirst().status()).isNotEqualTo(MeasurementStatus.FAIL);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
     }
 
     @Test
-    void 注意水準の関数があれば警告() {
+    void しきい値以下の関数だけなら合格で中間の段階は無い() {
         List<MetricResult> results = evaluator.evaluate(context(input(List.of(),
                 List.of(function("borderline", 12)), Set.of("M-06"))));
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
-        assertThat(results.getFirst().detail()).containsEntry("functionsInWarnBand", 1);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(results.getFirst().findingsToPersist()).isEmpty();
     }
 
     @Test

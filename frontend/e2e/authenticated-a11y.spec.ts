@@ -1,112 +1,38 @@
 import { test, expect, type Page } from '@playwright/test'
 import { COLOR_SCHEMES, expectNoBlockingViolations } from './axe'
-import runDetail from './fixtures/run-detail.json' with { type: 'json' }
-import findings from './fixtures/findings.json' with { type: 'json' }
-import trend from './fixtures/trend.json' with { type: 'json' }
-import repositoryDetail from './fixtures/repository-detail.json' with { type: 'json' }
-import runs from './fixtures/runs.json' with { type: 'json' }
-import configInvalid from './fixtures/config-invalid.json' with { type: 'json' }
-import users from './fixtures/users.json' with { type: 'json' }
 import releaseReport from './fixtures/release-report.json' with { type: 'json' }
+import releaseHistory from './fixtures/release-history.json' with { type: 'json' }
 
 /**
- * ログインが要る画面のアクセシビリティ検査。
+ * ログインが要る画面（リリース判定）のアクセシビリティ検査。
  *
- * 応答例は結合テスト（RunQueryApiIT など）が実物の API から書き出したものを使う。
+ * 応答例は結合テスト（ReleaseReportApiIT）が実物の API から書き出したものを使う。
  * 手で書いた例だと、API が変わっても検査は通り続け、実際の画面だけが壊れる。
  */
-const RUN_ID = runDetail.runId
-const REPOSITORY_ID = runDetail.repository.repositoryId
-
-type Role = 'VIEWER' | 'ADMIN'
-
-/** API のパスごとに応答例を返す。一致しない API は 404 にし、検査中の取りこぼしを目立たせる。 */
-const RESPONSES: [RegExp, unknown][] = [
-  [/^\/api\/v1\/runs\/[^/]+\/findings$/, findings],
-  [/^\/api\/v1\/runs\/[^/]+\/artifacts$/, { items: [] }],
-  [/^\/api\/v1\/runs\/[^/]+$/, runDetail],
-  [/^\/api\/v1\/runs$/, runs],
-  [/^\/api\/v1\/repositories\/[^/]+\/trends$/, trend],
-  [/^\/api\/v1\/repositories\/[^/]+\/config$/, configInvalid],
-  [/^\/api\/v1\/repositories\/[^/]+\/release-report$/, releaseReport],
-  [/^\/api\/v1\/repositories\/[^/]+$/, repositoryDetail],
-  [/^\/api\/v1\/users$/, users],
-]
-
-async function stubApi(page: Page, role: Role): Promise<void> {
+async function stubApi(page: Page): Promise<void> {
   await page.route('**/api/v1/**', (route) => {
     const path = new URL(route.request().url()).pathname
-    if (path === '/api/v1/me') {
-      return route.fulfill({
-        json: {
-          userId: '00000000-0000-0000-0000-000000000001',
-          githubLogin: 'ymiyamoto63',
-          displayName: '検査用',
-          avatarUrl: null,
-          role,
-        },
-      })
-    }
-    const match = RESPONSES.find(([pattern]) => pattern.test(path))
-    return match ? route.fulfill({ json: match[1] }) : route.fulfill({ status: 404, json: {} })
+    if (path === '/api/v1/me') return route.fulfill({ json: { username: 'quality' } })
+    if (path === '/api/v1/release') return route.fulfill({ json: releaseReport })
+    if (path === '/api/v1/release/history') return route.fulfill({ json: releaseHistory })
+    // 一致しない API は 404 にし、検査中の取りこぼしを目立たせる
+    return route.fulfill({ status: 404, json: {} })
   })
 }
 
-interface Target {
-  path: string
-  name: string
-  expected: string
-  role?: Role
-  /** 検査の前に画面を動的な状態にする（ダイアログを開くなど。docs/development.md 6 章） */
-  prepare?: (page: Page) => Promise<void>
-}
+for (const scheme of COLOR_SCHEMES) {
+  test(`リリース判定（${scheme}）に重大なアクセシビリティ違反がない`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme })
+    await stubApi(page)
+    await page.goto('/?ref=v1.2.0')
 
-const PAGES: Target[] = [
-  { path: `/runs/${RUN_ID}`, name: 'Run 詳細', expected: '重大・高 脆弱性件数' },
-  { path: `/runs/${RUN_ID}/findings`, name: '違反一覧', expected: 'critical-lib' },
-  {
-    path: `/repositories/${REPOSITORY_ID}/trends`,
-    name: 'トレンド',
-    expected: 'ブランチカバレッジ の推移',
-  },
-  { path: `/repositories/${REPOSITORY_ID}`, name: 'リポジトリ詳細', expected: '直近の Run' },
-  // 検証エラーを該当行の下に出した状態で検査する
-  {
-    path: `/repositories/${REPOSITORY_ID}/config`,
-    name: '設定（検証エラー）',
-    expected: "'mutation_score' の誤り",
-  },
-  { path: '/admin/users', name: '利用者管理', expected: 'admin-user', role: 'ADMIN' },
-  // 技術的な定義（<details>）を開いた状態で検査する
-  {
-    path: `/repositories/${REPOSITORY_ID}/release?ref=1111111`,
-    name: 'リリース判定',
-    expected: '各指標の説明と基準の根拠',
-    prepare: async (page) => {
-      for (const summary of await page.locator('details > summary').all()) await summary.click()
-    },
-  },
-]
+    // 検査前に中身が描かれていることを確かめる。空のページは必ず「違反 0 件」になる
+    await expect(page.getByRole('heading', { name: 'リリース不可' })).toBeVisible()
+    await expect(page.getByText('判定の履歴')).toBeVisible()
 
-for (const target of PAGES) {
-  for (const scheme of COLOR_SCHEMES) {
-    test(`${target.name}（${scheme}）に重大なアクセシビリティ違反がない`, async ({ page }) => {
-      await page.emulateMedia({ colorScheme: scheme })
-      await stubApi(page, target.role ?? 'VIEWER')
-      await page.goto(target.path)
+    // 折りたたまれた中身（主な違反・技術的な定義）も開いて検査する
+    for (const summary of await page.locator('details > summary').all()) await summary.click()
 
-      // 検査前に中身が描かれていることを確かめる。空のページは必ず「違反 0 件」になる
-      await expect(page.getByText(target.expected).first()).toBeVisible()
-
-      // 折りたたまれた中身も検査する。合格だけのカテゴリは初期状態で閉じるため、
-      // 開かないと「対象外」などの行が一度も検査されない
-      const collapsed = page.locator('[aria-expanded="false"]')
-      while ((await collapsed.count()) > 0) {
-        await collapsed.first().click()
-      }
-
-      await target.prepare?.(page)
-      await expectNoBlockingViolations(page)
-    })
-  }
+    await expectNoBlockingViolations(page)
+  })
 }

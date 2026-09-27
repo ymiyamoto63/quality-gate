@@ -43,7 +43,7 @@ public record MetricResult(
 
     /**
      * ツールの制約で、このコンポーネントでは計測しようがない場合。
-     * 未計測（SKIP）とは区別する（docs/metrics.md M-02）。
+     * 合否には使わない（docs/metrics.md M-02）。
      */
     public static MetricResult notApplicable(String metricId, String componentName,
                                              String reason) {
@@ -54,11 +54,6 @@ public record MetricResult(
     /** 成果物が無い・読めないなど、値を確定できない場合。 */
     public static MetricResult error(String metricId, String reason) {
         return new MetricResult(metricId, null, MeasurementStatus.ERROR, null, null,
-                Map.of(), reason, Map.of(), List.of(), null);
-    }
-
-    public static MetricResult skipped(String metricId, String reason) {
-        return new MetricResult(metricId, null, MeasurementStatus.SKIP, null, null,
                 Map.of(), reason, Map.of(), List.of(), null);
     }
 }

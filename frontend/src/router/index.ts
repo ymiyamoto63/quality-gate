@@ -1,18 +1,13 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
-import DashboardView from '@/views/DashboardView.vue'
-import LoginView from '@/views/LoginView.vue'
-import ForbiddenView from '@/views/ForbiddenView.vue'
-import NotFoundView from '@/views/NotFoundView.vue'
-import RepositoryDetailView from '@/views/RepositoryDetailView.vue'
-import ConfigView from '@/views/ConfigView.vue'
-import AdminView from '@/views/AdminView.vue'
-import RunDetailView from '@/views/RunDetailView.vue'
-import FindingListView from '@/views/FindingListView.vue'
-import TrendView from '@/views/TrendView.vue'
 import ReleaseView from '@/views/ReleaseView.vue'
+import LoginView from '@/views/LoginView.vue'
+import NotFoundView from '@/views/NotFoundView.vue'
 
-/** 画面一覧は docs/architecture.md 7.1と対応する。 */
+/**
+ * 画面はリリース判定の 1 つだけ（docs/architecture.md 7.1）。
+ * 見るタグ・コミットは ?ref= に置き、同じ判定を URL で共有できるようにする。
+ */
 const routes: RouteRecordRaw[] = [
   {
     path: '/login',
@@ -20,59 +15,7 @@ const routes: RouteRecordRaw[] = [
     component: LoginView,
     meta: { public: true, title: 'ログイン' },
   },
-  {
-    path: '/forbidden',
-    name: 'forbidden',
-    component: ForbiddenView,
-    meta: { public: true, title: 'アクセス拒否' },
-  },
-
-  { path: '/', name: 'dashboard', component: DashboardView, meta: { title: 'ダッシュボード' } },
-
-  {
-    path: '/repositories/:repositoryId',
-    name: 'repository',
-    component: RepositoryDetailView,
-    meta: { title: 'リポジトリ詳細' },
-  },
-  {
-    path: '/repositories/:repositoryId/trends',
-    name: 'trends',
-    component: TrendView,
-    meta: { title: 'トレンド' },
-  },
-  {
-    path: '/repositories/:repositoryId/release',
-    name: 'release',
-    component: ReleaseView,
-    meta: { title: 'リリース判定' },
-  },
-  {
-    path: '/repositories/:repositoryId/config',
-    name: 'config',
-    component: ConfigView,
-    meta: { title: '設定' },
-  },
-  { path: '/runs/:runId', name: 'run', component: RunDetailView, meta: { title: 'Run 詳細' } },
-  {
-    path: '/runs/:runId/findings',
-    name: 'findings',
-    component: FindingListView,
-    meta: { title: '違反一覧' },
-  },
-  {
-    path: '/admin/users',
-    name: 'users',
-    component: AdminView,
-    meta: { title: '利用者管理', adminOnly: true },
-  },
-  {
-    path: '/admin/audit-logs',
-    name: 'audit-logs',
-    component: AdminView,
-    meta: { title: '監査ログ', adminOnly: true },
-  },
-
+  { path: '/', name: 'release', component: ReleaseView, meta: { title: 'リリース判定' } },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
@@ -96,11 +39,8 @@ router.beforeEach(async (to) => {
     return true
   }
   if (!auth.isAuthenticated) {
-    return { name: 'login' }
-  }
-  // 画面側の制御は利便性のためのもの。権限の境界は API 側が担保する。
-  if (to.meta.adminOnly && !auth.isAdmin) {
-    return { name: 'forbidden' }
+    // ログインの後に、開こうとしていた判定へ戻す
+    return { name: 'login', query: to.fullPath === '/' ? {} : { next: to.fullPath } }
   }
   return true
 })

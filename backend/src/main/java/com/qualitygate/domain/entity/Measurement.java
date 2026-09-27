@@ -17,9 +17,8 @@ import java.util.UUID;
 /**
  * 指標ごとの実測値と判定。
  *
- * <p>{@code repositoryId} と {@code measuredAt} は {@link Run} からの意図的な複製である。
- * トレンド検索は期間・リポジトリ・指標で絞り込むため、毎回 {@code runs} と結合すると
- * 性能要件（p95 800ms）を満たしにくい。更新されない値の複製であり不整合の余地がない。
+ * <p>{@code repositoryId} と {@code measuredAt} は {@link Run} からの複製である（更新されない値のため不整合の余地がない）。
+ * {@code threshold} には判定に使った合格ラインを残す。合格ラインの環境変数を後から変えても、判定の根拠が分かる。
  */
 @Entity
 @Table(name = "measurements")
@@ -46,7 +45,7 @@ public class Measurement {
 
     /**
      * 計測条件（性能の計測環境）。条件の違う値は比較できないため、
-     * 前回比とトレンドの系列はこの値ごとに分ける。条件の区別が無い指標では null。
+     * 前回比はこの値ごとに分ける。条件の区別が無い指標では null。
      */
     @Column
     private String variant;

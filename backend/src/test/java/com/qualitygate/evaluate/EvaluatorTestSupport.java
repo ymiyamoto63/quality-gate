@@ -1,17 +1,17 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Run;
-import com.qualitygate.domain.gate.GateConfigDocument;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.report.RawFinding;
 import com.qualitygate.domain.report.RawMeasurement;
+import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.platform.id.Uuid7;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.LinkedHashMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -39,15 +39,52 @@ final class EvaluatorTestSupport {
                 previousValues, hasBaseline);
     }
 
-    /** 既定の設定のうち、1 つの指標の設定だけを差し替えた合格ライン。 */
+    /**
+     * 既定の合格ラインのうち、1 つの指標の値だけを差し替えた合格ライン。
+     * キーは指標ごとの短い名前（環境変数 {@code QG_*} に対応する）。知らないキーは例外にする。
+     */
     static GateThresholds thresholdsWith(String metric, Map<String, Object> values) {
-        GateConfigDocument defaults = GateConfigDocument.defaults();
-        Map<String, GateConfigDocument.MetricConfig> metrics =
-                new LinkedHashMap<>(defaults.metrics());
-        metrics.put(metric, new GateConfigDocument.MetricConfig(true, values));
-        return GateThresholds.from(new GateConfigDocument(defaults.version(),
-                defaults.execution(),
-                defaults.exclusions(), metrics));
+        Map<String, Object> v = new HashMap<>(values);
+        QualityGateProperties.Gate gate = new QualityGateProperties.Gate(null, null,
+                decimal(take(v, metric, "branch_coverage", "threshold")),
+                decimal(take(v, metric, "mutation_score", "threshold")),
+                list(take(v, metric, "mutation_score", "components")),
+                decimal(take(v, metric, "performance", "p95_ms")),
+                decimal(take(v, metric, "performance", "arrival_rate_rps")),
+                decimal(take(v, metric, "performance", "error_rate_pct")),
+                list(take(v, metric, "performance", "scenarios")),
+                integer(take(v, metric, "vulnerabilities", "max_critical")),
+                integer(take(v, metric, "vulnerabilities", "max_high")),
+                integer(take(v, metric, "cyclomatic_complexity", "max_complexity")),
+                integer(take(v, metric, "api_contract", "breaking_changes")),
+                integer(take(v, metric, "accessibility", "max_critical")),
+                list(take(v, metric, "accessibility", "pages")),
+                decimal(take(v, metric, "test_results", "min_success_rate")),
+                integer(take(v, metric, "test_results", "min_test_count")),
+                integer(take(v, metric, "test_results", "max_skipped_increase")),
+                integer(take(v, metric, "secrets", "max_secrets")),
+                integer(take(v, metric, "licenses", "max_forbidden")));
+        if (!v.isEmpty()) {
+            throw new IllegalArgumentException("合格ラインに無い項目です: " + metric + " " + v.keySet());
+        }
+        return GateThresholds.from(gate);
+    }
+
+    private static Object take(Map<String, Object> values, String metric, String target, String key) {
+        return metric.equals(target) ? values.remove(key) : null;
+    }
+
+    private static BigDecimal decimal(Object value) {
+        return value == null ? null : new BigDecimal(value.toString());
+    }
+
+    private static Integer integer(Object value) {
+        return value == null ? null : ((Number) value).intValue();
+    }
+
+    @SuppressWarnings("unchecked")
+    private static List<String> list(Object value) {
+        return (List<String>) value;
     }
 
     static NormalizedInput input(List<RawMeasurement> measurements,

@@ -3,15 +3,12 @@ package com.qualitygate.ingest;
 import com.qualitygate.domain.entity.ArtifactRecord;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
-import com.qualitygate.domain.entity.RunSkippedMetric;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.report.ParseContext;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.ingest.dto.CreateRunRequest;
-import com.qualitygate.ingest.dto.SkippedMetricRequest;
 import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.platform.error.ApiException;
 import com.qualitygate.platform.error.ErrorCode;
@@ -29,7 +26,6 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
-import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -44,20 +40,17 @@ public class IngestService {
 
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
-    private final RunSkippedMetricRepository skippedMetrics;
     private final ArtifactRecordRepository artifacts;
     private final ArtifactStore artifactStore;
     private final QualityGateProperties properties;
     private final ObjectMapper objectMapper;
 
     public IngestService(MonitoredRepositoryRepository repositories, RunRepository runs,
-                         RunSkippedMetricRepository skippedMetrics,
                          ArtifactRecordRepository artifacts,
                          ArtifactStore artifactStore, QualityGateProperties properties,
                          ObjectMapper objectMapper) {
         this.repositories = repositories;
         this.runs = runs;
-        this.skippedMetrics = skippedMetrics;
         this.artifacts = artifacts;
         this.artifactStore = artifactStore;
         this.properties = properties;
@@ -66,8 +59,12 @@ public class IngestService {
 
     @Transactional
     public Run createRun(CreateRunRequest request) {
-        // 計測の対象は計測プロファイル（collector/targets/）だけで決める。送り手は Ingest Token を持つ
-        // 収集ランナーだけなので（DD-20）、初めて送られたリポジトリはここで登録する
+        // 計測の対象は 1 つだけ（QG_REPOSITORY）。取り違えた送信で別のアプリの結果が混ざらないよう拒否する
+        if (!properties.repository().equals(request.repository())) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "計測対象のリポジトリは %s です（受信: %s）。QG_REPOSITORY を確かめてください"
+                            .formatted(properties.repository(), request.repository()));
+        }
         MonitoredRepository repository = repositories
                 .findByOwnerAndName(request.owner(), request.name())
                 .orElseGet(() -> register(request));
@@ -82,13 +79,9 @@ public class IngestService {
                 request.branch(), request.triggeredBy(),
                 request.measuredAt(), attempt);
         run.setBaseCommitSha(request.baseCommitSha());
-        run.setPullRequestNumber(request.pullRequestNumber());
         run.setCiRunUrl(request.ciRunUrl());
-        run.setConfigCommitSha(request.configCommitSha());
         run.setTags(request.tagsOrEmpty());
         runs.save(run);
-
-        recordSkippedMetrics(run.getId(), request.skippedMetricsOrEmpty());
         log.info("Run を作成しました runId={} repository={} commit={} attempt={}",
                 run.getId(), request.repository(), request.commitSha(), attempt);
         return run;
@@ -98,19 +91,6 @@ public class IngestService {
         log.info("リポジトリを登録しました repository={}", request.repository());
         return repositories.save(new MonitoredRepository(Uuid7.generate(), request.owner(), request.name(),
                 request.defaultBranch() == null ? "main" : request.defaultBranch()));
-    }
-
-    /**
-     * スキップ申告を記録する。
-     *
-     * <p>受理するかどうかは<strong>判定時に決める</strong>。取り込み時点では
-     * 設定（{@code execution.skippable_metrics}）が未解決であり、設定は成果物として
-     * 後から届くためである。ここで暫定値を入れると、設定と食い違ったまま記録が残る。
-     */
-    private void recordSkippedMetrics(UUID runId, List<SkippedMetricRequest> requested) {
-        requested.stream()
-                .map(s -> new RunSkippedMetric(runId, s.metricId(), s.reason()))
-                .forEach(skippedMetrics::save);
     }
 
     @Transactional
@@ -177,7 +157,7 @@ public class IngestService {
                 try {
                     artifactStore.delete(storageKey);
                 } catch (RuntimeException e) {
-                    // 取り込みは成功している。残ったファイルは日次バッチの孤児ファイルの削除で消える
+                    // 取り込みは成功している。残ったファイルは判定に使われない
                     log.warn("置き換えた成果物の古いファイルを消せませんでした key={} 理由={}", storageKey, e.getMessage());
                 }
             }
@@ -200,8 +180,8 @@ public class IngestService {
         return runs.findById(runId).orElseThrow(() -> ApiException.notFound("Run", runId));
     }
 
-    public String detailUrl(UUID runId) {
-        return "%s/runs/%s".formatted(properties.baseUrl(), runId);
+    public String detailUrl(Run run) {
+        return "%s/?ref=%s".formatted(properties.baseUrl(), run.getCommitSha());
     }
 
     /**
@@ -228,7 +208,7 @@ public class IngestService {
     }
 
     /**
-     * 性能計測の環境。名前はトレンドの系列を分ける軸になるため必須とする。
+     * 性能計測の環境。名前は前回値を比べる単位になるため必須とする。
      * 名前の無い値は、どの環境の性能か分からず比較できない。
      */
     private static void validateEnvironment(JsonNode environment) {

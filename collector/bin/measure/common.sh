@@ -103,15 +103,3 @@ start_app() {
   APP_URL="http://127.0.0.1:${port}"
 }
 
-# --- 合格ライン（*.gate.yml）で無効の指標 ------------------------------------------------------------
-# 合格ラインで enabled: false にした指標の名前（1 行 1 件）。書いていない指標は有効（quality-gate の既定と同じ）。
-# quality-gate（SnakeYAML、YAML 1.1）と同じく、引用符の無い no / off も false として読む。"false" のような文字列は有効のまま
-disabled_metrics() {
-  yq '.metrics // {} | to_entries | .[]
-    | select((.value.enabled | style) != "double" and (.value.enabled | style) != "single"
-      and (.value.enabled | tostring | test("^(false|False|FALSE|no|No|NO|off|Off|OFF)$")))
-    | .key' < "$1"
-}
-
-# metric_enabled <合格ラインの指標名>（performance など）
-metric_enabled() { ! grep -qx "$1" <<< "$DISABLED_METRICS"; }

@@ -2,7 +2,7 @@
   <section class="qg-notfound">
     <h1>ページが見つかりません</h1>
     <p>URL が変更されたか、削除された可能性があります。</p>
-    <RouterLink to="/">ダッシュボードへ戻る</RouterLink>
+    <RouterLink to="/">リリース判定へ戻る</RouterLink>
   </section>
 </template>
 

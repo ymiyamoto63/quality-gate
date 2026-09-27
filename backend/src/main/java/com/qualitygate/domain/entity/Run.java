@@ -1,6 +1,5 @@
 package com.qualitygate.domain.entity;
 
-import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
 import jakarta.persistence.Column;
@@ -20,8 +19,8 @@ import java.util.UUID;
 /**
  * 1 つのコミットに対する 1 回の計測・判定。確定後は不変として扱う。
  *
- * <p>比較対象 Run（{@code baselineRunId}）を保持し、合格ラインは成果物として残すことで、
- * 判定の再現性を担保する。
+ * <p>比較対象 Run（{@code baselineRunId}）と、指標ごとの合格ライン（measurements.threshold）を残すことで、
+ * 判定の根拠を後から辿れるようにする。
  */
 @Entity
 @Table(name = "runs")
@@ -42,9 +41,6 @@ public class Run {
     @Column(nullable = false)
     private String branch;
 
-    @Column(name = "pull_request_number")
-    private Integer pullRequestNumber;
-
     @Column(nullable = false)
     private int attempt = 1;
 
@@ -57,10 +53,6 @@ public class Run {
     @Column(name = "measured_at", nullable = false)
     private Instant measuredAt;
 
-    /** 合格ラインを送った quality-gate リポジトリのコミット。合格ラインの版は Git で見る。 */
-    @Column(name = "config_commit_sha", length = 40)
-    private String configCommitSha;
-
     @Column(name = "baseline_run_id")
     private UUID baselineRunId;
 
@@ -71,10 +63,6 @@ public class Run {
     @Enumerated(EnumType.STRING)
     @Column
     private Verdict verdict;
-
-    @Enumerated(EnumType.STRING)
-    @Column
-    private Completeness completeness;
 
     /** 計測したコミットを指すタグ（収集ランナーが計測時に求めて送る）。リリース判定でタグをコミットに解決するのに使う。 */
     @JdbcTypeCode(SqlTypes.ARRAY)
@@ -122,14 +110,6 @@ public class Run {
         this.status = RunStatus.PROCESSING;
     }
 
-    public void setConfigCommitSha(String configCommitSha) {
-        this.configCommitSha = configCommitSha;
-    }
-
-    public String getConfigCommitSha() {
-        return configCommitSha;
-    }
-
     /**
      * 差分（新規 / 継続 / 解消）の算出に使った比較対象 Run を記録する。
      *
@@ -146,27 +126,19 @@ public class Run {
         return baselineRunId;
     }
 
-    /** finalize されないまま滞留した Run を終端にする。ダッシュボードの最新から外す。 */
-    public void markAbandoned() {
-        this.status = RunStatus.ABANDONED;
-    }
-
     /** 処理そのものが失敗した場合。判定結果 FAIL とは区別する。 */
     public void markFailed(String errorCode, String errorDetail) {
         this.status = RunStatus.FAILED;
         this.verdict = null;
-        this.completeness = null;
         this.errorCode = errorCode;
         this.errorDetail = errorDetail;
         this.evaluatedAt = Instant.now();
     }
 
-    public void markEvaluated(Verdict verdict, Completeness completeness, Instant at) {
+    public void markEvaluated(Verdict verdict, Instant at) {
         this.status = RunStatus.EVALUATED;
         this.verdict = verdict;
-        this.completeness = completeness;
         this.evaluatedAt = at;
-        // 処理失敗の後に再評価で判定できた場合、失敗の理由を残さない
         this.errorCode = null;
         this.errorDetail = null;
     }
@@ -203,14 +175,6 @@ public class Run {
         return branch;
     }
 
-    public Integer getPullRequestNumber() {
-        return pullRequestNumber;
-    }
-
-    public void setPullRequestNumber(Integer pullRequestNumber) {
-        this.pullRequestNumber = pullRequestNumber;
-    }
-
     public int getAttempt() {
         return attempt;
     }
@@ -233,10 +197,6 @@ public class Run {
 
     public Verdict getVerdict() {
         return verdict;
-    }
-
-    public Completeness getCompleteness() {
-        return completeness;
     }
 
     public String getErrorCode() {

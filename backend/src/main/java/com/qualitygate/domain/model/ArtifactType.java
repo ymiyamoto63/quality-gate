@@ -22,14 +22,7 @@ public enum ArtifactType implements WireValued {
     /** すべてのテストの結果（JUnit XML）。 */
     TEST_JUNIT_XML("test-junit-xml", "M-09", "M-10"),
     OASDIFF_JSON("oasdiff-json", "M-07"),
-    AXE_JSON("axe-json", "M-08"),
-
-    /**
-     * 合格ライン（{@code collector/targets/<owner>__<name>.gate.yml}）そのもの。
-     *
-     * <p>指標を供給しないが、判定に使う合格ラインを運ぶ。
-     */
-    QUALITY_GATE_CONFIG("quality-gate-config");
+    AXE_JSON("axe-json", "M-08");
 
     private final String wire;
     private final List<String> metricIds;
@@ -58,15 +51,5 @@ public enum ArtifactType implements WireValued {
     /** 性能計測の成果物か（environment メタデータが必須になる）。 */
     public boolean requiresEnvironmentMetadata() {
         return this == K6_SUMMARY;
-    }
-
-    /** 指標の計測結果を運ぶ成果物か。 */
-    public boolean carriesMetrics() {
-        return !metricIds.isEmpty();
-    }
-
-    /** 指標の計測結果ではなく、判定の設定を運ぶ成果物か。 */
-    public boolean isConfiguration() {
-        return this == QUALITY_GATE_CONFIG;
     }
 }

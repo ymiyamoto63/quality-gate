@@ -4,31 +4,31 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 目的は、**同じコミットを誰がいつ計測しても同じ数値・同じ判定になる**ことである。
 
 - 計測（ツールの実行）は収集ランナーが行い、quality-gate は送られた成果物を読んで判定する（[アーキテクチャ](architecture.md#3-測定の仕組み収集ランナー)）
-- しきい値は対象ごとの合格ライン（`collector/targets/<owner>__<name>.gate.yml`）で決める（[合格ライン](features/gate-config/design.md)）
-- 判定の流れ（スキップ・未提出・形式不正の扱い）は [判定](features/evaluation/design.md) にある
+- 合格ラインはアプリの環境変数（`QG_*`）で決める（[合格ライン](features/gate-config/design.md)、[運用](operations.md#24-合格ライン)）
+- 判定の流れ（未提出・形式不正の扱い）は [判定](features/evaluation/design.md) にある
+- **合否は合格 / 不合格の 2 値**。合格ライン内の気になる点（前回からの低下など）は判定理由に書き添えるだけで、合否には影響しない
 
 ---
 
 ## 1. 指標の一覧
 
-| ID | カテゴリ | 指標 | 既定の合格ライン | 計測ツール | 成果物の `type` | 合格ラインのキー |
+| ID | カテゴリ | 指標 | 既定の合格ライン | 計測ツール | 成果物の `type` | 合格ラインの環境変数 |
 | --- | --- | --- | --- | --- | --- | --- |
-| M-01 | 機能テスト | ブランチカバレッジ | 75% 以上（backend / frontend それぞれ） | JaCoCo / Vitest（v8） | `jacoco-xml` / `lcov` | `branch_coverage` |
-| M-02 | 機能テスト | ミューテーションスコア | 60% 以上（backend のみ） | PIT | `pit-xml` | `mutation_score` |
-| M-03 | 性能 | 応答時間 p95 | 到達率 50 req/s の負荷の下で 500ms 以内 | k6 | `k6-summary` | `performance` |
-| M-04 | 性能 | エラー率 | 0.1% 以下 | k6 | `k6-summary` | `performance` |
-| M-05 | セキュリティ | 重大・高 脆弱性件数 | Critical 0 件・High 0 件 | Trivy（SARIF） | `sarif` | `vulnerabilities` |
-| M-06 | コード構造 | 循環的複雑度 15 超の関数数 | 0 件 | PMD / ESLint | `pmd-xml` / `eslint-json` | `cyclomatic_complexity` |
-| M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `api_contract` |
-| M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `accessibility` |
-| M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `test_results` |
-| M-10 | 機能テスト | スキップされたテスト数 | 比較対象 Run から増やさない | JUnit XML | `test-junit-xml` | `test_results` |
-| M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `secrets` |
-| M-12 | セキュリティ | ライセンス違反件数 | forbidden 0 パッケージ | Trivy（SARIF） | `sarif` | `licenses` |
+| M-01 | 機能テスト | ブランチカバレッジ | 75% 以上（backend / frontend それぞれ） | JaCoCo / Vitest（v8） | `jacoco-xml` / `lcov` | `QG_BRANCH_COVERAGE_MIN` |
+| M-02 | 機能テスト | ミューテーションスコア | 60% 以上（backend のみ） | PIT | `pit-xml` | `QG_MUTATION_SCORE_MIN` |
+| M-03 | 性能 | 応答時間 p95 | 到達率 50 req/s の負荷の下で 500ms 以内 | k6 | `k6-summary` | `QG_RESPONSE_TIME_P95_MAX_MS` / `QG_ARRIVAL_RATE_RPS` |
+| M-04 | 性能 | エラー率 | 0.1% 以下 | k6 | `k6-summary` | `QG_ERROR_RATE_MAX_PCT` |
+| M-05 | セキュリティ | 重大・高 脆弱性件数 | Critical 0 件・High 0 件 | Trivy（SARIF） | `sarif` | `QG_CRITICAL_VULNERABILITIES_MAX` / `QG_HIGH_VULNERABILITIES_MAX` |
+| M-06 | コード構造 | 循環的複雑度 15 超の関数数 | 0 件 | PMD / ESLint | `pmd-xml` / `eslint-json` | `QG_COMPLEXITY_MAX` |
+| M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
+| M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
+| M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `QG_TEST_SUCCESS_RATE_MIN` |
+| M-10 | 機能テスト | スキップされたテスト数 | 比較対象 Run から増やさない | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_INCREASE_MAX` |
+| M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `QG_SECRETS_MAX` |
+| M-12 | セキュリティ | ライセンス違反件数 | forbidden 0 パッケージ | Trivy（SARIF） | `sarif` | `QG_FORBIDDEN_LICENSES_MAX` |
 
-- 合格ライン（`*.gate.yml`）に書かなかった指標は既定値で判定する。**M-11 / M-12 だけは既定で無効**（後から追加した指標のため。既定で有効にすると、その成果物を送っていない Run がすべて ERROR になる）
-- `enabled: false` にした指標は判定もせず、Run の指標にも現れない。収集ランナーはその指標を計測しない（[運用](operations.md#43-計測する指標の切り替え)）
-- M-02 と M-03 / M-04 は時間がかかるため、収集ランナーは **PR の計測では実行せずスキップを申告する**（Run は部分計測になる）
+- 環境変数を書かなかった合格ラインは既定値で判定する。12 の指標はすべて既定で判定する
+- `QG_DISABLED_METRICS` に書いた指標は判定もせず、Run の指標にも現れない。収集ランナーの計測プロファイルの `DISABLED_METRICS` にも書いて計測を止める（[運用](operations.md#43-計測する指標の切り替え)）
 
 ---
 
@@ -39,25 +39,19 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | ステータス | 画面の表記 | 条件 |
 | --- | --- | --- |
 | `PASS` | 合格 | 合格ラインを満たす |
-| `WARN` | 注意 | 合格ラインは満たすが、指標ごとに定めた注意水準に当たる |
 | `FAIL` | 不合格 | 合格ラインを満たさない |
-| `SKIP` | 未計測 | 収集ランナーがスキップを申告し、合格ラインの `execution.skippable_metrics` がそれを許している |
-| `ERROR` | 計測エラー | 成果物が未提出・形式不正・必須のメタデータが無い、または許されていないスキップの申告。値を確定できない |
+| `ERROR` | 計測エラー | 成果物が未提出・形式不正・必須のメタデータが無い、または計測の条件を満たしていない（負荷試験の回数や到達率、検査したルールの範囲など）。値を確定できない |
 | `NOT_APPLICABLE` | 対象外 | ツールの制約でそのコンポーネントは測りようがない（M-02 の frontend）、または比較元に API 定義が無い（M-07） |
 
-**「意図して測らなかった（SKIP）」と「測ったつもりが届いていない（ERROR）」を区別する**ことが quality-gate の根幹である。
+**測っていないものを合格とみなさない**（fail-closed）ことが quality-gate の根幹である。計測エラーは不合格と同じく、リリース不可の理由になる。
 
-Run 全体の判定（verdict）は次のとおり（fail-closed）。
+Run 全体の判定（verdict）は次のとおり。
 
 ```
-FAIL または ERROR が 1 つ以上      → FAIL（不合格）
-上記なし かつ WARN が 1 つ以上     → PASS_WITH_WARNINGS（注意つき合格）
-上記いずれもなし                   → PASS（合格）
-SKIP / NOT_APPLICABLE は影響しない
+FAIL または ERROR が 1 つ以上      → FAIL（不合格。リリース不可）
+それ以外                           → PASS（合格。リリース可）
+NOT_APPLICABLE は影響しない
 ```
-
-`SKIP` を 1 つ以上含む Run は**部分計測**、含まない Run は**完全計測**とする。部分計測の PASS は「測った範囲では合格」にすぎない。
-画面は部分計測を常に明示し、リリース判定は完全計測を求める。
 
 ### 2.2 コンポーネント
 
@@ -65,9 +59,9 @@ SKIP / NOT_APPLICABLE は影響しない
 `BACKEND_DIR` / `FRONTEND_DIR` の末尾のディレクトリ名をそのまま使う。
 M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算すると片方の悪さが隠れる）、ほかの指標は Run 全体で 1 つの値にする。
 
-### 2.3 計測の対象範囲（`exclusions`）
+### 2.3 計測の対象範囲（`QG_EXCLUSIONS`）
 
-合格ラインの `exclusions` に書いた glob パターンに一致するファイルは、次の指標の計測から外す。
+`QG_EXCLUSIONS` に書いた glob パターン（カンマ区切り）に一致するファイルは、次の指標の計測から外す。
 
 | 適用する | 適用しない |
 | --- | --- |
@@ -91,14 +85,14 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 
 | 用語 | 意味 | 決め方 |
 | --- | --- | --- |
-| 比較元（`baseCommitSha`） | M-07 の破壊的変更を数える起点のコミット | 収集ランナーが clone した履歴から求めて送る（[アーキテクチャ](architecture.md#34-比較元とタグ)）。既定ブランチは直前のコミット、PR やそれ以外のブランチはマージ先との merge-base、タグは前のタグ |
+| 比較元（`baseCommitSha`） | M-07 の破壊的変更を数える起点のコミット | 収集ランナーが clone した履歴から求めて送る（[アーキテクチャ](architecture.md#34-比較元とタグ)）。既定ブランチは直前のコミット、それ以外のブランチは比較先のブランチとの merge-base、タグは前のタグ |
 | 比較対象 Run | 前回比・違反の新規 / 継続 / 解消・M-10 の増加の起点 | 比較元コミットで判定済みの Run があればそれ。無ければ同じブランチで直前に計測した判定済みの Run |
 
 前回値は、コンポーネントと計測条件（`variant`）が一致する値だけから取る。
 
 ### 2.5 計測条件（`variant`）
 
-値どうしを比べられるかを分ける条件。前回比とトレンドの系列は `variant` ごとに分かれる。
+値どうしを比べられるかを分ける条件。前回比は `variant` ごとに分かれる。
 
 | 指標 | `variant` | 表示名 |
 | --- | --- | --- |
@@ -112,7 +106,7 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 | 指標 | 同定子 | 保存する違反 |
 | --- | --- | --- |
 | M-05 | `パッケージ名|脆弱性 ID`（パッケージが無ければ `ルール ID|ファイル`） | すべての検出 |
-| M-06 | `モジュール相対パス#関数` | しきい値超と注意水準（`max_complexity` − 4 以上）の関数 |
+| M-06 | `モジュール相対パス#関数` | しきい値を超える関数 |
 | M-07 | 変更 ID・メソッド・パス・説明文 | level 2 以上の変更 |
 | M-08 | ページのパス（ID を `:id` に置換）・ルール ID・要素の CSS セレクタ | すべての違反（基準外を含む） |
 | M-09 / M-10 | `テストクラス名#テスト名` | 失敗・エラー・再実行で成功・スキップしたテスト |
@@ -150,10 +144,8 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
 | 1 | 分岐が 0 個 | PASS（値なし。100% と扱うと分岐の無いコンポーネントが合格を稼ぐため） |
-| 2 | `threshold`（既定 75）未満 | FAIL |
-| 3 | `threshold` + 5 未満 | WARN |
-| 4 | 前回から 1 ポイント以上低下 | WARN |
-| 5 | それ以外 | PASS |
+| 2 | `QG_BRANCH_COVERAGE_MIN`（既定 75）未満 | FAIL |
+| 3 | それ以外 | PASS（前回から 1 ポイント以上低下していれば理由に書き添える） |
 
 ### M-02 ミューテーションスコア
 
@@ -171,7 +163,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 
 **対象は backend だけ**。PIT は JVM 専用のため、frontend は測りようがなく、テストの実効性は M-01 で担保する（frontend のミューテーションテストはスコープ外）。
 
-**計測方法**: PR 以外の計測で、PIT のコマンドライン版を対象のテストのクラスパス（`mvn dependency:build-classpath`）で動かす。
+**計測方法**: 毎回の計測で全量を、PIT のコマンドライン版を対象のテストのクラスパス（`mvn dependency:build-classpath`）で動かす。
 対象の pom の PIT の設定は使わない。対象クラスは計測プロファイルの `MUTATION_TARGET_CLASSES` などで決める（[運用](operations.md#42-計測プロファイル)）。
 **テストが 1 件でも失敗していると PIT は動かない**ため、M-02 は ERROR になる。
 
@@ -181,11 +173,8 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | --- | --- | --- |
 | 1 | ミューテーションが 0 個 | PASS（値なし） |
 | 2 | 失敗（上記）が全体の 10% 超 | ERROR（値なし。生き残ったはずのものが失敗側に紛れうる） |
-| 3 | `threshold`（既定 60）未満 | FAIL |
-| 4 | `threshold` + 5 未満 | WARN |
-| 6 | `TIMED_OUT` が全体の 10% 超 | WARN（遅いランナーでスコアが過大に出ている疑い） |
-| 7 | 前回から 2 ポイント以上低下 | WARN |
-| 8 | それ以外 | PASS |
+| 3 | `QG_MUTATION_SCORE_MIN`（既定 60）未満 | FAIL |
+| 4 | それ以外 | PASS（`TIMED_OUT` が全体の 10% 超＝遅いランナーでスコアが過大に出ている疑い、前回から 2 ポイント以上の低下は理由に書き添える） |
 
 ちょうど 10% は「超える」に含めない。
 
@@ -226,10 +215,10 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | ウォームアップ | 60 秒。集計から外す（計測区間のリクエストに `phase: measure` のタグを付け、その部分指標を読む） |
 | 計測時間 | 300 秒 |
 | 実行回数 | 3 回。値ごとの**中央値**で判定する |
-| 実行環境 | 他のジョブと同居しない専有のセルフホストランナー。計測環境の名前（`environment.name`）ごとに前回比とトレンドの系列を分ける |
+| 実行環境 | 他のジョブと同居しない専有のセルフホストランナー。計測環境の名前（`environment.name`）ごとに前回比を分ける |
 | シナリオ | 合格ラインの `performance.scenarios`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
 
-**計測方法**: PR 以外の計測で、対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/targets/` の k6 シナリオ）で負荷をかける。
+**計測方法**: 対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/target/` の k6 シナリオ）で負荷をかける。
 1 回約 6 分 × 3 回。各回の summary を `k6-summary` として送り、メタデータの `environment` に計測環境（名前・CPU 数・メモリ・k6 の版・シードデータ）を入れる。
 k6 が異常終了した回は `aborted: true` を付けて送る。
 
@@ -241,12 +230,12 @@ k6 が異常終了した回は `aborted: true` を付けて送る。
 | --- | --- | --- |
 | 1 | 異常終了（`aborted`）の回がある、またはリクエスト 0 件 | ERROR |
 | 2 | エラー率（中央値）が 5% 超 | M-03 / M-04 とも ERROR（負荷試験が成立していない） |
-| 3 | M-03: `scenarios` のうち summary に無いシナリオがある | ERROR |
-| 4 | M-03: 全体またはいずれかのシナリオの p95 が `p95_ms`（既定 500）超 | FAIL |
-| 5 | M-03: 成功スループットが `arrival_rate_rps`（既定 50）の 95% 未満 / 3 回の p95 の変動係数が 20% 超 / 全体・シナリオの p95 が `p95_ms` の 80% 超 | WARN |
-| 6 | M-04: エラー率が `error_rate_pct`（既定 0.1）超 | FAIL |
-| 7 | M-04: `error_rate_pct` の半分超 | WARN |
-| 8 | 上で PASS でも実行回数が 3 回未満 | WARN |
+| 3 | 実行回数が 3 回未満 | ERROR（中央値で判定できない） |
+| 4 | M-03: `QG_PERF_SCENARIOS` のうち summary に無いシナリオがある | ERROR |
+| 5 | M-03: 成功スループットが `QG_ARRIVAL_RATE_RPS`（既定 50）の 95% 未満 | ERROR（負荷条件を満たしておらず、p95 が実態より良く出ている疑い） |
+| 6 | M-03: 全体またはいずれかのシナリオの p95 が `QG_RESPONSE_TIME_P95_MAX_MS`（既定 500）超 | FAIL |
+| 7 | M-04: エラー率が `QG_ERROR_RATE_MAX_PCT`（既定 0.1）超 | FAIL |
+| 8 | それ以外 | PASS（3 回の p95 の変動係数が 20% 超なら、計測環境が不安定なことを理由に書き添える） |
 
 負荷をかける k6 とアプリは同じコンテナで動く。値は本番の性能ではなく、前回との比較（劣化の検出）に使う。
 
@@ -270,17 +259,16 @@ k6 が異常終了した回は `aborted: true` を付けて送る。
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | Critical が `max_critical`（既定 0）超、または High が `max_high`（既定 0）超 | FAIL |
-| 2 | Medium が比較対象 Run より増えた | WARN（放置すると、深刻度が見直されたときに一気に不合格へ転じるため） |
-| 3 | それ以外 | PASS |
+| 1 | Critical が `QG_CRITICAL_VULNERABILITIES_MAX`（既定 0）超、または High が `QG_HIGH_VULNERABILITIES_MAX`（既定 0）超 | FAIL |
+| 2 | それ以外 | PASS（Medium が比較対象 Run より増えていれば理由に書き添える。放置すると、深刻度が見直されたときに一気に不合格へ転じるため） |
 
-Medium / Low は判定に使わず、件数を内訳に残す。修正版の無い脆弱性で判定から外す必要があるときは、合格ラインの変更として扱い理由をコミットに残す。
+Medium / Low は判定に使わず、件数を内訳に残す。修正版の無い脆弱性で判定から外す必要があるときは、合格ラインの変更として扱い理由を記録する。
 新しい CVE の公開で、コードを変えなくても計測し直すと不合格になりうる。
 
 ### M-06 循環的複雑度 15 超の関数数
 
-**定義**: McCabe の循環的複雑度（CC）が `max_complexity`（既定 15）を超える関数の数。**計測したコミットの全関数の件数（絶対値）で判定し、比較元との差分は取らない**。
-既存の関数を当面許容するときは `exclusions` で外し、理由をコミットに残す。backend と frontend を合わせて 1 つの値にする。
+**定義**: McCabe の循環的複雑度（CC）が `QG_COMPLEXITY_MAX`（既定 15）を超える関数の数。**計測したコミットの全関数の件数（絶対値）で判定し、比較元との差分は取らない**。
+既存の関数を当面許容するときは `QG_EXCLUSIONS` で外し、理由を記録する。backend と frontend を合わせて 1 つの値にする。
 
 **計測方法**
 
@@ -289,17 +277,16 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 | backend | PMD のコマンドライン版（版は `collector/versions.env`）で `src/main/java` を解析する。ルールセットは `collector/pmd-ruleset.xml`（`CyclomaticComplexity` を `reportLevel: 1` で動かし、全メソッドの CC を出す） |
 | frontend | quality-gate 側で版を固定した ESLint（`collector/complexity`）の `complexity` ルールだけを上限 0 で動かし、`eslint -f json` の出力を送る。対象の ESLint の設定は使わない。解析するのは `FRONTEND_COMPLEXITY_SOURCES`（既定 `src`）で、テスト（`*.spec.ts` / `*.test.ts`）と型定義は既定で外す |
 
-ツールの設定を quality-gate 側に持つのは、対象の設定変更で CC の算出が変わり、トレンドに段差が出るのを防ぐため。
-ツールによって CC の数え方（`&&` を数えるか等）が違うため、版を上げるときはトレンドへの影響を確かめる。
+ツールの設定を quality-gate 側に持つのは、対象の設定変更で CC の算出が変わり、値に段差が出るのを防ぐため。
+ツールによって CC の数え方（`&&` を数えるか等）が違うため、版を上げるときは値への影響を確かめる。
 関数名の無い関数はファイル内の出現順で区別する。SARIF で届いた複雑度ツール（PMD / ESLint）の結果は、M-05 に混ざらないよう読み飛ばす。
 
 **判定**
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | CC が `max_complexity` を超える関数がある | FAIL |
-| 2 | CC が `max_complexity` − 4（既定 11）以上 `max_complexity` 以下の関数がある | WARN |
-| 3 | それ以外 | PASS |
+| 1 | CC が `QG_COMPLEXITY_MAX` を超える関数がある | FAIL |
+| 2 | それ以外 | PASS |
 
 ファイルを移動した関数は、移動後のパスで別の違反になる（新規と解消）。件数で判定するため合否には影響しない。
 
@@ -316,7 +303,7 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 | level | 意味 | 扱い |
 | --- | --- | --- |
 | 3 / `error` | 破壊的 | 件数に数え、違反（High） |
-| 2 / `warning` | 破壊的になりうる | WARN の根拠にし、違反（Medium） |
+| 2 / `warning` | 破壊的になりうる | 理由に書き添え、違反（Medium） |
 | 1 / `info` | 非破壊的 | 件数だけ残し、違反にしない |
 
 **判定**
@@ -324,18 +311,17 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
 | 1 | すべての成果物が `baseSpecMissing` を申告し、破壊的変更が無い（新規 API） | NOT_APPLICABLE |
-| 2 | 破壊的変更が `breaking_changes`（既定 0）を超える | FAIL |
-| 3 | 破壊的になりうる変更が 1 件以上 | WARN |
-| 4 | それ以外 | PASS |
+| 2 | 破壊的変更が `QG_BREAKING_CHANGES_MAX`（既定 0）を超える | FAIL |
+| 3 | それ以外 | PASS（破壊的になりうる変更があれば件数を理由に書き添える） |
 
-意図した破壊的変更は API のバージョニング（`/v1` → `/v2`）で対応する。やむを得なければ合格ラインを変え、理由をコミットに残す。
+意図した破壊的変更は API のバージョニング（`/v1` → `/v2`）で対応する。やむを得なければ合格ラインを変え、理由を記録する。
 
 ### M-08 アクセシビリティ重大違反件数
 
 **定義**: WCAG 2.2 AA を基準に axe-core が自動検出した違反のうち、重大（critical / serious）なものの件数。
 serious にはキーボードで操作できない・コントラスト不足など、実際に利用を妨げる違反が含まれるため、critical と合わせて判定する。
 
-自動検査で検出できるのは WCAG 違反の一部にとどまる。**「重大 0 件」は適合の必要条件であって十分条件ではない**。Run 詳細の M-08 の行には、判定によらずこの旨を注記する。
+自動検査で検出できるのは WCAG 違反の一部にとどまる。**「重大 0 件」は適合の必要条件であって十分条件ではない**。リリース判定の M-08 の説明に、この旨を書いている。
 
 **計測方法**: 対象のバックエンドの jar と `vite build` した画面（`vite preview`）を計測用のコンテナの中で起動し、
 計測プロファイルの `A11Y_PAGES` の各画面をライト・ダークの 2 通りで開いて、WCAG 2.2 AA のタグ（`wcag2a` 〜 `wcag22aa`）で axe-core を実行する。
@@ -353,7 +339,7 @@ serious にはキーボードで操作できない・コントラスト不足な
 | --- | --- | --- |
 | `critical` | Critical | 重大（件数に数える） |
 | `serious` / 不明 | High | 重大（件数に数える） |
-| `moderate` | Medium | WARN の根拠 |
+| `moderate` | Medium | 件数を理由に書き添える |
 | `minor` | Low | 表示のみ |
 
 - 違反したルールのタグに WCAG 2.2 AA のタグ（`wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`）が 1 つも無ければ基準外（best-practice や AAA）として、件数（`outOfStandard`）と違反一覧には残すが判定に使わない
@@ -364,14 +350,11 @@ serious にはキーボードで操作できない・コントラスト不足な
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 読み込みに失敗した画面がある / 検査した画面が無い / `pages` の画面が検査されていない | ERROR（値なし） |
-| 2 | 基準内の critical + serious が `max_critical`（既定 0）を超える | FAIL |
-| 3 | 検査ルールが基準より狭い（`runOnly` のタグに基準の一部が無い、`rules` で無効にしたルールがある、`runOnly` でルールを個別に指定した） | WARN |
-| 4 | 基準内の moderate が 1 件以上 | WARN |
-| 5 | 重大な違反が前回より増えた | WARN |
-| 6 | それ以外 | PASS |
+| 1 | 読み込みに失敗した画面がある / 検査した画面が無い / `QG_ACCESSIBILITY_PAGES` の画面が検査されていない / 検査ルールが基準より狭い（`runOnly` のタグに基準の一部が無い、`rules` で無効にしたルールがある、`runOnly` でルールを個別に指定した） | ERROR（値なし） |
+| 2 | 基準内の critical + serious が `QG_ACCESSIBILITY_VIOLATIONS_MAX`（既定 0）を超える | FAIL |
+| 3 | それ以外 | PASS（基準内の moderate の件数、重大な違反の前回からの増加は理由に書き添える） |
 
-`pages` との照合は区切りごとに行い、`:` で始まる区切りは任意の 1 区切りに一致する。`pages` を省略すると、1 画面以上を検査したことだけを確かめる。
+`QG_ACCESSIBILITY_PAGES` との照合は区切りごとに行い、`:` で始まる区切りは任意の 1 区切りに一致する。省略すると、1 画面以上を検査したことだけを確かめる。
 空のページは必ず違反 0 件になるため、検査した画面が足りないことを合格と見分けられるようにしている。
 
 ### M-09 テスト成功率 / M-10 スキップされたテスト数
@@ -405,18 +388,17 @@ frontend は Vitest に junit reporter を足して出した `junit.xml` を `te
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 実行件数が `min_test_count`（既定 1。0 は設定の検証で拒否する）未満 | ERROR |
-| 2 | 成功率が `min_success_rate`（既定 100）未満 | FAIL |
-| 3 | 失敗したテストがある（合格ラインを 100 未満に緩めた場合）/ 再実行で成功したテストがある | WARN |
-| 4 | それ以外 | PASS |
+| 1 | 実行件数が `QG_TEST_COUNT_MIN`（既定 1。0 を書いても 1 とする）未満 | ERROR |
+| 2 | 成功率が `QG_TEST_SUCCESS_RATE_MIN`（既定 100）未満 | FAIL |
+| 3 | それ以外 | PASS（合格ラインを 100 未満に緩めた場合の失敗件数と、再実行で成功したテストは理由に書き添える） |
 
-スキップは M-10 で判定するため、M-09 では WARN にしない。
+スキップは M-10 で判定するため、M-09 では扱わない。
 
 **判定（M-10）**: スキップ（`@Disabled` / `it.skip` など）は落ちるテストを黙らせる手段になりうるため、**比較対象 Run からの増加**を見る（既存のスキップを一括で不合格にしない）。
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 比較対象 Run からの増加が `max_skipped_increase`（既定 0）を超える | FAIL |
+| 1 | 比較対象 Run からの増加が `QG_SKIPPED_TESTS_INCREASE_MAX`（既定 0）を超える | FAIL |
 | 2 | それ以外（比較対象に同じコンポーネントの値が無ければ増加は見ない） | PASS |
 
 ### M-11 シークレット検出件数
@@ -426,7 +408,7 @@ frontend は Vitest に junit reporter を足して出した `junit.xml` を `te
 **計測方法**: M-05 と同じ Trivy の走査（`--scanners vuln,secret`）。ルールの tags に `secret` がある検出（または gitleaks / trufflehog の SARIF）を M-11 に振り分ける。
 深刻度はすべて Critical。値そのものは持たず、ツールが伏せ字にした一致だけを残す。
 
-**判定**: 件数が `max_secrets`（既定 0）を超えたら FAIL、それ以外は PASS。誤検出は `exclusions` でファイルごと外す。
+**判定**: 件数が `QG_SECRETS_MAX`（既定 0）を超えたら FAIL、それ以外は PASS。誤検出は `QG_EXCLUSIONS` でファイルごと外す。
 
 ### M-12 ライセンス違反件数
 
@@ -441,9 +423,8 @@ unknown は、同じパッケージに分類の分かるライセンスがあれ
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | forbidden が `max_forbidden`（既定 0）を超える | FAIL |
-| 2 | restricted / unknown のパッケージがある | WARN（利用形態で可否が変わるため、件数では落とさない） |
-| 3 | それ以外 | PASS |
+| 1 | forbidden が `QG_FORBIDDEN_LICENSES_MAX`（既定 0）を超える | FAIL |
+| 2 | それ以外 | PASS（restricted / unknown のパッケージは、利用形態で可否が変わるため件数では落とさず、件数を理由に書き添えて違反として残す） |
 
 ### SARIF の振り分け（M-05 / M-11 / M-12 共通）
 
@@ -479,5 +460,5 @@ SARIF の成果物には、走査した対象をメタデータ `scanners` で�
 導入直後の 1〜2 週間は、しきい値を緩める期間ではなく**計測そのものが信頼できるかを確かめる期間**とし、次を確認する。
 
 - 性能の 3 回実行の変動係数が 20% 以内に収まっているか
-- `exclusions` で意図せず広い範囲を外していないか（M-01 / M-02 の `excludedFiles`）
+- `QG_EXCLUSIONS` で意図せず広い範囲を外していないか（M-01 / M-02 の `excludedFiles`）
 - ERROR（成果物の未提出・形式不正）が出ていないか

@@ -42,11 +42,12 @@ class BreakingChangeEvaluatorTest {
     }
 
     @Test
-    void 破壊的になりうる変更は注意() {
+    void 破壊的になりうる変更は合格のまま理由に書き添える() {
         MetricResult result = evaluate(0, List.of(report(false)), List.of(
                 change("response-property-enum-value-added", Severity.MEDIUM)));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).contains("破壊的になりうる変更が 1 件");
         assertThat(result.value()).isEqualByComparingTo("0");
     }
 

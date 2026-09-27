@@ -1,15 +1,15 @@
 <script setup lang="ts">
 import { computed } from 'vue'
-import { presentationOf, type MeasurementStatus } from '@/api/status'
+import { presentationOf, type DisplayStatus } from '@/api/status'
 
 /**
  * 判定ステータスのチップ。
  *
  * 色は点・記号・アイコンにのみ使い、文字色には使わない。
- * WARN(#fab219) と ERROR(#ec835a) はライト面でのコントラストが 3:1 を下回るため、
+ * ERROR(#ec835a) はライト面でのコントラストが 3:1 を下回るため、
  * ラベルは常にインクトークンで描き、色付きの記号を隣に置いて識別性を担保する。
  */
-const props = defineProps<{ status: MeasurementStatus }>()
+const props = defineProps<{ status: DisplayStatus }>()
 const presentation = computed(() => presentationOf(props.status))
 </script>
 
@@ -41,10 +41,6 @@ const presentation = computed(() => presentationOf(props.status))
 .qg-status[data-status='PASS'] .pi,
 .qg-status[data-status='PASS'] .qg-status__mark {
   color: var(--status-pass);
-}
-.qg-status[data-status='WARN'] .pi,
-.qg-status[data-status='WARN'] .qg-status__mark {
-  color: var(--status-warn);
 }
 .qg-status[data-status='FAIL'] .pi,
 .qg-status[data-status='FAIL'] .qg-status__mark {

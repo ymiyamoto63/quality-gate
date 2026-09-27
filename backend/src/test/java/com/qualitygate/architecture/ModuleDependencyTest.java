@@ -16,10 +16,6 @@ import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
         importOptions = ImportOption.DoNotIncludeTests.class)
 class ModuleDependencyTest {
 
-    // adapter / evaluate / normalize は Phase 1 の次ステップで実装する。
-    // 先に規則を置いておくことで、実装が入った瞬間から検証が効く。
-    // 対象クラスが未作成の間は allowEmptyShould で失敗させない。
-
     @ArchTest
     static final ArchRule パーサは判定を知らない = noClasses()
             .that().resideInAPackage("..adapter..")
@@ -50,16 +46,15 @@ class ModuleDependencyTest {
             .because("共通基盤が業務ロジックを知らない状態を保つ");
 
     @ArchTest
-    static final ArchRule 判定は設定の取得方法を知らない = noClasses()
+    static final ArchRule 判定は画面や認証の組み立てを知らない = noClasses()
             .that().resideInAPackage("..evaluate..")
-            .should().dependOnClassesThat().resideInAPackage("..config..")
-            .because("判定は解決済みの設定（domain.gate）だけを入力とする。"
-                    + "取得元がファイルか API かで判定ロジックが変わらないようにする");
+            .should().dependOnClassesThat().resideInAPackage("com.qualitygate.config..")
+            .because("判定は合格ライン（platform.config の値）と正規化モデルだけを入力とする");
 
     @ArchTest
-    static final ArchRule アダプタは設定の解決を知らない = noClasses()
+    static final ArchRule アダプタは設定を知らない = noClasses()
             .that().resideInAPackage("..adapter..")
-            .should().dependOnClassesThat().resideInAPackage("..config..")
+            .should().dependOnClassesThat().resideInAnyPackage("com.qualitygate.config..", "..platform.config..")
             .because("アダプタは ParseContext で渡された情報だけを使う")
             .allowEmptyShould(true);
 }

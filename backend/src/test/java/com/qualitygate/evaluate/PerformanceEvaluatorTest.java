@@ -29,7 +29,8 @@ class PerformanceEvaluatorTest {
         MetricResult result = p95(sample("300", 50, 0, "300"), sample("350", 50, 0, "300"),
                 sample("900", 50, 0, "300"));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);  // 変動が大きい
+        // 変動が大きいことは理由に書き添える
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(result.value()).isEqualByComparingTo("350");
         assertThat(result.variant()).isEqualTo("perf-staging");
         assertThat(result.reason()).contains("変動係数");
@@ -55,17 +56,17 @@ class PerformanceEvaluatorTest {
     }
 
     @Test
-    void 注意水準を超えれば注意() {
+    void 合格ラインに近くても合格で中間の段階は無い() {
         MetricResult result = p95(sample("450", 50, 0, "100"), sample("450", 50, 0, "100"),
                 sample("450", 50, 0, "100"));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
-        assertThat(result.reason()).contains("注意水準 400");
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
     }
 
     @Test
     void 設定したシナリオが無ければERROR() {
-        MetricResult result = p95(sample("300", 50, 0, null));
+        MetricResult result = p95(sample("300", 50, 0, null), sample("300", 50, 0, null),
+                sample("300", 50, 0, null));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(result.value()).isNull();
@@ -83,37 +84,38 @@ class PerformanceEvaluatorTest {
     }
 
     @Test
-    void 実行回数が足りなければ合格ではなく注意() {
+    void 実行回数が足りなければ合格ではなく計測エラー() {
         MetricResult result = p95(sample("300", 50, 0, "300"));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
+        assertThat(result.value()).isNull();
         assertThat(result.reason()).contains("実行回数が 1 回");
     }
 
     @Test
-    void エラー率は合格ラインの半分を超えると注意() {
+    void エラー率は合格ラインを超えると不合格() {
         MetricResult pass = evaluate(new ErrorRateEvaluator(), sample("300", 50, 5, "300"), sample("300", 50, 5, "300"),
                 sample("300", 50, 5, "300"));
-        MetricResult warn = evaluate(new ErrorRateEvaluator(), sample("300", 50, 8, "300"), sample("300", 50, 8, "300"),
+        MetricResult near = evaluate(new ErrorRateEvaluator(), sample("300", 50, 8, "300"), sample("300", 50, 8, "300"),
                 sample("300", 50, 8, "300"));
         MetricResult fail = evaluate(new ErrorRateEvaluator(), sample("300", 50, 20, "300"), sample("300", 50, 20, "300"),
                 sample("300", 50, 20, "300"));
 
         // 10,000 件中 5 件 = 0.05%、8 件 = 0.08%、20 件 = 0.2%
         assertThat(pass.status()).isEqualTo(MeasurementStatus.PASS);
-        assertThat(warn.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(near.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(fail.status()).isEqualTo(MeasurementStatus.FAIL);
     }
 
     @Test
-    void 成功スループットが到達率の95パーセント未満なら応答時間を注意にする() {
+    void 成功スループットが到達率の95パーセント未満なら応答時間は計測エラー() {
         MetricResult ok = p95(sample("300", 50, 0, "300"), sample("300", 49, 0, "300"),
                 sample("300", 50, 0, "300"));
         MetricResult slow = p95(sample("300", 30, 0, "300"), sample("300", 30, 0, "300"),
                 sample("300", 30, 0, "300"));
 
         assertThat(ok.status()).isEqualTo(MeasurementStatus.PASS);
-        assertThat(slow.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(slow.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(slow.reason()).contains("到達率");
         assertThat(slow.threshold()).containsEntry("arrivalRateRps", new BigDecimal("50"));
     }

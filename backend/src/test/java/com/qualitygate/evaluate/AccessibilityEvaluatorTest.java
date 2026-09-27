@@ -75,12 +75,12 @@ class AccessibilityEvaluatorTest {
     }
 
     @Test
-    void moderateがあれば警告() {
+    void moderateは合格のまま理由に書き添える() {
         MetricResult result = evaluate(Map.of(), List.of(scan(List.of("/"))),
                 List.of(violation("/", "list", Severity.MEDIUM, "wcag2a")));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
-        assertThat(result.reason()).contains("moderate の違反が 1 件");
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).contains("moderate の違反 1 件");
     }
 
     @Test
@@ -93,14 +93,14 @@ class AccessibilityEvaluatorTest {
     }
 
     @Test
-    void 重大な違反が前回より増えれば警告() {
+    void 重大な違反が前回より増えれば合格ライン内でも理由に書き添える() {
         MetricResult result = evaluate(Map.of("max_critical", 5),
                 Map.of(EvaluationContext.key("M-08", null), BigDecimal.ONE),
                 List.of(scan(List.of("/"))), List.of(
                         violation("/", "image-alt", Severity.CRITICAL, "wcag2a"),
                         violation("/", "label", Severity.CRITICAL, "wcag2a")));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(result.reason()).contains("1 件 → 2 件");
     }
 
@@ -146,31 +146,32 @@ class AccessibilityEvaluatorTest {
     }
 
     @Test
-    void 基準のタグを外して検査していれば警告() {
+    void 基準のタグを外して検査していれば計測エラー() {
         Map<String, Object> detail = scanDetail(List.of("/"));
         detail.put("tagFilters", List.of(List.of("wcag2a", "wcag2aa")));
 
         MetricResult result = evaluate(Map.of(), List.of(measurement(detail)), List.of());
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        // 検査していないものを「違反 0 件」として合格にしない
+        assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(result.reason()).contains("wcag21a, wcag21aa, wcag22aa");
     }
 
     @Test
-    void ルールを無効化していれば警告() {
+    void ルールを無効化していれば計測エラー() {
         Map<String, Object> detail = scanDetail(List.of("/"));
         detail.put("disabledRules", List.of("color-contrast"));
         detail.put("ruleFiltered", true);
 
         MetricResult result = evaluate(Map.of(), List.of(measurement(detail)), List.of());
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(result.reason()).contains("無効にしたルール: color-contrast")
                 .contains("ルールを個別に指定しています");
     }
 
     @Test
-    void 基準のタグをすべて含む絞り込みなら警告しない() {
+    void 基準のタグをすべて含む絞り込みなら合格() {
         Map<String, Object> detail = scanDetail(List.of("/"));
         detail.put("tagFilters", List.of(WCAG22AA_TAGS));
 

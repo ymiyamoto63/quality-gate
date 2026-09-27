@@ -25,7 +25,7 @@ import java.util.TreeSet;
  *   <li>ミューテーションが 0 個 → 値なしの合格（ロジックを含まない変更）</li>
  *   <li>生成・実行に失敗したものが全体の 10% 超 → ERROR（値そのものが疑わしい）</li>
  *   <li>しきい値未満 → FAIL</li>
- *   <li>注意水準未満、TIMED_OUT が 10% 超、前回比 2 ポイント以上の低下 → WARN</li>
+ *   <li>それ以外 → PASS（TIMED_OUT が 10% 超、前回比 2 ポイント以上の低下は理由に書き添える）</li>
  * </ol>
  *
  * <p><strong>コンポーネントを合算しない</strong>のは M-01 と同じ理由による。
@@ -35,10 +35,8 @@ import java.util.TreeSet;
 @Component
 public class MutationScoreEvaluator implements MetricEvaluator {
 
-    /** 注意水準はしきい値にこの幅を足したところ（60% なら 65%）。 */
-    static final BigDecimal WARN_MARGIN = new BigDecimal("5");
-    /** 前回からこれ以上下がったら注意を出す（ポイント）。 */
-    static final BigDecimal DROP_WARN_POINTS = new BigDecimal("2");
+    /** 前回からこれ以上下がったら書き添える（ポイント）。 */
+    static final BigDecimal DROP_NOTE_POINTS = new BigDecimal("2");
     /** 生成・実行に失敗したものがこの割合（%）を超えたら、計測が機能していないとみなす。 */
     static final BigDecimal FAILED_RATIO_LIMIT = new BigDecimal("10");
     /** TIMED_OUT がこの割合（%）を超えたら、遅いランナーによる過大評価を疑う。 */
@@ -189,33 +187,24 @@ public class MutationScoreEvaluator implements MetricEvaluator {
                             tally.killed() + tally.timedOut(), tally.scored()));
         }
 
-        BigDecimal warnBelow = thresholds.mutationThreshold().add(WARN_MARGIN);
-        if (value.compareTo(warnBelow) < 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "しきい値 %s%% は満たしていますが、注意水準 %s%% を下回っています（実測 %s%%）"
-                            .formatted(limit, warnBelow.toPlainString(), value.toPlainString()));
-        }
-
+        StringBuilder note = new StringBuilder();
         BigDecimal timeoutRatio = tally.ratioOf(tally.timedOut());
         if (timeoutRatio.compareTo(TIMEOUT_RATIO_LIMIT) > 0) {
             // TIMED_OUT は検出側に数えるため、遅いランナーほどスコアが高く出る
-            return new Judgement(MeasurementStatus.WARN,
-                    "TIMED_OUT が全体の %s%% あり、実態より高く出ている可能性があります（実測 %s%%）。ランナーの性能を確認してください"
-                            .formatted(timeoutRatio.toPlainString(), value.toPlainString()));
+            note.append("。TIMED_OUT が全体の %s%% あり、実態より高く出ている可能性があります"
+                    .formatted(timeoutRatio.toPlainString()));
         }
-
         BigDecimal previous = context.previousValue(metricId(), component).orElse(null);
-        if (previous != null && previous.subtract(value).compareTo(DROP_WARN_POINTS) >= 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "前回より %s ポイント低下しています（%s%% → %s%%）".formatted(
-                            scaled(previous.subtract(value)).toPlainString(),
-                            scaled(previous).toPlainString(), value.toPlainString()));
+        if (previous != null && previous.subtract(value).compareTo(DROP_NOTE_POINTS) >= 0) {
+            note.append("。前回より %s ポイント低下しています（%s%% → %s%%）".formatted(
+                    scaled(previous.subtract(value)).toPlainString(),
+                    scaled(previous).toPlainString(), value.toPlainString()));
         }
 
         return new Judgement(MeasurementStatus.PASS,
                 "しきい値 %s%% を満たしています（実測 %s%%、検出 %d / 対象 %d）".formatted(
                         limit, value.toPlainString(),
-                        tally.killed() + tally.timedOut(), tally.scored()));
+                        tally.killed() + tally.timedOut(), tally.scored()) + note);
     }
 
     private static BigDecimal scaled(BigDecimal value) {

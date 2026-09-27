@@ -1,4 +1,4 @@
-package com.qualitygate.query;
+package com.qualitygate.release;
 
 import org.junit.jupiter.api.Test;
 

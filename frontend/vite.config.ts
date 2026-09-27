@@ -14,13 +14,8 @@ export default defineConfig({
   server: {
     port: 5173,
     proxy: {
+      // ログイン・ログアウトも /api/v1/login・/api/v1/logout なので、ここだけで足りる
       '/api': backend,
-      '/oauth2': backend,
-      // OAuth の折り返し先だけをバックエンドへ送る。'/login' 全体を送ると、
-      // SPA のログイン画面（/login）が開発時だけバックエンドに吸われて表示できない。
-      // 本番は SPA フォールバックの除外が 'login/' のため /login は SPA に届く。
-      '/login/oauth2': backend,
-      '/logout': backend,
       '/actuator': backend,
     },
   },

@@ -53,8 +53,7 @@ public class ArtifactStore {
     public InputStream open(String storageKey) {
         Path path = resolve(storageKey);
         if (!Files.exists(path)) {
-            throw new ApiException(ErrorCode.ARTIFACTS_DELETED,
-                    "成果物のファイル実体がありません（保持期間を過ぎて削除された可能性があります）: " + storageKey);
+            throw new IllegalStateException("成果物のファイル実体がありません: " + storageKey);
         }
         try {
             return Files.newInputStream(path);
@@ -69,31 +68,6 @@ public class ArtifactStore {
             Files.deleteIfExists(resolve(storageKey));
         } catch (IOException e) {
             throw new IllegalStateException("成果物の削除に失敗しました: " + storageKey, e);
-        }
-    }
-
-    /**
-     * 指定時刻より前に書き込まれた保存キーを列挙する。孤児ファイル
-     * （DB に記録の無いファイル）の回収に使う（docs/features/ingest/design.md 3 章）。
-     */
-    public java.util.List<String> listKeysWrittenBefore(java.time.Instant before, int limit) {
-        if (!Files.isDirectory(root)) {
-            return java.util.List.of();
-        }
-        try (var paths = Files.walk(root, 2)) {
-            return paths.filter(Files::isRegularFile)
-                    .filter(path -> {
-                        try {
-                            return Files.getLastModifiedTime(path).toInstant().isBefore(before);
-                        } catch (IOException e) {
-                            return false;
-                        }
-                    })
-                    .limit(limit)
-                    .map(path -> root.relativize(path).toString().replace('\\', '/'))
-                    .toList();
-        } catch (IOException e) {
-            throw new IllegalStateException("成果物の一覧を取得できませんでした", e);
         }
     }
 

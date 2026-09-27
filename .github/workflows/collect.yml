@@ -1,10 +1,10 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture.md 3 章、手順は docs/operations.md）。
 #
-# 起動は手動実行だけ（DD-7）。対象とブランチ（またはコミット・タグ・PR）を指定して計測する。
-# リリース判定（DD-16）に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
+# 起動は手動実行だけ（DD-7）。計測対象は collector/target/profile.env の 1 つだけで、ブランチ（またはコミット・タグ）を指定して計測する。
+# リリース判定に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
-# 計測する指標は M-01〜M-12。M-02（PIT）と M-03 / M-04（k6 の負荷試験）は PR 以外の計測でだけ実行する。
+# 計測する指標は M-01〜M-12（計測プロファイルの DISABLED_METRICS に書いたものは除く）。
 #
 # 必要な設定（Settings → Secrets and variables → Actions）:
 #   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
@@ -15,24 +15,17 @@
 # ジョブを 3 つ（fetch → measure → submit）に分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect
-# 画面に出す名前（例: ymiyamoto63/like-chatgpt main / ymiyamoto63/like-chatgpt #14 / ymiyamoto63/like-chatgpt v1.2.0）
-run-name: ${{ inputs.repository }} ${{ inputs.pull_request != '' && format('#{0}', inputs.pull_request) || inputs.commit || inputs.branch || 'default' }}
+# 画面に出す名前（例: collect main / collect v1.2.0）
+run-name: collect ${{ inputs.commit || inputs.branch || 'default' }}
 
 on:
   workflow_dispatch:
     inputs:
-      repository:
-        description: 計測するリポジトリ（owner/name。collector/targets/ に計測プロファイルが必要）
-        required: true
-        default: ymiyamoto63/like-chatgpt
       branch:
-        description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH。PR の場合は PR のブランチ名）
+        description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH）
         required: false
       commit:
-        description: 計測するコミット（40 桁の SHA）またはタグ（空ならブランチまたは PR の先頭）
-        required: false
-      pull_request:
-        description: PR を計測する場合の番号
+        description: 計測するコミット（40 桁の SHA）またはタグ（空ならブランチの先頭）。リリース判定にはタグを指定する
         required: false
 
 permissions:
@@ -49,11 +42,10 @@ jobs:
 
       - name: 計測プロファイルの読み込み
         id: profile
-        env:
-          QG_TARGET: ${{ inputs.repository }}
         run: |
           source collector/bin/lib.sh
-          load_profile "$QG_TARGET"
+          load_profile
+          QG_TARGET=$QG_REPOSITORY
           {
             echo "owner=${QG_TARGET%%/*}"
             echo "name=${QG_TARGET#*/}"
@@ -74,11 +66,9 @@ jobs:
       - name: 対象リポジトリの取得
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
-          QG_TARGET: ${{ inputs.repository }}
           QG_BRANCH: ${{ inputs.branch }}
           QG_COMMIT: ${{ inputs.commit }}
-          QG_PR_NUMBER: ${{ inputs.pull_request }}
-        run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
+        run: ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
 
       - name: 受け渡し用にまとめる
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
@@ -92,7 +82,7 @@ jobs:
   measure:
     needs: fetch
     runs-on: self-hosted
-    # PR 以外の計測は、ビルド・テストに加えて PIT と負荷試験（約 18 分）を実行する
+    # ビルド・テストに加えて PIT と負荷試験（有効なら約 18 分）を実行する
     timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
@@ -106,9 +96,7 @@ jobs:
         run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
 
       - name: 計測
-        env:
-          QG_TARGET: ${{ inputs.repository }}
-        run: ./collector/bin/measure-isolated.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
+        run: ./collector/bin/measure-isolated.sh "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
 
       - uses: actions/upload-artifact@v4
         if: always()

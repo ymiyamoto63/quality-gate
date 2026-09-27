@@ -1,17 +1,11 @@
 # shellcheck shell=bash
-# M-02（PIT）: ミューテーションテスト。PR 以外の計測で全量を実行する。
+# M-02（PIT）: ミューテーションテスト。全量を実行する。
 # measure.sh が source する（単独では実行しない）。
 
 # PIT のコマンドライン版を、対象のテストのクラスパスで動かす（対象の pom は書き換えない）。
 # measure_backend のビルドで出来た target/classes と target/test-classes をそのまま使う。
-# 時間がかかるため、PR の計測では実行せずスキップを申告する（DD-8）。
-# リリース判定（DD-16）でリリースブランチやタグも完全計測にするため、ブランチでは絞らない
 measure_mutation() {
   local dir="$SRC/$BACKEND_DIR" out="$WORK/pit" mvn platform
-  if [ -n "$PR_NUMBER" ]; then
-    skip M-02 "収集ランナーは PR の計測ではミューテーションテストを実行しない"
-    return
-  fi
   if [ -x "$dir/mvnw" ]; then mvn=(./mvnw); else mvn=(mvn); fi
   group "ミューテーションテスト（PIT ${PITEST_VERSION}、全量）"
   rm -rf "$out"

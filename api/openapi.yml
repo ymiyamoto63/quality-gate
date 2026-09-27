@@ -14,89 +14,16 @@ servers:
 - description: 同一オリジン
   url: /
 tags:
-- description: 全リポジトリのサマリ
-  name: Dashboard
-- description: Run の参照
-  name: Runs
-- description: 再評価（管理者のみ）
-  name: Operations
-- description: ログイン中の利用者
-  name: Me
 - description: CI からの計測結果の取り込み
   name: Ingest
-- description: リリース判定（UC-06）
+- description: リリース判定
   name: Release
-- description: 監査ログの閲覧（管理者のみ）
-  name: AuditLogs
-- description: 設定の表示・検証結果
-  name: Config
-- description: リポジトリ単位の参照
-  name: Repositories
-- description: 許可リストとロールの管理（管理者のみ）
-  name: Users
+- description: ログインの状態
+  name: Me
 paths:
-  /api/v1/audit-logs:
-    get:
-      operationId: list_3
-      parameters:
-      - description: 省略時は to の 30 日前
-        in: query
-        name: from
-        required: false
-        schema:
-          type: string
-          format: date-time
-      - description: 省略時は現在時刻
-        in: query
-        name: to
-        required: false
-        schema:
-          type: string
-          format: date-time
-      - description: 操作種別（USER_ROLE_CHANGED など）
-        in: query
-        name: action
-        required: false
-        schema:
-          type: string
-      - in: query
-        name: limit
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: cursor
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/AuditLogListResponse"
-          description: OK
-      summary: 監査ログを新しい順に一覧する
-      tags:
-      - AuditLogs
-  /api/v1/dashboard:
-    get:
-      description: 不合格・注意を先頭に並べる。開く目的が「問題があるか確認すること」であるため。
-      operationId: dashboard
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/DashboardResponse"
-          description: OK
-      summary: ダッシュボードを取得する
-      tags:
-      - Dashboard
   /api/v1/me:
     get:
+      description: 未ログインなら 401
       operationId: me
       responses:
         "200":
@@ -105,68 +32,18 @@ paths:
               schema:
                 $ref: "#/components/schemas/MeResponse"
           description: OK
-      summary: ログイン中の利用者とロールを返す
+      summary: ログイン中の利用者を返す
       tags:
       - Me
-  /api/v1/repositories/{repositoryId}:
+  /api/v1/release:
     get:
-      description: "指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立\
-        てを 2 箇所に持たないため。"
-      operationId: detail_1
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryDetail"
-          description: OK
-      summary: リポジトリ詳細を取得する
-      tags:
-      - Repositories
-  /api/v1/repositories/{repositoryId}/config:
-    get:
-      description: 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
-      operationId: get
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryConfig"
-          description: OK
-      summary: 現在の設定と直近の検証結果を取得する
-      tags:
-      - Config
-  /api/v1/repositories/{repositoryId}/release-report:
-    get:
-      description: 指定したタグ・コミットで判定済みの Run から、リリースしてよいかと全指標の合否を返す。タグは、そのタグを付けて計測した Run
-        からコミットを探す。ブランチ名は受け付けない
+      description: 指定したタグ・コミットで判定済みの計測から、リリースしてよいかと全指標の合否を返す。指定が無ければ最新の判定済みの計測を使う。ブランチ名は受け付けない
       operationId: releaseReport
       parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - description: タグ名、またはコミット SHA（7〜40 桁）
+      - description: タグ名、またはコミット SHA（7〜40 桁）。省略すると最新
         in: query
         name: ref
-        required: true
+        required: false
         schema:
           type: string
       responses:
@@ -179,107 +56,21 @@ paths:
       summary: リリース判定を取得する
       tags:
       - Release
-  /api/v1/repositories/{repositoryId}/release-report.csv:
+  /api/v1/release/history:
     get:
-      description: 1 行が 1 指標。判定の前提（コミット・Run・合格ラインの版）と出力日時・出力者を各行に含む。UTF-8（BOM つき）。出力したことを監査ログに残す
-      operationId: releaseReportCsv
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: ref
-        required: true
-        schema:
-          type: string
+      description: 判定済みの計測を新しい順に最大 50 件（同じコミットは最後の判定だけ）
+      operationId: history
       responses:
         "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/ReleaseHistoryResponse"
           description: OK
-      summary: リリース判定を CSV で取得する
+      summary: 判定の履歴を取得する
       tags:
       - Release
-  /api/v1/repositories/{repositoryId}/trends:
-    get:
-      description: 計測環境ごとに系列を分ける。未計測は値 null の点として返し、0 にしない。
-      operationId: trends
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - description: 指標 ID（M-01 など）
-        in: query
-        name: metricId
-        required: true
-        schema:
-          type: string
-      - description: 省略時はリポジトリの既定ブランチ
-        in: query
-        name: branch
-        required: false
-        schema:
-          type: string
-      - description: 省略時は to の 30 日前
-        in: query
-        name: from
-        required: false
-        schema:
-          type: string
-          format: date-time
-      - description: 省略時は現在時刻
-        in: query
-        name: to
-        required: false
-        schema:
-          type: string
-          format: date-time
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/TrendResponse"
-          description: OK
-      summary: 指標の時系列を取得する
-      tags:
-      - Repositories
   /api/v1/runs:
-    get:
-      operationId: list_1
-      parameters:
-      - in: query
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: query
-        name: limit
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: cursor
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RunListResponse"
-          description: OK
-      summary: Run を新しい順に一覧する
-      tags:
-      - Runs
     post:
       description: 計測開始時に呼ぶ。同一コミットへの再送信は attempt を増やした新しい Run になる。
       operationId: createRun
@@ -299,47 +90,7 @@ paths:
       summary: Run を作成する
       tags:
       - Ingest
-  /api/v1/runs/{runId}:
-    get:
-      description: 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
-      operationId: detail
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RunDetailResponse"
-          description: OK
-      summary: Run の判定結果を取得する
-      tags:
-      - Runs
   /api/v1/runs/{runId}/artifacts:
-    get:
-      operationId: list_2
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ArtifactListResponse"
-          description: OK
-      summary: Run に取り込んだ成果物を一覧する
-      tags:
-      - Runs
     post:
       description: この時点ではパースしない。受領・検証・保存のみを行い、パースは確定時の判定で行う。
       operationId: uploadArtifact
@@ -386,37 +137,10 @@ paths:
       summary: 成果物をアップロードする
       tags:
       - Ingest
-  /api/v1/runs/{runId}/artifacts/{artifactId}/content:
-    get:
-      description: 保持期間を過ぎて実体を削除済みなら 409 ARTIFACTS_DELETED。
-      operationId: content
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - in: path
-        name: artifactId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                type: string
-                format: binary
-          description: OK
-      summary: 成果物をダウンロードする
-      tags:
-      - Runs
   /api/v1/runs/{runId}/finalize:
     post:
-      description: その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は Run 詳細に表示される）。
+      description: その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる（理由は errorCode
+        とサーバのログで確かめる）。
       operationId: finalizeRun
       parameters:
       - in: path
@@ -435,250 +159,8 @@ paths:
       summary: 取り込み完了を宣言し、判定する
       tags:
       - Ingest
-  /api/v1/runs/{runId}/findings:
-    get:
-      description: state を省略すると新規・継続・初回のみを返す。解消済みは明示指定が必要。
-      operationId: findings
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      - description: 指標 ID。複数指定可
-        in: query
-        name: metricId
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-      - description: 省略時は NEW / CONTINUING / INITIAL
-        in: query
-        name: state
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-      - in: query
-        name: severity
-        required: false
-        schema:
-          type: array
-          items:
-            type: string
-      - in: query
-        name: limit
-        required: false
-        schema:
-          type: integer
-          format: int32
-          default: 0
-      - in: query
-        name: cursor
-        required: false
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/FindingListResponse"
-          description: OK
-      summary: Run に紐づく違反を一覧する
-      tags:
-      - Runs
-  /api/v1/runs/{runId}/reevaluate:
-    post:
-      description: 保存済みの成果物と、その Run とともに送られた設定を読み直して、その場で判定し直す。成果物が保持期間を過ぎて削除されていれば
-        409 ARTIFACTS_DELETED。判定に失敗した場合も 200 で、status が FAILED になる。
-      operationId: reevaluate
-      parameters:
-      - in: path
-        name: runId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/ReevaluateResponse"
-          description: OK
-      summary: Run を再評価する
-      tags:
-      - Operations
-  /api/v1/users:
-    get:
-      operationId: list
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserList"
-          description: OK
-      summary: 許可リストの利用者を一覧する
-      tags:
-      - Users
-    post:
-      description: GitHub ログイン名の実在は確認しない。存在しない名前はログインできないだけで害がない。
-      operationId: add
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateUserRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-          description: OK
-      summary: 許可リストに利用者を追加する
-      tags:
-      - Users
-  /api/v1/users/{userId}:
-    patch:
-      description: 自分自身の降格・無効化と、有効な管理者が 0 人になる変更は 409 ADMIN_REQUIRED。
-      operationId: update
-      parameters:
-      - in: path
-        name: userId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateUserRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UserResponse"
-          description: OK
-      summary: ロールの変更・無効化
-      tags:
-      - Users
 components:
   schemas:
-    ArtifactItem:
-      type: object
-      properties:
-        artifactId:
-          type: string
-          format: uuid
-        component:
-          type:
-          - string
-          - "null"
-        deleted:
-          type: boolean
-          description: 保持期間を過ぎて実体を削除済みなら true。ダウンロードできない
-        filename:
-          type: string
-        sha256:
-          type: string
-        sizeBytes:
-          type: integer
-          format: int64
-        type:
-          type: string
-        uploadedAt:
-          type: string
-          format: date-time
-      required:
-      - artifactId
-      - component
-      - deleted
-      - filename
-      - sha256
-      - sizeBytes
-      - type
-      - uploadedAt
-    ArtifactListResponse:
-      type: object
-      description: Run に取り込んだ成果物の一覧（RUN-5）
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/ArtifactItem"
-      required:
-      - items
-    AuditLogItem:
-      type: object
-      properties:
-        action:
-          type: string
-        actorLogin:
-          type:
-          - string
-          - "null"
-          description: 日次バッチの操作は system
-        after:
-          type:
-          - object
-          - "null"
-          additionalProperties: {}
-          description: 変更後の値
-        auditLogId:
-          type: string
-          format: uuid
-        before:
-          type:
-          - object
-          - "null"
-          additionalProperties: {}
-          description: 変更前の値
-        occurredAt:
-          type: string
-          format: date-time
-        targetId:
-          type:
-          - string
-          - "null"
-        targetType:
-          type: string
-      required:
-      - action
-      - actorLogin
-      - after
-      - auditLogId
-      - before
-      - occurredAt
-      - targetId
-      - targetType
-    AuditLogListResponse:
-      type: object
-      description: 監査ログ。新しいものから返す
-      properties:
-        hasMore:
-          type: boolean
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/AuditLogItem"
-        nextCursor:
-          type:
-          - string
-          - "null"
-      required:
-      - hasMore
-      - items
-      - nextCursor
     CreateRunRequest:
       type: object
       description: Run の作成要求。CI が計測開始時に送信する。
@@ -697,33 +179,21 @@ components:
           description: 計測対象のコミット SHA（40 桁）
           minLength: 1
           pattern: "^[0-9a-f]{40}$"
-        configCommitSha:
-          type: string
-          description: 合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット
-          pattern: "^[0-9a-f]{40}$"
         defaultBranch:
           type: string
-          description: 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。トレンドの既定の系列に使う。省略すると登録済みの値のまま（新規は
+          description: 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。省略すると登録済みの値のまま（新規は
             main）
           maxLength: 255
           minLength: 1
         measuredAt:
           type: string
           format: date-time
-        pullRequestNumber:
-          type: integer
-          format: int32
         repository:
           type: string
-          description: owner/name 形式。初めて送られたリポジトリは登録される
+          description: owner/name 形式。quality-gate の計測対象（QG_REPOSITORY）と一致しなければ拒否する
           example: ymiyamoto63/quality-gate
           minLength: 1
           pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
-        skippedMetrics:
-          type: array
-          description: CI が実行しなかった指標の申告。省略時は全指標を計測したものとして扱う
-          items:
-            $ref: "#/components/schemas/SkippedMetricRequest"
         tags:
           type: array
           description: 計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。リリース判定でタグをコミットに解決するのに使う
@@ -751,7 +221,7 @@ components:
           format: int32
         detailUrl:
           type: string
-          description: Run 詳細画面への直リンク。CI のログに出して、不合格時にその場から飛べるようにする
+          description: リリース判定の画面（このコミット）への直リンク。CI のログに出して、その場から飛べるようにする
         runId:
           type: string
           format: uuid
@@ -764,44 +234,13 @@ components:
           - PROCESSING
           - EVALUATED
           - FAILED
-          - ABANDONED
-    CreateUserRequest:
-      type: object
-      properties:
-        githubLogin:
-          type: string
-          minLength: 1
-          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
-        role:
-          type:
-          - string
-          - "null"
-          description: 省略時は VIEWER
-          enum:
-          - ADMIN
-          - VIEWER
-      required:
-      - githubLogin
-    DashboardResponse:
-      type: object
-      description: ダッシュボード。リポジトリごとの最新の判定済み Run と、最後の完全計測。
-      properties:
-        repositories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryCard"
     FinalizeResponse:
       type: object
       description: 確定と判定の結果。収集ランナーはこれをログに出す
       properties:
-        completeness:
-          type: string
-          description: 完全計測か部分計測か。処理失敗なら null
-          enum:
-          - FULL
-          - PARTIAL
         detailUrl:
           type: string
+          description: リリース判定の画面（このコミット）への直リンク
         errorCode:
           type: string
           description: 処理失敗の理由のコード。判定済みなら null
@@ -818,248 +257,23 @@ components:
           - PROCESSING
           - EVALUATED
           - FAILED
-          - ABANDONED
         verdict:
           type: string
           description: 判定結果。処理失敗なら null
           enum:
           - PASS
-          - PASS_WITH_WARNINGS
           - FAIL
-    FindingItem:
-      type: object
-      properties:
-        componentName:
-          type:
-          - string
-          - "null"
-        detail:
-          type: object
-          additionalProperties: {}
-          description: ツール固有の付加情報。無ければ空オブジェクト
-        filePath:
-          type:
-          - string
-          - "null"
-        findingId:
-          type: string
-          format: uuid
-        fingerprint:
-          type: string
-          description: Run をまたいで違反を同定するキー
-        line:
-          type:
-          - integer
-          - "null"
-          format: int32
-        metricId:
-          type: string
-        metricName:
-          type: string
-        ruleId:
-          type:
-          - string
-          - "null"
-        severity:
-          type: string
-          enum:
-          - CRITICAL
-          - HIGH
-          - MEDIUM
-          - LOW
-          - INFO
-        sourceUrl:
-          type:
-          - string
-          - "null"
-          description: 該当箇所へのリンク。ホスティング先の URL 形式はサーバが持つ。パスを持たない違反（依存パッケージの脆弱性など）では
-            null
-        state:
-          type: string
-          enum:
-          - NEW
-          - CONTINUING
-          - RESOLVED
-          - INITIAL
-        title:
-          type: string
-      required:
-      - componentName
-      - detail
-      - filePath
-      - findingId
-      - fingerprint
-      - line
-      - metricId
-      - metricName
-      - ruleId
-      - severity
-      - sourceUrl
-      - state
-      - title
-    FindingListResponse:
-      type: object
-      description: Run に紐づく違反の一覧
-      properties:
-        hasMore:
-          type: boolean
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/FindingItem"
-        nextCursor:
-          type:
-          - string
-          - "null"
-          description: 次ページのカーソル。最終ページでは null
-        totalCount:
-          type: integer
-          format: int64
-          description: 絞り込み後の総件数。件数表示と「全部見た」の判断に使う
-      required:
-      - hasMore
-      - items
-      - nextCursor
-      - totalCount
-    Freshness:
-      type: object
-      description: 最後の計測と最後の完全計測の日時
-      properties:
-        lastFullMeasuredAt:
-          type: string
-          format: date-time
-        lastMeasuredAt:
-          type: string
-          format: date-time
-    LatestRun:
-      type: object
-      properties:
-        completeness:
-          type: string
-          enum:
-          - FULL
-          - PARTIAL
-        measuredAt:
-          type: string
-          format: date-time
-        runId:
-          type: string
-          format: uuid
-        verdict:
-          type: string
-          description: 判定結果。未判定なら null
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-    LatestRunSummary:
-      type: object
-      properties:
-        branch:
-          type: string
-        commitSha:
-          type: string
-        completeness:
-          type:
-          - string
-          - "null"
-          enum:
-          - FULL
-          - PARTIAL
-        measuredAt:
-          type: string
-          format: date-time
-        runId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
-          - ABANDONED
-        verdict:
-          type:
-          - string
-          - "null"
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-      required:
-      - branch
-      - commitSha
-      - completeness
-      - measuredAt
-      - runId
-      - status
-      - verdict
     MeResponse:
       type: object
-      description: ログイン中の利用者。フロントエンドはこの role で表示を制御する（防御は API 側）。
       properties:
-        avatarUrl:
+        username:
           type: string
-        displayName:
-          type: string
-        githubLogin:
-          type: string
-        role:
-          type: string
-          enum:
-          - ADMIN
-          - VIEWER
-        userId:
-          type: string
-          format: uuid
-    ReevaluateResponse:
-      type: object
-      description: 再評価の結果
-      properties:
-        errorCode:
-          type:
-          - string
-          - "null"
-          description: 処理失敗の理由のコード
-        runId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          description: EVALUATED（判定済み）か FAILED（処理失敗）
-          enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
-          - ABANDONED
-        verdict:
-          type:
-          - string
-          - "null"
-          description: 判定結果。処理失敗なら null
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
       required:
-      - errorCode
-      - runId
-      - status
-      - verdict
+      - username
     ReleaseCounts:
       type: object
-      description: 合否に使った指標の件数（参考値・対象外を除く）
+      description: 合否に使った指標の件数
       properties:
-        errored:
-          type: integer
-          format: int32
         failed:
           type: integer
           format: int32
@@ -1069,36 +283,38 @@ components:
         passed:
           type: integer
           format: int32
-        skipped:
-          type: integer
-          format: int32
-        warned:
-          type: integer
-          format: int32
       required:
-      - errored
       - failed
       - judged
       - passed
-      - skipped
-      - warned
-    ReleaseGateConfig:
+    ReleaseFinding:
       type: object
-      description: 判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る
       properties:
-        commitSha:
+        location:
           type:
           - string
           - "null"
-          description: 合格ラインを送った quality-gate リポジトリのコミット
-        exclusions:
-          type: array
-          description: 計測の対象から外したパス
-          items:
-            type: string
+          description: ファイルと行（backend/src/Foo.java:42 など）
+        severity:
+          type: string
+          enum:
+          - CRITICAL
+          - HIGH
+          - MEDIUM
+          - LOW
+          - INFO
+        title:
+          type: string
+        url:
+          type:
+          - string
+          - "null"
+          description: GitHub の該当箇所
       required:
-      - commitSha
-      - exclusions
+      - location
+      - severity
+      - title
+      - url
     ReleaseGuide:
       type: object
       properties:
@@ -1136,6 +352,45 @@ components:
       - risk
       - summary
       - tools
+    ReleaseHistoryItem:
+      type: object
+      properties:
+        branch:
+          type: string
+        commitSha:
+          type: string
+        measuredAt:
+          type: string
+          format: date-time
+        ref:
+          type: string
+          description: リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA）
+        tags:
+          type: array
+          description: 計測したコミットを指すタグ
+          items:
+            type: string
+        verdict:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+      required:
+      - branch
+      - commitSha
+      - measuredAt
+      - ref
+      - tags
+      - verdict
+    ReleaseHistoryResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReleaseHistoryItem"
+      required:
+      - items
     ReleaseMetric:
       type: object
       properties:
@@ -1145,6 +400,15 @@ components:
           type:
           - string
           - "null"
+        findingCount:
+          type: integer
+          format: int32
+          description: 不合格のときの違反の総数。合格なら 0
+        findings:
+          type: array
+          description: 不合格のときの主な違反（深刻な順に最大 10 件）。合格なら空
+          items:
+            $ref: "#/components/schemas/ReleaseFinding"
         metricId:
           type: string
         name:
@@ -1153,17 +417,12 @@ components:
           type:
           - string
           - "null"
-        scenario:
-          type:
-          - string
-          - "null"
         status:
           type: string
+          description: PASS（合格）/ FAIL（不合格）/ ERROR（計測できなかった。不合格として扱う）
           enum:
           - PASS
-          - WARN
           - FAIL
-          - SKIP
           - ERROR
           - NOT_APPLICABLE
         threshold:
@@ -1179,7 +438,7 @@ components:
           type:
           - number
           - "null"
-          description: 実測値。未計測は null
+          description: 実測値。計測エラーは null
         variantLabel:
           type:
           - string
@@ -1187,10 +446,11 @@ components:
       required:
       - category
       - componentName
+      - findingCount
+      - findings
       - metricId
       - name
       - reason
-      - scenario
       - status
       - threshold
       - unit
@@ -1198,28 +458,28 @@ components:
       - variantLabel
     ReleaseReportResponse:
       type: object
-      description: リリース判定。指定したタグ・コミットで判定済みの Run から組み立てる
+      description: リリース判定。判定済みの計測（Run）から組み立てる
       properties:
         commitSha:
-          type: string
+          type:
+          - string
+          - "null"
+          description: 判定したコミット。計測が 1 件も無ければ null
         commitUrl:
-          type: string
+          type:
+          - string
+          - "null"
         counts:
           $ref: "#/components/schemas/ReleaseCounts"
         decision:
           type: string
           enum:
           - RELEASABLE
-          - RELEASABLE_WITH_WARNINGS
           - NOT_RELEASABLE
-          - UNDETERMINED
+          - NOT_MEASURED
         decisionReason:
           type: string
           description: 判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する
-        gateConfig:
-          type: "null"
-          $ref: "#/components/schemas/ReleaseGateConfig"
-          description: 判定に使った合格ライン。設定ファイルの無い Run と未計測では null
         guides:
           type: array
           description: 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）
@@ -1227,719 +487,70 @@ components:
             $ref: "#/components/schemas/ReleaseGuide"
         metrics:
           type: array
-          description: 指標ごとの結果。不合格・計測エラー・注意を先に、参考値を最後に並べる
+          description: 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない
           items:
             $ref: "#/components/schemas/ReleaseMetric"
-        otherRunCount:
-          type: integer
-          format: int32
-          description: 同じコミットのほかの Run の件数（判定には使っていない）
         ref:
-          type: string
-          description: 指定したタグ・コミット（前後の空白を除いたもの）
-        refType:
-          type: string
-          enum:
-          - TAG
-          - COMMIT
+          type:
+          - string
+          - "null"
+          description: 指定したタグ・コミット。最新の計測を見ているときは null
         repositoryFullName:
           type: string
-        repositoryId:
-          type: string
-          format: uuid
         run:
           type: "null"
           $ref: "#/components/schemas/ReleaseRun"
-          description: 判定に使った Run。未計測なら null
+          description: 判定に使った計測。未計測なら null
       required:
       - commitSha
       - commitUrl
       - counts
       - decision
       - decisionReason
-      - gateConfig
       - guides
       - metrics
-      - otherRunCount
       - ref
-      - refType
       - repositoryFullName
-      - repositoryId
       - run
     ReleaseRun:
       type: object
       properties:
-        attempt:
-          type: integer
-          format: int32
         baseCommitSha:
           type:
           - string
           - "null"
-          description: 比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。タグで計測したときは前のタグ
+          description: 比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ
         branch:
           type: string
-        completeness:
-          type: string
-          enum:
-          - FULL
-          - PARTIAL
-        measuredAt:
-          type: string
-          format: date-time
-        runId:
-          type: string
-          format: uuid
-        verdict:
-          type: string
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-      required:
-      - attempt
-      - baseCommitSha
-      - branch
-      - completeness
-      - measuredAt
-      - runId
-      - verdict
-    RepositoryCard:
-      type: object
-      properties:
-        freshness:
-          $ref: "#/components/schemas/Freshness"
-        fullName:
-          type: string
-        latestRun:
-          $ref: "#/components/schemas/LatestRun"
-        openCriticalCount:
-          type: integer
-          format: int32
-        openHighCount:
-          type: integer
-          format: int32
-        repositoryId:
-          type: string
-          format: uuid
-    RepositoryConfig:
-      type: object
-      description: 直近の Run に送られた合格ラインと、その検証結果。版の履歴は Git で見る
-      properties:
-        configCommitSha:
-          type:
-          - string
-          - "null"
-          description: 合格ラインを送った quality-gate リポジトリのコミット
-        errors:
-          type: array
-          description: 検証エラー。不正なら判定されず、Run は処理失敗になる
-          items:
-            $ref: "#/components/schemas/ValidationErrorItem"
-        measuredAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        rawYaml:
-          type:
-          - string
-          - "null"
-          description: 設定ファイルの内容。設定ファイルの無い Run（既定値で判定）では null
-        runId:
-          type:
-          - string
-          - "null"
-          format: uuid
-          description: 直近の Run。まだ計測が無ければ null
-      required:
-      - configCommitSha
-      - errors
-      - measuredAt
-      - rawYaml
-      - runId
-    RepositoryDetail:
-      type: object
-      description: リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く
-      properties:
-        freshness:
-          $ref: "#/components/schemas/RepositoryFreshness"
-        lastFullRunId:
-          type:
-          - string
-          - "null"
-          format: uuid
-        latestRun:
-          type: "null"
-          $ref: "#/components/schemas/LatestRunSummary"
-          description: 判定済みの最新 Run。まだ無ければ null
-        repository:
-          $ref: "#/components/schemas/RepositoryItem"
-      required:
-      - freshness
-      - lastFullRunId
-      - latestRun
-      - repository
-    RepositoryFreshness:
-      type: object
-      description: 最後の計測と最後の完全計測の日時（DASH-2）
-      properties:
-        lastFullMeasuredAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        lastMeasuredAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-      required:
-      - lastFullMeasuredAt
-      - lastMeasuredAt
-    RepositoryItem:
-      type: object
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        defaultBranch:
-          type: string
-        fullName:
-          type: string
-        name:
-          type: string
-        owner:
-          type: string
-        repositoryId:
-          type: string
-          format: uuid
-      required:
-      - createdAt
-      - defaultBranch
-      - fullName
-      - name
-      - owner
-      - repositoryId
-    RepositoryRef:
-      type: object
-      properties:
-        fullName:
-          type:
-          - string
-          - "null"
-        repositoryId:
-          type: string
-          format: uuid
-      required:
-      - fullName
-      - repositoryId
-    RunCategory:
-      type: object
-      properties:
-        category:
-          type: string
-          description: カテゴリ名（機能テスト など）
-        expandByDefault:
-          type: boolean
-          description: 不合格・注意を含むカテゴリは画面の初期状態で展開する
-        metrics:
-          type: array
-          items:
-            $ref: "#/components/schemas/RunMetric"
-        status:
-          type: string
-          description: カテゴリ内で最も重いステータス
-          enum:
-          - PASS
-          - WARN
-          - FAIL
-          - SKIP
-          - ERROR
-          - NOT_APPLICABLE
-      required:
-      - category
-      - expandByDefault
-      - metrics
-      - status
-    RunDetailResponse:
-      type: object
-      description: Run 1 件の判定結果
-      properties:
-        artifactCount:
-          type: integer
-          format: int32
-        attempt:
-          type: integer
-          format: int32
-        baseCommitSha:
-          type:
-          - string
-          - "null"
-        baselineRunId:
-          type:
-          - string
-          - "null"
-          format: uuid
-          description: 差分算出に使った比較対象 Run。初回 Run では null
-        branch:
-          type: string
-        categories:
-          type: array
-          items:
-            $ref: "#/components/schemas/RunCategory"
         ciRunUrl:
           type:
           - string
           - "null"
-        commitSha:
-          type: string
-        commitUrl:
-          type:
-          - string
-          - "null"
-          description: コミットへのリンク。URL の組み立てはサーバが持つ
-        completeness:
-          type:
-          - string
-          - "null"
-          enum:
-          - FULL
-          - PARTIAL
-        configCommitSha:
-          type:
-          - string
-          - "null"
-          description: 判定に使った合格ライン（collector/targets/*.gate.yml）を送った quality-gate
-            リポジトリのコミット。合格ライン自体は Run の成果物に残る
-        evaluatedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        failure:
-          type: "null"
-          $ref: "#/components/schemas/RunFailure"
-          description: 処理そのものが失敗した場合のみ。判定結果 FAIL とは別物
-        findingSummary:
-          $ref: "#/components/schemas/RunFindingSummary"
+          description: 計測したワークフローの実行 URL
         measuredAt:
           type: string
           format: date-time
-        pullRequestNumber:
-          type:
-          - integer
-          - "null"
-          format: int32
-        repository:
-          $ref: "#/components/schemas/RepositoryRef"
         runId:
           type: string
           format: uuid
-        skippedMetrics:
+        tags:
           type: array
+          description: 計測したコミットを指すタグ
           items:
-            $ref: "#/components/schemas/SkippedMetricView"
-        status:
+            type: string
+        verdict:
           type: string
           enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
-          - ABANDONED
-        verdict:
-          type:
-          - string
-          - "null"
-          description: 判定結果。判定前・処理失敗では null
-          enum:
           - PASS
-          - PASS_WITH_WARNINGS
           - FAIL
       required:
-      - artifactCount
-      - attempt
       - baseCommitSha
-      - baselineRunId
       - branch
-      - categories
       - ciRunUrl
-      - commitSha
-      - commitUrl
-      - completeness
-      - configCommitSha
-      - evaluatedAt
-      - failure
-      - findingSummary
       - measuredAt
-      - pullRequestNumber
-      - repository
       - runId
-      - skippedMetrics
-      - status
+      - tags
       - verdict
-    RunFailure:
-      type: object
-      description: 処理失敗の内容。errorCode で分岐し、hint で対処を示す
-      properties:
-        detail:
-          type:
-          - string
-          - "null"
-        errorCode:
-          type:
-          - string
-          - "null"
-        hint:
-          type: string
-        title:
-          type: string
-      required:
-      - detail
-      - errorCode
-      - hint
-      - title
-    RunFindingSummary:
-      type: object
-      description: 違反の内訳。解消（RESOLVED）も件数に含めて「直った数」を示す
-      properties:
-        continuing:
-          type: integer
-          format: int64
-        initial:
-          type: integer
-          format: int64
-        newCount:
-          type: integer
-          format: int64
-        resolved:
-          type: integer
-          format: int64
-      required:
-      - continuing
-      - initial
-      - newCount
-      - resolved
-    RunListResponse:
-      type: object
-      description: Run の一覧。新しいものから返す
-      properties:
-        hasMore:
-          type: boolean
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/RunSummary"
-        nextCursor:
-          type:
-          - string
-          - "null"
-      required:
-      - hasMore
-      - items
-      - nextCursor
-    RunMetric:
-      type: object
-      properties:
-        componentName:
-          type:
-          - string
-          - "null"
-          description: コンポーネント名（backend / frontend）。全体値の指標では null
-        delta:
-          type:
-          - number
-          - "null"
-          description: 前回比。前回値か今回値が無ければ null
-        deltaImproved:
-          type:
-          - boolean
-          - "null"
-          description: 差分が良い方向か。null は前回比なし
-        detail:
-          type:
-          - object
-          - "null"
-          additionalProperties: {}
-        findingCount:
-          type: integer
-          format: int64
-          description: この指標に紐づく未解消の違反件数
-        metricId:
-          type: string
-        name:
-          type: string
-        previousValue:
-          type:
-          - number
-          - "null"
-        reason:
-          type:
-          - string
-          - "null"
-          description: 判定理由。文言はサーバが持ち、画面はそのまま表示する
-        status:
-          type: string
-          enum:
-          - PASS
-          - WARN
-          - FAIL
-          - SKIP
-          - ERROR
-          - NOT_APPLICABLE
-        threshold:
-          type:
-          - object
-          - "null"
-          additionalProperties: {}
-          description: "合格ライン。例: {\"operator\": \">=\", \"value\": 75}"
-        unit:
-          type:
-          - string
-          - "null"
-        value:
-          type:
-          - number
-          - "null"
-          description: 実測値。未計測は null。0 は「計測して 0 だった」を意味し別物
-        variant:
-          type:
-          - string
-          - "null"
-          description: 計測条件（性能の計測環境）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null
-        variantLabel:
-          type:
-          - string
-          - "null"
-          description: 計測条件の表示名（計測環境の名前）
-      required:
-      - componentName
-      - delta
-      - deltaImproved
-      - detail
-      - findingCount
-      - metricId
-      - name
-      - previousValue
-      - reason
-      - status
-      - threshold
-      - unit
-      - value
-      - variant
-      - variantLabel
-    RunSummary:
-      type: object
-      properties:
-        branch:
-          type: string
-        commitSha:
-          type: string
-        completeness:
-          type:
-          - string
-          - "null"
-          enum:
-          - FULL
-          - PARTIAL
-        evaluatedAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-        measuredAt:
-          type: string
-          format: date-time
-        pullRequestNumber:
-          type:
-          - integer
-          - "null"
-          format: int32
-        runId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
-          - ABANDONED
-        verdict:
-          type:
-          - string
-          - "null"
-          enum:
-          - PASS
-          - PASS_WITH_WARNINGS
-          - FAIL
-      required:
-      - branch
-      - commitSha
-      - completeness
-      - evaluatedAt
-      - measuredAt
-      - pullRequestNumber
-      - runId
-      - status
-      - verdict
-    SkippedMetricRequest:
-      type: object
-      description: スキップの申告。申告のない未提出は ERROR として扱われる。
-      properties:
-        metricId:
-          type: string
-          example: M-02
-          minLength: 1
-          pattern: "^M-\\d{2}$"
-        reason:
-          type: string
-          description: なぜ計測しなかったか。Run 詳細にそのまま表示される
-          example: PR の計測では PIT を実行しない
-          minLength: 1
-      required:
-      - metricId
-      - reason
-    SkippedMetricView:
-      type: object
-      description: CI からのスキップ申告。受理されなかった申告も残す
-      properties:
-        accepted:
-          type: boolean
-          description: 設定で許容されているか。false なら当該指標は ERROR
-        metricId:
-          type: string
-        name:
-          type: string
-        reason:
-          type: string
-      required:
-      - accepted
-      - metricId
-      - name
-      - reason
-    TrendPoint:
-      type: object
-      properties:
-        commitSha:
-          type: string
-        measuredAt:
-          type: string
-          format: date-time
-        runId:
-          type: string
-          format: uuid
-        status:
-          type: string
-          enum:
-          - PASS
-          - WARN
-          - FAIL
-          - SKIP
-          - ERROR
-          - NOT_APPLICABLE
-        value:
-          type:
-          - number
-          - "null"
-          description: 実測値。未計測は null。0 を返さない。0 を返すと、グラフ上で「極めて良い値」に見えてしまう
-      required:
-      - commitSha
-      - measuredAt
-      - runId
-      - status
-      - value
-    TrendResponse:
-      type: object
-      description: 指標の時系列。計測環境ごとに系列を分ける
-      properties:
-        branch:
-          type: string
-        from:
-          type: string
-          format: date-time
-        metricId:
-          type: string
-        name:
-          type: string
-        series:
-          type: array
-          items:
-            $ref: "#/components/schemas/TrendSeries"
-        threshold:
-          type:
-          - object
-          - "null"
-          additionalProperties: {}
-          description: 重畳表示する合格ライン。期間内で最後に適用された値。期間中にしきい値が変わった場合は thresholdChanged
-            が true になる
-        thresholdChanged:
-          type: boolean
-          description: 期間内でしきい値が変わったか。true のとき、1 本の線では過去の判定を説明できない
-        to:
-          type: string
-          format: date-time
-        unit:
-          type:
-          - string
-          - "null"
-      required:
-      - branch
-      - from
-      - metricId
-      - name
-      - series
-      - threshold
-      - thresholdChanged
-      - to
-      - unit
-    TrendSeries:
-      type: object
-      properties:
-        colorIndex:
-          type: integer
-          format: int32
-        componentName:
-          type:
-          - string
-          - "null"
-        label:
-          type: string
-        points:
-          type: array
-          items:
-            $ref: "#/components/schemas/TrendPoint"
-        seriesId:
-          type: string
-      required:
-      - colorIndex
-      - componentName
-      - label
-      - points
-      - seriesId
-    UpdateUserRequest:
-      type: object
-      properties:
-        role:
-          type:
-          - string
-          - "null"
-          enum:
-          - ADMIN
-          - VIEWER
-        status:
-          type:
-          - string
-          - "null"
-          enum:
-          - ACTIVE
-          - DISABLED
     UploadArtifactResponse:
       type: object
       properties:
@@ -1951,76 +562,3 @@ components:
         sizeBytes:
           type: integer
           format: int64
-    UserList:
-      type: object
-      description: 利用者の一覧
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/UserResponse"
-      required:
-      - items
-    UserResponse:
-      type: object
-      description: 許可リストの利用者。ここに無い GitHub ユーザーはログインできない
-      properties:
-        avatarUrl:
-          type:
-          - string
-          - "null"
-        createdAt:
-          type: string
-          format: date-time
-        displayName:
-          type:
-          - string
-          - "null"
-          description: 初回ログインまでは null
-        githubLogin:
-          type: string
-        lastLoginAt:
-          type:
-          - string
-          - "null"
-          format: date-time
-          description: 一度もログインしていなければ null
-        role:
-          type: string
-          enum:
-          - ADMIN
-          - VIEWER
-        status:
-          type: string
-          enum:
-          - ACTIVE
-          - DISABLED
-        userId:
-          type: string
-          format: uuid
-      required:
-      - avatarUrl
-      - createdAt
-      - displayName
-      - githubLogin
-      - lastLoginAt
-      - role
-      - status
-      - userId
-    ValidationErrorItem:
-      type: object
-      properties:
-        line:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: 1 始まりの行番号
-        message:
-          type: string
-        path:
-          type: string
-      required:
-      - line
-      - message
-      - path

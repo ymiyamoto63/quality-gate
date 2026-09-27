@@ -56,7 +56,7 @@ class TestSuccessEvaluatorTest {
     }
 
     @Test
-    void スキップはM12で判定するため警告にしない() {
+    void スキップはM10で判定するためここでは合格にする() {
         List<MetricResult> results = evaluate(Map.of(),
                 List.of(report("backend", 10, 0, 0, 5, 0)), List.of());
 
@@ -64,20 +64,21 @@ class TestSuccessEvaluatorTest {
     }
 
     @Test
-    void 再実行で成功したテストがあれば警告() {
+    void 再実行で成功したテストがあれば合格のまま理由に書き添える() {
         List<MetricResult> results = evaluate(Map.of(),
                 List.of(report("backend", 10, 0, 0, 0, 2)), List.of());
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(results.getFirst().reason()).contains("2 件は再実行で成功しました");
     }
 
     @Test
-    void 合格ラインを緩めても失敗があれば警告() {
+    void 合格ラインを緩めれば失敗があっても合格で失敗の件数を書き添える() {
         List<MetricResult> results = evaluate(Map.of("min_success_rate", 95),
                 List.of(report("backend", 99, 1, 0, 0, 0)), List.of());
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(results.getFirst().reason()).contains("テストが 1 件失敗しています");
     }
 
     @Test

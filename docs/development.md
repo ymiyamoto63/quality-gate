@@ -25,12 +25,12 @@ quality-gate/
 `spring-boot:run` がフロントエンドのビルドと同梱まで行うため（Node.js も Maven が `backend/target/` に取得します）、`npm run dev` は要りません。
 
 ```bash
-cp .env.example .env                    # ログイン用 GitHub App の認証情報を書き入れる（3 章）
+cp .env.example .env                    # QG_LOGIN_PASSWORD（12 文字以上）を書き入れる（3 章）
 docker compose up -d db                 # PostgreSQL だけを起動する
 cd backend && ./mvnw spring-boot:run    # 画面も API も http://localhost:8080
 ```
 
-`.env` が無くても起動はしますが、ログインできません。`.env.example` をコピーしただけで `QG_GITHUB_CLIENT_ID=` が空のままだと、起動に失敗します（9 章）。
+`.env` に `QG_REPOSITORY` と `QG_LOGIN_PASSWORD` が無いと起動に失敗します（10 章）。
 
 **画面（`frontend/`）を開発するときは**、次の 2 つを別々のターミナルで起動して `http://localhost:5173` を開きます。保存するとブラウザに即時反映（HMR）されます。
 
@@ -48,47 +48,32 @@ cd frontend && npm ci && npm run dev                        # /api などは 808
 - `-DskipFrontend=true` で起動しても、以前にビルドした画面が `backend/target/classes/static/` に残っていると 8080 で表示されます。8080 を API だけにしたいときは `./mvnw clean spring-boot:run -DskipFrontend=true`
 - 成果物ストア（`QG_ARTIFACT_ROOT`、既定 `./data/artifacts`）の相対パスは起動したディレクトリから解決されます。`backend/` から起動すると `backend/data/artifacts/` です
 - 取り込み API を手元で試すときは `.env` に `QG_INGEST_TOKEN` を書きます（[取り込み](features/ingest/design.md#6-手元で取り込みを試す)）。設定値の一覧は [運用](operations.md#22-設定値)
-- 利用者が 1 人もいない状態では、最初にログインしたユーザーが Admin になります
 
 ### 同一オリジンの実現方法
 
 quality-gate は SPA と API を**同一オリジン**で動かす前提です（CORS なし、セッション Cookie 認証）。
 
 - **同梱時（B / C）**: Maven の `frontend` プロファイル（`-DskipFrontend` を付けない限り有効）が `frontend-maven-plugin` で `npm ci` → `npm run build` を行い、`frontend/dist/` を `target/classes/static/` にコピーして jar に含めます。
-  静的ファイルとして存在しないパス（`/runs/xxx` など）は `SpaForwardingConfig` が `index.html` を返し、Vue Router に任せます。`api/`・`actuator/`・`v3/`・`swagger-ui`・`oauth2/`・`login/`・`logout` は対象外で、存在しない API には 404 を返します
-- **開発時（A）**: ブラウザは 5173 だけを見ます。`vite.config.ts` の `server.proxy` が `/api`・`/oauth2`・`/login/oauth2`・`/logout`・`/actuator` を 8080 へ送ります。
-  `/login` 全体ではなく `/login/oauth2` に限るのは、`/login` が SPA のログイン画面でもあるためです。`changeOrigin: false` のため、Cookie と OAuth の折り返し先を本番と同じ条件で確かめられます
+  静的ファイルとして存在しないパス（`/login` など）は `SpaForwardingConfig` が `index.html` を返し、Vue Router に任せます。`api/`・`actuator/`・`v3/`・`swagger-ui` は対象外で、存在しない API には 404 を返します
+- **開発時（A）**: ブラウザは 5173 だけを見ます。`vite.config.ts` の `server.proxy` が `/api`（ログイン・ログアウトを含む）と `/actuator` を 8080 へ送ります。`changeOrigin: false` のため、Cookie を本番と同じ条件で確かめられます
 
-## 3. ログイン用の GitHub App
+## 3. 開発時の設定（`.env`）
 
-ログインは GitHub App の user-to-server 認可フローで行います（[認証](features/auth/design.md)）。開発者ごとに App を 1 つ作り、その認証情報をバックエンドに渡します。
+リポジトリ直下の `.env` に最低限次を書きます（`.env.example` をコピーすると、like-chatgpt 向けの値が入っています）。
 
-1. GitHub の **Settings → Developer settings → GitHub Apps → New GitHub App** で作る
+```bash
+QG_REPOSITORY=ymiyamoto63/like-chatgpt
+QG_LOGIN_USERNAME=quality
+QG_LOGIN_PASSWORD=<12 文字以上>
+```
 
-   | 項目 | 値 |
-   | --- | --- |
-   | GitHub App name | 任意（GitHub 全体で一意。例: `quality-gate-local-<ログイン名>`） |
-   | Homepage URL | `http://localhost:5173` |
-   | Callback URL | `http://localhost:8080/login/oauth2/code/github` と `http://localhost:5173/login/oauth2/code/github` の両方（8080 だけで動かすなら前者のみ） |
-   | Webhook の Active | チェックを外す |
-   | Repository permissions | ログインだけなら不要。収集ランナーで private の対象を計測するなら Contents / Pull requests を Read-only にする（[運用](operations.md#33-対象を読むための-github-app)） |
-   | Where can this GitHub App be installed? | Only on this account |
+画面のログインは、この共有のユーザー名とパスワードで行います（[認証](features/auth/design.md)）。合格ライン（`QG_*`）の一覧は [運用](operations.md#24-合格ライン) にあります。
 
-   Callback URL は、ブラウザで開いたオリジンから組み立てられる `redirect_uri` と完全に一致する必要があるため、使うオリジンをすべて登録します。
-
-2. 作成後の画面で **Client ID** を控え、**Generate a new client secret** でシークレットを発行する（発行時にしか表示されません）
-3. リポジトリ直下の `.env` に書く
-
-   ```bash
-   QG_GITHUB_CLIENT_ID=Iv23li...
-   QG_GITHUB_CLIENT_SECRET=...
-   ```
-
-   - バックエンドは起動時に `.env` を読みます（`application.yml` の `spring.config.import`）。`backend/` から起動しても、リポジトリ直下から起動しても見つかります
-   - `.env` は `.gitignore` 済みです。認証情報はコミットしないでください
-   - 値は `KEY=value` の形で書き、引用符で囲まないでください（引用符も値の一部になります）
-   - 同じ名前の環境変数があれば、そちらが優先されます
-   - Windows 側のエディタで編集したら改行コードを LF にしてください（CRLF だと値の末尾に `\r` が付きます）
+- バックエンドは起動時に `.env` を読みます（`application.yml` の `spring.config.import`）。`backend/` から起動しても、リポジトリ直下から起動しても見つかります
+- `.env` は `.gitignore` 済みです。パスワードや Ingest Token はコミットしないでください
+- 値は `KEY=value` の形で書き、引用符で囲まないでください（引用符も値の一部になります）
+- 同じ名前の環境変数があれば、そちらが優先されます
+- Windows 側のエディタで編集したら改行コードを LF にしてください（CRLF だと値の末尾に `\r` が付きます）
 
 ## 4. コマンド
 
@@ -97,7 +82,7 @@ quality-gate は SPA と API を**同一オリジン**で動かす前提です�
 | `docker compose up -d db` | リポジトリ直下 | PostgreSQL 17 だけを起動する（DB 名・ユーザー・パスワードはいずれも `qualitygate`、ポート 5432、データは名前付きボリューム `pgdata`） |
 | `./mvnw verify` | `backend/` | コンパイル → 単体テスト（Surefire）→ jar → 結合テスト（Failsafe、`*IT`）。結合テストは **Testcontainers が専用の PostgreSQL を起動する**ため、`db` コンテナは使いません（Docker が動いていればよい）。あわせて `api/openapi.yml` と `frontend/e2e/fixtures/*.json` を生成する。`-DskipFrontend=true` を付けないとフロントエンドもビルドして同梱する |
 | `./mvnw test` | `backend/` | 単体テストだけ（Docker 不要） |
-| `./mvnw spring-boot:run` | `backend/` | アプリを 8080 で起動する。起動時に Flyway がマイグレーションを適用する。日次バッチも同じプロセスで動く |
+| `./mvnw spring-boot:run` | `backend/` | アプリを 8080 で起動する。起動時に Flyway がマイグレーションを適用する |
 | `./mvnw package -DskipTests` | `backend/` | フロントエンドを同梱した実行可能 jar（`target/quality-gate.jar`）を作る |
 | `npm ci` | `frontend/` | `package-lock.json` どおりに依存を入れる |
 | `npm run dev` | `frontend/` | Vite の dev server を 5173 で起動する |
@@ -121,7 +106,7 @@ cd ../frontend && npm run generate:api       # src/api/schema.d.ts を再生成�
 git diff --exit-code api/ frontend/src/api/schema.d.ts
 ```
 
-- `frontend/e2e/fixtures/` の応答例も生成物です。結合テスト（`RunQueryApiIT` / `TrendApiIT` / `ReleaseReportApiIT` / `AdminApiIT` など）が実物の API から書き出し、アクセシビリティ検査がそれで画面を描きます。UUID と時刻は固定値に置き換えます（`FixtureWriter`）。そのままだと実行のたびに差分が出て、同期を検証できないためです
+- `frontend/e2e/fixtures/` の応答例も生成物です。結合テスト（`ReleaseReportApiIT`）が実物の API から書き出し、アクセシビリティ検査がそれで画面を描きます。UUID と時刻は固定値に置き換えます（`FixtureWriter`）。そのままだと実行のたびに差分が出て、同期を検証できないためです
 - DTO を変えたら、springdoc の注意点（8 章）と [API の共通規則](architecture.md#64-openapi-仕様の生成) に従ってください
 
 ## 6. アクセシビリティ検査
@@ -138,10 +123,9 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 
 | 検査する画面 | spec |
 | --- | --- |
-| `/login`・`/forbidden` | `e2e/a11y.spec.ts` |
-| リポジトリ詳細、Run 詳細、違反一覧、トレンド、設定（検証エラーの表示）、利用者管理、リリース判定（技術的な定義を開いた状態） | `e2e/authenticated-a11y.spec.ts` |
+| `/login` | `e2e/a11y.spec.ts` |
+| リリース判定（リリース不可の状態。主な違反と技術的な定義を開いた状態） | `e2e/authenticated-a11y.spec.ts` |
 
-ダッシュボードと監査ログは、応答例の書き出しが無いため検査していません。
 自動検査で見つかるのは WCAG 違反の一部だけです。キーボード操作とフォーカス順序は手で確かめてください。
 
 ## 7. 技術スタック
@@ -150,7 +134,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | --- | --- | --- |
 | 言語 / フレームワーク | Java 25（Temurin）/ Spring Boot 4.1 | Spring MVC + 仮想スレッド（取り込みは I/O 中心。リアクティブの複雑さを負わない） |
 | ビルド | Maven（Wrapper 同梱） | |
-| 認証 | Spring Security（OAuth2 Client）、Spring Session JDBC | |
+| 認証 | Spring Security（フォームログイン、共有の 1 アカウント。セッションはメモリ） | |
 | 永続化 | Spring Data JPA / PostgreSQL 17 / Flyway | |
 | API 仕様 | springdoc-openapi 3.1 | `api/openapi.yml` の生成元 |
 | JSON / XML | Jackson 3（`tools.jackson`）/ StAX | |
@@ -160,7 +144,6 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | UI コンポーネント | PrimeVue 4.5 + `@primevue/themes` | アクセシビリティ対応のため。5.x はライセンス条件が変わったため 4.5 系 |
 | 状態管理 / ルーティング | Pinia / Vue Router | |
 | API 呼び出し | openapi-typescript + openapi-fetch | |
-| グラフ | インライン SVG（`TrendChart.vue`） | [トレンド](features/trends/design.md#3-描画の方式) |
 | テスト（フロントエンド） | Vitest + @vue/test-utils、Playwright + `@axe-core/playwright` | |
 | Lint | ESLint（`eslint-plugin-vue`）+ Prettier | |
 
@@ -175,8 +158,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | Orval + TanStack Query / openapi-generator | ライブラリが増える、生成物が大きい。必要になれば openapi-fetch の上に載せられる |
 | MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` 1 つに閉じてある |
 | Spring WebFlux | 仮想スレッドで足りる |
-| Chart.js / ECharts | インライン SVG で足りる |
-| ShedLock | 単一プロセスのため多重実行の排他は要らない |
+| GitHub でのログイン | 経営陣が GitHub のアカウントを持っていないと見られない。画面は見るだけでロールも要らないため、共有のアカウントで足りる |
 
 ## 8. 実装上の注意（気づきにくい点）
 
@@ -188,10 +170,11 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | Testcontainers 2.x の `PostgreSQLContainer` は非ジェネリック | 型引数を付けずに使う |
 | SPA のフォールバックに `/**/{path}` を登録すると起動に失敗する | `PathResourceResolver` で、静的ファイルとして解決できないパスを index.html に解決し直す（`SpaForwardingConfig`） |
 | SPA のパスまで認証必須にすると、URL を直接開いたときに 401 が返る | `/api/**` だけ認証必須にし、未ログインでもシェルは返して `/api/v1/me` の 401 で `/login` へ誘導する |
+| ログイン（`POST /api/v1/login`）にも CSRF トークンが要る | 画面は先に `/api/v1/me` を GET して `XSRF-TOKEN` Cookie を受け取り、`X-XSRF-TOKEN` ヘッダで送り返す |
 | 複数モジュールを組み立てる設定（`SecurityConfig`）を `platform` に置くと依存規則に違反する | `com.qualitygate.config` に置く |
 | springdoc は入れ子レコードのスキーマ名に単純名を使い、同名の型を**静かに上書きする** | 応答をまたいで一意な名前を付け、`OpenApiExportIT` で検証する |
 | springdoc は既定で `required` も `nullable` も出さず、生成型が全項目省略可能になる | 必ず返す項目に `@NotNull`、null を返しうる項目に `@Schema(nullable = true)` を付ける |
-| 空の環境変数は既定値より優先される。`int` の設定に空文字を渡すと起動に失敗する | 設定の既定値は `QualityGateProperties` にだけ持ち、`application.yml` は未設定のとき空か 0 を渡す |
+| 空の環境変数は既定値より優先される | 設定の既定値は `QualityGateProperties` にだけ持ち、`application.yml` は未設定のとき空を渡す（空は null として受け、既定値にする） |
 | 同梱ブラウザを取得できない環境で Playwright が動かない | `QG_E2E_CHROMIUM` に実行ファイルのパスを渡す |
 
 ## 9. PR の CI（`ci.yml`）
@@ -210,9 +193,9 @@ quality-gate 自身は quality-gate で計測せず（DD-5）、PR の CI で次
 | 症状 | 原因と対処 |
 | --- | --- |
 | ヘッダーだけ表示され本文が空のまま。dev server に `http proxy error: /api/v1/me` / `connect ETIMEDOUT 127.0.0.1:8080` | バックエンドに届いていない。起動しているか確かめる。WSL2 では Vite とバックエンドを**同じ環境**で動かす。Windows 側の IDE でバックエンドを動かすなら `.wslconfig` に `networkingMode=mirrored` を設定する |
-| 「GitHub でログイン」を押すと GitHub の 404 になり、URL に `client_id=placeholder-client-id` が含まれる | `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` が読み込まれていない。3 章の手順で `.env` に書いて再起動する |
-| 起動時に `Client id of registration 'github' must not be empty` で失敗する | `.env` に `QG_GITHUB_CLIENT_ID=` のような空の値がある。値を入れるか行ごと消す |
-| GitHub で `redirect_uri is not associated with this application` と出る | App の Callback URL が `redirect_uri` と一致していない。表示された `redirect_uri` をそのまま Callback URL に足す |
-| 保持期間の設定で起動に失敗する | `QG_RETENTION_*` が下限（Run 30 日・成果物 1 日・監査ログ 365 日）を下回っているか、空の値になっている |
+| 起動時に `QG_REPOSITORY に計測対象のリポジトリを…` で失敗する | `.env` に `QG_REPOSITORY=owner/name` が無い |
+| 起動時に `QG_LOGIN_PASSWORD に…` / `12 文字以上にしてください` で失敗する | `.env` の `QG_LOGIN_PASSWORD` が無いか短い |
+| 起動時に `QG_DISABLED_METRICS には…`・数値の変換エラーで失敗する | 合格ライン（`QG_*`）の値の形式が不正 |
+| ログインしても「ユーザー名かパスワードが違います」と出る | `QG_LOGIN_USERNAME`（既定 `quality`）/ `QG_LOGIN_PASSWORD` と違う。アプリを再起動するとセッションが消え、ログインし直しになる |
 
 疎通は Vite を動かしているのと同じ端末から `curl http://127.0.0.1:8080/actuator/health` で確かめられます。

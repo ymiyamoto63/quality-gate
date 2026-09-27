@@ -51,7 +51,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AccessDeniedException.class)
     public ProblemDetail handleAccessDenied(AccessDeniedException ex) {
         log.warn("権限不足: {}", ex.getMessage());
-        return problemOf(ErrorCode.FORBIDDEN, "この操作には管理者権限が必要です");
+        return problemOf(ErrorCode.FORBIDDEN, "この操作は許可されていません");
     }
 
     /** 本文が JSON として読めない・型が合わない。サーバの異常ではない。 */

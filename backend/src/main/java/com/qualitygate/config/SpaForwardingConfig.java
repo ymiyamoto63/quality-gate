@@ -13,7 +13,7 @@ import java.util.List;
 /**
  * SPA のクライアントサイドルーティングを成立させる。
  *
- * <p>{@code /runs/xxx} のような URL を直接開いた場合、サーバ側にそのパスは無い。
+ * <p>{@code /?ref=v1.2.0} 以外の URL（ブックマークした古い URL など） を直接開いた場合、サーバ側にそのパスは無い。
  * 静的ファイルとして解決できないリクエストを index.html に解決し直し、
  * ルーティングを Vue Router に委ねる。
  *
@@ -27,7 +27,7 @@ public class SpaForwardingConfig implements WebMvcConfigurer {
     private static final String INDEX = "/static/index.html";
 
     private static final List<String> NON_SPA_PREFIXES =
-            List.of("api/", "actuator/", "v3/", "swagger-ui", "oauth2/", "login/", "logout");
+            List.of("api/", "actuator/", "v3/", "swagger-ui");
 
     @Override
     public void addResourceHandlers(ResourceHandlerRegistry registry) {

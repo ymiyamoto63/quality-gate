@@ -11,7 +11,7 @@ import java.util.Locale;
 import java.util.regex.Pattern;
 
 /**
- * リリース判定で指定されたタグ・コミットを、コミット SHA に解決する（UC-06）。
+ * リリース判定で指定されたタグ・コミットを、コミット SHA に解決する。
  *
  * <p>16 進数 7〜40 桁はコミット SHA とみなし、計測済みの Run から探す。それ以外はタグ名とみなし、
  * 収集ランナーが計測時に送ったタグ（計測したコミットを指すタグ）から探す。GitHub API は使わない（DD-10）。
@@ -43,14 +43,7 @@ public class ReleaseRefResolver {
     }
 
     public Resolved resolve(MonitoredRepository repository, String input) {
-        String ref = input == null ? "" : input.strip();
-        if (ref.isEmpty()) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "タグかコミット SHA を指定してください");
-        }
-        if (ref.length() > MAX_LENGTH) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                    "タグかコミット SHA は %d 文字以内で指定してください".formatted(MAX_LENGTH));
-        }
+        String ref = validate(input);
         if (SHA.matcher(ref).matches()) {
             return resolveCommit(repository, ref.toLowerCase(Locale.ROOT));
         }
@@ -59,6 +52,19 @@ public class ReleaseRefResolver {
                         ("タグ %s を付けたコミットの計測がありません。収集ランナーでタグを指定して計測するか、"
                                 + "コミット SHA で指定してください").formatted(ref)));
         return new Resolved(ref, RefType.TAG, commitSha);
+    }
+
+    /** 指定を検証し、前後の空白を除いたものを返す。 */
+    public String validate(String input) {
+        String ref = input == null ? "" : input.strip();
+        if (ref.isEmpty()) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED, "タグかコミット SHA を指定してください");
+        }
+        if (ref.length() > MAX_LENGTH) {
+            throw new ApiException(ErrorCode.VALIDATION_FAILED,
+                    "タグかコミット SHA は %d 文字以内で指定してください".formatted(MAX_LENGTH));
+        }
+        return ref;
     }
 
     /** 計測していない短い SHA は完全な SHA にできないが、判定は「未計測」で変わらないため止めない。 */

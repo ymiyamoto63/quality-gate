@@ -63,6 +63,14 @@ class SkippedTestEvaluatorTest {
     }
 
     @Test
+    void 合格ラインは前回からの増加で示す() {
+        MetricResult result = evaluate(Map.of("max_skipped_increase", 2),
+                List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
+
+        assertThat(result.threshold()).containsEntry("value", 2).containsEntry("basis", "increase");
+    }
+
+    @Test
     void コンポーネントごとに前回と比べる() {
         List<MetricResult> results = evaluate(Map.of(), List.of(
                         report("backend", 10, 0, 0, 1, 0),

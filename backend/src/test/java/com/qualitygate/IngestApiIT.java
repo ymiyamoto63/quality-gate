@@ -1,15 +1,10 @@
 package com.qualitygate;
 
 import com.qualitygate.domain.entity.MonitoredRepository;
-import com.qualitygate.domain.entity.UserAccount;
 import com.qualitygate.domain.model.RunStatus;
-import com.qualitygate.domain.model.UserRole;
-import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.domain.repo.RunSkippedMetricRepository;
-import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -49,10 +44,8 @@ class IngestApiIT {
     int port;
 
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
-    @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired RunRepository runs;
-    @Autowired RunSkippedMetricRepository skippedMetrics;
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired com.qualitygate.platform.storage.ArtifactStore artifactStore;
 
@@ -61,14 +54,6 @@ class IngestApiIT {
     @BeforeEach
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
-        artifacts.deleteAll();
-        skippedMetrics.deleteAll();
-        runs.deleteAll();
-        repositories.deleteAll();
-        users.deleteAll();
-
-        UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
-                UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositories.save(new MonitoredRepository(
                 Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
 
@@ -92,25 +77,15 @@ class IngestApiIT {
                         "branch", "main",
                         "triggeredBy", "github-actions",
                         "measuredAt", "2026-09-21T02:10:00Z",
-                        "tags", java.util.List.of("v1.2.0", "release/2026-09"),
-                        "skippedMetrics", java.util.List.of(
-                                Map.of("metricId", "M-02", "reason", "PR の計測では PIT を実行しない"),
-                                Map.of("metricId", "M-05", "reason", "理由なくスキップを申告した場合"))))
+                        "tags", java.util.List.of("v1.2.0", "release/2026-09")))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID runId = UUID.fromString(String.valueOf(created.getBody().get("runId")));
         assertThat(created.getBody()).containsEntry("attempt", 1);
-        assertThat(String.valueOf(created.getBody().get("detailUrl"))).endsWith(runId.toString());
+        // リンクはこのコミットのリリース判定の画面
+        assertThat(String.valueOf(created.getBody().get("detailUrl"))).endsWith("/?ref=" + COMMIT);
         assertThat(runs.findById(runId).orElseThrow().getTags()).containsExactly("v1.2.0", "release/2026-09");
-
-        // 申告は受け取るが、受理するかは判定時に決める。
-        // 取り込み時点では設定（execution.skippable_metrics）が未解決である。
-        assertThat(skippedMetrics.findByKeyRunId(runId))
-                .extracting("metricId", "accepted")
-                .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-02", false),
-                        org.assertj.core.groups.Tuple.tuple("M-05", false));
 
         // 成果物をアップロードする
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
@@ -141,7 +116,7 @@ class IngestApiIT {
 
         assertThat(finalized.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(finalized.getBody()).containsEntry("status", "EVALUATED")
-                .containsKeys("verdict", "completeness", "detailUrl");
+                .containsKeys("verdict", "detailUrl");
         assertThat(runs.findById(runId).orElseThrow().getStatus()).isEqualTo(RunStatus.EVALUATED);
 
         // 確定後の成果物追加は 409
@@ -201,19 +176,36 @@ class IngestApiIT {
     }
 
     @Test
-    void 初めて送られたリポジトリは既定ブランチとともに登録される() {
+    void 計測対象のリポジトリは初めての送信で既定ブランチとともに登録される() {
+        repositories.deleteAll();
         ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "feature/x",
+                .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "feature/x",
                         "defaultBranch", "develop", "triggeredBy", "collector",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(repositories.findByOwnerAndName("someone", "other")).hasValueSatisfying(repository ->
+        assertThat(repositories.findByOwnerAndName("ymiyamoto63", "quality-gate")).hasValueSatisfying(repository ->
                 assertThat(repository.getDefaultBranch()).isEqualTo("develop"));
+    }
+
+    /** quality-gate は 1 つのアプリだけを見る。取り違えた送信で別のアプリの結果が混ざらないようにする。 */
+    @Test
+    void 計測対象でないリポジトリは拒否される() {
+        ResponseEntity<Map<String, Object>> response = client.post()
+                .uri("/api/v1/runs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
+                        "triggeredBy", "collector", "measuredAt", "2026-09-21T02:10:00Z"))
+                .retrieve().toEntity(JSON_OBJECT);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(String.valueOf(response.getBody().get("detail"))).contains("QG_REPOSITORY");
+        assertThat(runs.findAll()).isEmpty();
     }
 
     @Test
