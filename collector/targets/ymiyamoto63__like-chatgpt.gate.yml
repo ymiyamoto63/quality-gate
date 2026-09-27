@@ -29,7 +29,7 @@ metrics:
     threshold: 60
     components: [backend]
   performance:
-    enabled: true
+    enabled: false
     p95_ms: 500
     arrival_rate_rps: 50          # k6 のシナリオの到達率の合計と一致させる
     error_rate_pct: 0.1

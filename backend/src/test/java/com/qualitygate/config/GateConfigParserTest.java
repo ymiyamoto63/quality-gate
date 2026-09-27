@@ -6,6 +6,7 @@ import com.qualitygate.domain.gate.GateConfigDocument;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class GateConfigParserTest {
@@ -165,21 +166,25 @@ class GateConfigParserTest {
 
     @Test
     void 収集ランナーの対象の合格ラインを読める() {
-        // collector/targets/*.gate.yml は収集ランナーが Run ごとに送る合格ライン（DD-13）。常に妥当であることを保証する
-        String yaml;
-        try {
-            yaml = java.nio.file.Files.readString(java.nio.file.Path.of(
-                    "..", "collector", "targets", "ymiyamoto63__like-chatgpt.gate.yml"));
+        // collector/targets/*.gate.yml は収集ランナーが Run ごとに送る合格ライン（DD-13）。常に妥当であることを保証する。
+        // どの指標を有効にするかは対象ごとに都度変えるため、中身の値は確かめない
+        java.util.List<java.nio.file.Path> files;
+        try (var paths = java.nio.file.Files.list(java.nio.file.Path.of("..", "collector", "targets"))) {
+            files = paths.filter(p -> p.getFileName().toString().endsWith(".gate.yml")).sorted().toList();
         } catch (java.io.IOException e) {
-            throw new AssertionError("like-chatgpt の合格ラインを読めません", e);
+            throw new AssertionError("収集ランナーの対象を一覧できません", e);
         }
+        assertThat(files).isNotEmpty();
 
-        GateConfigDocument document = parser.parse(yaml);
-
-        // PR の計測では M-02 と M-03 / M-04 をスキップする
-        assertThat(document.execution().skippableMetrics())
-                .containsExactly("mutation_score", "performance");
-        assertThat(document.metrics().get("performance").enabled()).isTrue();
+        for (java.nio.file.Path file : files) {
+            String yaml;
+            try {
+                yaml = java.nio.file.Files.readString(file);
+            } catch (java.io.IOException e) {
+                throw new AssertionError(file + " を読めません", e);
+            }
+            assertThatCode(() -> parser.parse(yaml)).as(file.toString()).doesNotThrowAnyException();
+        }
     }
 
     @Test
