@@ -4,21 +4,27 @@
 **WSL2 で作業する場合、リポジトリは Linux ファイルシステム側（`/home/...`）に置いてください。**
 `/mnt/c` 配下はファイル I/O が遅く、ビルドと HMR が体感できるほど遅延します。
 
-**アプリを動かすだけなら、手順 1〜3 で足ります。** ブラウザで `http://localhost:8080` を開いてください。
+**アプリを動かすだけなら、手順 0〜3 で足ります（手順 2 は省略可）。** ブラウザで `http://localhost:8080` を開いてください。
 `spring-boot:run` がフロントエンドのビルドと同梱まで自動で行うため（Node.js も Maven が
 `backend/target/` に取得します）、`npm run dev` は不要です。
 
 ```bash
+# 0. .env を作り、ログイン用 GitHub App の認証情報を書き入れる（「ログイン用の GitHub App」を参照）
+cp .env.example .env
+
 # 1. データベースを起動する
 docker compose up -d db
 
 # 2. バックエンドをビルド・テストする（Testcontainers が PostgreSQL を起動します。動かすだけなら省略可）
-cd backend && ./mvnw verify
+cd backend
+./mvnw verify
 
-# 3. アプリを起動する（GitHub App の設定と .env が必要。「ログイン用の GitHub App」を参照）
-#    画面も API も http://localhost:8080 で配信されます
+# 3. アプリを起動する。画面も API も http://localhost:8080 で配信されます
 ./mvnw spring-boot:run
 ```
+
+`.env` が無い場合も起動はしますが、ログインはできません。`.env.example` をコピーしただけで
+`QG_GITHUB_CLIENT_ID=` が空のままだと、起動時に失敗します（[起動時のよくある症状](troubleshooting.md)）。
 
 **画面（`frontend/`）を開発するときは**、手順 3 の代わりに次の 2 つを別々のターミナルで起動し、
 `http://localhost:5173` を開きます。コードを保存するとブラウザに即時反映（HMR）されます。
@@ -32,8 +38,9 @@ cd backend && ./mvnw spring-boot:run -DskipFrontend=true
 cd frontend && npm ci && npm run dev
 ```
 
-`-DskipFrontend=true` で起動したバックエンドは画面を同梱しないため、
-この場合 `http://localhost:8080` を開いても画面は表示されません（API のみ）。
+`-DskipFrontend=true` で起動したバックエンドはフロントエンドをビルドしないため、`http://localhost:8080` には最新の画面は出ません。
+ただし、以前に `-DskipFrontend` なしでビルドしていると `backend/target/classes/static/` に**そのときの古い画面が残っていて、
+8080 で表示されます**。8080 を API だけにしたい場合は `./mvnw clean spring-boot:run -DskipFrontend=true` で起動してください。
 
 ## ログイン用の GitHub App
 

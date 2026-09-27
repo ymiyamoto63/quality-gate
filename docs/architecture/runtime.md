@@ -17,7 +17,7 @@
     Bearer <QG_INGEST_TOKEN>  POST /api/v1/runs/...    └──────┬──────────────┬─────────┘
                                                               │ JDBC         │ ファイル
                                                               ▼              ▼
-                                                     PostgreSQL 17     data/artifacts/
+                                                     PostgreSQL 17     QG_ARTIFACT_ROOT
                                                      (:5432, Flyway)   （成果物ストア）
                                                               ▲
                               GitHub ◀── OAuth（user-to-server 認可）── Spring Boot
@@ -31,7 +31,7 @@ Vite の dev server は開発の利便性（HMR）のためのもので、本番
 
 | パターン | 起動するもの | ブラウザで開く URL | 用途 |
 | --- | --- | --- | --- |
-| A. 分離起動（通常の開発） | `db` コンテナ / `./mvnw spring-boot:run -DskipFrontend=true` / `npm run dev` | `http://localhost:5173` | 画面を触りながら開発する。フロントの変更は即時反映、バックエンドの変更は再起動で反映 |
+| A. 分離起動（通常の開発） | `db` コンテナ / `./mvnw spring-boot:run -DskipFrontend=true` / `npm run dev` | `http://localhost:5173` | 画面を触りながら開発する。フロントの変更は即時反映、バックエンドの変更は再起動で反映。8080 には以前のビルドで同梱した古い画面が残ることがある（`clean` で消える） |
 | B. 同梱起動 | `db` コンテナ / `./mvnw spring-boot:run` | `http://localhost:8080` | 本番に近い形での動作確認。SPA はビルド時点のものが配信されるため、フロントを直したら再ビルドが必要 |
 | C. すべてコンテナ | `docker compose --profile full up --build` | `http://localhost:8080` | JDK / Node.js を入れずに動かす、またはデモ用 |
 
@@ -41,7 +41,12 @@ DB の接続先は `compose.yaml` で `db:5432` に差し替えられ、`app` �
 通ってから起動します。`app` に渡る環境変数は `compose.yaml` に列挙したもの
 （DB 接続・成果物の保存先・ログイン用 GitHub App の認証情報・Ingest Token・ログの形式）だけで、
 値はリポジトリ直下の `.env` から Docker Compose が変数展開して渡します。
-成果物は `./data/artifacts` にマウントされます。
+成果物は名前付きボリューム `artifacts`（コンテナ内の `/var/lib/quality-gate/artifacts`）に保存され、
+コンテナを作り直しても残ります（消すときは `docker compose down -v`）。`app` のヘルスチェックは
+`/actuator/health` が `UP` を返すかで判定します。
+
+成果物ストアの場所は `QG_ARTIFACT_ROOT`（既定 `./data/artifacts`）で、相対パスは**起動したディレクトリ**から解決されます。
+パターン A / B で `backend/` から起動した場合は `backend/data/artifacts/` になります。
 
 ## フロントエンドとバックエンドの連携
 

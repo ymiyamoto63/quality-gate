@@ -36,7 +36,7 @@ spring:
 
   session:
     jdbc:
-      initialize-schema: never   # スキーマは V007 で管理する
+      initialize-schema: never   # スキーマは Flyway（V001__init.sql）で管理する
     timeout: 8h
 
   servlet:

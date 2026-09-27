@@ -30,8 +30,9 @@ services:
       QG_DB_USERNAME: qualitygate
       QG_DB_PASSWORD: qualitygate
       QG_ARTIFACT_ROOT: /var/lib/quality-gate/artifacts
-      QG_GITHUB_CLIENT_ID: ${QG_GITHUB_CLIENT_ID:-}
-      QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-}
+      # 未設定・空のときは application.yml と同じ仮の値にする（空文字を渡すとアプリが起動に失敗する。ログインはできない）
+      QG_GITHUB_CLIENT_ID: ${QG_GITHUB_CLIENT_ID:-placeholder-client-id}
+      QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-placeholder-client-secret}
       # 収集ランナーが取り込み API に送るトークン（収集ランナーの Secrets の QG_INGEST_TOKEN と同じ値）
       QG_INGEST_TOKEN: ${QG_INGEST_TOKEN:-}
       # データ保持期間（日）。既定は Run 730 / 成果物 90 / 監査ログ 730
@@ -43,12 +44,16 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ./data/artifacts:/var/lib/quality-gate/artifacts
+      # 名前付きボリュームにする。バインドマウント（./data/artifacts）だと Docker がホスト側に root 所有で
+      # ディレクトリを作り、uid 10001 で動くアプリが成果物を書き込めない（名前付きボリュームはイメージ側の所有者を引き継ぐ）
+      - artifacts:/var/lib/quality-gate/artifacts
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:8080/actuator/health"]
+      # 実行イメージ（eclipse-temurin:25-jre）には wget / curl が無いため、bash の /dev/tcp で問い合わせる
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/8080 && printf 'GET /actuator/health HTTP/1.0\\r\\nHost: localhost\\r\\n\\r\\n' >&3 && grep -q '\"status\":\"UP\"' <&3"]
       interval: 10s
       timeout: 3s
       retries: 12
 
 volumes:
   pgdata:
+  artifacts:
