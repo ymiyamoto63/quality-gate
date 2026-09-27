@@ -1,13 +1,12 @@
 #!/usr/bin/env bash
 # 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-12）。
 #
-# 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
+# 使い方: measure.sh <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
 #
 # 対象のテストコードを実行するため、このスクリプトには認証情報を渡さない。
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
-# 計測しない指標とその理由は reports/skipped-metrics.tsv に書き、submit.sh がスキップとして申告する。
-# 合格ライン（*.gate.yml）で無効（enabled: false）にした指標は計測しない（判定に使われないため。申告もしない）。
+# 計測プロファイルの DISABLED_METRICS に書いた指標は計測しない（quality-gate の QG_DISABLED_METRICS とそろえる）。
 #
 # 指標ごとの計測は collector/bin/measure/ に分けてあり、このスクリプトは準備と実行の順序だけを持つ。
 #
@@ -19,29 +18,25 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-[ $# -eq 3 ] || die "使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>"
+[ $# -eq 2 ] || die "使い方: measure.sh <作業ディレクトリ> <reports ディレクトリ>"
 [ -n "${QG_A11Y_TOOL_DIR:-}" ] && [ -n "${QG_COMPLEXITY_TOOL_DIR:-}" ] \
   || die "measure.sh は measure-isolated.sh からコンテナの中で実行してください"
-REPOSITORY=$1
-WORK=$(cd "$2" && pwd)
-mkdir -p "$3"
-REPORTS=$(cd "$3" && pwd)
+WORK=$(cd "$1" && pwd)
+mkdir -p "$2"
+REPORTS=$(cd "$2" && pwd)
 SRC="$WORK/src"
 CACHE=${QG_COLLECTOR_CACHE:-$HOME/.cache/quality-gate-collector}
 
-load_profile "$REPOSITORY"
+load_profile
 load_env "$WORK/meta.env"
 [ "$(git -C "$SRC" rev-parse HEAD)" = "$COMMIT_SHA" ] || die "作業ディレクトリのコミットが meta.env と一致しません"
 
 FAILED=()
 fail() { warn "$1"; FAILED+=("$1"); }
-# skip <指標 ID> <理由>
-skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 は計測しません: $2"; }
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
 mkdir -p "$REPORTS/backend" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
-rm -f "$REPORTS/skipped-metrics.tsv"
 
 MEASURE_DIR="$COLLECTOR_DIR/bin/measure"
 source "$MEASURE_DIR/common.sh"
@@ -50,12 +45,8 @@ for metric in backend-tests mutation complexity frontend-tests accessibility \
   source "$MEASURE_DIR/$metric.sh"
 done
 
-# 何を測るかは合格ラインの enabled で決める。計測プロファイル（*.env）は「どう測るか」だけを持つ
-GATE_CONFIG="$COLLECTOR_DIR/targets/${REPOSITORY/\//__}.gate.yml"
-[ -s "$GATE_CONFIG" ] || die "合格ラインがありません: $GATE_CONFIG"
-DISABLED_METRICS=$(disabled_metrics "$GATE_CONFIG") || die "合格ラインを読めませんでした: $GATE_CONFIG"
-if [ -n "$DISABLED_METRICS" ]; then
-  log "合格ラインで無効の指標は計測しません: ${DISABLED_METRICS//$'\n'/ }"
+if [ -n "${DISABLED_METRICS:-}" ]; then
+  log "計測しない指標（DISABLED_METRICS）: $DISABLED_METRICS"
 fi
 
 # M-08。対象アプリを起動して検査する
@@ -77,22 +68,22 @@ measure_app() {
 # テスト（M-01 / M-09 / M-10）はビルドを兼ね、M-02・M-03 / M-04・M-08 が使う成果物を作るため、常に実行する
 if [ -n "${BACKEND_DIR:-}" ]; then
   measure_backend
-  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && metric_enabled mutation_score; then measure_mutation; fi
-  if metric_enabled cyclomatic_complexity; then measure_complexity; fi
+  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && metric_enabled M-02; then measure_mutation; fi
+  if metric_enabled M-06; then measure_complexity; fi
 fi
 if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend
-  if metric_enabled cyclomatic_complexity; then measure_frontend_complexity; fi
+  if metric_enabled M-06; then measure_frontend_complexity; fi
 fi
-if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ] && metric_enabled accessibility; then
+if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ] && metric_enabled M-08; then
   build_frontend
   measure_app
 fi
-if [ -n "${PERF_SCRIPT:-}" ] && metric_enabled performance; then measure_performance; fi
-if [ -n "${OPENAPI_PATH:-}" ] && metric_enabled api_contract; then measure_breaking_changes; fi
+if [ -n "${PERF_SCRIPT:-}" ] && metric_enabled M-03; then measure_performance; fi
+if [ -n "${OPENAPI_PATH:-}" ] && metric_enabled M-07; then measure_breaking_changes; fi
 # M-05 と M-11 は 1 回の走査で両方を出す
-if metric_enabled vulnerabilities || metric_enabled secrets; then measure_vulnerabilities; fi
-if metric_enabled licenses; then measure_licenses; fi
+if metric_enabled M-05 || metric_enabled M-11; then measure_vulnerabilities; fi
+if metric_enabled M-12; then measure_licenses; fi
 
 log "計測結果:"
 (cd "$REPORTS" && find . -type f ! -name '*.env' ! -name '*.tsv' | sort | sed 's/^/  /') >&2

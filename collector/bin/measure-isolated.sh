@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # measure.sh をコンテナの中で実行する（計測のコンテナ隔離）。
 #
-# 使い方: measure-isolated.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>（measure.sh と同じ）
+# 使い方: measure-isolated.sh <作業ディレクトリ> <reports ディレクトリ>（measure.sh と同じ）
 #
 # 対象のビルド・テストのコードはコンテナの中だけで動く。コンテナに見せるのは次のものだけ:
 #   - 作業ディレクトリと reports ディレクトリ（読み書き）
@@ -19,13 +19,12 @@
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-[ $# -eq 3 ] || die "使い方: measure-isolated.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>"
-REPOSITORY=$1
-WORK=$(cd "$2" && pwd)
-mkdir -p "$3"
-REPORTS=$(cd "$3" && pwd)
+[ $# -eq 2 ] || die "使い方: measure-isolated.sh <作業ディレクトリ> <reports ディレクトリ>"
+WORK=$(cd "$1" && pwd)
+mkdir -p "$2"
+REPORTS=$(cd "$2" && pwd)
 
-load_profile "$REPOSITORY"
+load_profile
 command -v docker >/dev/null || die "docker がありません"
 
 # Node.js の版を完全な版（22.21.1 など）に解決する。.nvmrc には 22 や v22 や lts/* と書かれうる
@@ -50,7 +49,7 @@ BASE_IMAGE=${QG_COLLECTOR_BASE_IMAGE:-eclipse-temurin:${JAVA}-jdk-noble}
 HASH=$({ echo "$BASE_IMAGE"; cat "$COLLECTOR_DIR/runner/Dockerfile" "$COLLECTOR_DIR/a11y/package-lock.json" \
   "$COLLECTOR_DIR/complexity/package-lock.json"; } \
   | sha256sum | cut -c1-12)
-IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-yq${YQ_VERSION}-${HASH}"
+IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-${HASH}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   group "計測用のコンテナの作成（${IMAGE}）"
@@ -58,7 +57,6 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     --build-arg "BASE_IMAGE=$BASE_IMAGE" --build-arg "NODE_VERSION=$NODE" \
     --build-arg "MAVEN_VERSION=$MAVEN_VERSION" \
     --build-arg "TRIVY_VERSION=$TRIVY_VERSION" --build-arg "OASDIFF_VERSION=$OASDIFF_VERSION" \
-    --build-arg "YQ_VERSION=$YQ_VERSION" \
     "$COLLECTOR_DIR"
   endgroup
 fi
@@ -82,4 +80,4 @@ docker run --rm --init \
   -v "$COLLECTOR_DIR:$COLLECTOR_DIR:ro" \
   -v quality-gate-collector-home:/cache/home \
   -w "$WORK" \
-  "$IMAGE" "$COLLECTOR_DIR/bin/measure.sh" "$REPOSITORY" "$WORK" "$REPORTS"
+  "$IMAGE" "$COLLECTOR_DIR/bin/measure.sh" "$WORK" "$REPORTS"

@@ -12,7 +12,7 @@
 # 任意の環境変数:
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
-# 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（DD-13）。
+# 合格ラインは送らない。quality-gate が自分の環境変数（QG_*）の合格ラインで判定する。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -22,34 +22,11 @@ REPORTS=$1
 : "${QG_INGEST_TOKEN:?QG_INGEST_TOKEN が未設定です}"
 
 load_env "$REPORTS/meta.env"
-load_profile "$QG_REPOSITORY"
-
-# 合格ラインが無ければ Run を作らずに止める。既定値で黙って判定すると、意図しない基準で合否が出る
-GATE_CONFIG="${COLLECTOR_DIR}/targets/${QG_REPOSITORY/\//__}.gate.yml"
-[ -s "$GATE_CONFIG" ] || die "合格ラインがありません: $GATE_CONFIG"
+load_profile
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
 # curl の --retry は、一時的な障害（5xx など）を再試行する
-
-# スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
-skipped_json() {
-  local id reason
-  {
-    for id in ${SKIP_METRICS:-}; do
-      jq -n --arg id "$id" '{metricId: $id, reason: "収集ランナーでは計測していないため"}'
-    done
-    if [ -f "$REPORTS/skipped-metrics.tsv" ]; then
-      while IFS=$'\t' read -r id reason; do
-        if [ -n "$id" ]; then
-          jq -n --arg id "$id" --arg reason "$reason" '{metricId: $id, reason: $reason}'
-        fi
-      done < "$REPORTS/skipped-metrics.tsv"
-    fi
-  } | jq -s 'unique_by(.metricId)'
-}
-
-skipped() { [ -f "$REPORTS/skipped-metrics.tsv" ] && cut -f1 "$REPORTS/skipped-metrics.tsv" | grep -qx "$1"; }
 
 REQUEST=$(jq -n \
   --arg repository "$QG_REPOSITORY" \
@@ -57,19 +34,13 @@ REQUEST=$(jq -n \
   --arg baseCommitSha "$BASE_SHA" \
   --arg branch "$BRANCH" \
   --arg defaultBranch "$DEFAULT_BRANCH" \
-  --arg configCommitSha "$(git -C "$COLLECTOR_DIR" rev-parse HEAD 2>/dev/null || true)" \
-  --arg pr "$PR_NUMBER" \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --arg tags "${TAGS:-}" \
-  --argjson skippedMetrics "$(skipped_json)" \
   '{repository: $repository, commitSha: $commitSha, branch: $branch, defaultBranch: $defaultBranch,
     triggeredBy: "collector", measuredAt: $measuredAt,
-    tags: ($tags | split(" ") | map(select(. != ""))),
-    skippedMetrics: $skippedMetrics}
+    tags: ($tags | split(" ") | map(select(. != "")))}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
-   + (if $configCommitSha != "" then {configCommitSha: $configCommitSha} else {} end)
-   + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
 RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
@@ -77,7 +48,7 @@ RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
 echo "Run を作成しました: $RUN_ID"
 
 # upload <type> <file> [component] [metadata]
-# ファイルが無ければ送らない。未提出の指標は quality-gate が ERROR（未計測）として扱う
+# ファイルが無ければ送らない。未提出の指標は quality-gate が ERROR（計測エラー）として扱う
 upload() {
   local type=$1 file=$2 component=${3:-} metadata=${4:-}
   if [ ! -s "$file" ]; then
@@ -92,8 +63,6 @@ upload() {
   echo "送信しました: type=$type ${component:+component=$component }${file#"$REPORTS"/}"
 }
 
-upload quality-gate-config "$GATE_CONFIG"
-
 # コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
 BACKEND=${BACKEND_DIR##*/}
 FRONTEND=${FRONTEND_DIR##*/}
@@ -101,7 +70,7 @@ FRONTEND=${FRONTEND_DIR##*/}
 if [ -n "${BACKEND_DIR:-}" ]; then
   upload jacoco-xml "$REPORTS/backend/jacoco.xml" "$BACKEND"
   # 収集ランナーの PIT は常に全量（変更範囲への絞り込みはしない）
-  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && ! skipped M-02; then
+  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && metric_enabled M-02; then
     upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND" '{"mutationScope":"all"}'
   fi
   upload pmd-xml "$REPORTS/backend/pmd.xml" "$BACKEND"
@@ -131,7 +100,7 @@ fi
 upload sarif "$REPORTS/trivy.sarif" '' '{"scanners":["vuln","secret"]}'
 upload sarif "$REPORTS/trivy-license.sarif" '' '{"scanners":["license"]}'
 # M-03 / M-04。1 ファイル = 1 回の実行。計測環境（と異常終了）は measure.sh が書いた .metadata を添える
-if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
+if [ -n "${PERF_SCRIPT:-}" ] && metric_enabled M-03; then
   found=0
   for summary in "$REPORTS"/perf/k6-summary-*.json; do
     [ -e "$summary" ] || continue
@@ -148,4 +117,4 @@ STATUS=$(echo "$RESULT" | jq -r '.status')
 echo "判定: $(echo "$RESULT" | jq -r '.verdict // "—"')（$(echo "$RESULT" | jq -r '.detailUrl')）"
 # 処理失敗（設定の誤りなど）は計測のやり直しでは直らないため、ワークフローを失敗にして気づけるようにする。
 # 判定結果の不合格（FAIL）はワークフローの失敗にしない（品質の結果であって、計測の失敗ではない）
-[ "$STATUS" = "EVALUATED" ] || die "判定に失敗しました（$(echo "$RESULT" | jq -r '.errorCode')）。理由は Run 詳細を確認してください"
+[ "$STATUS" = "EVALUATED" ] || die "判定に失敗しました（$(echo "$RESULT" | jq -r '.errorCode')）。理由は quality-gate のログを確認してください"

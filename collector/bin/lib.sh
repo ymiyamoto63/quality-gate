@@ -26,23 +26,21 @@ load_env() {
   done < "$file"
 }
 
-# owner/name から計測プロファイルのパスを返す
-profile_path() {
-  local repository=$1
-  [[ "$repository" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
-    || die "リポジトリは owner/name の形式で指定してください: $repository"
-  echo "$COLLECTOR_DIR/targets/${repository/\//__}.env"
-}
+# 計測プロファイル（計測対象は 1 つだけ）
+PROFILE="$COLLECTOR_DIR/target/profile.env"
 
 # 計測プロファイルと版の定義を読む
 load_profile() {
-  local profile
-  profile=$(profile_path "$1")
-  [ -f "$profile" ] || die "計測プロファイルがありません: $profile"
+  [ -f "$PROFILE" ] || die "計測プロファイルがありません: $PROFILE"
   load_env "$COLLECTOR_DIR/versions.env"
-  load_env "$profile"
-  [ "$QG_REPOSITORY" = "$1" ] || die "計測プロファイルの QG_REPOSITORY（$QG_REPOSITORY）が $1 と一致しません"
+  load_env "$PROFILE"
+  [[ "${QG_REPOSITORY:-}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
+    || die "計測プロファイルの QG_REPOSITORY は owner/name の形式で指定してください: ${QG_REPOSITORY:-}"
 }
+
+# 計測しない指標（計測プロファイルの DISABLED_METRICS。quality-gate の QG_DISABLED_METRICS とそろえる）
+# metric_enabled <指標 ID>（M-03 など）
+metric_enabled() { ! grep -qw -- "$1" <<< "${DISABLED_METRICS:-}"; }
 
 group() { echo "::group::$*"; }
 endgroup() { echo "::endgroup::"; }
