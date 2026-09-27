@@ -70,7 +70,7 @@ class IngestApiIT {
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositories.save(new MonitoredRepository(
-                Uuid7.generate(), "ymiyamoto63", "quality-gate", admin.getId()));
+                Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
 
 
         client = RestClient.builder()
@@ -95,7 +95,7 @@ class IngestApiIT {
                         "tags", java.util.List.of("v1.2.0", "release/2026-09"),
                         "skippedMetrics", java.util.List.of(
                                 Map.of("metricId", "M-02", "reason", "PR の計測では PIT を実行しない"),
-                                Map.of("metricId", "M-06", "reason", "理由なくスキップを申告した場合"))))
+                                Map.of("metricId", "M-05", "reason", "理由なくスキップを申告した場合"))))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -110,7 +110,7 @@ class IngestApiIT {
                 .extracting("metricId", "accepted")
                 .containsExactlyInAnyOrder(
                         org.assertj.core.groups.Tuple.tuple("M-02", false),
-                        org.assertj.core.groups.Tuple.tuple("M-06", false));
+                        org.assertj.core.groups.Tuple.tuple("M-05", false));
 
         // 成果物をアップロードする
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
@@ -201,18 +201,19 @@ class IngestApiIT {
     }
 
     @Test
-    void 登録していないリポジトリへは送信できない() {
+    void 初めて送られたリポジトリは既定ブランチとともに登録される() {
         ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
-                .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
-                        "triggeredBy", "ci",
+                .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "feature/x",
+                        "defaultBranch", "develop", "triggeredBy", "collector",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(JSON_OBJECT);
 
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NOT_FOUND);
-        assertThat(runs.findAll()).isEmpty();
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+        assertThat(repositories.findByOwnerAndName("someone", "other")).hasValueSatisfying(repository ->
+                assertThat(repository.getDefaultBranch()).isEqualTo("develop"));
     }
 
     @Test

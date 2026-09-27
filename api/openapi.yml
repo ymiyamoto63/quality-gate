@@ -32,14 +32,12 @@ tags:
   name: Config
 - description: リポジトリ単位の参照
   name: Repositories
-- description: リポジトリの登録と設定（管理者のみ）
-  name: RepositoryAdmin
 - description: 許可リストとロールの管理（管理者のみ）
   name: Users
 paths:
   /api/v1/audit-logs:
     get:
-      operationId: list_4
+      operationId: list_3
       parameters:
       - description: 省略時は to の 30 日前
         in: query
@@ -55,7 +53,7 @@ paths:
         schema:
           type: string
           format: date-time
-      - description: 操作種別（REPOSITORY_UPDATED など）
+      - description: 操作種別（USER_ROLE_CHANGED など）
         in: query
         name: action
         required: false
@@ -110,42 +108,11 @@ paths:
       summary: ログイン中の利用者とロールを返す
       tags:
       - Me
-  /api/v1/repositories:
-    get:
-      operationId: list_3
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryList"
-          description: OK
-      summary: 登録済みのリポジトリを一覧する
-      tags:
-      - Repositories
-    post:
-      operationId: create
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/CreateRepositoryRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryAdminResponse"
-          description: OK
-      summary: リポジトリを登録する
-      tags:
-      - RepositoryAdmin
   /api/v1/repositories/{repositoryId}:
     get:
       description: "指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立\
         てを 2 箇所に持たないため。"
-      operationId: detail
+      operationId: detail_1
       parameters:
       - in: path
         name: repositoryId
@@ -163,31 +130,6 @@ paths:
       summary: リポジトリ詳細を取得する
       tags:
       - Repositories
-    patch:
-      operationId: update_1
-      parameters:
-      - in: path
-        name: repositoryId
-        required: true
-        schema:
-          type: string
-          format: uuid
-      requestBody:
-        content:
-          application/json:
-            schema:
-              $ref: "#/components/schemas/UpdateRepositoryRequest"
-        required: true
-      responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/RepositoryAdminResponse"
-          description: OK
-      summary: リポジトリの設定を更新する（既定ブランチ・有効/無効）
-      tags:
-      - RepositoryAdmin
   /api/v1/repositories/{repositoryId}/config:
     get:
       description: 検証エラーは行番号とキーのパス付きで返す。書いた人が自力で直せるように。
@@ -360,7 +302,7 @@ paths:
   /api/v1/runs/{runId}:
     get:
       description: 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
-      operationId: detail_1
+      operationId: detail
       parameters:
       - in: path
         name: runId
@@ -415,11 +357,6 @@ paths:
           type: string
       - in: query
         name: component
-        required: false
-        schema:
-          type: string
-      - in: query
-        name: scope
         required: false
         schema:
           type: string
@@ -742,84 +679,6 @@ components:
       - hasMore
       - items
       - nextCursor
-    ConfigValidation:
-      type: object
-      description: 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる
-      properties:
-        errors:
-          type: array
-          items:
-            $ref: "#/components/schemas/ValidationErrorItem"
-        rawYaml:
-          type:
-          - string
-          - "null"
-          description: 検証に失敗した設定ファイルの内容
-        runId:
-          type:
-          - string
-          - "null"
-          format: uuid
-          description: 検証に失敗した Run
-        valid:
-          type: boolean
-      required:
-      - errors
-      - rawYaml
-      - runId
-      - valid
-    ConfigVersion:
-      type: object
-      properties:
-        createdAt:
-          type: string
-          format: date-time
-        gateConfigId:
-          type: string
-          format: uuid
-        parsed:
-          type: object
-          additionalProperties: {}
-        rawYaml:
-          type: string
-        sourceCommitSha:
-          type:
-          - string
-          - "null"
-        sourceType:
-          type: string
-        version:
-          type: integer
-          format: int32
-      required:
-      - createdAt
-      - gateConfigId
-      - parsed
-      - rawYaml
-      - sourceCommitSha
-      - sourceType
-      - version
-    CreateRepositoryRequest:
-      type: object
-      properties:
-        defaultBranch:
-          type:
-          - string
-          - "null"
-          description: 省略時は main
-          maxLength: 255
-          minLength: 0
-        name:
-          type: string
-          minLength: 1
-          pattern: "^[A-Za-z0-9._-]{1,100}$"
-        owner:
-          type: string
-          minLength: 1
-          pattern: "^[A-Za-z0-9](?:[A-Za-z0-9]|-(?=[A-Za-z0-9])){0,38}$"
-      required:
-      - name
-      - owner
     CreateRunRequest:
       type: object
       description: Run の作成要求。CI が計測開始時に送信する。
@@ -838,6 +697,16 @@ components:
           description: 計測対象のコミット SHA（40 桁）
           minLength: 1
           pattern: "^[0-9a-f]{40}$"
+        configCommitSha:
+          type: string
+          description: 合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット
+          pattern: "^[0-9a-f]{40}$"
+        defaultBranch:
+          type: string
+          description: 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。トレンドの既定の系列に使う。省略すると登録済みの値のまま（新規は
+            main）
+          maxLength: 255
+          minLength: 1
         measuredAt:
           type: string
           format: date-time
@@ -846,7 +715,7 @@ components:
           format: int32
         repository:
           type: string
-          description: owner/name 形式。Ingest Token の発行元と一致する必要がある
+          description: owner/name 形式。初めて送られたリポジトリは登録される
           example: ymiyamoto63/quality-gate
           minLength: 1
           pattern: "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$"
@@ -1062,31 +931,6 @@ components:
         lastMeasuredAt:
           type: string
           format: date-time
-    GateConfigRef:
-      type: object
-      description: 判定に使った設定版。しきい値を変えても過去の Run は当時の判定のまま
-      properties:
-        gateConfigId:
-          type: string
-          format: uuid
-        sourceCommitSha:
-          type:
-          - string
-          - "null"
-        sourceType:
-          type:
-          - string
-          - "null"
-        version:
-          type:
-          - integer
-          - "null"
-          format: int32
-      required:
-      - gateConfigId
-      - sourceCommitSha
-      - sourceType
-      - version
     LatestRun:
       type: object
       properties:
@@ -1240,27 +1084,21 @@ components:
       - warned
     ReleaseGateConfig:
       type: object
-      description: 合格ラインの版。しきい値を変えた理由は、この版のコミットに残る
+      description: 判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る
       properties:
+        commitSha:
+          type:
+          - string
+          - "null"
+          description: 合格ラインを送った quality-gate リポジトリのコミット
         exclusions:
           type: array
           description: 計測の対象から外したパス
           items:
             type: string
-        sourceCommitSha:
-          type:
-          - string
-          - "null"
-        sourceType:
-          type: string
-        version:
-          type: integer
-          format: int32
       required:
+      - commitSha
       - exclusions
-      - sourceCommitSha
-      - sourceType
-      - version
     ReleaseGuide:
       type: object
       properties:
@@ -1381,7 +1219,7 @@ components:
         gateConfig:
           type: "null"
           $ref: "#/components/schemas/ReleaseGateConfig"
-          description: 判定に使った合格ライン。既定値で判定した場合と未計測では null
+          description: 判定に使った合格ライン。設定ファイルの無い Run と未計測では null
         guides:
           type: array
           description: 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）
@@ -1438,7 +1276,7 @@ components:
           type:
           - string
           - "null"
-          description: 比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ
+          description: 比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。タグで計測したときは前のタグ
         branch:
           type: string
         completeness:
@@ -1466,24 +1304,6 @@ components:
       - measuredAt
       - runId
       - verdict
-    RepositoryAdminResponse:
-      type: object
-      description: 登録・更新したリポジトリ
-      properties:
-        defaultBranch:
-          type: string
-        enabled:
-          type: boolean
-        fullName:
-          type: string
-        repositoryId:
-          type: string
-          format: uuid
-      required:
-      - defaultBranch
-      - enabled
-      - fullName
-      - repositoryId
     RepositoryCard:
       type: object
       properties:
@@ -1504,31 +1324,44 @@ components:
           format: uuid
     RepositoryConfig:
       type: object
-      description: 現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る
+      description: 直近の Run に送られた合格ラインと、その検証結果。版の履歴は Git で見る
       properties:
-        current:
-          type: "null"
-          $ref: "#/components/schemas/ConfigVersion"
-          description: 設定版が 1 つも無ければ null（既定値で判定）
-        defaultYaml:
-          type: string
-          description: 既定値の YAML。設定版が無いときの表示
-        validation:
-          $ref: "#/components/schemas/ConfigValidation"
+        configCommitSha:
+          type:
+          - string
+          - "null"
+          description: 合格ラインを送った quality-gate リポジトリのコミット
+        errors:
+          type: array
+          description: 検証エラー。不正なら判定されず、Run は処理失敗になる
+          items:
+            $ref: "#/components/schemas/ValidationErrorItem"
+        measuredAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+        rawYaml:
+          type:
+          - string
+          - "null"
+          description: 設定ファイルの内容。設定ファイルの無い Run（既定値で判定）では null
+        runId:
+          type:
+          - string
+          - "null"
+          format: uuid
+          description: 直近の Run。まだ計測が無ければ null
       required:
-      - current
-      - defaultYaml
-      - validation
+      - configCommitSha
+      - errors
+      - measuredAt
+      - rawYaml
+      - runId
     RepositoryDetail:
       type: object
       description: リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く
       properties:
-        configVersion:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: 判定に使われている設定の版。既定値なら null
         freshness:
           $ref: "#/components/schemas/RepositoryFreshness"
         lastFullRunId:
@@ -1543,7 +1376,6 @@ components:
         repository:
           $ref: "#/components/schemas/RepositoryItem"
       required:
-      - configVersion
       - freshness
       - lastFullRunId
       - latestRun
@@ -1573,8 +1405,6 @@ components:
           format: date-time
         defaultBranch:
           type: string
-        enabled:
-          type: boolean
         fullName:
           type: string
         name:
@@ -1587,21 +1417,10 @@ components:
       required:
       - createdAt
       - defaultBranch
-      - enabled
       - fullName
       - name
       - owner
       - repositoryId
-    RepositoryList:
-      type: object
-      description: 登録済みのリポジトリ。無効化したものも含む
-      properties:
-        items:
-          type: array
-          items:
-            $ref: "#/components/schemas/RepositoryItem"
-      required:
-      - items
     RepositoryRef:
       type: object
       properties:
@@ -1687,6 +1506,12 @@ components:
           enum:
           - FULL
           - PARTIAL
+        configCommitSha:
+          type:
+          - string
+          - "null"
+          description: 判定に使った合格ライン（collector/targets/*.gate.yml）を送った quality-gate
+            リポジトリのコミット。合格ライン自体は Run の成果物に残る
         evaluatedAt:
           type:
           - string
@@ -1698,10 +1523,6 @@ components:
           description: 処理そのものが失敗した場合のみ。判定結果 FAIL とは別物
         findingSummary:
           $ref: "#/components/schemas/RunFindingSummary"
-        gateConfig:
-          type: "null"
-          $ref: "#/components/schemas/GateConfigRef"
-          description: 判定に使った設定版。既定値で判定した場合は null
         measuredAt:
           type: string
           format: date-time
@@ -1749,10 +1570,10 @@ components:
       - commitSha
       - commitUrl
       - completeness
+      - configCommitSha
       - evaluatedAt
       - failure
       - findingSummary
-      - gateConfig
       - measuredAt
       - pullRequestNumber
       - repository
@@ -2103,20 +1924,6 @@ components:
       - label
       - points
       - seriesId
-    UpdateRepositoryRequest:
-      type: object
-      properties:
-        defaultBranch:
-          type:
-          - string
-          - "null"
-          maxLength: 255
-          minLength: 1
-        enabled:
-          type:
-          - boolean
-          - "null"
-          description: false で無効化（ダッシュボードから外れ、取り込みも拒否される）
     UpdateUserRequest:
       type: object
       properties:

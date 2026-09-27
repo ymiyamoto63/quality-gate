@@ -4,7 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier'
 
 /**
- * `complexity` ルールは M-07（循環的複雑度）の計測元を兼ねる。
+ * `complexity` ルールは M-06（循環的複雑度）の計測元を兼ねる。
  * max を 0 にして「しきい値超過の検出」ではなく「全関数の CC 値の出力」を得る。
  * ベースコミットとの比較は quality-gate 側が行うため、ここでは判定しない。
  * ただし CI のノイズになるため、既定の lint では warn に留める。

@@ -5,9 +5,8 @@
 
 取り込みから表示までの流れ:
 
-1. 送り手が `POST /api/v1/runs` で Run を作成する（`repository` は quality-gate に登録済みで、有効である必要がある）
-2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config` /
-   `git-renames`（ファイルの移動。[指標仕様書 0.4](../spec/02-metrics-spec.md)）など）を
+1. 送り手が `POST /api/v1/runs` で Run を作成する（初めての `repository` はこのとき登録される）
+2. `POST /api/v1/runs/{runId}/artifacts` で成果物（`jacoco-xml` / `pit-xml` / `sarif` / `pmd-xml` / `quality-gate-config`（合格ライン）など）を
    アップロードする。この時点ではパースせず、`QG_ARTIFACT_ROOT` に保存するだけ
 3. `POST /api/v1/runs/{runId}/finalize` で完了を宣言すると、その場で設定の解決 → 正規化 → 判定 → 保存を行い、
    判定結果（`status` / `verdict` / `completeness`）を返す（[03](../spec/03-design-decisions.md) DD-15）。判定に失敗した場合も 200 で、`status` が `FAILED` になる
@@ -31,8 +30,8 @@ openssl rand -hex 32   # この値をバックエンドの QG_INGEST_TOKEN と�
 
 ## ローカルで取り込みを試す
 
-`.env` に `QG_INGEST_TOKEN` を設定してバックエンドを起動し、ADMIN でログインして
-**管理 › リポジトリ管理（S-07）** からリポジトリを登録します。その後、たとえば次のように取り込みを試せます
+`.env` に `QG_INGEST_TOKEN` を設定してバックエンドを起動します。リポジトリは最初の Run 作成で登録されるため、
+画面での登録は要りません。たとえば次のように取り込みを試せます
 （`./mvnw verify` 済みで JaCoCo のレポートがある前提）。
 
 ```bash

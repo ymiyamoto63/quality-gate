@@ -7,17 +7,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
-/** リポジトリの参照（一覧と S-02 リポジトリ詳細）。 */
+/** リポジトリの参照（S-02 リポジトリ詳細）。 */
 public final class RepositoryResponses {
 
     private RepositoryResponses() {
-    }
-
-    @Schema(description = "登録済みのリポジトリ。無効化したものも含む")
-    public record RepositoryList(@NotNull List<RepositoryItem> items) {
     }
 
     public record RepositoryItem(
@@ -26,7 +21,6 @@ public final class RepositoryResponses {
             @NotNull String owner,
             @NotNull String name,
             @NotNull String defaultBranch,
-            @NotNull boolean enabled,
             @NotNull Instant createdAt) {
     }
 
@@ -36,9 +30,7 @@ public final class RepositoryResponses {
             @NotNull @Schema(nullable = true, description = "判定済みの最新 Run。まだ無ければ null")
             LatestRunSummary latestRun,
             @NotNull @Schema(nullable = true) UUID lastFullRunId,
-            @NotNull RepositoryFreshness freshness,
-            @NotNull @Schema(nullable = true, description = "判定に使われている設定の版。既定値なら null")
-            Integer configVersion) {
+            @NotNull RepositoryFreshness freshness) {
     }
 
     public record LatestRunSummary(

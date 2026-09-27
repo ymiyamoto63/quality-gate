@@ -217,7 +217,7 @@ class MutationScoreEvaluatorTest {
                                              List<RawMeasurement> measurements) {
         GateThresholds thresholds = thresholdsWith("mutation_score",
                 Map.of("threshold", 60, "components", List.copyOf(components)));
-        NormalizedInput input = input(measurements, List.of(), List.of(), Set.of("M-02"));
+        NormalizedInput input = input(measurements, List.of(), Set.of("M-02"));
         return new EvaluationContext(run(), thresholds, input, previous, !previous.isEmpty());
     }
 

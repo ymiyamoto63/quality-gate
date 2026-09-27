@@ -45,7 +45,7 @@ public record QualityGateProperties(
     }
 
     /**
-     * データ保持期間（日。docs/spec/06-database-design.md 7 章）。0 以下なら既定値。
+     * データ保持期間（日。docs/spec/06-database-design.md）。0 以下なら既定値。
      *
      * <p>下限を設けるのは、誤って短い日数を設定すると日次バッチが大半のデータを消すため。下限を下回れば起動しない。
      *

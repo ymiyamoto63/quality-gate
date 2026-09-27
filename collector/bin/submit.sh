@@ -57,17 +57,20 @@ REQUEST=$(jq -n \
   --arg commitSha "$COMMIT_SHA" \
   --arg baseCommitSha "$BASE_SHA" \
   --arg branch "$BRANCH" \
+  --arg defaultBranch "$DEFAULT_BRANCH" \
+  --arg configCommitSha "$(git -C "$COLLECTOR_DIR" rev-parse HEAD 2>/dev/null || true)" \
   --arg pr "$PR_NUMBER" \
   --arg triggeredBy "${QG_TRIGGERED_BY:-collector}" \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --arg tags "${TAGS:-}" \
   --argjson skippedMetrics "$(skipped_json)" \
-  '{repository: $repository, commitSha: $commitSha, branch: $branch,
+  '{repository: $repository, commitSha: $commitSha, branch: $branch, defaultBranch: $defaultBranch,
     triggeredBy: $triggeredBy, measuredAt: $measuredAt,
     tags: ($tags | split(" ") | map(select(. != ""))),
     skippedMetrics: $skippedMetrics}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
+   + (if $configCommitSha != "" then {configCommitSha: $configCommitSha} else {} end)
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
@@ -75,10 +78,10 @@ RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
   -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
 echo "Run を作成しました: $RUN_ID"
 
-# upload <type> <file> [component] [scope] [metadata]
+# upload <type> <file> [component] [metadata]
 # ファイルが無ければ送らない。未提出の指標は quality-gate が ERROR（未計測）として扱う
 upload() {
-  local type=$1 file=$2 component=${3:-} scope=${4:-} metadata=${5:-}
+  local type=$1 file=$2 component=${3:-} metadata=${4:-}
   if [ ! -s "$file" ]; then
     warn "成果物がありません（type=$type）: $file"
     return 0
@@ -87,14 +90,11 @@ upload() {
   [ -n "$metadata" ] && args+=(-F "metadata=${metadata}")
   local query="type=${type}"
   [ -n "$component" ] && query="${query}&component=${component}"
-  [ -n "$scope" ] && query="${query}&scope=${scope}"
   curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
-  echo "送信しました: type=$type ${component:+component=$component }${scope:+scope=$scope }${file#"$REPORTS"/}"
+  echo "送信しました: type=$type ${component:+component=$component }${file#"$REPORTS"/}"
 }
 
 upload quality-gate-config "$GATE_CONFIG"
-# ファイルの移動・リネーム。移動しただけのファイルの違反を新規・解消として扱わないために使われる
-upload git-renames "$REPORTS/renames.json"
 
 # コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
 BACKEND=${BACKEND_DIR##*/}
@@ -104,14 +104,10 @@ if [ -n "${BACKEND_DIR:-}" ]; then
   upload jacoco-xml "$REPORTS/backend/jacoco.xml" "$BACKEND"
   # 収集ランナーの PIT は常に全量（変更範囲への絞り込みはしない）
   if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && ! skipped M-02; then
-    upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND" '' '{"mutationScope":"all"}'
+    upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND" '{"mutationScope":"all"}'
   fi
-  upload pmd-xml "$REPORTS/backend/pmd.xml" "$BACKEND" head
-  # base の解析結果があれば、M-07 は「新規・悪化した関数」を判定できる
-  if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/backend/pmd-base.xml" ]; then
-    upload pmd-xml "$REPORTS/backend/pmd-base.xml" "$BACKEND" base
-  fi
-  # M-10 / M-11 はすべてのテストの結果（test-junit-xml）
+  upload pmd-xml "$REPORTS/backend/pmd.xml" "$BACKEND"
+  # M-09 / M-10 はすべてのテストの結果（test-junit-xml）
   found=0
   for junit in "$REPORTS"/tests/backend/TEST-*.xml; do
     [ -e "$junit" ] || continue
@@ -123,28 +119,25 @@ fi
 if [ -n "${FRONTEND_DIR:-}" ]; then
   upload lcov "$REPORTS/frontend-coverage/lcov.info" "$FRONTEND"
   upload test-junit-xml "$REPORTS/tests/frontend/junit.xml" "$FRONTEND"
-  upload eslint-json "$REPORTS/frontend/eslint.json" "$FRONTEND" head
-  if [ -n "$BASE_SHA" ] && [ -s "$REPORTS/frontend/eslint-base.json" ]; then
-    upload eslint-json "$REPORTS/frontend/eslint-base.json" "$FRONTEND" base
-  fi
+  upload eslint-json "$REPORTS/frontend/eslint.json" "$FRONTEND"
 fi
 [ -z "${A11Y_PAGES:-}" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
 if [ -n "${OPENAPI_PATH:-}" ]; then
   if [ -e "$REPORTS/oasdiff-base-spec-missing" ]; then
-    upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND" '' '{"baseSpecMissing":true}'
+    upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND" '{"baseSpecMissing":true}'
   else
     upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND"
   fi
 fi
-# 走査した対象を申告する（申告の無い SARIF は、すべて M-06 として読まれる）
-upload sarif "$REPORTS/trivy.sarif" '' '' '{"scanners":["vuln","secret"]}'
-upload sarif "$REPORTS/trivy-license.sarif" '' '' '{"scanners":["license"]}'
-# M-03〜05。1 ファイル = 1 回の実行。計測環境（と異常終了）は measure.sh が書いた .metadata を添える
+# 走査した対象を申告する（申告の無い SARIF は、すべて M-05 として読まれる）
+upload sarif "$REPORTS/trivy.sarif" '' '{"scanners":["vuln","secret"]}'
+upload sarif "$REPORTS/trivy-license.sarif" '' '{"scanners":["license"]}'
+# M-03 / M-04。1 ファイル = 1 回の実行。計測環境（と異常終了）は measure.sh が書いた .metadata を添える
 if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
   found=0
   for summary in "$REPORTS"/perf/k6-summary-*.json; do
     [ -e "$summary" ] || continue
-    upload k6-summary "$summary" "$BACKEND" '' "$(cat "$summary.metadata")"
+    upload k6-summary "$summary" "$BACKEND" "$(cat "$summary.metadata")"
     found=1
   done
   [ "$found" -eq 1 ] || warn "成果物がありません（type=k6-summary）: $REPORTS/perf/"

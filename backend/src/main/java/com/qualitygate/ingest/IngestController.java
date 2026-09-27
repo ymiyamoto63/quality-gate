@@ -65,13 +65,12 @@ public class IngestController {
             @RequestPart("file") MultipartFile file,
             @RequestParam("type") String type,
             @RequestParam(value = "component", required = false) String component,
-            @RequestParam(value = "scope", required = false) String scope,
             @RequestParam(value = "metadata", required = false) String metadata) {
 
         ArtifactType artifactType = parseType(type);
         try (InputStream content = file.getInputStream()) {
             ArtifactRecord record = ingestService.storeArtifact(runId,
-                    artifactType, originalName(file), component, scope, metadata,
+                    artifactType, originalName(file), component, metadata,
                     content, file.getSize());
             return ResponseEntity.accepted().body(new UploadArtifactResponse(
                     record.getId(), record.getSizeBytes(), record.getSha256()));

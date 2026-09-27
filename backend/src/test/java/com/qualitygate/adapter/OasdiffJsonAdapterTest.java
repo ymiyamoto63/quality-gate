@@ -46,7 +46,7 @@ class OasdiffJsonAdapterTest {
                 """, Map.of());
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-08");
+        assertThat(measurement.metricId()).isEqualTo("M-07");
         assertThat(measurement.value()).isEqualByComparingTo("1");
         assertThat(measurement.detail())
                 .containsEntry("breaking", 1L)
@@ -134,6 +134,6 @@ class OasdiffJsonAdapterTest {
 
     private NormalizedReport parse(String json, Map<String, Object> metadata) {
         return adapter.parse(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext(null, null, List.of(), metadata));
+                new ParseContext(null, List.of(), metadata));
     }
 }

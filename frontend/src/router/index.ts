@@ -6,7 +6,6 @@ import ForbiddenView from '@/views/ForbiddenView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
 import RepositoryDetailView from '@/views/RepositoryDetailView.vue'
 import ConfigView from '@/views/ConfigView.vue'
-import AdminRepositoriesView from '@/views/AdminRepositoriesView.vue'
 import AdminView from '@/views/AdminView.vue'
 import RunDetailView from '@/views/RunDetailView.vue'
 import FindingListView from '@/views/FindingListView.vue'
@@ -60,12 +59,6 @@ const routes: RouteRecordRaw[] = [
     name: 'findings',
     component: FindingListView,
     meta: { title: '違反一覧' },
-  },
-  {
-    path: '/admin/repositories',
-    name: 'admin-repositories',
-    component: AdminRepositoriesView,
-    meta: { title: 'リポジトリ管理', adminOnly: true },
   },
   {
     path: '/admin/users',

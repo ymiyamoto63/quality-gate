@@ -17,12 +17,19 @@ import java.util.TreeMap;
  *
  * <p>全体とシナリオ単位の<strong>双方</strong>で判定する。全体だけを見ると、
  * リクエスト数の多い軽いエンドポイントが重いエンドポイントの遅さを薄めてしまう。
+ *
+ * <p>到達率（スループット）は達成値を競う指標ではなく、<strong>応答時間を測るための負荷条件</strong>として扱う。
+ * 実測の成功スループットが設定到達率の 95% を下回った場合は、アプリが捌けずキューが詰まり
+ * p95 が楽観的に出ている疑いがあるため、WARN を付ける。
  */
 @Component
 public class ResponseTimeEvaluator extends PerformanceEvaluator {
 
     /** 3 回の p95 のばらつきがこれを超えたら、計測環境が不安定とみなす。 */
     static final BigDecimal UNSTABLE_CV_PCT = BigDecimal.valueOf(20);
+
+    /** 実測の成功スループットがこの割合を下回ったら、負荷条件を満たしていないとみなす。 */
+    static final BigDecimal ARRIVAL_WARN_RATIO = new BigDecimal("0.95");
 
     @Override
     public String metricId() {
@@ -40,6 +47,7 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
         threshold.put("operator", "<=");
         threshold.put("value", limits.p95Ms());
         threshold.put("warnAboveMs", limits.p95WarnMs());
+        threshold.put("arrivalRateRps", limits.arrivalRateRps());
         return threshold;
     }
 
@@ -48,6 +56,7 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
                                     GateThresholds.Performance limits) {
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("scenarios", scenarioMedians(runs));
+        detail.put("successRateRps", successRate(runs));
         detail.put("p95Runs", runs.stream().map(RawMeasurement::value).toList());
         detail.put("coefficientOfVariationPct", PerformanceSample.coefficientOfVariation(
                 runs.stream().map(RawMeasurement::value).toList()));
@@ -83,6 +92,15 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
                     .formatted(String.join("、", parts), plain(limits.p95Ms())));
         }
 
+        BigDecimal throughput = successRate(runs);
+        BigDecimal floor = limits.arrivalRateRps().multiply(ARRIVAL_WARN_RATIO);
+        if (throughput.compareTo(floor) < 0) {
+            return new Judgement(MeasurementStatus.WARN,
+                    ("p95 %sms は合格ラインを満たしますが、成功スループット %s req/s が設定到達率 %s req/s の 95%% を"
+                            + "下回っています。処理が追いつかず、p95 が実態より良く出ている可能性があります")
+                            .formatted(plain(median), plain(throughput), plain(limits.arrivalRateRps())));
+        }
+
         BigDecimal cv = PerformanceSample.coefficientOfVariation(
                 runs.stream().map(RawMeasurement::value).toList());
         if (cv.compareTo(UNSTABLE_CV_PCT) > 0) {
@@ -100,6 +118,15 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
         }
         return new Judgement(MeasurementStatus.PASS, "p95 %sms は合格ライン %sms 以内です"
                 .formatted(plain(median), plain(limits.p95Ms())));
+    }
+
+    /** 成功スループット（req/s）の中央値。 */
+    static BigDecimal successRate(List<RawMeasurement> runs) {
+        return PerformanceSample.median(runs.stream()
+                .map(run -> run.detail().get("successRate") instanceof Number number
+                        ? new BigDecimal(number.toString())
+                        : BigDecimal.ZERO)
+                .toList());
     }
 
     /** シナリオごとの p95 の中央値。 */

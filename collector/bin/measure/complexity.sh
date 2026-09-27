@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# M-07: 循環的複雑度。バックエンドは PMD、フロントエンドは ESLint の complexity ルールで、head と base の両方を解析する。
+# M-06: 循環的複雑度。バックエンドは PMD、フロントエンドは ESLint の complexity ルールで、計測するコミットを解析する。
 # measure.sh が source する（単独では実行しない）。
 
 pmd_bin() {
@@ -23,21 +23,10 @@ run_pmd() {
 
 measure_complexity() {
   local sources="$SRC/$BACKEND_DIR/src/main/java"
-  [ -d "$sources" ] || { fail "M-07: $BACKEND_DIR/src/main/java がありません"; return; }
+  [ -d "$sources" ] || { fail "M-06: $BACKEND_DIR/src/main/java がありません"; return; }
   group "循環的複雑度（PMD ${PMD_VERSION}）"
-  PMD=$(pmd_bin) || { fail "M-07: PMD を取得できませんでした"; endgroup; return; }
-  run_pmd "$sources" "$REPORTS/backend/pmd.xml" || fail "M-07: PMD（head）の実行に失敗しました"
-
-  # base は別の作業ツリーで解析する。PMD のパスは quality-gate がモジュール相対（src/...）に寄せるため、
-  # 置き場所が違っても同じ関数として比較される
-  if [ -d "$WORK/base" ]; then
-    if [ -d "$WORK/base/$BACKEND_DIR/src/main/java" ]; then
-      run_pmd "$WORK/base/$BACKEND_DIR/src/main/java" "$REPORTS/backend/pmd-base.xml" \
-        || fail "M-07: PMD（base）の実行に失敗しました"
-    else
-      log "base に $BACKEND_DIR/src/main/java が無いため、base の解析を省きます"
-    fi
-  fi
+  PMD=$(pmd_bin) || { fail "M-06: PMD を取得できませんでした"; endgroup; return; }
+  run_pmd "$sources" "$REPORTS/backend/pmd.xml" || fail "M-06: PMD の実行に失敗しました"
   endgroup
 }
 
@@ -57,18 +46,18 @@ run_eslint() {
     rm -f "$output.raw"
     return 1
   fi
-  # 作業ツリーの場所（head と base で違う）をパスから外し、/<FRONTEND_DIR>/src/... の形にそろえる。
+  # 作業ツリーの場所（計測ごとに違う）をパスから外し、/<FRONTEND_DIR>/src/... の形にそろえる。
   # quality-gate はこの形からモジュール相対（src/...）とリポジトリ相対（frontend/src/...）のパスを求める
   jq --arg root "$root" 'map(.filePath |= ltrimstr($root))' "$output.raw" > "$output"
   rm -f "$output.raw"
   local unreadable
   unreadable=$(jq '[.[] | select(any(.messages[]; .fatal == true))] | length' "$output")
-  [ "$unreadable" -eq 0 ] || warn "M-07: 構文を読めず、関数を数えられなかったファイルがあります（${unreadable} 件）"
+  [ "$unreadable" -eq 0 ] || warn "M-06: 構文を読めず、関数を数えられなかったファイルがあります（${unreadable} 件）"
 }
 
 measure_frontend_complexity() {
   COMPLEXITY_TOOL="$WORK/complexity-tool"
-  [ -d "$SRC/$FRONTEND_DIR" ] || { fail "M-07: $FRONTEND_DIR がありません"; return; }
+  [ -d "$SRC/$FRONTEND_DIR" ] || { fail "M-06: $FRONTEND_DIR がありません"; return; }
   group "循環的複雑度（フロントエンド、ESLint の complexity ルール）"
   if ! (
     set -e
@@ -84,18 +73,10 @@ measure_frontend_complexity() {
       npm ci --no-audit --no-fund
     fi
   ); then
-    fail "M-07: ESLint を用意できませんでした（フロントエンドの複雑度は送られません）"; endgroup; return
+    fail "M-06: ESLint を用意できませんでした（フロントエンドの複雑度は送られません）"; endgroup; return
   fi
 
-  run_eslint "$SRC" "$REPORTS/frontend/eslint.json" || fail "M-07: ESLint（head）の実行に失敗しました"
-  if [ -d "$WORK/base" ]; then
-    if [ -d "$WORK/base/$FRONTEND_DIR" ]; then
-      run_eslint "$WORK/base" "$REPORTS/frontend/eslint-base.json" \
-        || fail "M-07: ESLint（base）の実行に失敗しました"
-    else
-      log "base に $FRONTEND_DIR が無いため、base の解析を省きます"
-    fi
-  fi
+  run_eslint "$SRC" "$REPORTS/frontend/eslint.json" || fail "M-06: ESLint の実行に失敗しました"
   rm -rf "$COMPLEXITY_TOOL"
   endgroup
 }

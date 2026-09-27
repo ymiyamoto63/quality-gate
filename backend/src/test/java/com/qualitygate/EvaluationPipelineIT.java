@@ -1,7 +1,6 @@
 package com.qualitygate;
 
 import com.qualitygate.domain.entity.ArtifactRecord;
-import com.qualitygate.domain.entity.GateConfig;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
@@ -28,7 +27,6 @@ import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.config.GateConfigService;
 import com.qualitygate.domain.gate.ConfigValidationException;
-import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
 import com.qualitygate.normalize.ReportNormalizer;
@@ -117,6 +115,9 @@ class EvaluationPipelineIT {
             </pmd>
             """;
 
+    /** 複雑度がしきい値（15）にも注意水準（11）にも届かない関数だけの PMD の結果。 */
+    private static final String PMD_SIMPLE = PMD.replace("big", "small").replace("of 20", "of 8");
+
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
     @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
@@ -130,7 +131,6 @@ class EvaluationPipelineIT {
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
     @Autowired GateConfigService gateConfigService;
-    @Autowired GateConfigRepository gateConfigs;
 
     private UUID repositoryId;
 
@@ -142,22 +142,21 @@ class EvaluationPipelineIT {
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
         runs.deleteAll();
-        gateConfigs.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", admin.getId())).getId();
+                "ymiyamoto63", "quality-gate", "main")).getId();
     }
 
     @Test
     void 脆弱性があれば不合格になり読み取りモデルに反映される() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_HIGH);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_HIGH);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
@@ -178,18 +177,17 @@ class EvaluationPipelineIT {
                         // 専有ランナーで 3 回、p95 300ms 前後・エラー 0 件なので性能は合格
                         org.assertj.core.groups.Tuple.tuple("M-03", MeasurementStatus.PASS),
                         org.assertj.core.groups.Tuple.tuple("M-04", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-05", MeasurementStatus.PASS),
                         // High 1 件で不合格
+                        org.assertj.core.groups.Tuple.tuple("M-05", MeasurementStatus.FAIL),
+                        // 複雑度 20 の関数が 1 件あり不合格
                         org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.FAIL),
-                        // ベース比較ができないため新規関数数は 0 で合格
-                        org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
                         // 破壊的変更は無い
-                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-07", MeasurementStatus.PASS),
                         // 重大なアクセシビリティ違反は無い
-                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-08", MeasurementStatus.PASS),
                         // テストはすべて成功し、スキップも無い
-                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-09", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-10", MeasurementStatus.PASS));
 
         // 初回 Run なので違反はすべて INITIAL。NEW にすると
         // 「この変更が問題を持ち込んだ」という誤った表示になる
@@ -225,7 +223,7 @@ class EvaluationPipelineIT {
     @Test
     void 成果物が無い指標は申告が無ければ不合格になる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
 
         Run evaluated = evaluate(run);
 
@@ -234,22 +232,22 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
-                .containsExactlyInAnyOrder("M-02", "M-06", "M-07", "M-08", "M-09", "M-10", "M-11");
+                .containsExactlyInAnyOrder("M-02", "M-05", "M-06", "M-07", "M-08", "M-09", "M-10");
     }
 
     @Test
     void 申告されたスキップは未計測として扱われ部分計測になる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         // 既定の skippable_metrics は mutation_score / performance のみ。
         // 複雑度のスキップを受理させるには設定でそう書く必要がある。
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 execution:
                   skippable_metrics: [cyclomatic_complexity]
                 """);
-        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07",
+        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-06",
                 "PR の計測では実行しない"));
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
@@ -267,16 +265,16 @@ class EvaluationPipelineIT {
     @Test
     void 許容されないスキップ申告は計測エラーになる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         // 既定の設定は複雑度のスキップを許容していない
-        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07", "理由なく省略"));
+        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-06", "理由なく省略"));
 
         Run evaluated = evaluate(run);
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-07"))
+                .filteredOn(m -> m.getMetricId().equals("M-06"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
@@ -287,14 +285,14 @@ class EvaluationPipelineIT {
     @Test
     void 形式不正の成果物は該当指標だけが計測エラーになる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "broken.sarif", null, null, "{\"not\":\"sarif\"}");
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "broken.sarif", null, "{\"not\":\"sarif\"}");
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
 
         evaluate(run);
 
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-06"))
+                .filteredOn(m -> m.getMetricId().equals("M-05"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
@@ -311,36 +309,36 @@ class EvaluationPipelineIT {
     void 二回目のRunでは前回との差分から新規と解消を判定する() {
         // 1 回目: High 1 件
         Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
-        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(first, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_HIGH);
-        attach(first, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(first, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_HIGH);
+        attach(first, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         evaluate(first);
 
         // 2 回目: 脆弱性は解消し、代わりに別の高が出る
         String other = TRIVY_HIGH.replace("CVE-2026-1234", "CVE-2026-5678")
                 .replace("example-lib", "another-lib");
         Run second = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(second, ArtifactType.SARIF, "trivy.sarif", null, null, other);
-        attach(second, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(second, ArtifactType.SARIF, "trivy.sarif", null, other);
+        attach(second, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         evaluate(second);
 
         var states = findings.findByRunId(second.getId()).stream()
-                .filter(f -> f.getMetricId().equals("M-06"))
+                .filter(f -> f.getMetricId().equals("M-05"))
                 .toList();
 
         assertThat(states).extracting(f -> f.getState())
                 .containsExactlyInAnyOrder(FindingState.NEW, FindingState.RESOLVED);
         // 複雑度の違反は前回から継続している
         assertThat(findings.findByRunId(second.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-07"))
+                .filteredOn(f -> f.getMetricId().equals("M-06"))
                 .allSatisfy(f -> assertThat(f.getState()).isEqualTo(FindingState.CONTINUING));
     }
 
     @Test
     void ミューテーションスコアは対象のbackendだけを判定しfrontendは対象外と示す() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   mutation_score:
@@ -358,8 +356,8 @@ class EvaluationPipelineIT {
                   performance:
                     enabled: false
                 """);
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.LCOV, "lcov.info", "frontend", null,
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
                 "SF:src/api/format.ts\nBRF:10\nBRH:9\nend_of_record\n");
         attachPit(run, "changed");
 
@@ -410,9 +408,9 @@ class EvaluationPipelineIT {
     @Test
     void アクセシビリティ違反は不合格にするがダッシュボードの脆弱性件数には数えない() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         attachPit(run, "changed");
         // 別の成果物で同じ画面を検査した結果（ライト / ダークなど）は、同じ違反として 1 件に数える
         String violation = """
@@ -429,14 +427,14 @@ class EvaluationPipelineIT {
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-09"))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL);
                     assertThat(m.getValue()).isEqualByComparingTo("1");
                 });
         assertThat(findings.findByRunId(run.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-09"))
+                .filteredOn(f -> f.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(f -> {
                     assertThat(f.getSeverity()).isEqualTo(Severity.CRITICAL);
@@ -449,7 +447,7 @@ class EvaluationPipelineIT {
     @Test
     void 設定したページが検査されていなければアクセシビリティは計測エラー() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   accessibility:
@@ -464,7 +462,7 @@ class EvaluationPipelineIT {
         // 検査していない画面まで「違反 0 件」と表示される
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-09"))
+                .filteredOn(m -> m.getMetricId().equals("M-08"))
                 .singleElement()
                 .satisfies(m -> {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.ERROR);
@@ -475,14 +473,14 @@ class EvaluationPipelineIT {
     @Test
     void 破壊的変更は不合格になり違反として残る() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
-        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend",
                 JUNIT_CLEAN);
-        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, """
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, """
                 [{ "id": "api-path-removed-without-deprecation",
                    "text": "api path removed without deprecation",
                    "level": 3, "operation": "GET", "path": "/api/v1/runs" }]
@@ -492,12 +490,12 @@ class EvaluationPipelineIT {
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .filteredOn(m -> m.getMetricId().equals("M-07"))
                 .singleElement()
                 .satisfies(m -> assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL));
         // API のパスはファイルではない。GitHub へのリンクを作らない
         assertThat(findings.findByRunId(run.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-08"))
+                .filteredOn(f -> f.getMetricId().equals("M-07"))
                 .singleElement()
                 .satisfies(f -> {
                     assertThat(f.getFilePath()).isNull();
@@ -528,15 +526,15 @@ class EvaluationPipelineIT {
                     min_success_rate: 100
                 """;
         Run first = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(first, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, config);
-        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(first, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", null, """
+        attach(first, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, config);
+        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(first, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", """
                 <testsuite name="A">
                   <testcase classname="A" name="a"/>
                   <testcase classname="A" name="b"><skipped/></testcase>
                 </testsuite>
                 """);
-        attach(first, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", null, """
+        attach(first, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", """
                 <testsuites><testsuite name="src/a.spec.ts">
                   <testcase classname="src/a.spec.ts" name="a"/>
                 </testsuite></testsuites>
@@ -545,16 +543,16 @@ class EvaluationPipelineIT {
 
         // 2 回目: backend のスキップが 1 件増え、frontend のテストが 1 件失敗した
         Run second = createRun(Instant.parse("2026-09-23T00:00:00Z"));
-        attach(second, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, config);
-        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(second, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", null, """
+        attach(second, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, config);
+        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(second, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", """
                 <testsuite name="A">
                   <testcase classname="A" name="a"/>
                   <testcase classname="A" name="b"><skipped/></testcase>
                   <testcase classname="A" name="c"><skipped/></testcase>
                 </testsuite>
                 """);
-        attach(second, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", null, """
+        attach(second, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", """
                 <testsuites><testsuite name="src/a.spec.ts">
                   <testcase classname="src/a.spec.ts" name="a"><failure message="boom"/></testcase>
                 </testsuite></testsuites>
@@ -566,17 +564,17 @@ class EvaluationPipelineIT {
                 .extracting(Measurement::getMetricId, Measurement::getComponentName,
                         Measurement::getStatus)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-10", "backend", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-10", "frontend", MeasurementStatus.FAIL),
-                        org.assertj.core.groups.Tuple.tuple("M-11", "backend", MeasurementStatus.FAIL),
-                        org.assertj.core.groups.Tuple.tuple("M-11", "frontend", MeasurementStatus.PASS));
-        // 失敗したテストは M-10、スキップしたテストは M-11 の違反として残る。増えたスキップだけが新規
+                        org.assertj.core.groups.Tuple.tuple("M-09", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-09", "frontend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "backend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "frontend", MeasurementStatus.PASS));
+        // 失敗したテストは M-09、スキップしたテストは M-10 の違反として残る。増えたスキップだけが新規
         assertThat(findings.findByRunId(second.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-11"))
+                .filteredOn(f -> f.getMetricId().equals("M-10"))
                 .extracting(f -> f.getState().name())
                 .containsExactlyInAnyOrder("CONTINUING", "NEW");
         assertThat(findings.findByRunId(second.getId()))
-                .filteredOn(f -> f.getMetricId().equals("M-10"))
+                .filteredOn(f -> f.getMetricId().equals("M-09"))
                 .singleElement()
                 .satisfies(f -> assertThat(f.getRuleId()).isEqualTo("failed"));
     }
@@ -584,7 +582,7 @@ class EvaluationPipelineIT {
     @Test
     void 走査対象を宣言したSARIFはシークレットとライセンスを別の指標で判定する() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   branch_coverage:
@@ -606,7 +604,7 @@ class EvaluationPipelineIT {
                   licenses:
                     max_forbidden: 0
                 """);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, """
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, """
                 { "version": "2.1.0", "runs": [{
                   "tool": { "driver": { "name": "Trivy", "rules": [
                     { "id": "aws-access-key-id", "properties": { "security-severity": "9.5", "tags": ["secret"] } }
@@ -617,7 +615,7 @@ class EvaluationPipelineIT {
                   ]
                 }]}
                 """, "{\"scanners\":[\"vuln\",\"secret\"]}");
-        attach(run, ArtifactType.SARIF, "trivy-license.sarif", null, null, """
+        attach(run, ArtifactType.SARIF, "trivy-license.sarif", null, """
                 { "version": "2.1.0", "runs": [{
                   "tool": { "driver": { "name": "Trivy", "rules": [
                     { "id": "a:LGPL-2.1-only", "properties": { "tags": ["license"] } },
@@ -634,24 +632,24 @@ class EvaluationPipelineIT {
 
         Run evaluated = evaluate(run);
 
-        // シークレットは M-06（脆弱性）ではなく M-12 で数える
+        // シークレットは M-05（脆弱性）ではなく M-11 で数える
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
         assertThat(measurements.findByRunId(run.getId()))
                 .extracting(Measurement::getMetricId, Measurement::getStatus)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-05", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.FAIL),
                         // デュアルライセンスは緩いほう（EPL-2.0）を採る
-                        org.assertj.core.groups.Tuple.tuple("M-13", MeasurementStatus.PASS));
+                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.PASS));
         assertThat(findings.findByRunId(run.getId()))
                 .extracting(f -> f.getMetricId())
-                .containsExactly("M-12");
+                .containsExactly("M-11");
     }
 
     @Test
     void シークレットを有効にしても走査を宣言していなければ計測エラー() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   branch_coverage:
@@ -671,7 +669,7 @@ class EvaluationPipelineIT {
                   secrets:
                     enabled: true
                 """);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
 
         evaluate(run);
 
@@ -679,21 +677,21 @@ class EvaluationPipelineIT {
         assertThat(measurements.findByRunId(run.getId()))
                 .extracting(Measurement::getMetricId, Measurement::getStatus)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("M-06", MeasurementStatus.PASS),
-                        org.assertj.core.groups.Tuple.tuple("M-12", MeasurementStatus.ERROR));
+                        org.assertj.core.groups.Tuple.tuple("M-05", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-11", MeasurementStatus.ERROR));
     }
 
     @Test
     void 比較元にOpenAPI定義が無ければ破壊的変更は対象外() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD_SIMPLE);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
-        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend",
                 JUNIT_CLEAN);
-        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, "[]",
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]",
                 "{\"baseSpecMissing\":true}");
 
         Run evaluated = evaluate(run);
@@ -702,7 +700,7 @@ class EvaluationPipelineIT {
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
         assertThat(evaluated.getCompleteness()).isEqualTo(Completeness.FULL);
         assertThat(measurements.findByRunId(run.getId()))
-                .filteredOn(m -> m.getMetricId().equals("M-08"))
+                .filteredOn(m -> m.getMetricId().equals("M-07"))
                 .singleElement()
                 .satisfies(m -> assertThat(m.getStatus())
                         .isEqualTo(MeasurementStatus.NOT_APPLICABLE));
@@ -713,7 +711,7 @@ class EvaluationPipelineIT {
     void 設定ファイルのしきい値が判定に使われる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         // カバレッジ 90% を不合格にするしきい値を設定で与える
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   branch_coverage:
@@ -733,7 +731,7 @@ class EvaluationPipelineIT {
                   performance:
                     enabled: false
                 """);
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
 
         Run evaluated = evaluate(run);
 
@@ -745,33 +743,12 @@ class EvaluationPipelineIT {
                     assertThat(m.getStatus()).isEqualTo(MeasurementStatus.FAIL);
                     assertThat(m.getReason()).contains("95% を下回っています");
                 });
-        // どの設定版で判定したかが Run に残る
-        assertThat(evaluated.getGateConfigId()).isNotNull();
-    }
-
-    @Test
-    void 同じ内容の設定は版を増やさない() {
-        String yaml = "version: 1\nmetrics:\n  branch_coverage:\n    threshold: 80\n";
-
-        Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
-        attach(first, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, yaml);
-        attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        Run firstEvaluated = evaluate(first);
-
-        Run second = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(second, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, yaml);
-        attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        Run secondEvaluated = evaluate(second);
-
-        // 毎回新しい版を作ると、変更履歴がノイズで埋まる
-        assertThat(gateConfigs.count()).isEqualTo(1);
-        assertThat(secondEvaluated.getGateConfigId()).isEqualTo(firstEvaluated.getGateConfigId());
     }
 
     @Test
     void 設定が不正なら行番号つきで拒否する() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   branch_coverage:
@@ -802,9 +779,9 @@ class EvaluationPipelineIT {
     @Test
     void 設定ファイルが無ければ既定値で判定する() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD_SIMPLE);
         attachPit(run, "changed");
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
@@ -812,33 +789,12 @@ class EvaluationPipelineIT {
         Run evaluated = evaluate(run);
 
         assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
-        assertThat(evaluated.getGateConfigId()).isNull();
-        assertThat(gateConfigs.count()).isZero();
-    }
-
-    /**
-     * 設定ファイルの無い Run を再評価するときは、
-     * 前回の判定で使った版を使う。再評価で判定の基準が変わらないように。
-     */
-    @Test
-    void 設定ファイルの無いRunは前回の判定で使った版で判定し直す() {
-        GateConfig applied = gateConfigs.save(new GateConfig(Uuid7.generate(), repositoryId, 1, "UI", null,
-                "hash", "version: 1\nmetrics:\n  branch_coverage:\n    threshold: 95\n", "{}"));
-        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        run.applyGateConfig(applied.getId());
-        runs.save(run);
-
-        GateConfigService.Resolved config = gateConfigService.resolve(run, artifacts.findByRunId(run.getId()));
-
-        assertThat(config.gateConfig().getId()).isEqualTo(applied.getId());
-        assertThat(config.document().metric("branch_coverage").number("threshold"))
-                .contains(new java.math.BigDecimal("95"));
     }
 
     @Test
     void 設定で無効にした指標は判定対象から外れる() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, null, """
+        attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
                 metrics:
                   mutation_score:
@@ -856,7 +812,7 @@ class EvaluationPipelineIT {
                   performance:
                     enabled: false
                 """);
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
 
         Run evaluated = evaluate(run);
 
@@ -869,11 +825,9 @@ class EvaluationPipelineIT {
 
     private Run evaluate(Run run) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
-        GateConfigService.Resolved config = gateConfigService.resolve(run, records);
-        GateThresholds thresholds = GateThresholds.from(config.document());
+        GateThresholds thresholds = GateThresholds.from(gateConfigService.resolve(run, records));
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
-        evaluationService.evaluate(run.getId(), input, thresholds,
-                config.isDefault() ? null : config.gateConfig().getId());
+        evaluationService.evaluate(run.getId(), input, thresholds);
         return runs.findById(run.getId()).orElseThrow();
     }
 
@@ -890,7 +844,7 @@ class EvaluationPipelineIT {
     /** 性能の成果物（3 回分）。性能以外を検証するテストでも、未提出で ERROR にならないよう送る。 */
     private void attachPerformance(Run run) {
         for (int i = 1; i <= 3; i++) {
-            attach(run, ArtifactType.K6_SUMMARY, "k6-summary-%d.json".formatted(i), null, null,
+            attach(run, ArtifactType.K6_SUMMARY, "k6-summary-%d.json".formatted(i), null,
                     PerformanceFixtures.summary(i), PerformanceFixtures.METADATA);
         }
     }
@@ -905,17 +859,17 @@ class EvaluationPipelineIT {
     }
 
     private void attachAllMetrics(Run run) {
-        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", null, JACOCO);
-        attach(run, ArtifactType.SARIF, "trivy.sarif", null, null, TRIVY_CLEAN);
-        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", null, PMD);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
     }
 
     private void attachContract(Run run) {
-        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", null,
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend",
                 JUNIT_CLEAN);
-        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, null, OASDIFF_CLEAN);
+        attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, OASDIFF_CLEAN);
     }
 
     private void attachAxe(Run run, String json) {
@@ -923,7 +877,7 @@ class EvaluationPipelineIT {
     }
 
     private void attachAxe(Run run, String filename, String json) {
-        attach(run, ArtifactType.AXE_JSON, filename, "frontend", null, json);
+        attach(run, ArtifactType.AXE_JSON, filename, "frontend", json);
     }
 
     private void attachPit(Run run, String mutationScope) {
@@ -936,7 +890,7 @@ class EvaluationPipelineIT {
                 + mutation("KILLED").repeat(killed)
                 + mutation("SURVIVED").repeat(10 - killed)
                 + "</mutations>";
-        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", null, xml,
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", xml,
                 "{\"mutationScope\":\"%s\"}".formatted(mutationScope));
     }
 
@@ -946,17 +900,17 @@ class EvaluationPipelineIT {
     }
 
     private void attach(Run run, ArtifactType type, String filename, String component,
-                        String scope, String content) {
-        attach(run, type, filename, component, scope, content, null);
+                        String content) {
+        attach(run, type, filename, component, content, null);
     }
 
     private void attach(Run run, ArtifactType type, String filename, String component,
-                        String scope, String content, String metadata) {
+                        String content, String metadata) {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, scope, metadata));
+                component, metadata));
     }
 
     private DashboardResponse.RepositoryCard dashboardCard() {

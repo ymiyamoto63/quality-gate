@@ -26,8 +26,8 @@ import java.util.Optional;
 @Tag(name = "Dashboard", description = "全リポジトリのサマリ")
 public class DashboardController {
 
-    /** 脆弱性（M-06）。 */
-    private static final String M_VULNERABILITIES = "M-06";
+    /** 脆弱性（M-05）。 */
+    private static final String M_VULNERABILITIES = "M-05";
 
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
@@ -46,7 +46,7 @@ public class DashboardController {
     @Transactional(readOnly = true)
     public DashboardResponse dashboard() {
         List<DashboardResponse.RepositoryCard> cards =
-                repositories.findByEnabledTrueOrderByOwnerAscNameAsc().stream()
+                repositories.findAllByOrderByOwnerAscNameAsc().stream()
                         .map(this::toCard)
                         .sorted(Comparator.comparingInt(DashboardController::severityOrder))
                         .toList();
@@ -72,7 +72,7 @@ public class DashboardController {
     }
 
     /**
-     * 「重大 N 件・高 N 件」は脆弱性（M-06）の件数に限る。アクセシビリティ違反（M-09）も
+     * 「重大 N 件・高 N 件」は脆弱性（M-05）の件数に限る。アクセシビリティ違反（M-08）も
      * 同じ深刻度で保存するため、混ぜると未解決の脆弱性が増えたように見える。
      */
     private int openVulnerabilities(Run run, Severity severity) {

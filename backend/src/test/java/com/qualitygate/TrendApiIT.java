@@ -13,7 +13,6 @@ import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingRepository;
-import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
@@ -81,7 +80,6 @@ class TrendApiIT {
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
-    @Autowired GateConfigRepository gateConfigs;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
@@ -99,14 +97,13 @@ class TrendApiIT {
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
         runs.deleteAll();
-        gateConfigs.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", admin.getId())).getId();
+                "ymiyamoto63", "quality-gate", "main")).getId();
     }
 
     @Test
@@ -487,11 +484,9 @@ class TrendApiIT {
 
     private void evaluate(Run run) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
-        GateConfigService.Resolved config = gateConfigService.resolve(run, records);
-        GateThresholds thresholds = GateThresholds.from(config.document());
+        GateThresholds thresholds = GateThresholds.from(gateConfigService.resolve(run, records));
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
-        evaluationService.evaluate(run.getId(), input, thresholds,
-                config.isDefault() ? null : config.gateConfig().getId());
+        evaluationService.evaluate(run.getId(), input, thresholds);
     }
 
     private Run createRun(Instant measuredAt, String branch) {
@@ -515,6 +510,6 @@ class TrendApiIT {
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, null, metadata));
+                component, metadata));
     }
 }

@@ -96,7 +96,7 @@ management:
 logging:
   level:
     com.qualitygate: INFO
-  # JSON 構造化ログ（docs/spec/05-architecture.md 10.1）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
+  # JSON 構造化ログ（docs/spec/05-architecture.md）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
   # 標準出力が 1 行 1 JSON になり、MDC の相関 ID（requestId / runId / jobId）が項目として載る。未指定なら従来のテキスト形式
   structured:
     format:

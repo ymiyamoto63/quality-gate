@@ -36,7 +36,7 @@ class JUnitXmlAdapterTest {
                 """);
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-10");
+        assertThat(measurement.metricId()).isEqualTo("M-09");
         assertThat(measurement.componentName()).isEqualTo("backend");
         assertThat(measurement.value()).isEqualByComparingTo("100");
         assertThat(measurement.detail())
@@ -165,11 +165,11 @@ class JUnitXmlAdapterTest {
                   </testcase>
                 </testsuite>
                 """.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext("frontend", null, List.of()));
+                new ParseContext("frontend", List.of()));
 
         assertThat(report.type()).isEqualTo(ArtifactType.TEST_JUNIT_XML);
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-10");
+        assertThat(measurement.metricId()).isEqualTo("M-09");
         assertThat(measurement.componentName()).isEqualTo("frontend");
         assertThat(measurement.detail())
                 .containsEntry("executed", 3L)
@@ -178,13 +178,13 @@ class JUnitXmlAdapterTest {
                 .containsEntry("flaky", 1L);
         assertThat(report.findings()).extracting(RawFinding::metricId, RawFinding::ruleId)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("M-10", "failed"),
-                        org.assertj.core.groups.Tuple.tuple("M-11", "skipped"),
-                        org.assertj.core.groups.Tuple.tuple("M-10", "flaky"));
+                        org.assertj.core.groups.Tuple.tuple("M-09", "failed"),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "skipped"),
+                        org.assertj.core.groups.Tuple.tuple("M-09", "flaky"));
     }
 
     private NormalizedReport parse(String xml) {
         return adapter.parse(new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext("backend", null, List.of()));
+                new ParseContext("backend", List.of()));
     }
 }

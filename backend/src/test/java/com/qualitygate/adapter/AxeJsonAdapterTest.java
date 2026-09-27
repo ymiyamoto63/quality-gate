@@ -20,7 +20,7 @@ class AxeJsonAdapterTest {
 
     private final AxeJsonAdapter adapter = new AxeJsonAdapter(JsonMapper.builder().build());
 
-    private static final ParseContext CONTEXT = new ParseContext("frontend", "head", List.of());
+    private static final ParseContext CONTEXT = new ParseContext("frontend", List.of());
 
     @Test
     void 実際のaxe_coreの出力を読める() {
@@ -29,7 +29,7 @@ class AxeJsonAdapterTest {
         NormalizedReport report = adapter.parse(resource("/axe/axe-results.json"), CONTEXT);
 
         RawMeasurement measurement = report.measurements().getFirst();
-        assertThat(measurement.metricId()).isEqualTo("M-09");
+        assertThat(measurement.metricId()).isEqualTo("M-08");
         assertThat(measurement.componentName()).isEqualTo("frontend");
         assertThat(measurement.value()).isNull();
         assertThat(measurement.detail())

@@ -100,7 +100,7 @@ class PmdXmlAdapterTest {
     }
 
     private static ParseContext context(List<String> exclusions) {
-        return new ParseContext("backend", "head", exclusions);
+        return new ParseContext("backend", exclusions);
     }
 
     private static InputStream stream(String xml) {

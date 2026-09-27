@@ -14,9 +14,8 @@
 #   QG_REMOTE_URL clone 元の URL（既定: https://github.com/<owner/name>.git。試験用）
 #
 # 出力:
-#   <作業ディレクトリ>/src       対象リポジトリ（全履歴。base の解析に必要）
+#   <作業ディレクトリ>/src       対象リポジトリ（全履歴。比較元・タグを求めるのと、比較元の OpenAPI 定義を読むのに使う）
 #   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / PR_NUMBER / TAGS（コミットを指すタグ。空白区切り）
-#   <作業ディレクトリ>/renames.json  ファイルの移動・リネーム（renames.sh の出力）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -76,7 +75,7 @@ else
 fi
 git checkout --quiet --detach "$COMMIT"
 
-# 比較元（新規の違反・破壊的変更・スキップの増加を数える起点）。
+# 比較元（破壊的変更・スキップの増加・違反の新規 / 解消を数える起点）。
 #   - 指定（QG_BASE）があればそれ
 #   - タグを計測するときは、その前のタグ（リリース判定では「前回のリリースから何が増えたか」を見るため）。
 #     前のタグが無ければ直前のコミット
@@ -100,7 +99,7 @@ else
   [ "$BASE" != "$COMMIT" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 fi
 
-# コミットを指すタグ。リリース判定（S-09）でタグを指定したとき、quality-gate はこれでコミットを探す
+# コミットを指すタグ。リリース判定（S-08）でタグを指定したとき、quality-gate はこれでコミットを探す
 TAGS=$(git tag --points-at "$COMMIT" | tr '\n' ' ' | sed 's/ *$//')
 
 cat > "$WORK/meta.env" <<EOF
@@ -111,5 +110,4 @@ BASE_SHA=$BASE
 PR_NUMBER=$PR_NUMBER
 TAGS="$TAGS"
 EOF
-"$COLLECTOR_DIR/bin/renames.sh" "$WORK/src" "$COMMIT" "$BASE" > "$WORK/renames.json"
 log "計測するコミット: $COMMIT${TAG:+（$TAG）}（比較元: ${BASE:-なし}${BASE_LABEL:+（$BASE_LABEL）}）"

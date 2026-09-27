@@ -84,15 +84,10 @@ function metricLabel(metric: Schemas['RunMetric']): string {
         </nav>
       </header>
 
-      <p v-if="!detail.repository.enabled" class="qg-panel" role="status">
-        このリポジトリは無効化されています。計測結果は受け付けず、ダッシュボードにも表示されません。
-      </p>
-
       <section class="qg-panel" aria-labelledby="latest-heading">
         <h2 id="latest-heading">最新の判定</h2>
         <p v-if="!detail.latestRun" class="qg-empty">
-          まだ計測結果がありません。収集ランナー（または CI）から送信されると表示されます（Ingest
-          Token は管理 › リポジトリで発行します）。
+          まだ判定済みの計測結果がありません。収集ランナーから送信されると表示されます。
         </p>
         <template v-else>
           <p class="qg-latest">
@@ -113,7 +108,6 @@ function metricLabel(metric: Schemas['RunMetric']): string {
             >
               （Run を見る）
             </RouterLink>
-            · 設定 {{ detail.configVersion ? `v${detail.configVersion}` : '既定値' }}
           </p>
 
           <!--

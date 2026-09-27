@@ -69,16 +69,13 @@ public class IngestService {
 
     @Transactional
     public Run createRun(CreateRunRequest request) {
-        // 送れるのは quality-gate に登録したリポジトリだけ。Ingest Token は収集ランナーの 1 つだけで、
-        // リポジトリごとには分けない（DD-20）
+        // 計測の対象は計測プロファイル（collector/targets/）だけで決める。送り手は Ingest Token を持つ
+        // 収集ランナーだけなので（DD-20）、初めて送られたリポジトリはここで登録する
         MonitoredRepository repository = repositories
                 .findByOwnerAndName(request.owner(), request.name())
-                .orElseThrow(() -> ApiException.notFound("リポジトリ", request.repository()));
-        if (!repository.isEnabled()) {
-            // 無効化したリポジトリの計測がダッシュボードの外で積み上がり続けないようにする
-            throw new ApiException(ErrorCode.FORBIDDEN,
-                    "%s は quality-gate で無効化されています。管理者に確認してください"
-                            .formatted(request.repository()));
+                .orElseGet(() -> register(request));
+        if (request.defaultBranch() != null && !request.defaultBranch().equals(repository.getDefaultBranch())) {
+            repository.setDefaultBranch(request.defaultBranch());
         }
 
         // 同一コミットへの再送信は上書きせず、attempt を増やした新しい Run とする。
@@ -90,6 +87,7 @@ public class IngestService {
         run.setBaseCommitSha(request.baseCommitSha());
         run.setPullRequestNumber(request.pullRequestNumber());
         run.setCiRunUrl(request.ciRunUrl());
+        run.setConfigCommitSha(request.configCommitSha());
         run.setTags(request.tagsOrEmpty());
         runs.save(run);
 
@@ -97,6 +95,12 @@ public class IngestService {
         log.info("Run を作成しました runId={} repository={} commit={} attempt={}",
                 run.getId(), request.repository(), request.commitSha(), attempt);
         return run;
+    }
+
+    private MonitoredRepository register(CreateRunRequest request) {
+        log.info("リポジトリを登録しました repository={}", request.repository());
+        return repositories.save(new MonitoredRepository(Uuid7.generate(), request.owner(), request.name(),
+                request.defaultBranch() == null ? "main" : request.defaultBranch()));
     }
 
     /**
@@ -115,7 +119,7 @@ public class IngestService {
     @Transactional
     public ArtifactRecord storeArtifact(UUID runId,
                                         ArtifactType type, String filename,
-                                        String componentName, String scope, String metadata,
+                                        String componentName, String metadata,
                                         InputStream content, long declaredSize) {
         Run run = loadRun(runId);
 
@@ -163,7 +167,7 @@ public class IngestService {
 
         ArtifactRecord record = new ArtifactRecord(artifactId, runId, type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                componentName, scope, metadata);
+                componentName, metadata);
         artifacts.save(record);
         run.markUploading();
         return record;

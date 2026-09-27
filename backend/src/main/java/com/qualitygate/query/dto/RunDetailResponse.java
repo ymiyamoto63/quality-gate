@@ -17,7 +17,7 @@ import java.util.UUID;
  * Run 詳細（S-03）。
  *
  * <p>指標をカテゴリでまとめて返すのは、画面が 6 カテゴリの表として描かれるため
- * （docs/spec/07-api-design.md 4.2）。平坦な配列を返して画面側で分類すると、
+ * （docs/spec/07-api-design.md）。平坦な配列を返して画面側で分類すると、
  * カテゴリの定義がサーバとクライアントの 2 箇所に存在することになる。
  *
  * <h2>必須と null の宣言について</h2>
@@ -61,8 +61,9 @@ public record RunDetailResponse(
         RunFailure failure,
         @NotNull
         @Schema(nullable = true,
-                description = "判定に使った設定版。既定値で判定した場合は null")
-        GateConfigRef gateConfig,
+                description = "判定に使った合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット。"
+                        + "合格ライン自体は Run の成果物に残る")
+        String configCommitSha,
         @NotNull List<RunCategory> categories,
         @NotNull RunFindingSummary findingSummary,
         @NotNull List<SkippedMetricView> skippedMetrics,
@@ -70,13 +71,6 @@ public record RunDetailResponse(
 
     public record RepositoryRef(@NotNull UUID repositoryId,
                                 @NotNull @Schema(nullable = true) String fullName) {
-    }
-
-    @Schema(description = "判定に使った設定版。しきい値を変えても過去の Run は当時の判定のまま")
-    public record GateConfigRef(@NotNull UUID gateConfigId,
-                                @NotNull @Schema(nullable = true) Integer version,
-                                @NotNull @Schema(nullable = true) String sourceType,
-                                @NotNull @Schema(nullable = true) String sourceCommitSha) {
     }
 
     @Schema(description = "処理失敗の内容。errorCode で分岐し、hint で対処を示す")

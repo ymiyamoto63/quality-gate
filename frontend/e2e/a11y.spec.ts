@@ -2,7 +2,7 @@ import { test } from '@playwright/test'
 import { COLOR_SCHEMES, expectNoBlockingViolations } from './axe'
 
 /**
- * M-09（アクセシビリティ）の計測元。ログイン不要の画面。
+ * M-08（アクセシビリティ）の計測元。ログイン不要の画面。
  *
  * ログインが要る画面は authenticated-a11y.spec.ts で検査する。
  */

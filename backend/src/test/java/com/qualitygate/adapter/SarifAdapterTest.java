@@ -131,7 +131,7 @@ class SarifAdapterTest {
 
     @Test
     void 複雑度ツールのSARIFは脆弱性として扱わない() {
-        // ここで混ぜると M-06 の件数に複雑度違反が混入する
+        // ここで混ぜると M-05 の件数に複雑度違反が混入する
         String pmd = """
                 { "version": "2.1.0", "runs": [{
                   "tool": { "driver": { "name": "PMD" } },
@@ -194,12 +194,12 @@ class SarifAdapterTest {
 
     @Test
     void 走査した対象を宣言すればシークレットとライセンスを別の指標に振り分ける() {
-        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null,
                 List.of(), java.util.Map.of("scanners", List.of("vuln", "secret", "license"))));
 
-        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-12", "M-13");
+        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-05", "M-11", "M-12");
         assertThat(report.findings()).extracting(RawFinding::metricId)
-                .containsExactly("M-06", "M-12", "M-13", "M-13");
+                .containsExactly("M-05", "M-11", "M-12", "M-12");
         RawFinding secret = report.findings().get(1);
         assertThat(secret.severity()).isEqualTo(Severity.CRITICAL);
         assertThat(secret.filePath()).isEqualTo("config.py");
@@ -214,12 +214,12 @@ class SarifAdapterTest {
 
     @Test
     void 宣言していない対象の検出は捨て値も与えない() {
-        // ライセンスだけを走査した SARIF で、M-06 を「0 件」として合格にしない
-        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+        // ライセンスだけを走査した SARIF で、M-05 を「0 件」として合格にしない
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null,
                 List.of(), java.util.Map.of("scanners", List.of("license"))));
 
-        assertThat(report.metricIdsWithData()).containsExactly("M-13");
-        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-13");
+        assertThat(report.metricIdsWithData()).containsExactly("M-12");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-12");
     }
 
     @Test
@@ -227,20 +227,20 @@ class SarifAdapterTest {
         // シークレットの分離を知らない送り手のシークレットを、判定から黙って消さない
         NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), context(List.of()));
 
-        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-06", "M-07");
-        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-06");
+        assertThat(report.metricIdsWithData()).containsExactlyInAnyOrder("M-05", "M-06");
+        assertThat(report.findings()).extracting(RawFinding::metricId).containsOnly("M-05");
     }
 
     @Test
     void 未知の走査対象はERRORにする() {
-        assertThatThrownBy(() -> adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null, "head",
+        assertThatThrownBy(() -> adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null,
                 List.of(), java.util.Map.of("scanners", List.of("vulnerabilities")))))
                 .isInstanceOf(ArtifactFormatException.class)
                 .hasMessageContaining("vulnerabilities");
     }
 
     private static ParseContext context(List<String> exclusions) {
-        return new ParseContext(null, "head", exclusions);
+        return new ParseContext(null, exclusions);
     }
 
     private static InputStream stream(String json) {

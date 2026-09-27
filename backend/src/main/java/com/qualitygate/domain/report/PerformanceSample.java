@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 負荷試験 1 回分の結果と、M-03 / M-04 / M-05 の計算式（docs/spec/02-metrics-spec.md M-03）。
+ * 負荷試験 1 回分の結果と、M-03 / M-04 の計算式（docs/spec/02-metrics-spec.md M-03）。
  *
  * <p>式をここに 1 つだけ置く。アダプタ（1 回分の値）と評価器（3 回の中央値）が
  * 別々に式を持つと、画面の値と判定が食い違う。
@@ -52,6 +52,7 @@ public record PerformanceSample(
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("p95Ms", p95Ms);
         detail.put("requestRate", requestRate);
+        detail.put("successRate", successRate());
         detail.put("requests", requests);
         detail.put("failedRequests", failedRequests);
         detail.put("scenarios", scenarios);

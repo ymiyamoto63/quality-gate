@@ -45,18 +45,9 @@ public class ArtifactRecord {
     @Column(name = "component_name")
     private String componentName;
 
-    @Column
-    private String scope;
-
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
     private String metadata;
-
-    @Column(name = "parse_status", nullable = false)
-    private String parseStatus = "PENDING";
-
-    @Column(name = "parse_error")
-    private String parseError;
 
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt = Instant.now();
@@ -69,7 +60,7 @@ public class ArtifactRecord {
 
     public ArtifactRecord(UUID id, UUID runId, ArtifactType type, String filename,
                           long sizeBytes, String sha256, String storageKey,
-                          String componentName, String scope, String metadata) {
+                          String componentName, String metadata) {
         this.id = id;
         this.runId = runId;
         this.type = type;
@@ -78,7 +69,6 @@ public class ArtifactRecord {
         this.sha256 = sha256;
         this.storageKey = storageKey;
         this.componentName = componentName;
-        this.scope = scope;
         this.metadata = metadata;
     }
 
@@ -113,25 +103,6 @@ public class ArtifactRecord {
     /** アップロード時に宣言されたコンポーネント名（backend / frontend）。 */
     public String getComponentName() {
         return componentName;
-    }
-
-    /** base / head。M-07 のベース比較に使う。 */
-    public String getScope() {
-        return scope;
-    }
-
-    public String getParseStatus() {
-        return parseStatus;
-    }
-
-    public void markParsed() {
-        this.parseStatus = "OK";
-        this.parseError = null;
-    }
-
-    public void markParseFailed(String error) {
-        this.parseStatus = "FAILED";
-        this.parseError = error;
     }
 
     public String getMetadata() {

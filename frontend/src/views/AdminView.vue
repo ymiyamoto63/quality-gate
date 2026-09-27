@@ -139,9 +139,6 @@ function describe(value: Record<string, unknown> | null | undefined): string {
       >
         {{ t.label }}
       </RouterLink>
-      <RouterLink class="qg-tabs__link" :to="{ name: 'admin-repositories' }">
-        リポジトリ →
-      </RouterLink>
     </nav>
 
     <template v-if="tab === 'users'">

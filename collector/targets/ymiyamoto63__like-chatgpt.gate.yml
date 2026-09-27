@@ -11,7 +11,7 @@
 version: 1
 
 execution:
-  skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03〜05 をスキップする
+  skippable_metrics: [mutation_score, performance]   # PR の計測では M-02 と M-03 / M-04 をスキップする
 
 exclusions:
   - "**/ChatBackendApplication.java"
@@ -64,6 +64,6 @@ metrics:
     enabled: true
     standard: wcag22aa
     max_critical: 0
-    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-09 は ERROR
+    # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-08 は ERROR
     pages:
       - "/"

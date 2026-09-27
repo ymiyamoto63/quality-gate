@@ -16,7 +16,6 @@ import com.qualitygate.domain.model.Verdict;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingCriteria;
 import com.qualitygate.domain.repo.FindingRepository;
-import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
@@ -167,7 +166,6 @@ class RunQueryApiIT {
     @Autowired ArtifactRecordRepository artifacts;
     @Autowired MeasurementRepository measurements;
     @Autowired FindingRepository findings;
-    @Autowired GateConfigRepository gateConfigs;
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
@@ -185,14 +183,13 @@ class RunQueryApiIT {
         artifacts.deleteAll();
         skippedMetrics.deleteAll();
         runs.deleteAll();
-        gateConfigs.deleteAll();
         repositories.deleteAll();
         users.deleteAll();
 
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         MonitoredRepository repository = repositories.save(new MonitoredRepository(
-                Uuid7.generate(), "ymiyamoto63", "quality-gate", admin.getId()));
+                Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
         repositoryId = repository.getId();
     }
 
@@ -219,7 +216,7 @@ class RunQueryApiIT {
         // 不合格を含むカテゴリは開いた瞬間に見えている状態にする
         assertThat(security.expandByDefault()).isTrue();
         assertThat(security.metrics()).singleElement().satisfies(metric -> {
-            assertThat(metric.metricId()).isEqualTo("M-06");
+            assertThat(metric.metricId()).isEqualTo("M-05");
             assertThat(metric.name()).isEqualTo("重大・高 脆弱性件数");
             assertThat(metric.threshold()).containsEntry("operator", "<=");
             // 違反件数を添えて「違反 2 件を見る」への導線にする
@@ -248,7 +245,7 @@ class RunQueryApiIT {
      * 合格ラインの形をすべての指標で揃える。
      *
      * <p>画面は {@code operator} と {@code value} だけで「≥ 75%」「≤ 0 件」と描く。
-     * 指標ごとに形が違うと、画面に指標ごとの分岐が生まれる。実際 M-06 は
+     * 指標ごとに形が違うと、画面に指標ごとの分岐が生まれる。実際 M-05 は
      * {@code maxCritical} / {@code maxHigh} しか持たず、合格ラインが表示されなかった。
      */
     @Test
@@ -299,14 +296,14 @@ class RunQueryApiIT {
     void 受理されなかったスキップ申告も詳細に残る() {
         Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
-        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-07", "理由なく省略"));
+        skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-06", "理由なく省略"));
         evaluate(run);
 
         RunDetailResponse detail = queryService.detail(run.getId());
 
         assertThat(detail.skippedMetrics()).singleElement().satisfies(skip -> {
-            assertThat(skip.metricId()).isEqualTo("M-07");
-            assertThat(skip.name()).isEqualTo("循環的複雑度 15 超の新規関数数");
+            assertThat(skip.metricId()).isEqualTo("M-06");
+            assertThat(skip.name()).isEqualTo("循環的複雑度 15 超の関数数");
             // 申告の事実は残し、なぜ ERROR になったのかを説明できるようにする
             assertThat(skip.accepted()).isFalse();
         });
@@ -360,7 +357,7 @@ class RunQueryApiIT {
         Run run = evaluated(Instant.parse("2026-09-22T00:00:00Z"));
 
         FindingListResponse critical = queryService.findings(run.getId(),
-                new FindingCriteria(run.getId(), Set.of("M-06"), Set.of(),
+                new FindingCriteria(run.getId(), Set.of("M-05"), Set.of(),
                         Set.of(Severity.CRITICAL)), 20, null);
 
         assertThat(critical.totalCount()).isEqualTo(1);
@@ -379,7 +376,7 @@ class RunQueryApiIT {
         Run run = evaluated(Instant.parse("2026-09-22T00:00:00Z"));
 
         FindingListResponse complexity = queryService.findings(run.getId(),
-                new FindingCriteria(run.getId(), Set.of("M-07"), Set.of(), Set.of()),
+                new FindingCriteria(run.getId(), Set.of("M-06"), Set.of(), Set.of()),
                 20, null);
 
         // PMD の絶対パスは /build/backend/src/... なので、
@@ -521,16 +518,16 @@ class RunQueryApiIT {
                     json.extractingPath("$.items[0].sourceUrl").asString()
                             .startsWith("https://github.com/ymiyamoto63/quality-gate/blob/");
                     // 画面の違反にはリポジトリ上のファイルが無い。GitHub への壊れたリンクを作らない
-                    json.extractingPath("$.items[?(@.metricId == 'M-09')].sourceUrl")
+                    json.extractingPath("$.items[?(@.metricId == 'M-08')].sourceUrl")
                             .asArray().containsExactly((Object) null);
-                    json.extractingPath("$.items[?(@.metricId == 'M-09')].detail.page")
+                    json.extractingPath("$.items[?(@.metricId == 'M-08')].detail.page")
                             .asArray().containsExactly("/runs/:id");
                 });
 
         storeFixtures(tester, run);
     }
 
-    /** 画面のアクセシビリティ検査（M-09）で使う応答例を書き出す（{@link FixtureWriter}）。 */
+    /** 画面のアクセシビリティ検査（M-08）で使う応答例を書き出す（{@link FixtureWriter}）。 */
     private static void storeFixtures(MockMvcTester tester, Run run) throws Exception {
         FixtureWriter.write("run-detail.json",
                 tester.get().uri("/api/v1/runs/{id}", run.getId())
@@ -600,7 +597,7 @@ class RunQueryApiIT {
     /**
      * 画面の検査用に、backend と frontend の両方を計測した Run を作る。
      * M-02 は設定で backend に限るため、frontend は対象外として並ぶ。
-     * 違反一覧の画面がアクセシビリティ違反も描けるよう、M-09 の違反を 1 件含める。
+     * 違反一覧の画面がアクセシビリティ違反も描けるよう、M-08 の違反を 1 件含める。
      */
     private Run evaluatedWithFrontend(Instant measuredAt) {
         Run run = createRun(measuredAt);
@@ -626,11 +623,9 @@ class RunQueryApiIT {
 
     private Run evaluate(Run run) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
-        GateConfigService.Resolved config = gateConfigService.resolve(run, records);
-        GateThresholds thresholds = GateThresholds.from(config.document());
+        GateThresholds thresholds = GateThresholds.from(gateConfigService.resolve(run, records));
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
-        evaluationService.evaluate(run.getId(), input, thresholds,
-                config.isDefault() ? null : config.gateConfig().getId());
+        evaluationService.evaluate(run.getId(), input, thresholds);
         return runs.findById(run.getId()).orElseThrow();
     }
 
@@ -659,6 +654,6 @@ class RunQueryApiIT {
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
                 stored.sizeBytes(), stored.sha256(), stored.storageKey(),
-                component, null, metadata));
+                component, metadata));
     }
 }

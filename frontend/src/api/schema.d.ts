@@ -12,7 +12,7 @@ export interface paths {
       cookie?: never
     }
     /** 監査ログを新しい順に一覧する */
-    get: operations['list_4']
+    get: operations['list_3']
     put?: never
     post?: never
     delete?: never
@@ -58,24 +58,6 @@ export interface paths {
     patch?: never
     trace?: never
   }
-  '/api/v1/repositories': {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    /** 登録済みのリポジトリを一覧する */
-    get: operations['list_3']
-    put?: never
-    /** リポジトリを登録する */
-    post: operations['create']
-    delete?: never
-    options?: never
-    head?: never
-    patch?: never
-    trace?: never
-  }
   '/api/v1/repositories/{repositoryId}': {
     parameters: {
       query?: never
@@ -87,14 +69,13 @@ export interface paths {
      * リポジトリ詳細を取得する
      * @description 指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。判定表の組み立てを 2 箇所に持たないため。
      */
-    get: operations['detail']
+    get: operations['detail_1']
     put?: never
     post?: never
     delete?: never
     options?: never
     head?: never
-    /** リポジトリの設定を更新する（既定ブランチ・有効/無効） */
-    patch: operations['update_1']
+    patch?: never
     trace?: never
   }
   '/api/v1/repositories/{repositoryId}/config': {
@@ -209,7 +190,7 @@ export interface paths {
      * Run の判定結果を取得する
      * @description 指標はカテゴリごとにまとめて返す。分類規則を画面に持たせない。
      */
-    get: operations['detail_1']
+    get: operations['detail']
     put?: never
     post?: never
     delete?: never
@@ -407,38 +388,6 @@ export interface components {
       items: components['schemas']['AuditLogItem'][]
       nextCursor: string | null
     }
-    /** @description 設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる */
-    ConfigValidation: {
-      errors: components['schemas']['ValidationErrorItem'][]
-      /** @description 検証に失敗した設定ファイルの内容 */
-      rawYaml: string | null
-      /**
-       * Format: uuid
-       * @description 検証に失敗した Run
-       */
-      runId: string | null
-      valid: boolean
-    }
-    ConfigVersion: {
-      /** Format: date-time */
-      createdAt: string
-      /** Format: uuid */
-      gateConfigId: string
-      parsed: {
-        [key: string]: unknown
-      }
-      rawYaml: string
-      sourceCommitSha: string | null
-      sourceType: string
-      /** Format: int32 */
-      version: number
-    }
-    CreateRepositoryRequest: {
-      /** @description 省略時は main */
-      defaultBranch?: string | null
-      name: string
-      owner: string
-    }
     /** @description Run の作成要求。CI が計測開始時に送信する。 */
     CreateRunRequest: {
       /** @description 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する */
@@ -447,12 +396,16 @@ export interface components {
       ciRunUrl?: string
       /** @description 計測対象のコミット SHA（40 桁） */
       commitSha: string
+      /** @description 合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット */
+      configCommitSha?: string
+      /** @description 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。トレンドの既定の系列に使う。省略すると登録済みの値のまま（新規は main） */
+      defaultBranch?: string
       /** Format: date-time */
       measuredAt: string
       /** Format: int32 */
       pullRequestNumber?: number
       /**
-       * @description owner/name 形式。Ingest Token の発行元と一致する必要がある
+       * @description owner/name 形式。初めて送られたリポジトリは登録される
        * @example ymiyamoto63/quality-gate
        */
       repository: string
@@ -552,15 +505,6 @@ export interface components {
       /** Format: date-time */
       lastMeasuredAt?: string
     }
-    /** @description 判定に使った設定版。しきい値を変えても過去の Run は当時の判定のまま */
-    GateConfigRef: {
-      /** Format: uuid */
-      gateConfigId: string
-      sourceCommitSha: string | null
-      sourceType: string | null
-      /** Format: int32 */
-      version: number | null
-    }
     LatestRun: {
       /** @enum {string} */
       completeness?: 'FULL' | 'PARTIAL'
@@ -632,14 +576,12 @@ export interface components {
       /** Format: int32 */
       warned: number
     }
-    /** @description 合格ラインの版。しきい値を変えた理由は、この版のコミットに残る */
+    /** @description 判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る */
     ReleaseGateConfig: {
+      /** @description 合格ラインを送った quality-gate リポジトリのコミット */
+      commitSha: string | null
       /** @description 計測の対象から外したパス */
       exclusions: string[]
-      sourceCommitSha: string | null
-      sourceType: string
-      /** Format: int32 */
-      version: number
     }
     ReleaseGuide: {
       basis: string
@@ -683,7 +625,7 @@ export interface components {
       decision: 'RELEASABLE' | 'RELEASABLE_WITH_WARNINGS' | 'NOT_RELEASABLE' | 'UNDETERMINED'
       /** @description 判定の理由（1 文）。文言はサーバが持ち、画面はそのまま表示する */
       decisionReason: string
-      /** @description 判定に使った合格ライン。既定値で判定した場合と未計測では null */
+      /** @description 判定に使った合格ライン。設定ファイルの無い Run と未計測では null */
       gateConfig: components['schemas']['ReleaseGateConfig']
       /** @description 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び） */
       guides: components['schemas']['ReleaseGuide'][]
@@ -707,7 +649,7 @@ export interface components {
     ReleaseRun: {
       /** Format: int32 */
       attempt: number
-      /** @description 比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ */
+      /** @description 比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。タグで計測したときは前のタグ */
       baseCommitSha: string | null
       branch: string
       /** @enum {string} */
@@ -718,14 +660,6 @@ export interface components {
       runId: string
       /** @enum {string} */
       verdict: 'PASS' | 'PASS_WITH_WARNINGS' | 'FAIL'
-    }
-    /** @description 登録・更新したリポジトリ */
-    RepositoryAdminResponse: {
-      defaultBranch: string
-      enabled: boolean
-      fullName: string
-      /** Format: uuid */
-      repositoryId: string
     }
     RepositoryCard: {
       freshness?: components['schemas']['Freshness']
@@ -738,21 +672,24 @@ export interface components {
       /** Format: uuid */
       repositoryId?: string
     }
-    /** @description 現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る */
+    /** @description 直近の Run に送られた合格ラインと、その検証結果。版の履歴は Git で見る */
     RepositoryConfig: {
-      /** @description 設定版が 1 つも無ければ null（既定値で判定） */
-      current: components['schemas']['ConfigVersion']
-      /** @description 既定値の YAML。設定版が無いときの表示 */
-      defaultYaml: string
-      validation: components['schemas']['ConfigValidation']
+      /** @description 合格ラインを送った quality-gate リポジトリのコミット */
+      configCommitSha: string | null
+      /** @description 検証エラー。不正なら判定されず、Run は処理失敗になる */
+      errors: components['schemas']['ValidationErrorItem'][]
+      /** Format: date-time */
+      measuredAt: string | null
+      /** @description 設定ファイルの内容。設定ファイルの無い Run（既定値で判定）では null */
+      rawYaml: string | null
+      /**
+       * Format: uuid
+       * @description 直近の Run。まだ計測が無ければ null
+       */
+      runId: string | null
     }
     /** @description リポジトリ詳細（S-02）。指標の表は latestRunId の Run 詳細から描く */
     RepositoryDetail: {
-      /**
-       * Format: int32
-       * @description 判定に使われている設定の版。既定値なら null
-       */
-      configVersion: number | null
       freshness: components['schemas']['RepositoryFreshness']
       /** Format: uuid */
       lastFullRunId: string | null
@@ -771,16 +708,11 @@ export interface components {
       /** Format: date-time */
       createdAt: string
       defaultBranch: string
-      enabled: boolean
       fullName: string
       name: string
       owner: string
       /** Format: uuid */
       repositoryId: string
-    }
-    /** @description 登録済みのリポジトリ。無効化したものも含む */
-    RepositoryList: {
-      items: components['schemas']['RepositoryItem'][]
     }
     RepositoryRef: {
       fullName: string | null
@@ -819,13 +751,13 @@ export interface components {
       commitUrl: string | null
       /** @enum {string|null} */
       completeness: 'FULL' | 'PARTIAL' | null
+      /** @description 判定に使った合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット。合格ライン自体は Run の成果物に残る */
+      configCommitSha: string | null
       /** Format: date-time */
       evaluatedAt: string | null
       /** @description 処理そのものが失敗した場合のみ。判定結果 FAIL とは別物 */
       failure: components['schemas']['RunFailure']
       findingSummary: components['schemas']['RunFindingSummary']
-      /** @description 判定に使った設定版。既定値で判定した場合は null */
-      gateConfig: components['schemas']['GateConfigRef']
       /** Format: date-time */
       measuredAt: string
       /** Format: int32 */
@@ -975,11 +907,6 @@ export interface components {
       points: components['schemas']['TrendPoint'][]
       seriesId: string
     }
-    UpdateRepositoryRequest: {
-      defaultBranch?: string | null
-      /** @description false で無効化（ダッシュボードから外れ、取り込みも拒否される） */
-      enabled?: boolean | null
-    }
     UpdateUserRequest: {
       /** @enum {string|null} */
       role?: 'ADMIN' | 'VIEWER' | null
@@ -1035,14 +962,14 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
-  list_4: {
+  list_3: {
     parameters: {
       query?: {
         /** @description 省略時は to の 30 日前 */
         from?: string
         /** @description 省略時は現在時刻 */
         to?: string
-        /** @description 操作種別（REPOSITORY_UPDATED など） */
+        /** @description 操作種別（USER_ROLE_CHANGED など） */
         action?: string
         limit?: number
         cursor?: string
@@ -1104,51 +1031,7 @@ export interface operations {
       }
     }
   }
-  list_3: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody?: never
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryList']
-        }
-      }
-    }
-  }
-  create: {
-    parameters: {
-      query?: never
-      header?: never
-      path?: never
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['CreateRepositoryRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryAdminResponse']
-        }
-      }
-    }
-  }
-  detail: {
+  detail_1: {
     parameters: {
       query?: never
       header?: never
@@ -1166,32 +1049,6 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['RepositoryDetail']
-        }
-      }
-    }
-  }
-  update_1: {
-    parameters: {
-      query?: never
-      header?: never
-      path: {
-        repositoryId: string
-      }
-      cookie?: never
-    }
-    requestBody: {
-      content: {
-        'application/json': components['schemas']['UpdateRepositoryRequest']
-      }
-    }
-    responses: {
-      /** @description OK */
-      200: {
-        headers: {
-          [name: string]: unknown
-        }
-        content: {
-          '*/*': components['schemas']['RepositoryAdminResponse']
         }
       }
     }
@@ -1344,7 +1201,7 @@ export interface operations {
       }
     }
   }
-  detail_1: {
+  detail: {
     parameters: {
       query?: never
       header?: never
@@ -1393,7 +1250,6 @@ export interface operations {
       query: {
         type: string
         component?: string
-        scope?: string
         metadata?: string
       }
       header?: never

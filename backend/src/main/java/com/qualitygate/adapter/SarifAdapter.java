@@ -24,7 +24,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * SARIF 2.1.0 から M-06（脆弱性）・M-12（シークレット）・M-13（ライセンス）を読む。
+ * SARIF 2.1.0 から M-05（脆弱性）・M-11（シークレット）・M-12（ライセンス）を読む。
  *
  * <p>SARIF を静的解析系の第一形式としたのは、SARIF で出せるツールをすべて
  * このアダプタ 1 本に集約できるためである。Trivy / Semgrep / gitleaks / OSV などの
@@ -35,18 +35,18 @@ import java.util.regex.Pattern;
  * CVSS が無い検出（SAST・シークレット混入）のみ、ツール固有の値からマッピングする。
  *
  * <p><strong>走査した対象（メタデータの {@code scanners}）が宣言されていれば</strong>、検出を指標に振り分ける。
- * シークレット（Trivy のルールの tags に {@code secret}、または gitleaks などのシークレット専用ツール）は M-12、
- * ライセンス（tags に {@code license}）は M-13、それ以外は M-06。値を与えるのも宣言した対象の指標だけにする
- * （ライセンスだけを走査した SARIF で、M-06 を「0 件」として合格にしないため）。
+ * シークレット（Trivy のルールの tags に {@code secret}、または gitleaks などのシークレット専用ツール）は M-11、
+ * ライセンス（tags に {@code license}）は M-12、それ以外は M-05。値を与えるのも宣言した対象の指標だけにする
+ * （ライセンスだけを走査した SARIF で、M-05 を「0 件」として合格にしないため）。
  *
- * <p>宣言が無い SARIF は従来どおりすべてを M-06 として読む。シークレットの分離を知らない送り手の
+ * <p>宣言が無い SARIF は従来どおりすべてを M-05 として読む。シークレットの分離を知らない送り手の
  * シークレットが、判定から黙って消えないようにするためである。
  */
 @Component
 public class SarifAdapter implements ArtifactAdapter {
 
     /**
-     * 複雑度を報告するツール。SARIF は M-07 も運びうるため、
+     * 複雑度を報告するツール。SARIF は M-06 も運びうるため、
      * ツール名で振り分ける。判定表を定数として外に出しておき、
      * 新しいツールの追加でロジックを変えずに済むようにする。
      */
@@ -55,12 +55,12 @@ public class SarifAdapter implements ArtifactAdapter {
     /** シークレット混入は有効な認証情報の流出であり、常に重大として扱う。 */
     private static final Set<String> SECRET_TOOLS = Set.of("gitleaks", "trufflehog");
 
-    static final String VULNERABILITY_METRIC = "M-06";
-    static final String SECRET_METRIC = "M-12";
-    static final String LICENSE_METRIC = "M-13";
+    static final String VULNERABILITY_METRIC = "M-05";
+    static final String SECRET_METRIC = "M-11";
+    static final String LICENSE_METRIC = "M-12";
 
     /** 宣言が無い SARIF が値を与える指標（従来どおり）。 */
-    private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, "M-07");
+    private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, "M-06");
 
     /** Trivy のライセンスの分類。メッセージの {@code Classification: forbidden} から読む。 */
     private static final Pattern CLASSIFICATION =
@@ -93,7 +93,7 @@ public class SarifAdapter implements ArtifactAdapter {
             String toolName = toolNameOf(run);
             if (COMPLEXITY_TOOLS.contains(toolName)) {
                 // 複雑度は専用アダプタ（PmdXmlAdapter など）で扱う。
-                // ここで混ぜると M-06 の件数に複雑度違反が混入する。
+                // ここで混ぜると M-05 の件数に複雑度違反が混入する。
                 continue;
             }
             Map<String, JsonNode> rules = rulesOf(run);

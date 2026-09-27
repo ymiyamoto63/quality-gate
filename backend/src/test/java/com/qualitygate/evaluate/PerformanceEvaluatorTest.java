@@ -106,14 +106,15 @@ class PerformanceEvaluatorTest {
     }
 
     @Test
-    void スループットは不合格にせず到達率の95パーセント未満で注意() {
-        MetricResult ok = evaluate(new ThroughputEvaluator(), sample("300", 50, 0, "300"), sample("300", 49, 0, "300"),
+    void 成功スループットが到達率の95パーセント未満なら応答時間を注意にする() {
+        MetricResult ok = p95(sample("300", 50, 0, "300"), sample("300", 49, 0, "300"),
                 sample("300", 50, 0, "300"));
-        MetricResult slow = evaluate(new ThroughputEvaluator(), sample("300", 30, 0, "300"), sample("300", 30, 0, "300"),
+        MetricResult slow = p95(sample("300", 30, 0, "300"), sample("300", 30, 0, "300"),
                 sample("300", 30, 0, "300"));
 
         assertThat(ok.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(slow.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(slow.reason()).contains("到達率");
         assertThat(slow.threshold()).containsEntry("arrivalRateRps", new BigDecimal("50"));
     }
 
@@ -126,7 +127,6 @@ class PerformanceEvaluatorTest {
         for (PerformanceSample sample : samples) {
             BigDecimal value = switch (evaluator.metricId()) {
                 case "M-03" -> sample.p95Ms();
-                case "M-04" -> sample.successRate();
                 default -> sample.errorRatePercent();
             };
             measurements.add(RawMeasurement.of(evaluator.metricId(), null, value, "ms",
@@ -137,7 +137,7 @@ class PerformanceEvaluatorTest {
                 Instant.parse("2026-09-22T00:00:00Z"), 1);
         EvaluationContext context = new EvaluationContext(run,
                 thresholdsWith("performance", PERFORMANCE),
-                input(measurements, List.of(), List.of(), Set.of(evaluator.metricId())),
+                input(measurements, List.of(), Set.of(evaluator.metricId())),
                 Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);

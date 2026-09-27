@@ -1,6 +1,5 @@
 package com.qualitygate.release;
 
-import com.qualitygate.domain.entity.GateConfig;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
@@ -11,7 +10,9 @@ import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
-import com.qualitygate.domain.repo.GateConfigRepository;
+import com.qualitygate.domain.repo.ArtifactRecordRepository;
+import com.qualitygate.config.GateConfigService;
+import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
@@ -56,19 +57,21 @@ public class ReleaseReportService {
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
     private final MeasurementRepository measurements;
-    private final GateConfigRepository gateConfigs;
+    private final ArtifactRecordRepository artifacts;
+    private final GateConfigService gateConfigService;
     private final ReleaseRefResolver resolver;
     private final AuditLogger auditLogger;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
     public ReleaseReportService(MonitoredRepositoryRepository repositories, RunRepository runs,
-                                MeasurementRepository measurements, GateConfigRepository gateConfigs,
-                                ReleaseRefResolver resolver, AuditLogger auditLogger, ObjectMapper objectMapper) {
+                                MeasurementRepository measurements, ArtifactRecordRepository artifacts,
+                                GateConfigService gateConfigService, ReleaseRefResolver resolver, AuditLogger auditLogger, ObjectMapper objectMapper) {
         this.repositories = repositories;
         this.runs = runs;
         this.measurements = measurements;
-        this.gateConfigs = gateConfigs;
+        this.artifacts = artifacts;
+        this.gateConfigService = gateConfigService;
         this.resolver = resolver;
         this.auditLogger = auditLogger;
         this.objectMapper = objectMapper;
@@ -235,21 +238,16 @@ public class ReleaseReportService {
         }).toList();
     }
 
+    /** 合格ラインは Run の成果物として残っている（保持期間の削除の対象外）。読めなければ示さない。 */
     private ReleaseReportResponse.ReleaseGateConfig gateConfigOf(Run run) {
-        if (run.getGateConfigId() == null) {
+        try {
+            return gateConfigService.find(artifacts.findByRunId(run.getId()))
+                    .map(config -> new ReleaseReportResponse.ReleaseGateConfig(run.getConfigCommitSha(),
+                            config.exclusions()))
+                    .orElse(null);
+        } catch (ConfigValidationException e) {
             return null;
         }
-        Optional<GateConfig> config = gateConfigs.findById(run.getGateConfigId());
-        return config.map(c -> new ReleaseReportResponse.ReleaseGateConfig(c.getVersion(), c.getSourceType(),
-                c.getSourceCommitSha(), exclusionsOf(c))).orElse(null);
-    }
-
-    private List<String> exclusionsOf(GateConfig config) {
-        if (config.getParsed() == null || config.getParsed().isBlank()) {
-            return List.of();
-        }
-        Object exclusions = objectMapper.readValue(config.getParsed(), JSON_OBJECT).get("exclusions");
-        return exclusions instanceof List<?> list ? list.stream().map(String::valueOf).toList() : List.of();
     }
 
     private Map<String, Object> toMap(String json) {

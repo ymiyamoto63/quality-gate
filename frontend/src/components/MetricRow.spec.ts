@@ -46,7 +46,7 @@ describe('MetricRow', () => {
   it('差分の良し悪しはサーバの判断に従う', () => {
     // 脆弱性件数は減れば改善。符号だけで判断すると向きが逆になる
     const wrapper = render(
-      metric({ metricId: 'M-06', unit: 'count', delta: -2, deltaImproved: true }),
+      metric({ metricId: 'M-05', unit: 'count', delta: -2, deltaImproved: true }),
     )
 
     expect(wrapper.find('.qg-metric__arrow').attributes('data-improved')).toBe('true')
@@ -116,7 +116,7 @@ describe('MetricRow', () => {
     // 合格でも出す。「重大 0 件」を適合の証明と受け取らせない
     const text = render(
       metric({
-        metricId: 'M-09',
+        metricId: 'M-08',
         name: 'アクセシビリティ違反',
         componentName: null,
         unit: 'count',

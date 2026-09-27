@@ -64,14 +64,10 @@ public class RunEvaluationService {
     }
 
     @Transactional
-    public Run evaluate(UUID runId, NormalizedInput input, GateThresholds thresholds,
-                        UUID gateConfigId) {
+    public Run evaluate(UUID runId, NormalizedInput input, GateThresholds thresholds) {
         Run run = runs.findByIdForUpdate(runId).orElseThrow(
                 () -> new IllegalStateException("Run が見つかりません: " + runId));
         run.markProcessing();
-        // どの設定版で判定したかを残す。後からしきい値を変えても、
-        // 過去の Run は当時の判定のまま保たれる。
-        run.applyGateConfig(gateConfigId);
 
         Optional<Run> baseline = findBaseline(run);
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
@@ -88,7 +84,7 @@ public class RunEvaluationService {
         findings.flush();
 
         persistMeasurements(run, results, context);
-        persistFindings(run, results, baseline, input);
+        persistFindings(run, results, baseline);
 
         Verdict verdict = aggregate(results);
         Completeness completeness = completenessOf(results);
@@ -119,7 +115,7 @@ public class RunEvaluationService {
     }
 
     /**
-     * 指標 1 件の判定。優先順位は docs/spec/05-architecture.md 6.2 に従う。
+     * 指標 1 件の判定。優先順位は docs/spec/05-architecture.mdに従う。
      *
      * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
      * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。
@@ -188,8 +184,7 @@ public class RunEvaluationService {
      * <p>解消された違反も {@link FindingState#RESOLVED} として保存する。Run を
      * 不変のスナップショットに保ち、比較対象が削除されても表示が壊れないようにするため。
      */
-    private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline,
-                                 NormalizedInput input) {
+    private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline) {
         Set<String> baselineFingerprints = baseline
                 .map(b -> Set.copyOf(findings.findActiveFingerprints(b.getId())))
                 .orElse(Set.of());
@@ -198,15 +193,7 @@ public class RunEvaluationService {
         for (MetricResult result : results) {
             for (IdentifiedFinding finding : result.findingsToPersist()) {
                 current.add(finding.fingerprint());
-                // ファイルを移動・リネームしただけの違反は、移動前の fingerprint で比較対象と突き合わせる
-                // （指標仕様書 0.4）。比較対象の移動前の違反は「解消」にしない
-                String previous = input.previousFingerprintOf(finding.fingerprint());
-                boolean moved = previous != null && baselineFingerprints.contains(previous)
-                        && !baselineFingerprints.contains(finding.fingerprint());
-                if (moved) {
-                    current.add(previous);
-                }
-                FindingState state = stateOf(moved ? previous : finding.fingerprint(), baselineFingerprints,
+                FindingState state = stateOf(finding.fingerprint(), baselineFingerprints,
                         baseline.isPresent());
                 findings.save(toEntity(run, finding, state));
             }

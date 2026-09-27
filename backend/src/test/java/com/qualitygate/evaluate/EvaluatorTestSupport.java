@@ -51,10 +51,9 @@ final class EvaluatorTestSupport {
     }
 
     static NormalizedInput input(List<RawMeasurement> measurements,
-                                 List<IdentifiedFinding> head,
-                                 List<IdentifiedFinding> base,
+                                 List<IdentifiedFinding> findings,
                                  Set<String> metricsWithData) {
-        return new NormalizedInput(measurements, head, base, metricsWithData, Map.of());
+        return new NormalizedInput(measurements, findings, metricsWithData, Map.of());
     }
 
     static RawMeasurement coverage(String component, String value) {
@@ -63,13 +62,13 @@ final class EvaluatorTestSupport {
     }
 
     static IdentifiedFinding vulnerability(String id, Severity severity) {
-        RawFinding finding = new RawFinding("M-06", id, severity, id + " の脆弱性",
+        RawFinding finding = new RawFinding("M-05", id, severity, id + " の脆弱性",
                 "backend/pom.xml", null, "backend", id, Map.of());
         return new IdentifiedFinding("fp-" + id, finding);
     }
 
     static IdentifiedFinding function(String name, int complexity) {
-        RawFinding finding = new RawFinding("M-07", "CyclomaticComplexity", Severity.INFO,
+        RawFinding finding = new RawFinding("M-06", "CyclomaticComplexity", Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(name, complexity),
                 "src/main/java/A.java", 10, "backend", "A.java#" + name,
                 Map.of("complexity", complexity, "member", name));
