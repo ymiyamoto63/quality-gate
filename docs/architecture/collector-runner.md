@@ -10,7 +10,7 @@
 - バックエンドは送られた成果物を取り込んで判定するだけで、**テストを実行しない**（[03](../spec/03-design-decisions.md) DD-6）
 - Ingest API の送り手は収集ランナーだけ。合格ライン（`*.gate.yml`）も収集ランナーが Run ごとに送る（DD-13）
 - 計測は手動実行で起動する（DD-7）。PIT と負荷試験は PR 以外の計測で実行する（DD-17）
-- 比較元・タグ・ファイルの移動は、収集ランナーが clone した履歴から求めて送る（DD-10）
+- 比較元とタグは、収集ランナーが clone した履歴から求めて送る（DD-10）
 - 対象のビルド構成への追従は、対象のチームではなく quality-gate の運用者が担う
 
 ## 2. 前提条件
@@ -37,7 +37,7 @@
    .github/workflows/collect.yml                   │
    collector/                                      ▼
      targets/<owner>__<name>.env      ──►  セルフホストランナー
-     targets/<owner>__<name>.gate.yml       1. clone、比較元・タグ・ファイルの移動を求める（fetch）
+     targets/<owner>__<name>.gate.yml       1. clone、比較元とタグを求める（fetch）
      bin/*.sh                               2. 計測（measure。コンテナの中。ツールは版を固定）
      versions.env                           3. Ingest API へ送信（submit。合格ラインも送る）
                                                    │
