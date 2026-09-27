@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * M-12 ライセンス違反件数（docs/spec/02-metrics-spec.md M-12）。
+ * M-12 ライセンス違反件数（docs/metrics.md M-12）。
  *
  * <p>数えるのは<strong>パッケージ</strong>。ライセンスの分類（Trivy の分類。緩い順に
  * unencumbered / permissive / notice / reciprocal / restricted / forbidden）で判定する。

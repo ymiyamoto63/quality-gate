@@ -57,7 +57,7 @@ interface Target {
   name: string
   expected: string
   role?: Role
-  /** 検査の前に画面を動的な状態にする（ダイアログを開くなど。docs/08 8 章） */
+  /** 検査の前に画面を動的な状態にする（ダイアログを開くなど。docs/development.md 6 章） */
   prepare?: (page: Page) => Promise<void>
 }
 

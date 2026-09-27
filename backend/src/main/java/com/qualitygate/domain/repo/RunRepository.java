@@ -33,7 +33,7 @@ public interface RunRepository extends JpaRepository<Run, UUID> {
     Optional<Run> findFirstByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(UUID repositoryId,
                                                                                   RunStatus status);
 
-    /** 最後の完全計測（FR-06-3）。 */
+    /** 最後の完全計測（DASH-2）。 */
     Optional<Run> findFirstByRepositoryIdAndStatusAndCompletenessOrderByMeasuredAtDescAttemptDesc(
             UUID repositoryId, RunStatus status, Completeness completeness);
 

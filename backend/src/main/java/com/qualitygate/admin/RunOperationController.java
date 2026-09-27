@@ -24,7 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.Map;
 import java.util.UUID;
 
-/** Run の再評価（FR-05-5）。管理者のみ。 */
+/** Run の再評価（EVAL-6）。管理者のみ。 */
 @RestController
 @PreAuthorize("hasRole('ADMIN')")
 @Tag(name = "Operations", description = "再評価（管理者のみ）")

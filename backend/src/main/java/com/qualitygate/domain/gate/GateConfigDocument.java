@@ -61,7 +61,7 @@ public record GateConfigDocument(
         return metrics.getOrDefault(name, new MetricConfig(true, Map.of()));
     }
 
-    /** 設定ファイルが無い場合に使う既定値。要件定義書 6.5 の設定例に対応する。 */
+    /** 設定ファイルが無い場合に使う既定値。docs/features/gate-config/design.md 2 章の例と同じ値。 */
     public static GateConfigDocument defaults() {
         Map<String, MetricConfig> metrics = new LinkedHashMap<>();
         metrics.put("branch_coverage", new MetricConfig(true, Map.of(

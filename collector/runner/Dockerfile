@@ -1,4 +1,4 @@
-# 収集ランナーの計測用コンテナ（docs/operations/collector.md 7 章）。
+# 収集ランナーの計測用コンテナ（docs/architecture.md 3.6）。
 #
 # 対象リポジトリのビルド・テストのコードは、このコンテナの中だけで動かす（collector/bin/measure-isolated.sh）。
 # ランナーのマシンのファイル・Docker・他のジョブの作業領域には触れられない。

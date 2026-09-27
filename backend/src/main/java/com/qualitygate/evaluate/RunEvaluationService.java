@@ -20,6 +20,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
@@ -41,6 +42,9 @@ import java.util.UUID;
  */
 @Service
 public class RunEvaluationService {
+
+    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
+    };
 
     private static final Logger log = LoggerFactory.getLogger(RunEvaluationService.class);
 
@@ -71,10 +75,12 @@ public class RunEvaluationService {
 
         Optional<Run> baseline = findBaseline(run);
         run.applyBaseline(baseline.map(Run::getId).orElse(null));
-        Map<String, BigDecimal> previousValues = previousValuesOf(baseline);
+        List<Measurement> previous = baseline
+                .map(b -> measurements.findByRunId(b.getId()))
+                .orElse(List.of());
 
         EvaluationContext context = new EvaluationContext(run, thresholds,
-                input, previousValues, baseline.isPresent());
+                input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
         List<MetricResult> results = evaluateAll(context);
 
         // 再評価でも重複しないよう、この Run の既存の判定結果を置き換える
@@ -115,7 +121,7 @@ public class RunEvaluationService {
     }
 
     /**
-     * 指標 1 件の判定。優先順位は docs/spec/05-architecture.mdに従う。
+     * 指標 1 件の判定。優先順位は docs/features/evaluation/design.md 5 章に従う。
      *
      * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
      * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。
@@ -296,17 +302,28 @@ public class RunEvaluationService {
                 .filter(candidate -> !candidate.getId().equals(run.getId()));
     }
 
-    private Map<String, BigDecimal> previousValuesOf(Optional<Run> baseline) {
-        if (baseline.isEmpty()) {
-            return Map.of();
-        }
+    private static Map<String, BigDecimal> previousValuesOf(List<Measurement> previous) {
         Map<String, BigDecimal> values = new HashMap<>();
-        for (Measurement measurement : measurements.findByRunId(baseline.get().getId())) {
-            values.put(EvaluationContext.key(measurement.getMetricId(),
-                    measurement.getComponentName(), measurement.getVariant()),
-                    measurement.getValue());
+        for (Measurement measurement : previous) {
+            values.put(keyOf(measurement), measurement.getValue());
         }
         return values;
+    }
+
+    private Map<String, Map<String, Object>> previousDetailsOf(List<Measurement> previous) {
+        Map<String, Map<String, Object>> details = new HashMap<>();
+        for (Measurement measurement : previous) {
+            if (measurement.getDetail() != null) {
+                details.put(keyOf(measurement),
+                        objectMapper.readValue(measurement.getDetail(), JSON_OBJECT));
+            }
+        }
+        return details;
+    }
+
+    private static String keyOf(Measurement measurement) {
+        return EvaluationContext.key(measurement.getMetricId(),
+                measurement.getComponentName(), measurement.getVariant());
     }
 
     private String toJson(Object value) {

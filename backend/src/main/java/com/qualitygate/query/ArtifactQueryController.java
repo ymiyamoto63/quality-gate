@@ -24,7 +24,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Comparator;
 import java.util.UUID;
 
-/** 取り込んだ元成果物の一覧とダウンロード（FR-07-5）。 */
+/** 取り込んだ元成果物の一覧とダウンロード（RUN-5）。 */
 @RestController
 @RequestMapping("/api/v1/runs/{runId}/artifacts")
 @Tag(name = "Runs")

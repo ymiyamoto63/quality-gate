@@ -610,7 +610,7 @@ components:
       - uploadedAt
     ArtifactListResponse:
       type: object
-      description: Run に取り込んだ成果物の一覧（FR-07-5）
+      description: Run に取り込んだ成果物の一覧（RUN-5）
       properties:
         items:
           type: array
@@ -1382,7 +1382,7 @@ components:
       - repository
     RepositoryFreshness:
       type: object
-      description: 最後の計測と最後の完全計測の日時（FR-06-2 / FR-06-3）
+      description: 最後の計測と最後の完全計測の日時（DASH-2）
       properties:
         lastFullMeasuredAt:
           type:

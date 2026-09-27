@@ -7,7 +7,7 @@ import org.springframework.core.Ordered;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
-/** 相関 ID をログに載せる仕組みの登録（docs/spec/05-architecture.md）。 */
+/** 相関 ID をログに載せる仕組みの登録（docs/architecture.md 4.3）。 */
 @Configuration
 public class ObservabilityConfig implements WebMvcConfigurer {
 

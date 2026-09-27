@@ -11,7 +11,7 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * M-11 シークレット検出件数（docs/spec/02-metrics-spec.md M-11）。
+ * M-11 シークレット検出件数（docs/metrics.md M-11）。
  *
  * <p>コミットされた鍵やトークンは、履歴に残った時点で漏えいとみなす。M-06 のように
  * 「新規だけを数える」ことはせず、<strong>検出されたものすべて</strong>を数える。

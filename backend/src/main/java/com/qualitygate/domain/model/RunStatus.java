@@ -1,7 +1,7 @@
 package com.qualitygate.domain.model;
 
 /**
- * Run の処理状態（docs/spec/05-architecture.md）。
+ * Run の処理状態（docs/architecture.md 4.2）。
  *
  * <p>{@link #FAILED} は quality-gate 側の処理失敗であり、
  * 品質が合格ラインを満たさない {@link Verdict#FAIL} とは別物である。

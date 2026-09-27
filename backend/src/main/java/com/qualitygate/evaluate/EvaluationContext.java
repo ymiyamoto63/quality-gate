@@ -10,14 +10,23 @@ import java.util.Optional;
 /**
  * 判定に必要な入力一式。
  *
- * @param previousValues 比較対象 Run の実測値（キーは {@link #key(String, String, String)}）
+ * @param previousValues  比較対象 Run の実測値（キーは {@link #key(String, String, String)}）
+ * @param previousDetails 比較対象 Run の内訳（{@code detail}。キーは previousValues と同じ）。
+ *                        値に表れない件数（M-05 の Medium など）を前回と比べるのに使う
  */
 public record EvaluationContext(
         Run run,
         GateThresholds thresholds,
         NormalizedInput input,
         Map<String, BigDecimal> previousValues,
+        Map<String, Map<String, Object>> previousDetails,
         boolean hasBaseline) {
+
+    /** 内訳を使わない判定用（前回の内訳は無いものとして扱う）。 */
+    public EvaluationContext(Run run, GateThresholds thresholds, NormalizedInput input,
+                             Map<String, BigDecimal> previousValues, boolean hasBaseline) {
+        this(run, thresholds, input, previousValues, Map.of(), hasBaseline);
+    }
 
     public static String key(String metricId, String componentName) {
         return key(metricId, componentName, null);
@@ -39,5 +48,9 @@ public record EvaluationContext(
     public Optional<BigDecimal> previousValue(String metricId, String componentName,
                                               String variant) {
         return Optional.ofNullable(previousValues.get(key(metricId, componentName, variant)));
+    }
+
+    public Optional<Map<String, Object>> previousDetail(String metricId, String componentName) {
+        return Optional.ofNullable(previousDetails.get(key(metricId, componentName, null)));
     }
 }
