@@ -13,6 +13,7 @@ ARG NODE_VERSION
 ARG MAVEN_VERSION
 ARG TRIVY_VERSION
 ARG OASDIFF_VERSION
+ARG YQ_VERSION
 
 RUN apt-get update \
  && apt-get install -y --no-install-recommends ca-certificates curl git jq unzip xz-utils \
@@ -35,6 +36,11 @@ RUN arch=$(dpkg --print-architecture) \
     | tar -xz -C /usr/local/bin trivy \
  && curl -fsSL "https://github.com/oasdiff/oasdiff/releases/download/v${OASDIFF_VERSION}/oasdiff_${OASDIFF_VERSION}_linux_${arch}.tar.gz" \
     | tar -xz -C /usr/local/bin oasdiff
+
+# 合格ライン（*.gate.yml）の読み取り（measure.sh が無効の指標を計測しないために使う）
+RUN arch=$(dpkg --print-architecture) \
+ && curl -fsSL -o /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_${arch}" \
+ && chmod +x /usr/local/bin/yq
 
 # M-08 の検査ツールと Chromium（とその動作に必要なライブラリ）
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/ms-playwright

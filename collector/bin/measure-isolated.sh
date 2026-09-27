@@ -47,12 +47,13 @@ NODE=$(node_version) || true
 [ -n "$NODE" ] || die "Node.js の版を解決できませんでした（${NODE_VERSION_FILE:-既定の 22}）"
 TRIVY_VERSION=${TRIVY_IMAGE##*:}
 OASDIFF_VERSION=${OASDIFF_IMAGE##*:v}
+YQ_VERSION=${YQ_IMAGE##*:}
 BASE_IMAGE=${QG_COLLECTOR_BASE_IMAGE:-eclipse-temurin:${JAVA}-jdk-noble}
 # ベースのイメージ・Dockerfile・検査ツールの内容でタグを決める。同じなら作り直さない
 HASH=$({ echo "$BASE_IMAGE"; cat "$COLLECTOR_DIR/runner/Dockerfile" "$COLLECTOR_DIR/a11y/package-lock.json" \
   "$COLLECTOR_DIR/complexity/package-lock.json"; } \
   | sha256sum | cut -c1-12)
-IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-${HASH}"
+IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-yq${YQ_VERSION}-${HASH}"
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   group "計測用のコンテナの作成（${IMAGE}）"
@@ -60,6 +61,7 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
     --build-arg "BASE_IMAGE=$BASE_IMAGE" --build-arg "NODE_VERSION=$NODE" \
     --build-arg "MAVEN_VERSION=$MAVEN_VERSION" \
     --build-arg "TRIVY_VERSION=$TRIVY_VERSION" --build-arg "OASDIFF_VERSION=$OASDIFF_VERSION" \
+    --build-arg "YQ_VERSION=$YQ_VERSION" \
     "$COLLECTOR_DIR"
   endgroup
 fi
