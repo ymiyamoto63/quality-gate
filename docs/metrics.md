@@ -102,7 +102,6 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 
 | 指標 | `variant` | 表示名 |
 | --- | --- | --- |
-| M-02 | 実行範囲（`mutationScope`。受け付けるのは `all` だけ） | 全量 |
 | M-03 / M-04 | 計測環境の名前（`environment.name`） | 名前そのもの |
 
 ### 2.6 違反（Finding）と fingerprint
@@ -113,7 +112,7 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 | 指標 | 同定子 | 保存する違反 |
 | --- | --- | --- |
 | M-05 | `パッケージ名|脆弱性 ID`（パッケージが無ければ `ルール ID|ファイル`） | すべての検出 |
-| M-06 | `モジュール相対パス#関数` | しきい値超と注意水準（`warn_from` 以上）の関数 |
+| M-06 | `モジュール相対パス#関数` | しきい値超と注意水準（`max_complexity` − 4 以上）の関数 |
 | M-07 | 変更 ID・メソッド・パス・説明文 | level 2 以上の変更 |
 | M-08 | ページのパス（ID を `:id` に置換）・ルール ID・要素の CSS セレクタ | すべての違反（基準外を含む） |
 | M-09 / M-10 | `テストクラス名#テスト名` | 失敗・エラー・再実行で成功・スキップしたテスト |
@@ -152,7 +151,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | --- | --- | --- |
 | 1 | 分岐が 0 個 | PASS（値なし。100% と扱うと分岐の無いコンポーネントが合格を稼ぐため） |
 | 2 | `threshold`（既定 75）未満 | FAIL |
-| 3 | `warn_below`（省略時は `threshold` + 5）未満 | WARN |
+| 3 | `threshold` + 5 未満 | WARN |
 | 4 | 前回から 1 ポイント以上低下 | WARN |
 | 5 | それ以外 | PASS |
 
@@ -176,18 +175,14 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 対象の pom の PIT の設定は使わない。対象クラスは計測プロファイルの `MUTATION_TARGET_CLASSES` などで決める（[運用](operations.md#42-計測プロファイル)）。
 **テストが 1 件でも失敗していると PIT は動かない**ため、M-02 は ERROR になる。
 
-**取り込みの規則**: `pit-xml` はメタデータ `{"mutationScope": "all"}` が必須（無ければ `422 MUTATION_SCOPE_MISSING`、`all` 以外は `400 VALIDATION_FAILED`）。
-範囲の分からない値を後から正しい系列に振り分けられないため、判定時ではなく取り込み時に拒否する。
-
 **判定**（コンポーネントごと）
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 実行範囲の違う成果物が混在 | ERROR |
-| 2 | ミューテーションが 0 個 | PASS（値なし） |
-| 3 | 失敗（上記）が全体の 10% 超 | ERROR（値なし。生き残ったはずのものが失敗側に紛れうる） |
-| 4 | `threshold`（既定 60）未満 | FAIL |
-| 5 | `threshold` + 5 未満 | WARN |
+| 1 | ミューテーションが 0 個 | PASS（値なし） |
+| 2 | 失敗（上記）が全体の 10% 超 | ERROR（値なし。生き残ったはずのものが失敗側に紛れうる） |
+| 3 | `threshold`（既定 60）未満 | FAIL |
+| 4 | `threshold` + 5 未満 | WARN |
 | 6 | `TIMED_OUT` が全体の 10% 超 | WARN（遅いランナーでスコアが過大に出ている疑い） |
 | 7 | 前回から 2 ポイント以上低下 | WARN |
 | 8 | それ以外 | PASS |
@@ -303,7 +298,7 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
 | 1 | CC が `max_complexity` を超える関数がある | FAIL |
-| 2 | CC が `warn_from`（既定 11）以上 `max_complexity` 以下の関数がある | WARN |
+| 2 | CC が `max_complexity` − 4（既定 11）以上 `max_complexity` 以下の関数がある | WARN |
 | 3 | それ以外 | PASS |
 
 ファイルを移動した関数は、移動後のパスで別の違反になる（新規と解消）。件数で判定するため合否には影響しない。
@@ -361,7 +356,7 @@ serious にはキーボードで操作できない・コントラスト不足な
 | `moderate` | Medium | WARN の根拠 |
 | `minor` | Low | 表示のみ |
 
-- 違反したルールのタグに基準（`standard`。既定 `wcag22aa`）のタグが 1 つも無ければ基準外（best-practice や AAA）として、件数（`outOfStandard`）と違反一覧には残すが判定に使わない。`standard` に書けるのは `wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`
+- 違反したルールのタグに WCAG 2.2 AA のタグ（`wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`）が 1 つも無ければ基準外（best-practice や AAA）として、件数（`outOfStandard`）と違反一覧には残すが判定に使わない
 - axe が判断を保留した要素（`incomplete`）は違反に数えず、件数を `needsReview` に残す
 - `url` のスキームが `http` / `https` / `file` 以外（`chrome-error://` など）の結果は読み込みに失敗した画面とみなす
 
@@ -421,9 +416,8 @@ frontend は Vitest に junit reporter を足して出した `junit.xml` を `te
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 件数が `max_skipped`（既定なし）を超える | FAIL |
-| 2 | 比較対象 Run からの増加が `max_skipped_increase`（既定 0）を超える | FAIL |
-| 3 | それ以外（比較対象に同じコンポーネントの値が無ければ増加は見ない） | PASS |
+| 1 | 比較対象 Run からの増加が `max_skipped_increase`（既定 0）を超える | FAIL |
+| 2 | それ以外（比較対象に同じコンポーネントの値が無ければ増加は見ない） | PASS |
 
 ### M-11 シークレット検出件数
 
@@ -447,8 +441,8 @@ unknown は、同じパッケージに分類の分かるライセンスがあれ
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | forbidden が `max_forbidden`（既定 0）を超える、または restricted / unknown が上限（`max_restricted` / `max_unknown`。設定したときだけ）を超える | FAIL |
-| 2 | restricted / unknown のパッケージがある | WARN（利用形態で可否が変わるため、既定では落とさない） |
+| 1 | forbidden が `max_forbidden`（既定 0）を超える | FAIL |
+| 2 | restricted / unknown のパッケージがある | WARN（利用形態で可否が変わるため、件数では落とさない） |
 | 3 | それ以外 | PASS |
 
 ### SARIF の振り分け（M-05 / M-11 / M-12 共通）

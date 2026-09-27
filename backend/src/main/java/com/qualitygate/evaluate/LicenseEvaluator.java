@@ -24,8 +24,8 @@ import java.util.Objects;
  *
  * <p>判定の優先順位:
  * <ol>
- *   <li>forbidden のパッケージが上限（既定 0）を超えた、または restricted / unknown が上限（設定したときだけ）を超えた → FAIL</li>
- *   <li>restricted / unknown のパッケージがある → WARN（既定では件数で落とさない。利用形態で可否が変わるため）</li>
+ *   <li>forbidden のパッケージが上限（既定 0）を超えた → FAIL</li>
+ *   <li>restricted / unknown のパッケージがある → WARN（件数で落とさない。利用形態で可否が変わるため）</li>
  *   <li>それ以外 → PASS</li>
  * </ol>
  *
@@ -47,7 +47,7 @@ public class LicenseEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        GateThresholds.Licenses thresholds = context.thresholds().licenses();
+        int maxForbidden = context.thresholds().maxForbiddenLicenses();
 
         // パッケージ（とコンポーネント）ごとに、最も緩い分類を採る
         Map<String, List<IdentifiedFinding>> byPackage = new LinkedHashMap<>();
@@ -74,16 +74,13 @@ public class LicenseEvaluator implements MetricEvaluator {
         int unknown = counts.get("unknown");
         Map<String, Object> threshold = new LinkedHashMap<>();
         threshold.put("operator", "<=");
-        threshold.put("value", thresholds.maxForbidden());
-        threshold.put("maxRestricted", thresholds.maxRestricted());
-        threshold.put("maxUnknown", thresholds.maxUnknown());
+        threshold.put("value", maxForbidden);
         Map<String, Object> detail = new LinkedHashMap<>(counts);
         detail.put("packages", byPackage.size());
 
         MeasurementStatus status;
         String reason;
-        if (forbidden > thresholds.maxForbidden() || exceeds(restricted, thresholds.maxRestricted())
-                || exceeds(unknown, thresholds.maxUnknown())) {
+        if (forbidden > maxForbidden) {
             status = MeasurementStatus.FAIL;
             reason = "使えないライセンスのパッケージがあります（forbidden %d 件・restricted %d 件・分類不明 %d 件）"
                     .formatted(forbidden, restricted, unknown);
@@ -98,10 +95,6 @@ public class LicenseEvaluator implements MetricEvaluator {
         }
         return List.of(MetricResult.of(metricId(), null, status, BigDecimal.valueOf(forbidden),
                 "count", threshold, reason, detail, violations));
-    }
-
-    private static boolean exceeds(int count, Integer max) {
-        return max != null && count > max;
     }
 
     private static String classificationOf(IdentifiedFinding finding) {

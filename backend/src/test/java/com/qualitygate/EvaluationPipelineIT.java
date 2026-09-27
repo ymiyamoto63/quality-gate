@@ -157,7 +157,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_HIGH);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
-        attachPit(run, "changed");
+        attachPit(run);
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
 
@@ -206,12 +206,12 @@ class EvaluationPipelineIT {
     void 性能は同じ計測環境の前回値とだけ比べる() {
         Run first = createRun(Instant.parse("2026-09-21T00:00:00Z"));
         attachAllMetrics(first);
-        attachPit(first, "changed");
+        attachPit(first);
         evaluate(first);
 
         Run second = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attachAllMetrics(second);
-        attachPit(second, "changed");
+        attachPit(second);
         evaluate(second);
 
         assertThat(measurements.findByRunId(second.getId()))
@@ -249,7 +249,7 @@ class EvaluationPipelineIT {
                 """);
         skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-06",
                 "PR の計測では実行しない"));
-        attachPit(run, "changed");
+        attachPit(run);
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
 
@@ -359,7 +359,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
                 "SF:src/api/format.ts\nBRF:10\nBRH:9\nend_of_record\n");
-        attachPit(run, "changed");
+        attachPit(run);
 
         Run evaluated = evaluate(run);
 
@@ -371,38 +371,27 @@ class EvaluationPipelineIT {
                 .extracting(Measurement::getComponentName, Measurement::getStatus,
                         Measurement::getVariant)
                 .containsExactlyInAnyOrder(
-                        org.assertj.core.groups.Tuple.tuple("backend", MeasurementStatus.PASS,
-                                "changed"),
+                        org.assertj.core.groups.Tuple.tuple("backend", MeasurementStatus.PASS, null),
                         org.assertj.core.groups.Tuple.tuple("frontend",
                                 MeasurementStatus.NOT_APPLICABLE, null));
     }
 
     @Test
-    void ミューテーションスコアの前回値は実行範囲が同じRunからだけ引く() {
+    void ミューテーションスコアが前回から落ちれば警告() {
         Run first = createRun(Instant.parse("2026-09-20T00:00:00Z"));
         attachAllMetrics(first);
-        attachPit(first, "changed", 8);
+        attachPit(first, 8);
         evaluate(first);
 
         Run second = createRun(Instant.parse("2026-09-21T00:00:00Z"));
         attachAllMetrics(second);
-        attachPit(second, "changed", 7);
+        attachPit(second, 7);
         evaluate(second);
-
-        // 全量の値を変更範囲の値と比べた差は、品質の変化ではなく範囲の違い
-        Run third = createRun(Instant.parse("2026-09-22T00:00:00Z"));
-        attachAllMetrics(third);
-        attachPit(third, "all", 9);
-        evaluate(third);
 
         Measurement changed = mutationOf(second);
         assertThat(changed.getPreviousValue()).isEqualByComparingTo("80");
         // 70% は合格ラインを満たすが、前回から 10 ポイント落ちている
         assertThat(changed.getStatus()).isEqualTo(MeasurementStatus.WARN);
-
-        Measurement all = mutationOf(third);
-        assertThat(all.getVariant()).isEqualTo("all");
-        assertThat(all.getPreviousValue()).isNull();
     }
 
     @Test
@@ -411,7 +400,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
-        attachPit(run, "changed");
+        attachPit(run);
         // 別の成果物で同じ画面を検査した結果（ライト / ダークなど）は、同じ違反として 1 件に数える
         String violation = """
                 [{ "url": "http://localhost:5173/runs/0190f5a2-7c1e-7a3b-9e4d-2f6a8b1c3d5e",
@@ -454,7 +443,7 @@ class EvaluationPipelineIT {
                     pages: ["/login", "/runs/:id"]
                 """);
         attachAllMetrics(run);
-        attachPit(run, "changed");
+        attachPit(run);
 
         Run evaluated = evaluate(run);
 
@@ -476,7 +465,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
-        attachPit(run, "changed");
+        attachPit(run);
         attachAxe(run, AXE_CLEAN);
         attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend",
                 JUNIT_CLEAN);
@@ -687,7 +676,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD_SIMPLE);
-        attachPit(run, "changed");
+        attachPit(run);
         attachAxe(run, AXE_CLEAN);
         attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend",
                 JUNIT_CLEAN);
@@ -782,7 +771,7 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY_CLEAN);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD_SIMPLE);
-        attachPit(run, "changed");
+        attachPit(run);
         attachAxe(run, AXE_CLEAN);
         attachContract(run);
 
@@ -880,18 +869,17 @@ class EvaluationPipelineIT {
         attach(run, ArtifactType.AXE_JSON, filename, "frontend", json);
     }
 
-    private void attachPit(Run run, String mutationScope) {
-        attachPit(run, mutationScope, 8);
+    private void attachPit(Run run) {
+        attachPit(run, 8);
     }
 
     /** 10 個の mutation のうち {@code killed} 個を検出した PIT の結果。 */
-    private void attachPit(Run run, String mutationScope, int killed) {
+    private void attachPit(Run run, int killed) {
         String xml = "<mutations>"
                 + mutation("KILLED").repeat(killed)
                 + mutation("SURVIVED").repeat(10 - killed)
                 + "</mutations>";
-        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", xml,
-                "{\"mutationScope\":\"%s\"}".formatted(mutationScope));
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", xml);
     }
 
     private static String mutation(String status) {

@@ -21,12 +21,8 @@ import java.util.Optional;
  * そこで<strong>比較対象 Run からの増加</strong>を判定する。
  * 既存のスキップを一括で不合格にしないのは M-06 と同じ考え方による。
  *
- * <p>判定の優先順位は次のとおり。
- * <ol>
- *   <li>件数の上限（{@code max_skipped}）を超えた → FAIL</li>
- *   <li>比較対象 Run からの増加が上限（{@code max_skipped_increase}、既定 0）を超えた → FAIL</li>
- *   <li>それ以外 → PASS（比較対象が無ければ増加は判定せず、件数だけを記録する）</li>
- * </ol>
+ * <p>比較対象 Run からの増加が上限（{@code max_skipped_increase}、既定 0）を超えたら FAIL、
+ * それ以外は PASS（比較対象が無ければ増加は判定せず、件数だけを記録する）。
  *
  * <p>件数はコンポーネントごとに数える（M-09 と同じ）。
  */
@@ -45,7 +41,6 @@ public class SkippedTestEvaluator implements MetricEvaluator {
         GateThresholds.TestResults thresholds = context.thresholds().testResults();
         Map<String, Object> threshold = new LinkedHashMap<>();
         threshold.put("operator", "<=");
-        threshold.put("value", thresholds.maxSkipped());
         threshold.put("maxIncrease", thresholds.maxSkippedIncrease());
 
         List<MetricResult> results = new ArrayList<>();
@@ -71,11 +66,6 @@ public class SkippedTestEvaluator implements MetricEvaluator {
     private static Judgement judge(TestTally tally, Optional<BigDecimal> previous,
                                    GateThresholds.TestResults thresholds) {
         long skipped = tally.skipped();
-        if (thresholds.maxSkipped() != null && skipped > thresholds.maxSkipped()) {
-            return new Judgement(MeasurementStatus.FAIL,
-                    "スキップされたテストが %d 件あり、上限 %d 件を超えています"
-                            .formatted(skipped, thresholds.maxSkipped()));
-        }
         if (previous.isEmpty()) {
             return new Judgement(MeasurementStatus.PASS,
                     "スキップされたテストは %d 件です（比較対象の Run が無いため、増加は判定していません）"

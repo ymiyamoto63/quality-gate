@@ -3,7 +3,6 @@ package com.qualitygate.config;
 import com.qualitygate.domain.gate.ConfigValidationError;
 import com.qualitygate.domain.gate.ConfigValidationException;
 import com.qualitygate.domain.gate.GateConfigDocument;
-import com.qualitygate.domain.model.WcagStandard;
 import org.springframework.stereotype.Component;
 import org.yaml.snakeyaml.LoaderOptions;
 import org.yaml.snakeyaml.Yaml;
@@ -12,14 +11,11 @@ import org.yaml.snakeyaml.error.MarkedYAMLException;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * {@code .quality-gate.yml} を検証して {@link GateConfigDocument} にする。
@@ -39,18 +35,18 @@ public class GateConfigParser {
 
     /** 指標名（YAML のキー）と、それぞれに書ける項目。 */
     private static final Map<String, Set<String>> METRIC_KEYS = Map.ofEntries(
-            Map.entry("branch_coverage", Set.of("enabled", "threshold", "warn_below")),
+            Map.entry("branch_coverage", Set.of("enabled", "threshold")),
             Map.entry("mutation_score", Set.of("enabled", "threshold", "components")),
             Map.entry("performance", Set.of("enabled", "p95_ms", "arrival_rate_rps", "error_rate_pct",
                     "scenarios")),
             Map.entry("vulnerabilities", Set.of("enabled", "max_critical", "max_high")),
-            Map.entry("cyclomatic_complexity", Set.of("enabled", "max_complexity", "warn_from")),
+            Map.entry("cyclomatic_complexity", Set.of("enabled", "max_complexity")),
             Map.entry("api_contract", Set.of("enabled", "breaking_changes")),
-            Map.entry("accessibility", Set.of("enabled", "standard", "max_critical", "pages")),
+            Map.entry("accessibility", Set.of("enabled", "max_critical", "pages")),
             Map.entry("test_results", Set.of("enabled", "min_success_rate", "min_test_count",
-                    "max_skipped", "max_skipped_increase")),
+                    "max_skipped_increase")),
             Map.entry("secrets", Set.of("enabled", "max_secrets")),
-            Map.entry("licenses", Set.of("enabled", "max_forbidden", "max_restricted", "max_unknown")));
+            Map.entry("licenses", Set.of("enabled", "max_forbidden")));
 
     public GateConfigDocument parse(String yaml) {
         YamlLineIndex lines = YamlLineIndex.of(yaml);
@@ -193,20 +189,12 @@ public class GateConfigParser {
     }
 
     /**
-     * M-08 の判定基準と検査対象ページ。
+     * M-08 の検査対象ページ。
      *
-     * <p>未知の基準を既定値で読み流すと、書いた基準とは違う基準で合否が出る。
-     * ページは画面のパス（{@code /runs/:id}）で書く。URL で書くと検査結果と照合できない。
+     * <p>ページは画面のパス（{@code /runs/:id}）で書く。URL で書くと検査結果と照合できない。
      */
     private void validateAccessibility(Map<String, Object> values, String path,
                                        YamlLineIndex lines, List<ConfigValidationError> errors) {
-        Object standard = values.get("standard");
-        Set<String> standards = Arrays.stream(WcagStandard.values()).map(WcagStandard::wire)
-                .collect(Collectors.toSet());
-        if (standard != null && !standards.contains(String.valueOf(standard))) {
-            errors.add(error(lines, path + ".standard", "指定できるのは %s のいずれかです（受信値: %s）"
-                    .formatted(String.join(" / ", sorted(standards)), quote(standard))));
-        }
         Object pages = values.get("pages");
         boolean listOfPaths = pages instanceof List<?> list
                 && list.stream().allMatch(p -> p instanceof String s && s.startsWith("/"));
@@ -246,7 +234,7 @@ public class GateConfigParser {
             boolean percentage = key.endsWith("threshold") || key.endsWith("_rate_pct")
                     || key.equals("min_success_rate");
             boolean count = key.startsWith("max_") || key.startsWith("min_test")
-                    || key.equals("warn_from") || key.equals("breaking_changes")
+                    || key.equals("breaking_changes")
                     || key.equals("p95_ms") || key.equals("arrival_rate_rps");
             if (!percentage && !count) {
                 continue;
@@ -267,9 +255,7 @@ public class GateConfigParser {
         }
     }
 
-    /**
-     * 未知のキーを報告する。似た名前の候補を添えるのは、typo を自力で直せるようにするため。
-     */
+    /** 未知のキーを報告する。 */
     private void checkUnknownKeys(Map<String, Object> actual, Set<String> allowed, String path,
                                   YamlLineIndex lines, List<ConfigValidationError> errors) {
         for (String key : actual.keySet()) {
@@ -277,38 +263,9 @@ public class GateConfigParser {
                 continue;
             }
             String childPath = path.isEmpty() ? key : path + "." + key;
-            String suggestion = closest(key, allowed)
-                    .map(candidate -> "。'%s' の誤りではありませんか".formatted(candidate))
-                    .orElse("");
-            errors.add(error(lines, childPath, "未知のキーです" + suggestion));
+            errors.add(error(lines, childPath, "未知のキーです（書けるのは %s）"
+                    .formatted(String.join(", ", sorted(allowed)))));
         }
-    }
-
-    /** 編集距離が近いものを候補にする。遠いものを出すと、かえって迷わせる。 */
-    static Optional<String> closest(String key, Set<String> candidates) {
-        return candidates.stream()
-                .map(candidate -> Map.entry(candidate, distance(key, candidate)))
-                .filter(entry -> entry.getValue() <= Math.max(2, key.length() / 3))
-                .min(Map.Entry.comparingByValue())
-                .map(Map.Entry::getKey);
-    }
-
-    static int distance(String a, String b) {
-        int[] previous = new int[b.length() + 1];
-        int[] current = new int[b.length() + 1];
-        for (int j = 0; j <= b.length(); j++) {
-            previous[j] = j;
-        }
-        for (int i = 1; i <= a.length(); i++) {
-            current[0] = i;
-            for (int j = 1; j <= b.length(); j++) {
-                int cost = a.charAt(i - 1) == b.charAt(j - 1) ? 0 : 1;
-                current[j] = Math.min(Math.min(current[j - 1] + 1, previous[j] + 1),
-                        previous[j - 1] + cost);
-            }
-            System.arraycopy(current, 0, previous, 0, current.length);
-        }
-        return previous[b.length()];
     }
 
     private static ConfigValidationError error(YamlLineIndex lines, String path, String message) {

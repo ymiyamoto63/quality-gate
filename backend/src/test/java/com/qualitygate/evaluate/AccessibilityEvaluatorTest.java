@@ -75,17 +75,6 @@ class AccessibilityEvaluatorTest {
     }
 
     @Test
-    void 基準を下げればその基準に含まれないルールは判定に使わない() {
-        // WCAG 2.2 で加わった target-size は 2.1 AA の違反ではない
-        MetricResult result = evaluate(Map.of("standard", "wcag21aa"),
-                List.of(scan(List.of("/"))),
-                List.of(violation("/", "target-size", Severity.HIGH, "wcag22aa")));
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
-        assertThat(result.detail()).containsEntry("standard", "wcag21aa");
-    }
-
-    @Test
     void moderateがあれば警告() {
         MetricResult result = evaluate(Map.of(), List.of(scan(List.of("/"))),
                 List.of(violation("/", "list", Severity.MEDIUM, "wcag2a")));

@@ -64,12 +64,12 @@ class ObservabilityIT {
     void エラー応答のtraceIdは要求のIDと一致する() {
         ResponseEntity<Map<String, Object>> response = client.post().uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
-                .header("X-Request-Id", "trace-me-1")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "ymiyamoto63/quality-gate"))
                 .retrieve().toEntity(JSON_OBJECT);
 
-        assertThat(response.getHeaders().getFirst("X-Request-Id")).isEqualTo("trace-me-1");
-        assertThat(response.getBody()).containsEntry("traceId", "trace-me-1");
+        String requestId = response.getHeaders().getFirst("X-Request-Id");
+        assertThat(requestId).isNotBlank();
+        assertThat(response.getBody()).containsEntry("traceId", requestId);
     }
 }

@@ -143,7 +143,7 @@ class RunQueryApiIT {
                    "failureSummary": "Fix any of the following:\\n  Element has insufficient color contrast of 3.2" }] }] }]
             """;
 
-    /** 全量の PIT 結果。検出 8 / 対象 10 = 80% で合格。 */
+    /** PIT 結果。検出 8 / 対象 10 = 80% で合格。 */
     private static final String PIT = "<mutations partial='true'>"
             + mutation("KILLED").repeat(8)
             + mutation("SURVIVED")
@@ -227,12 +227,10 @@ class RunQueryApiIT {
         assertThat(functional.status()).isEqualTo(MeasurementStatus.PASS);
         // 合格だけのカテゴリは初期状態で折りたたむ
         assertThat(functional.expandByDefault()).isFalse();
-        // 計測条件（実行範囲）は生の値と表示名の両方を返す
         assertThat(functional.metrics()).filteredOn(m -> m.metricId().equals("M-02"))
                 .singleElement().satisfies(metric -> {
                     assertThat(metric.value()).isEqualByComparingTo("80");
-                    assertThat(metric.variant()).isEqualTo("all");
-                    assertThat(metric.variantLabel()).isEqualTo("全量");
+                    assertThat(metric.variant()).isNull();
                 });
 
         assertThat(detail.findingSummary().initial()).isEqualTo(3);
@@ -586,8 +584,7 @@ class RunQueryApiIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco);
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, sarif);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", pmd);
-        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
-                "{\"mutationScope\":\"all\"}");
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT);
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CLEAN);
         attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
         attach(run, ArtifactType.OASDIFF_JSON, "oasdiff.json", null, "[]");
@@ -612,8 +609,7 @@ class RunQueryApiIT {
                 "SF:src/api/format.ts\nBRF:20\nBRH:17\nend_of_record\n");
         attach(run, ArtifactType.SARIF, "trivy.sarif", null, TRIVY);
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
-        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT,
-                "{\"mutationScope\":\"all\"}");
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", PIT);
         attach(run, ArtifactType.AXE_JSON, "axe-results.json", "frontend", AXE_CONTRAST);
         attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_PROVIDER);
         attach(run, ArtifactType.TEST_JUNIT_XML, "junit.xml", "frontend", JUNIT_CONSUMER);

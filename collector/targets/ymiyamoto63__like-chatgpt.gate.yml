@@ -28,8 +28,7 @@ metrics:
   # M-01 分岐網羅率（backend の JaCoCo と frontend の Vitest）
   branch_coverage:
     enabled: true
-    threshold: 75
-    warn_below: 80                # 75% 以上 80% 未満は注意（WARN）
+    threshold: 75                 # 75% 以上 80% 未満は注意（WARN）
   # M-02 ミューテーションスコア（PIT）。PR 以外の計測で全量を実行する
   mutation_score:
     enabled: true
@@ -50,8 +49,7 @@ metrics:
   # M-06 循環的複雑度（backend の PMD と frontend の ESLint）
   cyclomatic_complexity:
     enabled: true
-    max_complexity: 15
-    warn_from: 11
+    max_complexity: 15            # 11〜15 は注意（WARN）
   # M-07 破壊的変更（oasdiff で比較元と OpenAPI 定義を比べる）
   api_contract:
     enabled: true
@@ -70,10 +68,9 @@ metrics:
   licenses:
     enabled: true
     max_forbidden: 0
-  # M-08 アクセシビリティ（axe-core で A11Y_PAGES の画面をライト・ダークで検査）
+  # M-08 アクセシビリティ（axe-core で A11Y_PAGES の画面をライト・ダークで WCAG 2.2 AA を検査）
   accessibility:
     enabled: true
-    standard: wcag22aa
     max_critical: 0
     # 計測プロファイルの A11Y_PAGES と一致させる。ここに書いた画面が検査結果に無ければ M-08 は ERROR
     pages:

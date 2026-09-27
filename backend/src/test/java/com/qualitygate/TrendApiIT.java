@@ -202,42 +202,22 @@ class TrendApiIT {
         assertThat(trendOf("M-01", "feature/x").series().getFirst().points()).hasSize(1);
     }
 
-    /**
-     * 実行範囲の違う値を 1 本の線で結ぶと、範囲が切り替わるたびに品質が乱高下して見える。
-     * 範囲ごとに別の系列にする（取り込みが受け付けるのは all だけだが、系列の分け方は計測条件の値によらない）。
-     */
     @Test
-    void ミューテーションスコアは実行範囲ごとに系列を分け対象外は系列にしない() {
-        mutation(Instant.parse("2026-09-20T00:00:00Z"), 8, "changed");
-        mutation(Instant.parse("2026-09-21T00:00:00Z"), 9, "all");
-        mutation(Instant.parse("2026-09-22T00:00:00Z"), 7, "changed");
+    void ミューテーションスコアの対象外のコンポーネントは系列にしない() {
+        mutation(Instant.parse("2026-09-20T00:00:00Z"), 8);
+        mutation(Instant.parse("2026-09-21T00:00:00Z"), 9);
+        mutation(Instant.parse("2026-09-22T00:00:00Z"), 7);
 
         TrendResponse trend = trend("M-02");
 
         // frontend は対象外（NOT_APPLICABLE）。値の無い線を 1 本増やさない
-        assertThat(trend.series())
-                .extracting(TrendResponse.TrendSeries::label)
-                .containsExactly("backend（全量）", "backend（changed）");
-        assertThat(trend.series().get(1).points())
-                .extracting(TrendResponse.TrendPoint::value)
-                .usingElementComparator(java.math.BigDecimal::compareTo)
-                .containsExactly(new java.math.BigDecimal("80"), new java.math.BigDecimal("70"));
-    }
-
-    /** 実行範囲の分からない計測エラーは、新しい系列ではなく既存の系列の欠測にする。 */
-    @Test
-    void 実行範囲の分からない計測エラーは既存の系列の欠測になる() {
-        mutation(Instant.parse("2026-09-20T00:00:00Z"), 8, "changed");
-        mutation(Instant.parse("2026-09-21T00:00:00Z"), 8, "changed", "all");
-        mutation(Instant.parse("2026-09-22T00:00:00Z"), 8, "changed");
-
-        TrendResponse trend = trend("M-02");
-
         assertThat(trend.series()).singleElement().satisfies(series -> {
-            assertThat(series.label()).isEqualTo("backend（changed）");
-            assertThat(series.points()).extracting(TrendResponse.TrendPoint::status)
-                    .containsExactly(MeasurementStatus.PASS, MeasurementStatus.ERROR,
-                            MeasurementStatus.PASS);
+            assertThat(series.label()).isEqualTo("backend");
+            assertThat(series.points())
+                    .extracting(TrendResponse.TrendPoint::value)
+                    .usingElementComparator(java.math.BigDecimal::compareTo)
+                    .containsExactly(new java.math.BigDecimal("80"), new java.math.BigDecimal("90"),
+                            new java.math.BigDecimal("70"));
         });
     }
 
@@ -430,11 +410,8 @@ class TrendApiIT {
         evaluate(run);
     }
 
-    /**
-     * backend の PIT と frontend の lcov を計測した Run。
-     * 実行範囲を複数渡すと、範囲の違う成果物が混在した Run になる。
-     */
-    private void mutation(Instant measuredAt, int killed, String... scopes) {
+    /** backend の PIT と frontend の lcov を計測した Run。 */
+    private void mutation(Instant measuredAt, int killed) {
         Run run = createRun(measuredAt, "main");
         attach(run, ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", null, """
                 version: 1
@@ -449,14 +426,11 @@ class TrendApiIT {
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", jacoco(17));
         attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
                 "SF:src/api/client.ts\nBRF:20\nBRH:18\nend_of_record\n");
-        for (String scope : scopes) {
-            String xml = "<mutations>"
-                    + mutant("KILLED").repeat(killed)
-                    + mutant("SURVIVED").repeat(10 - killed)
-                    + "</mutations>";
-            attach(run, ArtifactType.PIT_XML, "mutations-" + scope + ".xml", "backend", xml,
-                    "{\"mutationScope\":\"%s\"}".formatted(scope));
-        }
+        String xml = "<mutations>"
+                + mutant("KILLED").repeat(killed)
+                + mutant("SURVIVED").repeat(10 - killed)
+                + "</mutations>";
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend", xml);
         evaluate(run);
     }
 

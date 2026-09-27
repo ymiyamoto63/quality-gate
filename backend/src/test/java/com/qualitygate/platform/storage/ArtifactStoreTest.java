@@ -15,16 +15,16 @@ import java.nio.file.Path;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-class LocalFileArtifactStoreTest {
+class ArtifactStoreTest {
 
     @TempDir
     Path tempDir;
 
-    private LocalFileArtifactStore store;
+    private ArtifactStore store;
 
     @BeforeEach
     void setUp() {
-        store = new LocalFileArtifactStore(
+        store = new ArtifactStore(
                 new QualityGateProperties(tempDir, 0, 0, null, null, null));
     }
 

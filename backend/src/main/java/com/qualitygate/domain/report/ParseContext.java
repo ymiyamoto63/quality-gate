@@ -4,7 +4,6 @@ import java.nio.file.FileSystems;
 import java.nio.file.PathMatcher;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 /**
  * パースに必要な周辺情報。
@@ -36,13 +35,6 @@ public record ParseContext(String componentName, List<String> exclusions,
 
     public ParseContext {
         metadata = metadata == null ? Map.of() : metadata;
-    }
-
-    /** 文字列のメタデータ。無い・文字列でない場合は空。 */
-    public Optional<String> metadataText(String key) {
-        return metadata.get(key) instanceof String text && !text.isBlank()
-                ? Optional.of(text)
-                : Optional.empty();
     }
 
     /** 文字列の配列のメタデータ。無い・配列でない場合は空。 */

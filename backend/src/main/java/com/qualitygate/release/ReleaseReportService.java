@@ -201,7 +201,7 @@ public class ReleaseReportService {
         MetricDefinition definition = MetricCatalog.of(m.getMetricId());
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), definition.name(),
                 definition.category().displayName(), m.getComponentName(),
-                MetricCatalog.variantLabel(m.getMetricId(), m.getVariant()), m.getScenario(), m.getStatus(),
+                m.getVariant(), m.getScenario(), m.getStatus(),
                 m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason());
     }
 

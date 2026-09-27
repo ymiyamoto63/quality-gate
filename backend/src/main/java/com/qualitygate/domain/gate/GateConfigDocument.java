@@ -45,11 +45,6 @@ public record GateConfigDocument(
             return Optional.empty();
         }
 
-        public Optional<String> text(String key) {
-            Object value = values.get(key);
-            return value instanceof String s ? Optional.of(s) : Optional.empty();
-        }
-
         @SuppressWarnings("unchecked")
         public List<String> list(String key) {
             Object value = values.get(key);
@@ -64,15 +59,13 @@ public record GateConfigDocument(
     /** 設定ファイルが無い場合に使う既定値。docs/features/gate-config/design.md 2 章の例と同じ値。 */
     public static GateConfigDocument defaults() {
         Map<String, MetricConfig> metrics = new LinkedHashMap<>();
-        metrics.put("branch_coverage", new MetricConfig(true, Map.of(
-                "threshold", 75, "warn_below", 80)));
+        metrics.put("branch_coverage", new MetricConfig(true, Map.of("threshold", 75)));
         metrics.put("mutation_score", new MetricConfig(true, Map.of("threshold", 60)));
         metrics.put("performance", new MetricConfig(true, Map.of(
                 "p95_ms", 500, "arrival_rate_rps", 50, "error_rate_pct", 0.1)));
         metrics.put("vulnerabilities", new MetricConfig(true, Map.of(
                 "max_critical", 0, "max_high", 0)));
-        metrics.put("cyclomatic_complexity", new MetricConfig(true, Map.of(
-                "max_complexity", 15, "warn_from", 11)));
+        metrics.put("cyclomatic_complexity", new MetricConfig(true, Map.of("max_complexity", 15)));
         metrics.put("api_contract", new MetricConfig(true, Map.of("breaking_changes", 0)));
         // テストの成功は M-09 で既定から見る
         metrics.put("test_results", new MetricConfig(true, Map.of(

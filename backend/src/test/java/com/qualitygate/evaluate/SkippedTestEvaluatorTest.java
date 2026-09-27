@@ -63,15 +63,6 @@ class SkippedTestEvaluatorTest {
     }
 
     @Test
-    void 件数の上限を超えれば比較対象が無くても不合格() {
-        MetricResult result = evaluate(Map.of("max_skipped", 2),
-                List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
-        assertThat(result.threshold()).containsEntry("value", 2);
-    }
-
-    @Test
     void コンポーネントごとに前回と比べる() {
         List<MetricResult> results = evaluate(Map.of(), List.of(
                         report("backend", 10, 0, 0, 1, 0),

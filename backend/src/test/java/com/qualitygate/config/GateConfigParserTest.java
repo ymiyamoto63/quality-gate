@@ -44,7 +44,7 @@ class GateConfigParserTest {
     }
 
     @Test
-    void 未知のキーは行番号と候補つきで拒否する() {
+    void 未知のキーは行番号と書けるキーを添えて拒否する() {
         // typo を黙って無視すると、設定したつもりの値が効かないまま合格が出続ける
         assertThatThrownBy(() -> parser.parse("""
                 version: 1
@@ -118,19 +118,6 @@ class GateConfigParserTest {
                 """))
                 .isInstanceOf(ConfigValidationException.class)
                 .hasMessageContaining("配列");
-    }
-
-    @Test
-    void アクセシビリティの基準の誤りは選択肢を示して拒否する() {
-        // 既定値で読み流すと、書いた基準とは違う基準で合否が出る
-        assertThatThrownBy(() -> parser.parse("""
-                version: 1
-                metrics:
-                  accessibility:
-                    standard: wcag22-aa
-                """))
-                .isInstanceOf(ConfigValidationException.class)
-                .hasMessageContaining("wcag21aa / wcag22aa");
     }
 
     @Test
@@ -226,30 +213,17 @@ class GateConfigParserTest {
     }
 
     @Test
-    void カバレッジの注意ラインを読める() {
-        GateConfigDocument document = parser.parse("""
-                version: 1
-                metrics:
-                  branch_coverage:
-                    threshold: 70
-                    warn_below: 72
-                """);
-        assertThat(document.metric("branch_coverage").number("warn_below"))
-                .contains(new java.math.BigDecimal("72"));
-    }
-
-    @Test
     void テスト結果の最小実行件数に0は指定できない() {
         assertThatThrownBy(() -> parser.parse("""
                 version: 1
                 metrics:
                   test_results:
                     min_test_count: 0
-                    max_skipped: -1
+                    max_skipped_increase: -1
                 """))
                 .isInstanceOf(ConfigValidationException.class)
                 .hasMessageContaining("metrics.test_results.min_test_count")
-                .hasMessageContaining("metrics.test_results.max_skipped");
+                .hasMessageContaining("metrics.test_results.max_skipped_increase");
     }
 
     @Test
@@ -264,12 +238,11 @@ class GateConfigParserTest {
                   secrets:
                     max_secrets: 0
                   licenses:
-                    max_forbidden: 0
-                    max_restricted: 3
+                    max_forbidden: 1
                 """);
         assertThat(document.metric("secrets").enabled()).isTrue();
-        assertThat(document.metric("licenses").number("max_restricted"))
-                .contains(new java.math.BigDecimal("3"));
+        assertThat(document.metric("licenses").number("max_forbidden"))
+                .contains(new java.math.BigDecimal("1"));
     }
 
     @Test
@@ -285,14 +258,5 @@ class GateConfigParserTest {
                     .isInstanceOf(ConfigValidationException.class)
                     .hasMessageContaining("metrics." + metric);
         }
-    }
-
-    @Test
-    void 編集距離が遠い候補は提示しない() {
-        // 遠い候補を出すと、かえって迷わせる
-        assertThat(GateConfigParser.closest("zzzzzzzz",
-                java.util.Set.of("metrics", "exclusions"))).isEmpty();
-        assertThat(GateConfigParser.closest("metric",
-                java.util.Set.of("metrics", "exclusions"))).contains("metrics");
     }
 }

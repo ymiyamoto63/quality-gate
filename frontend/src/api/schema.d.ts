@@ -828,9 +828,9 @@ export interface components {
       unit: string | null
       /** @description 実測値。未計測は null。0 は「計測して 0 だった」を意味し別物 */
       value: number | null
-      /** @description 計測条件（M-02 の実行範囲 all、性能の計測環境など）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null */
+      /** @description 計測条件（性能の計測環境）。前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null */
       variant: string | null
-      /** @description 計測条件の表示名（全量 など） */
+      /** @description 計測条件の表示名（計測環境の名前） */
       variantLabel: string | null
     }
     RunSummary: {

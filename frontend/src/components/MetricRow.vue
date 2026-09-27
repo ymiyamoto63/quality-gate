@@ -12,8 +12,8 @@ import type { RunMetric } from '@/stores/run'
  */
 const props = defineProps<{ metric: RunMetric; runId: string }>()
 
-// 計測条件（M-02 の実行範囲など）は名前に添える。変更範囲だけの値を
-// 全量の値と読み違えると、スコアの高低を取り違える
+// 計測条件（性能の計測環境）は名前に添える。環境の違う値を
+// 同じ条件の値と読み違えると、性能の高低を取り違える
 const label = computed(() => {
   const qualifiers = [props.metric.componentName, props.metric.variantLabel].filter(Boolean)
   return qualifiers.length > 0

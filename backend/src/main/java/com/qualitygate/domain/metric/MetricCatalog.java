@@ -1,6 +1,5 @@
 package com.qualitygate.domain.metric;
 
-import com.qualitygate.domain.model.MutationScope;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -56,22 +55,6 @@ public final class MetricCatalog {
     public static MetricDefinition of(String metricId) {
         return BY_ID.getOrDefault(metricId,
                 new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL, true));
-    }
-
-    /**
-     * 計測条件（{@code variant}）の表示名。条件の区別が無ければ null。
-     *
-     * <p>Run 詳細とトレンドの両方が使う。画面側で対応表を持つと、条件を足したときに
-     * 片方だけ「all」のような生の値を出してしまう。
-     */
-    public static String variantLabel(String metricId, String variant) {
-        if (variant == null) {
-            return null;
-        }
-        if ("M-02".equals(metricId)) {
-            return MutationScope.find(variant).map(MutationScope::label).orElse(variant);
-        }
-        return variant;
     }
 
     /** 指標 ID を要件定義の並び（M-01, M-02, …）で比較する。 */

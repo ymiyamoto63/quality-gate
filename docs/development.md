@@ -173,7 +173,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | Gradle | この規模では Maven で足り、Spring Boot と周辺プラグインの連携も枯れている |
 | nginx での分離配信 / 別オリジン | コンテナが増える、または CORS とクロスサイト Cookie の設計が要る。独立デプロイの必要が無い |
 | Orval + TanStack Query / openapi-generator | ライブラリが増える、生成物が大きい。必要になれば openapi-fetch の上に載せられる |
-| MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` の向こうに閉じてある |
+| MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` 1 つに閉じてある |
 | Spring WebFlux | 仮想スレッドで足りる |
 | Chart.js / ECharts | インライン SVG で足りる |
 | ShedLock | 単一プロセスのため多重実行の排他は要らない |

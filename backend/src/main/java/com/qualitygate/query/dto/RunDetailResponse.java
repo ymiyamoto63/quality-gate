@@ -98,11 +98,11 @@ public record RunDetailResponse(
             String componentName,
             @NotNull
             @Schema(nullable = true,
-                    description = "計測条件（M-02 の実行範囲 all、性能の計測環境など）。"
+                    description = "計測条件（性能の計測環境）。"
                             + "前回値は条件の一致する Run の値だけを使う。条件の区別が無い指標では null")
             String variant,
             @NotNull
-            @Schema(nullable = true, description = "計測条件の表示名（全量 など）")
+            @Schema(nullable = true, description = "計測条件の表示名（計測環境の名前）")
             String variantLabel,
             @NotNull MeasurementStatus status,
             @NotNull

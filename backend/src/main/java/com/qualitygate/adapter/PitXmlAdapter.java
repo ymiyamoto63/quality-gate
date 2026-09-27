@@ -1,7 +1,6 @@
 package com.qualitygate.adapter;
 
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
@@ -28,9 +27,6 @@ import java.util.Set;
  * <p>status ごとの件数を内訳（{@code detail}）として渡す。評価器は複数の成果物を
  * 件数で合算してから計算し直すため、ここで出す値は 1 ファイル分の参考値である。
  * 式は {@link MutationTally} にだけ置く。
- *
- * <p>実行範囲（all）はアップロード時のメタデータから読み、計測条件
- * （{@code variant}）として値に添える。範囲の違う値は比較できないためである。
  */
 @Component
 public class PitXmlAdapter implements ArtifactAdapter {
@@ -95,13 +91,9 @@ public class PitXmlAdapter implements ArtifactAdapter {
 
         Map<String, Object> detail = new LinkedHashMap<>(tally.toDetail());
         detail.put("excludedFiles", (long) excludedFiles.size());
-        String scope = context.metadataText(MutationScope.METADATA_KEY).orElse(null);
-        if (scope != null) {
-            detail.put(MutationScope.METADATA_KEY, scope);
-        }
 
         RawMeasurement measurement = RawMeasurement.of("M-02", context.componentName(),
-                tally.score(), "percent", detail).withVariant(scope);
+                tally.score(), "percent", detail);
         return NormalizedReport.of(ArtifactType.PIT_XML, List.of(measurement), List.of());
     }
 
