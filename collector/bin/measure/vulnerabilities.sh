@@ -3,7 +3,7 @@
 # measure.sh が source する（単独では実行しない）。
 
 measure_vulnerabilities() {
-  group "脆弱性とシークレットのスキャン（${TRIVY_IMAGE}）"
+  group "脆弱性とシークレットのスキャン（Trivy ${TRIVY_VERSION}）"
   # 走査する対象を明示し、submit.sh がメタデータ（scanners）で申告する。
   # quality-gate は脆弱性を M-05、シークレットを M-11 に振り分ける
   if ! (cd "$SRC" && trivy fs --quiet --scanners vuln,secret --format sarif --severity CRITICAL,HIGH,MEDIUM .) \

@@ -13,15 +13,15 @@
 #
 # measure-isolated.sh からコンテナの中で実行される（collector/runner/Dockerfile に必要なものがそろっている）。
 # 環境変数（コンテナのイメージが設定する）:
-#   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（既定: ~/.cache/quality-gate-collector）
-#   A11Y_CHROMIUM       M-08 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
-#   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
-#   QG_A11Y_TOOL_DIR    M-08 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
-#   QG_COMPLEXITY_TOOL_DIR  M-06（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
+#   QG_A11Y_TOOL_DIR    M-08 の検査ツールと Chromium を取得済みのディレクトリ
+#   QG_COMPLEXITY_TOOL_DIR  M-06（フロントエンド）の ESLint を取得済みのディレクトリ
+#   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（任意。既定: ~/.cache/quality-gate-collector）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 [ $# -eq 3 ] || die "使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>"
+[ -n "${QG_A11Y_TOOL_DIR:-}" ] && [ -n "${QG_COMPLEXITY_TOOL_DIR:-}" ] \
+  || die "measure.sh は measure-isolated.sh からコンテナの中で実行してください"
 REPOSITORY=$1
 WORK=$(cd "$2" && pwd)
 mkdir -p "$3"

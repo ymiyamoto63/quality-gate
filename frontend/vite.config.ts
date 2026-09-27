@@ -33,15 +33,5 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     include: ['src/**/*.spec.ts'],
-    coverage: {
-      provider: 'v8',
-      // テストが触れていないファイルも分母に含める。include を指定しないと
-      // テストを書いた範囲だけの数字になり、実態より良く見える。
-      include: ['src/**/*.{ts,vue}'],
-      reporter: ['text', 'lcov'],
-      reportsDirectory: '../reports/frontend-coverage',
-      // 生成物と設定ファイルは計測対象から外す
-      exclude: ['src/api/schema.d.ts', '**/*.config.ts', 'src/main.ts', 'e2e/**'],
-    },
   },
 })

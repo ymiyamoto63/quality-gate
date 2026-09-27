@@ -29,7 +29,7 @@ RUN arch=$(dpkg --print-architecture | sed 's/amd64/x64/') \
  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${arch}.tar.xz" \
     | tar -xJ -C /usr/local --strip-components=1 --exclude='*.md' --exclude=LICENSE
 
-# M-05 / M-07 のツール。コンテナの中から Docker は使えないため、同じ版のバイナリを入れる
+# M-05 / M-07 / M-11 / M-12 のツール（版は collector/versions.env）
 RUN arch=$(dpkg --print-architecture) \
  && trivy_arch=$([ "$arch" = arm64 ] && echo ARM64 || echo 64bit) \
  && curl -fsSL "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${trivy_arch}.tar.gz" \
@@ -63,6 +63,5 @@ RUN mkdir -p /cache/home && chmod 1777 /cache/home
 # Maven のローカルリポジトリをボリュームに置き、Trivy（HOME の .m2 を読む）とも共有する
 ENV HOME=/cache/home \
     MAVEN_OPTS=-Duser.home=/cache/home \
-    QG_COLLECTOR_IN_CONTAINER=1 \
     QG_A11Y_TOOL_DIR=/opt/qg-a11y \
     QG_COMPLEXITY_TOOL_DIR=/opt/qg-complexity

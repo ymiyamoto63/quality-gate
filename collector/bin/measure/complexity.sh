@@ -59,20 +59,8 @@ measure_frontend_complexity() {
   COMPLEXITY_TOOL="$WORK/complexity-tool"
   [ -d "$SRC/$FRONTEND_DIR" ] || { fail "M-06: $FRONTEND_DIR がありません"; return; }
   group "循環的複雑度（フロントエンド、ESLint の complexity ルール）"
-  if ! (
-    set -e
-    rm -rf "$COMPLEXITY_TOOL"
-    mkdir -p "$COMPLEXITY_TOOL"
-    cp "$COLLECTOR_DIR"/complexity/eslint.config.mjs "$COMPLEXITY_TOOL/"
-    if [ -n "${QG_COMPLEXITY_TOOL_DIR:-}" ]; then
-      # コンテナのイメージに ESLint とパーサが入っている
-      ln -s "$QG_COMPLEXITY_TOOL_DIR/node_modules" "$COMPLEXITY_TOOL/node_modules"
-    else
-      cp "$COLLECTOR_DIR"/complexity/{package.json,package-lock.json} "$COMPLEXITY_TOOL/"
-      cd "$COMPLEXITY_TOOL"
-      npm ci --no-audit --no-fund
-    fi
-  ); then
+  # ESLint とパーサはコンテナのイメージに入っている
+  if ! prepare_tool complexity "$QG_COMPLEXITY_TOOL_DIR" "$COMPLEXITY_TOOL" eslint.config.mjs; then
     fail "M-06: ESLint を用意できませんでした（フロントエンドの複雑度は送られません）"; endgroup; return
   fi
 

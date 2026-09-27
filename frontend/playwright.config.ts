@@ -1,13 +1,9 @@
 import { defineConfig, devices } from '@playwright/test'
 
-// M-08（アクセシビリティ）の計測元。axe-core の critical / serious を 0 件に保つ。
+// アクセシビリティ検査（PR の CI）。axe-core の critical / serious を 0 件に保つ。
 export default defineConfig({
   testDir: './e2e',
-  // axe-core の結果（M-08 の成果物）は reports/axe-results.json に書き出す（e2e/axe-report.ts）。
-  // テストレポートを同じ名前で出すと、axe の結果と取り違えて送ってしまう
-  reporter: [['list'], ['json', { outputFile: '../reports/playwright-results.json' }]],
-  globalSetup: './e2e/global-setup.ts',
-  globalTeardown: './e2e/global-teardown.ts',
+  reporter: 'list',
   use: {
     baseURL: process.env.QG_E2E_BASE_URL ?? 'http://localhost:5173',
     trace: 'on-first-retry',

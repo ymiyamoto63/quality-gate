@@ -4,10 +4,7 @@ import pluginVue from 'eslint-plugin-vue'
 import prettier from 'eslint-config-prettier'
 
 /**
- * `complexity` ルールは M-06（循環的複雑度）の計測元を兼ねる。
- * max を 0 にして「しきい値超過の検出」ではなく「全関数の CC 値の出力」を得る。
- * ベースコミットとの比較は quality-gate 側が行うため、ここでは判定しない。
- * ただし CI のノイズになるため、既定の lint では warn に留める。
+ * `complexity` は 15 を超える関数を警告する。CI は `--max-warnings 0` で実行するため、超えたら失敗する。
  */
 export default tseslint.config(
   { ignores: ['dist', 'node_modules', 'src/api/schema.d.ts', 'coverage'] },

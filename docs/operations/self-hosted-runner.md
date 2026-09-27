@@ -1,6 +1,6 @@
 # セルフホストランナー
 
-quality-gate リポジトリの**収集ランナー**（`collect-target.yml` の `fetch` / `measure` / `submit` のすべて）が、
+quality-gate リポジトリの**収集ランナー**（`collect.yml` の `fetch` / `measure` / `submit` のすべて）が、
 **セルフホストランナー**（`runs-on: self-hosted`）で動きます。手動実行で対象リポジトリを計測します
 （[収集ランナーで計測する](collector.md)）。常にセルフホストランナーで動きます。
 

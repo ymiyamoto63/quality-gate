@@ -203,8 +203,8 @@ class TrendApiIT {
     }
 
     /**
-     * 変更範囲だけの値と全量の値を 1 本の線で結ぶと、範囲が切り替わるたびに
-     * 品質が乱高下して見える。範囲ごとに別の系列にする。
+     * 実行範囲の違う値を 1 本の線で結ぶと、範囲が切り替わるたびに品質が乱高下して見える。
+     * 範囲ごとに別の系列にする（取り込みが受け付けるのは all だけだが、系列の分け方は計測条件の値によらない）。
      */
     @Test
     void ミューテーションスコアは実行範囲ごとに系列を分け対象外は系列にしない() {
@@ -217,7 +217,7 @@ class TrendApiIT {
         // frontend は対象外（NOT_APPLICABLE）。値の無い線を 1 本増やさない
         assertThat(trend.series())
                 .extracting(TrendResponse.TrendSeries::label)
-                .containsExactly("backend（全量）", "backend（変更範囲）");
+                .containsExactly("backend（全量）", "backend（changed）");
         assertThat(trend.series().get(1).points())
                 .extracting(TrendResponse.TrendPoint::value)
                 .usingElementComparator(java.math.BigDecimal::compareTo)
@@ -234,7 +234,7 @@ class TrendApiIT {
         TrendResponse trend = trend("M-02");
 
         assertThat(trend.series()).singleElement().satisfies(series -> {
-            assertThat(series.label()).isEqualTo("backend（変更範囲）");
+            assertThat(series.label()).isEqualTo("backend（changed）");
             assertThat(series.points()).extracting(TrendResponse.TrendPoint::status)
                     .containsExactly(MeasurementStatus.PASS, MeasurementStatus.ERROR,
                             MeasurementStatus.PASS);

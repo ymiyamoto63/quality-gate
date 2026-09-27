@@ -10,7 +10,6 @@
 #   QG_BASE_URL      取り込み先の quality-gate の URL
 #   QG_INGEST_TOKEN  quality-gate の Ingest Token（すべての対象で共通）
 # 任意の環境変数:
-#   QG_TRIGGERED_BY  既定: collector（対象リポジトリの CI から送った Run と区別する）
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
 # 合格ライン（collector/targets/<owner>__<name>.gate.yml）も Run ごとに送る。判定はこの設定で行われる（DD-13）。
@@ -60,13 +59,12 @@ REQUEST=$(jq -n \
   --arg defaultBranch "$DEFAULT_BRANCH" \
   --arg configCommitSha "$(git -C "$COLLECTOR_DIR" rev-parse HEAD 2>/dev/null || true)" \
   --arg pr "$PR_NUMBER" \
-  --arg triggeredBy "${QG_TRIGGERED_BY:-collector}" \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --arg tags "${TAGS:-}" \
   --argjson skippedMetrics "$(skipped_json)" \
   '{repository: $repository, commitSha: $commitSha, branch: $branch, defaultBranch: $defaultBranch,
-    triggeredBy: $triggeredBy, measuredAt: $measuredAt,
+    triggeredBy: "collector", measuredAt: $measuredAt,
     tags: ($tags | split(" ") | map(select(. != ""))),
     skippedMetrics: $skippedMetrics}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)

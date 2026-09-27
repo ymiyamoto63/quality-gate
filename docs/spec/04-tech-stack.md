@@ -25,7 +25,7 @@ quality-gate/
 ├ frontend/    Vue 3 SPA（src/api/schema.d.ts は生成物。e2e/ に Playwright + axe-core）
 ├ api/         openapi.yml（バックエンドから生成）
 ├ collector/   収集ランナー（計測スクリプト・計測プロファイル・合格ライン・ツールの版）
-├ .github/workflows/  collect.yml・collect-target.yml（収集ランナー）/ ci.yml（PR の CI）
+├ .github/workflows/  collect.yml（収集ランナー）/ ci.yml（PR の CI）
 ├ compose.yaml
 └ Dockerfile   アプリのイメージ（SPA を同梱した jar）
 ```

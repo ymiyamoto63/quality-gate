@@ -28,6 +28,4 @@ public interface ArtifactStore {
      * （DB に記録の無いファイル）の回収に使う（docs/spec/05-architecture.md）。
      */
     java.util.List<String> listKeysWrittenBefore(java.time.Instant before, int limit);
-
-    boolean exists(String storageKey);
 }

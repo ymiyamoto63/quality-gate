@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# 複数の指標の計測で共用するもの（サーバの起動、画面のビルド、ツールの用意、Trivy）。
+# 複数の指標の計測で共用するもの（サーバの起動、画面のビルド、ツールの用意、合格ラインの読み取り）。
 # measure.sh が source する（単独では実行しない）。
 
 # --- サーバの起動（M-03 / M-04 / M-08 で共用） ----------------------------------------
@@ -60,7 +60,7 @@ build_frontend() {
 }
 
 # prepare_tool <collector/ 以下のディレクトリ名> <コンテナのイメージに入っているディレクトリ> <作業ディレクトリ> [写すファイル...]
-# 版を固定したツール（package.json / package-lock.json）を用意する。コンテナではイメージの node_modules を使う
+# 版を固定したツールを用意する。node_modules はコンテナのイメージに入っているものを使い、スクリプトや設定は collector/ から写す
 prepare_tool() {
   local name=$1 prebuilt=$2 dir=$3 file
   shift 3
@@ -69,13 +69,7 @@ prepare_tool() {
     rm -rf "$dir"
     mkdir -p "$dir"
     for file in "$@"; do cp "$COLLECTOR_DIR/$name/$file" "$dir/"; done
-    if [ -n "$prebuilt" ]; then
-      ln -s "$prebuilt/node_modules" "$dir/node_modules"
-    else
-      cp "$COLLECTOR_DIR/$name"/{package.json,package-lock.json} "$dir/"
-      cd "$dir"
-      npm ci --no-audit --no-fund
-    fi
+    ln -s "$prebuilt/node_modules" "$dir/node_modules"
   )
 }
 
@@ -85,12 +79,9 @@ prepare_tool() {
 A11Y_TOOL="$WORK/a11y"
 APP_URL=
 
+# Chromium もコンテナのイメージに入っている
 prepare_a11y_tool() {
-  prepare_tool a11y "${QG_A11Y_TOOL_DIR:-}" "$A11Y_TOOL" scan.mjs || return 1
-  # コンテナのイメージには Chromium も入っている。外では Playwright が取得する
-  if [ -z "${QG_A11Y_TOOL_DIR:-}" ] && [ -z "${A11Y_CHROMIUM:-}" ]; then
-    (cd "$A11Y_TOOL" && npx playwright install chromium) || return 1
-  fi
+  prepare_tool a11y "$QG_A11Y_TOOL_DIR" "$A11Y_TOOL" scan.mjs
 }
 
 # start_app <指標>。バックエンド（A11Y_BACKEND_PORT があれば）と、ビルドした画面（vite preview）を起動する
@@ -112,27 +103,7 @@ start_app() {
   APP_URL="http://127.0.0.1:${port}"
 }
 
-# --- Trivy（M-05 / M-11 / M-12 で共用）。コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす ----
-trivy() {
-  if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
-    command trivy "$@"
-  else
-    # 出力は標準出力で受け取る（コンテナの root 権限で書かれたファイルを作業領域に残さない）
-    docker run --rm -v "$PWD:/src:ro" -w /src -v quality-gate-collector-trivy:/root/.cache/ "$TRIVY_IMAGE" "$@"
-  fi
-}
-
 # --- 合格ライン（*.gate.yml）で無効の指標 ------------------------------------------------------------
-# yq はコンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす。
-# ファイルは標準入力で渡す（Docker のときにマウントせずに済むように）
-yq() {
-  if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
-    command yq "$@"
-  else
-    docker run --rm -i "$YQ_IMAGE" "$@"
-  fi
-}
-
 # 合格ラインで enabled: false にした指標の名前（1 行 1 件）。書いていない指標は有効（quality-gate の既定と同じ）。
 # quality-gate（SnakeYAML、YAML 1.1）と同じく、引用符の無い no / off も false として読む。"false" のような文字列は有効のまま
 disabled_metrics() {

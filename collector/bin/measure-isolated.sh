@@ -45,9 +45,6 @@ node_version() {
 JAVA=${JAVA_VERSION:-21}
 NODE=$(node_version) || true
 [ -n "$NODE" ] || die "Node.js の版を解決できませんでした（${NODE_VERSION_FILE:-既定の 22}）"
-TRIVY_VERSION=${TRIVY_IMAGE##*:}
-OASDIFF_VERSION=${OASDIFF_IMAGE##*:v}
-YQ_VERSION=${YQ_IMAGE##*:}
 BASE_IMAGE=${QG_COLLECTOR_BASE_IMAGE:-eclipse-temurin:${JAVA}-jdk-noble}
 # ベースのイメージ・Dockerfile・検査ツールの内容でタグを決める。同じなら作り直さない
 HASH=$({ echo "$BASE_IMAGE"; cat "$COLLECTOR_DIR/runner/Dockerfile" "$COLLECTOR_DIR/a11y/package-lock.json" \

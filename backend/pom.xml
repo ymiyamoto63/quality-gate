@@ -27,11 +27,7 @@
     <tomcat.version>11.0.25</tomcat.version>
     <frontend-maven-plugin.version>1.15.1</frontend-maven-plugin.version>
     <node.version>v24.21.0</node.version>
-    <pitest.version>1.20.4</pitest.version>
-    <pitest-junit5.version>1.2.3</pitest-junit5.version>
     <testcontainers.version>2.0.5</testcontainers.version>
-    <jacoco.version>0.8.15</jacoco.version>
-    <maven-pmd-plugin.version>3.28.0</maven-pmd-plugin.version>
     <!-- フロントエンドのソース・出力先 -->
     <frontend.dir>${project.basedir}/../frontend</frontend.dir>
     <frontend.dist>${frontend.dir}/dist</frontend.dist>
@@ -150,50 +146,11 @@
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
 
-      <!-- M-01 ブランチカバレッジの計測元 -->
-      <plugin>
-        <groupId>org.jacoco</groupId>
-        <artifactId>jacoco-maven-plugin</artifactId>
-        <version>${jacoco.version}</version>
-        <executions>
-          <execution>
-            <id>prepare-agent</id>
-            <goals><goal>prepare-agent</goal></goals>
-          </execution>
-          <execution>
-            <id>report</id>
-            <phase>verify</phase>
-            <goals><goal>report</goal></goals>
-          </execution>
-        </executions>
-      </plugin>
-
-      <!-- M-06 循環的複雑度の計測元。reportLevel=1 で全関数の CC を出力する -->
-      <plugin>
-        <groupId>org.apache.maven.plugins</groupId>
-        <artifactId>maven-pmd-plugin</artifactId>
-        <version>${maven-pmd-plugin.version}</version>
-        <configuration>
-          <rulesets>
-            <ruleset>${project.basedir}/pmd-ruleset.xml</ruleset>
-          </rulesets>
-          <format>xml</format>
-          <failOnViolation>false</failOnViolation>
-          <printFailingErrors>true</printFailingErrors>
-        </configuration>
-        <executions>
-          <execution>
-            <phase>verify</phase>
-            <goals><goal>pmd</goal></goals>
-          </execution>
-        </executions>
-      </plugin>
-
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-surefire-plugin</artifactId>
         <configuration>
-          <argLine>@{argLine} -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
+          <argLine>-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
         </configuration>
       </plugin>
 
@@ -201,7 +158,7 @@
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-failsafe-plugin</artifactId>
         <configuration>
-          <argLine>@{argLine} -Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
+          <argLine>-Dstdout.encoding=UTF-8 -Dstderr.encoding=UTF-8</argLine>
         </configuration>
         <executions>
           <execution>
@@ -264,47 +221,6 @@
                     <resource><directory>${frontend.dist}</directory></resource>
                   </resources>
                 </configuration>
-              </execution>
-            </executions>
-          </plugin>
-        </plugins>
-      </build>
-    </profile>
-
-    <!-- M-02 ミューテーションスコアの計測元（-P mutation で有効化） -->
-    <profile>
-      <id>mutation</id>
-      <build>
-        <plugins>
-          <plugin>
-            <groupId>org.pitest</groupId>
-            <artifactId>pitest-maven</artifactId>
-            <version>${pitest.version}</version>
-            <dependencies>
-              <dependency>
-                <groupId>org.pitest</groupId>
-                <artifactId>pitest-junit5-plugin</artifactId>
-                <version>${pitest-junit5.version}</version>
-              </dependency>
-            </dependencies>
-            <configuration>
-              <outputFormats>
-                <outputFormat>XML</outputFormat>
-                <outputFormat>HTML</outputFormat>
-              </outputFormats>
-              <timestampedReports>false</timestampedReports>
-              <targetClasses><param>com.qualitygate.*</param></targetClasses>
-              <targetTests><param>com.qualitygate.*</param></targetTests>
-              <excludedClasses>
-                <param>com.qualitygate.QualityGateApplication</param>
-                <param>com.qualitygate.*.config.*</param>
-              </excludedClasses>
-            </configuration>
-            <executions>
-              <execution>
-                <id>pit-report</id>
-                <phase>test</phase>
-                <goals><goal>mutationCoverage</goal></goals>
               </execution>
             </executions>
           </plugin>

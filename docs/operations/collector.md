@@ -22,12 +22,11 @@ M-02（PIT）と M-03 / M-04（性能）は時間がかかるため、**PR の�
 
 | ファイル | 役割 |
 | --- | --- |
-| `.github/workflows/collect.yml` | 入り口。手動実行（`workflow_dispatch`）の入力を受け取り、`collect-target.yml` を呼ぶ |
-| `.github/workflows/collect-target.yml` | 1 コミットの計測。`fetch`（取得）→ `measure`（計測）→ `submit`（送信）の 3 ジョブ。すべてセルフホストランナーで動く |
+| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）で対象とコミットを受け取り、`fetch`（取得）→ `measure`（計測）→ `submit`（送信）の 3 ジョブで計測する。すべてセルフホストランナーで動く |
 | `collector/bin/fetch.sh` | 対象を clone し、計測するコミットと比較元（base）を決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | `measure.sh` を計測用のコンテナの中で実行する（イメージが無ければ作る）。`measure` ジョブはこれを呼ぶ |
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
-| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-09 / M-10、`frontend-tests.sh` = M-01 TS / M-09 / M-10、`mutation.sh` = M-02、`performance.sh` = M-03 / M-04、`vulnerabilities.sh` = M-05 / M-11、`complexity.sh` = M-06、`breaking-changes.sh` = M-07、`accessibility.sh` = M-08、`licenses.sh` = M-12）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
+| `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-09 / M-10、`frontend-tests.sh` = M-01 TS / M-09 / M-10、`mutation.sh` = M-02、`performance.sh` = M-03 / M-04、`vulnerabilities.sh` = M-05 / M-11、`complexity.sh` = M-06、`breaking-changes.sh` = M-07、`accessibility.sh` = M-08、`licenses.sh` = M-12）と、複数の指標で共用するもの（`common.sh`。サーバと画面の起動、ツールの用意、合格ラインの読み取り）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
 | `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven / yq）。対象の設定に関係なくこの版で計測する |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・yq・Playwright と Chromium） |

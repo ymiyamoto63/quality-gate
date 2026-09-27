@@ -62,7 +62,7 @@ public final class MetricCatalog {
      * 計測条件（{@code variant}）の表示名。条件の区別が無ければ null。
      *
      * <p>Run 詳細とトレンドの両方が使う。画面側で対応表を持つと、条件を足したときに
-     * 片方だけ「changed」のような生の値を出してしまう。
+     * 片方だけ「all」のような生の値を出してしまう。
      */
     public static String variantLabel(String metricId, String variant) {
         if (variant == null) {

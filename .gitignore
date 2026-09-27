@@ -27,16 +27,6 @@ data/
 .DS_Store
 Thumbs.db
 
-# 計測結果の一時出力
-**/jacoco.xml
-**/mutations.xml
-**/*.sarif
-# テストの入力として使う実物の出力は追跡する
-!backend/src/test/resources/**/mutations.xml
-
-# カバレッジ・スキャン結果の出力先
-reports/
-
 # Playwright の失敗時トレース（e2e/fixtures は結合テストが生成する成果物なので追跡する）
 test-results/
 playwright-report/

@@ -90,11 +90,6 @@ public class LocalFileArtifactStore implements ArtifactStore {
         }
     }
 
-    @Override
-    public boolean exists(String storageKey) {
-        return Files.exists(resolve(storageKey));
-    }
-
     /**
      * 保存キーをルート配下の実パスに解決する。
      *

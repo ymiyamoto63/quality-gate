@@ -12,7 +12,7 @@ import java.util.Map;
  * @param unit          percent / ms / count / rps
  * @param detail        分母分子などの内訳。判定理由と画面表示に使う
  * @param variant       計測条件。値どうしを比較できるかを分ける軸
- *                      （M-02 の実行範囲 changed / all など）。条件の区別が無い指標では null
+ *                      （M-02 の実行範囲 all、性能の計測環境など）。条件の区別が無い指標では null
  */
 public record RawMeasurement(
         String metricId,
