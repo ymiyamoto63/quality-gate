@@ -11,9 +11,9 @@ import java.util.Map;
 import java.util.TreeSet;
 
 /**
- * M-12 シークレット検出件数（docs/spec/02-metrics-spec.md M-12）。
+ * M-11 シークレット検出件数（docs/spec/02-metrics-spec.md M-11）。
  *
- * <p>コミットされた鍵やトークンは、履歴に残った時点で漏えいとみなす。M-07 のように
+ * <p>コミットされた鍵やトークンは、履歴に残った時点で漏えいとみなす。M-06 のように
  * 「新規だけを数える」ことはせず、<strong>検出されたものすべて</strong>を数える。
  * 既存の検出を通すと、失効させていない鍵がいつまでも残る。誤検出は、
  * 合格ラインの設定の {@code exclusions} でファイルごと外す。
@@ -29,7 +29,7 @@ public class SecretEvaluator implements MetricEvaluator {
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         int max = context.thresholds().maxSecrets();
-        List<IdentifiedFinding> findings = context.input().headFindingsOf(metricId());
+        List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
         Map<String, Object> threshold = Map.of("operator", "<=", "value", max);
         Map<String, Object> detail = new LinkedHashMap<>();

@@ -12,7 +12,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * リリース判定（UC-06 / S-09）。指定したタグ・コミットの時点の、全指標の合否と説明。
+ * リリース判定（UC-06 / S-08）。指定したタグ・コミットの時点の、全指標の合否と説明。
  *
  * <p>{@code @NotNull} と {@code nullable} の付け方は RunDetailResponse と同じ（必ず返す項目を仕様に明示する）。
  */
@@ -34,7 +34,7 @@ public record ReleaseReportResponse(
         @Schema(description = "同じコミットのほかの Run の件数（判定には使っていない）")
         int otherRunCount,
         @NotNull
-        @Schema(nullable = true, description = "判定に使った合格ライン。既定値で判定した場合と未計測では null")
+        @Schema(nullable = true, description = "判定に使った合格ライン。設定ファイルの無い Run と未計測では null")
         ReleaseGateConfig gateConfig,
         @NotNull ReleaseCounts counts,
         @NotNull
@@ -51,15 +51,14 @@ public record ReleaseReportResponse(
                          @NotNull Verdict verdict,
                          @NotNull Completeness completeness,
                          @NotNull @Schema(nullable = true,
-                                 description = "比較元のコミット。新規の違反・破壊的変更・スキップの増加はここからの差で数える。"
+                                 description = "比較元のコミット。破壊的変更・スキップの増加・違反の新規 / 解消はここからの差で数える。"
                                          + "タグで計測したときは前のタグ")
                          String baseCommitSha) {
     }
 
-    @Schema(description = "合格ラインの版。しきい値を変えた理由は、この版のコミットに残る")
-    public record ReleaseGateConfig(@NotNull int version,
-                                @NotNull String sourceType,
-                                @NotNull @Schema(nullable = true) String sourceCommitSha,
+    @Schema(description = "判定に使った合格ライン（collector/targets/*.gate.yml）。しきい値を変えた理由は Git の履歴に残る")
+    public record ReleaseGateConfig(@NotNull @Schema(nullable = true,
+                                        description = "合格ラインを送った quality-gate リポジトリのコミット") String commitSha,
                                 @NotNull @Schema(description = "計測の対象から外したパス") List<String> exclusions) {
     }
 

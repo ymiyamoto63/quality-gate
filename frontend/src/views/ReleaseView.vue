@@ -12,7 +12,7 @@ type Row = Report['metrics'][number]
 type Decision = Report['decision']
 
 /**
- * リリース判定（S-09。UC-06）。
+ * リリース判定（S-08。UC-06）。
  *
  * 読み手に経営陣や開発に詳しくない人を想定し、結論を最上部に 1 行で出してから、
  * 指標ごとの合否、各指標の説明と基準の根拠の順に並べる。判定・理由・説明の文言はサーバが持つ
@@ -165,12 +165,18 @@ function print(): void {
             <dt>比較元</dt>
             <dd>
               <code>{{ shortSha(report.run.baseCommitSha) }}</code>
-              （新規の違反・破壊的変更・スキップの増加は、ここからの差で数えています）
+              （破壊的変更・スキップの増加は、ここからの差で数えています）
             </dd>
           </div>
           <div v-if="report.run">
             <dt>合格ライン</dt>
-            <dd>{{ report.gateConfig ? `v${report.gateConfig.version}` : '既定値' }}</dd>
+            <dd>
+              <template v-if="report.gateConfig?.commitSha">
+                quality-gate のコミット <code>{{ shortSha(report.gateConfig.commitSha) }}</code>
+              </template>
+              <template v-else-if="report.gateConfig">設定ファイル</template>
+              <template v-else>既定値</template>
+            </dd>
           </div>
           <div v-if="report.gateConfig && report.gateConfig.exclusions.length > 0">
             <dt>計測から除外</dt>

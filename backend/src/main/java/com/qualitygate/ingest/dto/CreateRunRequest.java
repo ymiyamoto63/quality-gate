@@ -13,7 +13,7 @@ import java.util.List;
 @Schema(description = "Run の作成要求。CI が計測開始時に送信する。")
 public record CreateRunRequest(
 
-        @Schema(description = "owner/name 形式。Ingest Token の発行元と一致する必要がある",
+        @Schema(description = "owner/name 形式。初めて送られたリポジトリは登録される",
                 example = "ymiyamoto63/quality-gate")
         @NotBlank
         @Pattern(regexp = "^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$",
@@ -32,12 +32,21 @@ public record CreateRunRequest(
         @NotBlank
         String branch,
 
+        @Schema(description = "対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。"
+                + "トレンドの既定の系列に使う。省略すると登録済みの値のまま（新規は main）")
+        @Size(min = 1, max = 255)
+        String defaultBranch,
+
         Integer pullRequestNumber,
 
         @NotBlank
         String triggeredBy,
 
         String ciRunUrl,
+
+        @Schema(description = "合格ライン（collector/targets/*.gate.yml）を送った quality-gate リポジトリのコミット")
+        @Pattern(regexp = "^[0-9a-f]{40}$", message = "40 桁の 16 進数で指定してください")
+        String configCommitSha,
 
         @NotNull
         Instant measuredAt,

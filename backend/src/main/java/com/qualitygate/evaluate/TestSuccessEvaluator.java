@@ -15,7 +15,7 @@ import java.util.Objects;
 import java.util.TreeMap;
 
 /**
- * M-10 テスト成功率（docs/spec/02-metrics-spec.md M-10）。
+ * M-09 テスト成功率（docs/spec/02-metrics-spec.md M-09）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
@@ -24,7 +24,7 @@ import java.util.TreeMap;
  *   <li>失敗したテストがある（合格ラインを 100% 未満に緩めた場合）、再実行で成功したテストがある → WARN</li>
  * </ol>
  *
- * <p>スキップは M-11 で判定するため、ここでは WARN にしない。同じスキップで 2 つの指標が
+ * <p>スキップは M-10 で判定するため、ここでは WARN にしない。同じスキップで 2 つの指標が
  * 黄色くなると、どちらを直せばよいかが読めない。
  *
  * <p><strong>コンポーネントごとに判定する</strong>（M-01 と同じ）。
@@ -51,7 +51,7 @@ public class TestSuccessEvaluator implements MetricEvaluator {
         List<MetricResult> results = new ArrayList<>();
         tallyByComponent(context).forEach((component, tally) -> {
             String componentName = component.isEmpty() ? null : component;
-            List<IdentifiedFinding> findings = context.input().headFindingsOf(metricId()).stream()
+            List<IdentifiedFinding> findings = context.input().findingsOf(metricId()).stream()
                     .filter(f -> Objects.equals(f.finding().componentName(), componentName))
                     .toList();
             Map<String, Object> detail = tally.toDetail();

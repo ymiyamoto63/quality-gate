@@ -21,7 +21,7 @@ import java.util.List;
  *
  * <p>削除は<strong>少量ずつ、短いトランザクションで</strong>行う（1 回あたり最大 10,000 行）。
  * 一括削除は長時間のロックと WAL の急増を招き、その間アプリが止まる
- * （docs/spec/06-database-design.md 7 章）。
+ * （docs/spec/06-database-design.md）。
  */
 @Component
 public class RetentionCleanup {
@@ -103,7 +103,7 @@ public class RetentionCleanup {
 
     /**
      * DB に記録の無いファイルを消す。ファイル保存を DB より先に行うため、
-     * 保存直後に失敗すると記録の無いファイルが残る（docs/spec/05-architecture.md 3.3）。
+     * 保存直後に失敗すると記録の無いファイルが残る（docs/spec/05-architecture.md）。
      */
     private int deleteOrphanFiles(Instant before) {
         int deleted = 0;
@@ -118,7 +118,7 @@ public class RetentionCleanup {
 
     /**
      * 監査ログの削除。本番ではアプリのロールから DELETE を剥奪しているため失敗する
-     * （管理ロールのバッチが消す。docs/spec/06-database-design.md 3.10）。その場合は警告に留める。
+     * （管理ロールのバッチが消す。docs/spec/06-database-design.md）。その場合は警告に留める。
      */
     private int deleteAuditLogs(Instant before) {
         try {

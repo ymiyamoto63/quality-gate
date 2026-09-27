@@ -12,17 +12,14 @@ import java.util.Optional;
  * <p>アダプタは DB にもしきい値にもアクセスしない。入力を読んで構造化するだけの責務に閉じる。
  *
  * @param componentName アップロード時に宣言されたコンポーネント名
- * @param scope         base / head（M-07 のベース比較用）
  * @param exclusions    計測除外の glob パターン
  * @param metadata      アップロード時に添えられた計測メタデータ（JSON オブジェクト）
  */
-public record ParseContext(String componentName, String scope, List<String> exclusions,
+public record ParseContext(String componentName, List<String> exclusions,
                            Map<String, Object> metadata) {
 
-    public static final String SCOPE_BASE = "base";
-
     /**
-     * M-08 の成果物のメタデータで、比較元（ベースコミット）に OpenAPI 定義が
+     * M-07 の成果物のメタデータで、比較元（ベースコミット）に OpenAPI 定義が
      * 無かったことを表すキー（真偽値）。新規 API では破壊的変更を数えようがない。
      */
     public static final String BASE_SPEC_MISSING = "baseSpecMissing";
@@ -33,8 +30,8 @@ public record ParseContext(String componentName, String scope, List<String> excl
      */
     public static final String SCANNERS = "scanners";
 
-    public ParseContext(String componentName, String scope, List<String> exclusions) {
-        this(componentName, scope, exclusions, Map.of());
+    public ParseContext(String componentName, List<String> exclusions) {
+        this(componentName, exclusions, Map.of());
     }
 
     public ParseContext {
@@ -59,10 +56,6 @@ public record ParseContext(String componentName, String scope, List<String> excl
     /** 真偽値のメタデータ。無い・真偽値でない場合は false。 */
     public boolean metadataFlag(String key) {
         return Boolean.TRUE.equals(metadata.get(key));
-    }
-
-    public boolean isBaseScope() {
-        return SCOPE_BASE.equals(scope);
     }
 
     /**

@@ -9,7 +9,6 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.evaluate.GateThresholds;
 import com.qualitygate.evaluate.RunEvaluationService;
-import com.qualitygate.normalize.BaseRenames;
 import com.qualitygate.normalize.ReportNormalizer;
 import com.qualitygate.platform.observability.CorrelationIds;
 import org.slf4j.Logger;
@@ -42,19 +41,16 @@ public class RunEvaluationPipeline {
     private final GateConfigService gateConfigService;
     private final ReportNormalizer normalizer;
     private final RunEvaluationService evaluationService;
-    private final BaseRenames baseRenames;
 
     public RunEvaluationPipeline(RunRepository runs, ArtifactRecordRepository artifacts,
                                  GateConfigService gateConfigService,
                                  ReportNormalizer normalizer,
-                                 RunEvaluationService evaluationService,
-                                 BaseRenames baseRenames) {
+                                 RunEvaluationService evaluationService) {
         this.runs = runs;
         this.artifacts = artifacts;
         this.gateConfigService = gateConfigService;
         this.normalizer = normalizer;
         this.evaluationService = evaluationService;
-        this.baseRenames = baseRenames;
     }
 
     /** @return 判定後の Run（判定済み、または処理失敗） */
@@ -81,19 +77,15 @@ public class RunEvaluationPipeline {
                 () -> new IllegalStateException("Run が存在しません: " + runId));
         List<ArtifactRecord> records = artifacts.findByRunId(runId);
 
-        GateConfigService.Resolved config = gateConfigService.resolve(run, records);
-        GateThresholds thresholds = GateThresholds.from(config.document());
+        GateThresholds thresholds = GateThresholds.from(gateConfigService.resolve(run, records));
 
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions(),
-                baseRenames.resolve(run, records));
+        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
 
-        log.info("正規化が完了しました runId={} 設定={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
-                runId, config.isDefault() ? "既定値" : "v" + config.gateConfig().getVersion(),
-                records.size(), input.metricsWithData(),
-                input.headFindings().size(), input.parseErrors().keySet());
+        log.info("正規化が完了しました runId={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
+                runId, records.size(), input.metricsWithData(),
+                input.findings().size(), input.parseErrors().keySet());
 
-        evaluationService.evaluate(runId, input, thresholds,
-                config.isDefault() ? null : config.gateConfig().getId());
+        evaluationService.evaluate(runId, input, thresholds);
     }
 
     /** 判定のトランザクションはロールバック済み。処理失敗の記録だけを別に保存する。 */

@@ -29,12 +29,6 @@ public class RepositoryQueryController {
         this.repositories = repositories;
     }
 
-    @GetMapping
-    @Operation(summary = "登録済みのリポジトリを一覧する")
-    public RepositoryResponses.RepositoryList list() {
-        return repositories.list();
-    }
-
     @GetMapping("/{repositoryId}")
     @Operation(summary = "リポジトリ詳細を取得する",
             description = "指標の表は latestRun の Run 詳細（GET /api/v1/runs/{runId}）から描く。"

@@ -24,7 +24,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/** 監査ログ（S-08）。閲覧は管理者のみ、書き込みの API は持たない（追記はサーバ内部のみ）。 */
+/** 監査ログ（S-07）。閲覧は管理者のみ、書き込みの API は持たない（追記はサーバ内部のみ）。 */
 @RestController
 @RequestMapping("/api/v1/audit-logs")
 @PreAuthorize("hasRole('ADMIN')")
@@ -56,7 +56,7 @@ public class AuditLogController {
             @Parameter(description = "省略時は現在時刻")
             @RequestParam(required = false)
             @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) Instant to,
-            @Parameter(description = "操作種別（REPOSITORY_UPDATED など）")
+            @Parameter(description = "操作種別（USER_ROLE_CHANGED など）")
             @RequestParam(required = false) String action,
             @RequestParam(required = false, defaultValue = "0") int limit,
             @RequestParam(required = false) String cursor) {

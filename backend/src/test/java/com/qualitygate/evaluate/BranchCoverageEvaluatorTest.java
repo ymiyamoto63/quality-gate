@@ -20,7 +20,7 @@ class BranchCoverageEvaluatorTest {
     @Test
     void しきい値以上なら合格() {
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("backend", "82.4")), List.of(), List.of(), Set.of("M-01"))));
+                input(List.of(coverage("backend", "82.4")), List.of(), Set.of("M-01"))));
 
         assertThat(results).singleElement()
                 .satisfies(r -> {
@@ -33,7 +33,7 @@ class BranchCoverageEvaluatorTest {
     @Test
     void しきい値未満なら不合格() {
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("frontend", "10.61")), List.of(), List.of(), Set.of("M-01"))));
+                input(List.of(coverage("frontend", "10.61")), List.of(), Set.of("M-01"))));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.FAIL);
         assertThat(results.getFirst().reason()).contains("75% を下回っています");
@@ -42,7 +42,7 @@ class BranchCoverageEvaluatorTest {
     @Test
     void 注意水準を下回ると警告() {
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("backend", "77")), List.of(), List.of(), Set.of("M-01"))));
+                input(List.of(coverage("backend", "77")), List.of(), Set.of("M-01"))));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
     }
@@ -52,7 +52,7 @@ class BranchCoverageEvaluatorTest {
         GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith("branch_coverage",
                 Map.of("threshold", 75, "warn_below", 90));
         List<MetricResult> results = evaluator.evaluate(new EvaluationContext(EvaluatorTestSupport.run(),
-                thresholds, input(List.of(coverage("backend", "85")), List.of(), List.of(), Set.of("M-01")),
+                thresholds, input(List.of(coverage("backend", "85")), List.of(), Set.of("M-01")),
                 Map.of(), false));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
@@ -63,7 +63,7 @@ class BranchCoverageEvaluatorTest {
     void 合格していても前回より1ポイント以上落ちれば警告() {
         // 下降が続いていることに気づかないまま、しきい値を割る直前まで放置されるのを防ぐ
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("backend", "84")), List.of(), List.of(), Set.of("M-01")),
+                input(List.of(coverage("backend", "84")), List.of(), Set.of("M-01")),
                 Map.of("M-01/backend", new BigDecimal("86.5")), true));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
@@ -75,7 +75,7 @@ class BranchCoverageEvaluatorTest {
         // 片方の高いカバレッジが、もう片方の低さを隠してはならない
         List<MetricResult> results = evaluator.evaluate(context(input(
                 List.of(coverage("backend", "95"), coverage("frontend", "10")),
-                List.of(), List.of(), Set.of("M-01"))));
+                List.of(), Set.of("M-01"))));
 
         assertThat(results).hasSize(2);
         assertThat(results).extracting(MetricResult::status)
@@ -85,7 +85,7 @@ class BranchCoverageEvaluatorTest {
     @Test
     void 分岐が無い場合は100パーセントとせず合格にする() {
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("backend", null)), List.of(), List.of(), Set.of("M-01"))));
+                input(List.of(coverage("backend", null)), List.of(), Set.of("M-01"))));
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(results.getFirst().value()).isNull();

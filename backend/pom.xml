@@ -168,7 +168,7 @@
         </executions>
       </plugin>
 
-      <!-- M-07 循環的複雑度の計測元。reportLevel=1 で全関数の CC を出力する -->
+      <!-- M-06 循環的複雑度の計測元。reportLevel=1 で全関数の CC を出力する -->
       <plugin>
         <groupId>org.apache.maven.plugins</groupId>
         <artifactId>maven-pmd-plugin</artifactId>

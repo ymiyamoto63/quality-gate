@@ -20,8 +20,8 @@ import java.util.UUID;
 /**
  * 1 つのコミットに対する 1 回の計測・判定。確定後は不変として扱う。
  *
- * <p>比較対象 Run（{@code baselineRunId}）と適用した設定版（{@code gateConfigId}）を
- * 保持することで、判定の再現性を担保する。
+ * <p>比較対象 Run（{@code baselineRunId}）を保持し、合格ラインは成果物として残すことで、
+ * 判定の再現性を担保する。
  */
 @Entity
 @Table(name = "runs")
@@ -57,8 +57,9 @@ public class Run {
     @Column(name = "measured_at", nullable = false)
     private Instant measuredAt;
 
-    @Column(name = "gate_config_id")
-    private UUID gateConfigId;
+    /** 合格ラインを送った quality-gate リポジトリのコミット。合格ラインの版は Git で見る。 */
+    @Column(name = "config_commit_sha", length = 40)
+    private String configCommitSha;
 
     @Column(name = "baseline_run_id")
     private UUID baselineRunId;
@@ -121,13 +122,12 @@ public class Run {
         this.status = RunStatus.PROCESSING;
     }
 
-    /** 判定に使った設定版を記録する。判定の再現性の根拠になる。 */
-    public void applyGateConfig(UUID gateConfigId) {
-        this.gateConfigId = gateConfigId;
+    public void setConfigCommitSha(String configCommitSha) {
+        this.configCommitSha = configCommitSha;
     }
 
-    public UUID getGateConfigId() {
-        return gateConfigId;
+    public String getConfigCommitSha() {
+        return configCommitSha;
     }
 
     /**

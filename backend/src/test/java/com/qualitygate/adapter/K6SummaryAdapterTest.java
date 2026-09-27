@@ -47,8 +47,8 @@ class K6SummaryAdapterTest {
                 .containsEntry("run-detail", new BigDecimal("455.5"));
 
         // passes は「失敗した（真）」の件数。名前に引きずられて取り違えない
-        assertThat(measurement(report, "M-05").value()).isEqualByComparingTo("0.1");
-        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("49.95");
+        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("0.1");
+        assertThat(measurement(report, "M-03").detail()).containsEntry("successRate", new BigDecimal("49.9500"));
     }
 
     @Test
@@ -64,8 +64,8 @@ class K6SummaryAdapterTest {
                 """, ENVIRONMENT);
 
         assertThat(measurement(report, "M-03").value()).isEqualByComparingTo("250");
-        assertThat(measurement(report, "M-05").value()).isEqualByComparingTo("0");
-        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("20");
+        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("0");
+        assertThat(measurement(report, "M-03").detail()).containsEntry("successRate", new BigDecimal("20.0000"));
     }
 
     @Test
@@ -74,7 +74,7 @@ class K6SummaryAdapterTest {
         // handleSummary が http_reqs{phase:measure} の rate を「件数 ÷ 計測秒数」に直している
         NormalizedReport report;
         try (var in = K6SummaryAdapterTest.class.getResourceAsStream("/k6/handle-summary-k6-1.8.json")) {
-            report = adapter.parse(in, new ParseContext(null, null, List.of(), ENVIRONMENT));
+            report = adapter.parse(in, new ParseContext(null, List.of(), ENVIRONMENT));
         }
 
         RawMeasurement p95 = measurement(report, "M-03");
@@ -83,8 +83,8 @@ class K6SummaryAdapterTest {
         @SuppressWarnings("unchecked")
         Map<String, Object> scenarios = (Map<String, Object>) p95.detail().get("scenarios");
         assertThat(scenarios).containsOnlyKeys("chat", "suggest", "monitoring");
-        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("50.3");
-        assertThat(measurement(report, "M-05").value()).isEqualByComparingTo("0");
+        assertThat((BigDecimal) p95.detail().get("successRate")).isEqualByComparingTo("50.3");
+        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("0");
     }
 
     @Test
@@ -103,7 +103,7 @@ class K6SummaryAdapterTest {
                 """, ENVIRONMENT);
 
         assertThat(measurement(report, "M-03").value()).isEqualByComparingTo("320");
-        assertThat(measurement(report, "M-05").value()).isEqualByComparingTo("0");
+        assertThat(measurement(report, "M-04").value()).isEqualByComparingTo("0");
         assertThat(measurement(report, "M-03").detail()).containsEntry("requests", 15000L);
     }
 
@@ -144,7 +144,7 @@ class K6SummaryAdapterTest {
 
     private NormalizedReport parse(String json, Map<String, Object> metadata) {
         return adapter.parse(new ByteArrayInputStream(json.getBytes(StandardCharsets.UTF_8)),
-                new ParseContext(null, null, List.of(), metadata));
+                new ParseContext(null, List.of(), metadata));
     }
 
     private static RawMeasurement measurement(NormalizedReport report, String metricId) {

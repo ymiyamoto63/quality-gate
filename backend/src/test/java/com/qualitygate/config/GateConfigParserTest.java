@@ -176,7 +176,7 @@ class GateConfigParserTest {
 
         GateConfigDocument document = parser.parse(yaml);
 
-        // PR の計測では M-02 と M-03〜05 をスキップする
+        // PR の計測では M-02 と M-03 / M-04 をスキップする
         assertThat(document.execution().skippableMetrics())
                 .containsExactly("mutation_score", "performance");
         assertThat(document.metrics().get("performance").enabled()).isTrue();
@@ -184,7 +184,7 @@ class GateConfigParserTest {
 
     @Test
     void テスト結果の指標は既定で有効() {
-        // テストの成功は M-10 で既定から見る
+        // テストの成功は M-09 で既定から見る
         assertThat(parser.parse("version: 1").metric("test_results").enabled()).isTrue();
     }
 

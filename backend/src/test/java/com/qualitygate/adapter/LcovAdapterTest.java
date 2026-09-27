@@ -63,7 +63,7 @@ class LcovAdapterTest {
     }
 
     private static ParseContext context(List<String> exclusions) {
-        return new ParseContext("frontend", "head", exclusions);
+        return new ParseContext("frontend", exclusions);
     }
 
     private static InputStream stream(String lcov) {

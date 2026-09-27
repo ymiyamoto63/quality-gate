@@ -16,7 +16,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * M-09 アクセシビリティ違反（docs/spec/02-metrics-spec.md M-09）。
+ * M-08 アクセシビリティ違反（docs/spec/02-metrics-spec.md M-08）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
@@ -45,7 +45,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         GateThresholds thresholds = context.thresholds();
         WcagStandard standard = thresholds.accessibilityStandard();
         Coverage coverage = Coverage.of(context.input().measurementsOf(metricId()));
-        List<IdentifiedFinding> findings = context.input().headFindingsOf(metricId());
+        List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
         long critical = 0;
         long serious = 0;

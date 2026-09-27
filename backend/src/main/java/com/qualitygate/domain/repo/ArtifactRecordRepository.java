@@ -15,8 +15,12 @@ public interface ArtifactRecordRepository extends JpaRepository<ArtifactRecord, 
     @Query("select coalesce(sum(a.sizeBytes), 0) from ArtifactRecord a where a.runId = :runId")
     long sumSizeBytesByRunId(@Param("runId") UUID runId);
 
-    /** 保持期間を過ぎ、まだ実体を消していない成果物。 */
+    /**
+     * 保持期間を過ぎ、まだ実体を消していない成果物。
+     * 合格ライン（quality-gate-config）は Run と同じ期間残す。再評価とリリース判定の根拠になるため。
+     */
     @Query("select a from ArtifactRecord a where a.deletedAt is null and a.uploadedAt < :before "
+            + "and a.type <> com.qualitygate.domain.model.ArtifactType.QUALITY_GATE_CONFIG "
             + "order by a.uploadedAt")
     List<ArtifactRecord> findFilesUploadedBefore(@Param("before") java.time.Instant before,
                                                  org.springframework.data.domain.Pageable pageable);

@@ -24,7 +24,7 @@ import java.util.Map;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 可観測性（docs/spec/05-architecture.md 10 章）: 相関 ID。
+ * 可観測性（docs/spec/05-architecture.md）: 相関 ID。
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @AbstractIntegrationTest
@@ -53,7 +53,7 @@ class ObservabilityIT {
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositories.save(new MonitoredRepository(
-                Uuid7.generate(), "ymiyamoto63", "quality-gate", admin.getId()));
+                Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
         client = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
                 .defaultStatusHandler(status -> true, (req, res) -> { })

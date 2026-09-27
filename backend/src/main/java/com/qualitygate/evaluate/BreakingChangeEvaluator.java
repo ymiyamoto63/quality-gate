@@ -13,7 +13,7 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * M-08 OpenAPI の破壊的変更件数（docs/spec/02-metrics-spec.md M-08）。
+ * M-07 OpenAPI の破壊的変更件数（docs/spec/02-metrics-spec.md M-07）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
@@ -39,7 +39,7 @@ public class BreakingChangeEvaluator implements MetricEvaluator {
     public List<MetricResult> evaluate(EvaluationContext context) {
         int maximum = context.thresholds().maxBreakingChanges();
         List<RawMeasurement> measurements = context.input().measurementsOf(metricId());
-        List<IdentifiedFinding> findings = context.input().headFindingsOf(metricId());
+        List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
         long breaking = count(findings, Severity.HIGH);
         long warnings = count(findings, Severity.MEDIUM);

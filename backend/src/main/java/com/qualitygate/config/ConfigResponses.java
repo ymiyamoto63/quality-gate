@@ -5,40 +5,24 @@ import jakarta.validation.constraints.NotNull;
 
 import java.time.Instant;
 import java.util.List;
-import java.util.Map;
 import java.util.UUID;
 
-/** 設定（S-06）の応答と入力。 */
+/** 設定（S-06）の応答。 */
 public final class ConfigResponses {
 
     private ConfigResponses() {
     }
 
-    @Schema(description = "現在の設定。validation は直近に届いた設定ファイルの検証結果。版の履歴は Git で見る")
+    @Schema(description = "直近の Run に送られた合格ラインと、その検証結果。版の履歴は Git で見る")
     public record RepositoryConfig(
-            @NotNull @Schema(nullable = true, description = "設定版が 1 つも無ければ null（既定値で判定）")
-            ConfigVersion current,
-            @NotNull ConfigValidation validation,
-            @NotNull @Schema(description = "既定値の YAML。設定版が無いときの表示")
-            String defaultYaml) {
-    }
-
-    public record ConfigVersion(
-            @NotNull UUID gateConfigId,
-            @NotNull int version,
-            @NotNull String sourceType,
-            @NotNull @Schema(nullable = true) String sourceCommitSha,
-            @NotNull Instant createdAt,
-            @NotNull String rawYaml,
-            @NotNull Map<String, Object> parsed) {
-    }
-
-    @Schema(description = "設定ファイルの検証結果。不正なら判定されず、Run は処理失敗になる")
-    public record ConfigValidation(
-            @NotNull boolean valid,
-            @NotNull List<ValidationErrorItem> errors,
-            @NotNull @Schema(nullable = true, description = "検証に失敗した Run") UUID runId,
-            @NotNull @Schema(nullable = true, description = "検証に失敗した設定ファイルの内容") String rawYaml) {
+            @NotNull @Schema(nullable = true, description = "直近の Run。まだ計測が無ければ null") UUID runId,
+            @NotNull @Schema(nullable = true) Instant measuredAt,
+            @NotNull @Schema(nullable = true,
+                    description = "合格ラインを送った quality-gate リポジトリのコミット") String configCommitSha,
+            @NotNull @Schema(nullable = true,
+                    description = "設定ファイルの内容。設定ファイルの無い Run（既定値で判定）では null") String rawYaml,
+            @NotNull @Schema(description = "検証エラー。不正なら判定されず、Run は処理失敗になる")
+            List<ValidationErrorItem> errors) {
     }
 
     public record ValidationErrorItem(

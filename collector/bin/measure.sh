@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-13。M-08 は欠番）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-11）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
@@ -10,15 +10,13 @@
 #
 # 指標ごとの計測は collector/bin/measure/ に分けてあり、このスクリプトは準備と実行の順序だけを持つ。
 #
-# 通常は measure-isolated.sh からコンテナの中で実行される（collector/runner/Dockerfile に必要なものがそろっている）。
-# コンテナの外で直接実行するときに必要なもの:
-#   git / curl / unzip / docker、JDK（バックエンド）、Node.js（フロントエンド）、Chromium の動作に必要なライブラリ（M-09）
-# 環境変数:
+# measure-isolated.sh からコンテナの中で実行される（collector/runner/Dockerfile に必要なものがそろっている）。
+# 環境変数（コンテナのイメージが設定する）:
 #   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（既定: ~/.cache/quality-gate-collector）
-#   A11Y_CHROMIUM       M-09 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
+#   A11Y_CHROMIUM       M-08 に使う Chromium の実行ファイル（任意。未指定なら Playwright が取得する）
 #   QG_COLLECTOR_IN_CONTAINER  1 なら Trivy / oasdiff を Docker ではなくコンテナに入れたバイナリで実行する
-#   QG_A11Y_TOOL_DIR    M-09 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
-#   QG_COMPLEXITY_TOOL_DIR  M-07（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
+#   QG_A11Y_TOOL_DIR    M-08 の検査ツールを取得済みのディレクトリ（コンテナのイメージに入っているもの）
+#   QG_COMPLEXITY_TOOL_DIR  M-06（フロントエンド）の ESLint を取得済みのディレクトリ（コンテナのイメージに入っているもの）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -40,7 +38,6 @@ fail() { warn "$1"; FAILED+=("$1"); }
 skip() { printf '%s\t%s\n' "$1" "$2" >> "$REPORTS/skipped-metrics.tsv"; log "$1 は計測しません: $2"; }
 
 cp "$WORK/meta.env" "$REPORTS/meta.env"
-cp "$WORK/renames.json" "$REPORTS/renames.json"
 cp "$COLLECTOR_DIR/versions.env" "$REPORTS/versions.env"
 mkdir -p "$REPORTS/backend" "$REPORTS/frontend" "$REPORTS/tests/backend" "$REPORTS/tests/frontend"
 rm -f "$REPORTS/skipped-metrics.tsv"
@@ -52,9 +49,9 @@ for metric in backend-tests mutation complexity frontend-tests accessibility \
   source "$MEASURE_DIR/$metric.sh"
 done
 
-# M-09。対象アプリを起動して検査する
+# M-08。対象アプリを起動して検査する
 measure_app() {
-  local label=M-09
+  local label=M-08
   [ -f "$SRC/$FRONTEND_DIR/package.json" ] || { fail "$label: $FRONTEND_DIR/package.json がありません"; return; }
   group "画面の検査（${label}）"
   if ! prepare_a11y_tool; then
@@ -68,7 +65,6 @@ measure_app() {
   rm -rf "$A11Y_TOOL"
 }
 
-prepare_base
 if [ -n "${BACKEND_DIR:-}" ]; then
   measure_backend
   [ -z "${MUTATION_TARGET_CLASSES:-}" ] || measure_mutation
@@ -78,7 +74,6 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend
   measure_frontend_complexity
 fi
-cleanup_base
 if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ]; then
   build_frontend
   measure_app

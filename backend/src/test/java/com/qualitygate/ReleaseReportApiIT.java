@@ -79,6 +79,8 @@ class ReleaseReportApiIT {
             """;
 
     private static final String PASSING = "1".repeat(40);
+    /** 合格ラインを送った quality-gate リポジトリのコミット。 */
+    private static final String CONFIG_COMMIT = "c".repeat(40);
     private static final String FAILING = "2".repeat(40);
     private static final String PARTIAL = "3".repeat(40);
     private static final String REMEASURED = "4".repeat(40);
@@ -105,7 +107,7 @@ class ReleaseReportApiIT {
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.VIEWER, UserStatus.ACTIVE, null));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", admin.getId())).getId();
+                "ymiyamoto63", "quality-gate", "main")).getId();
         mvc = MockMvcTester.create(MockMvcBuilders.webAppContextSetup(context).apply(springSecurity())
                 .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/")
                         .with(user("ymiyamoto63")))
@@ -133,7 +135,7 @@ class ReleaseReportApiIT {
             json.extractingPath("$.decision").isEqualTo("RELEASABLE");
             json.extractingPath("$.decisionReason").isEqualTo("合否に使う 1 件の指標がすべて合格です。");
             json.extractingPath("$.run.completeness").isEqualTo("FULL");
-            json.extractingPath("$.gateConfig.version").asNumber().isEqualTo(1);
+            json.extractingPath("$.gateConfig.commitSha").isEqualTo(CONFIG_COMMIT);
             json.extractingPath("$.gateConfig.exclusions[0]").isEqualTo("**/generated/**");
             json.extractingPath("$.counts.judged").asNumber().isEqualTo(1);
             json.extractingPath("$.metrics[0].metricId").isEqualTo("M-01");
@@ -234,7 +236,7 @@ class ReleaseReportApiIT {
         assertThat(lines.getFirst()).startsWith("﻿リポジトリ,指定,コミット,リリース判定");
         assertThat(lines).hasSize(2);
         assertThat(lines.get(1))
-                .contains("ymiyamoto63/quality-gate", "リリース不可", "完全計測", PASSING, "v1", "M-01", "ブランチカバレッジ",
+                .contains("ymiyamoto63/quality-gate", "リリース不可", "完全計測", PASSING, CONFIG_COMMIT, "M-01", "ブランチカバレッジ",
                         "75%", "≥ 80%", "不合格", "業界の目安", "2026-09-21T12:00:00+09:00", "ymiyamoto63");
 
         assertThat(auditLogs.findAll()).singleElement().satisfies(log -> {
@@ -264,6 +266,7 @@ class ReleaseReportApiIT {
     private void evaluated(String commitSha, String measuredAt, String config, int covered, boolean skipMutation) {
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main", "github-actions",
                 Instant.parse(measuredAt), runs.findMaxAttempt(repositoryId, commitSha) + 1);
+        run.setConfigCommitSha(CONFIG_COMMIT);
         // 前のリリースと比べた計測（PASSING の比較元は計測していないコミット）
         if (PASSING.equals(commitSha)) {
             run.setBaseCommitSha("0".repeat(40));
@@ -289,17 +292,15 @@ class ReleaseReportApiIT {
             skippedMetrics.save(new RunSkippedMetric(run.getId(), "M-02", "PR の計測"));
         }
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
-        GateConfigService.Resolved resolved = gateConfigService.resolve(run, records);
-        GateThresholds thresholds = GateThresholds.from(resolved.document());
+        GateThresholds thresholds = GateThresholds.from(gateConfigService.resolve(run, records));
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
-        evaluationService.evaluate(run.getId(), input, thresholds,
-                resolved.isDefault() ? null : resolved.gateConfig().getId());
+        evaluationService.evaluate(run.getId(), input, thresholds);
     }
 
     private void attach(Run run, ArtifactType type, String filename, String component, String content) {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
-                stored.sizeBytes(), stored.sha256(), stored.storageKey(), component, null, null));
+                stored.sizeBytes(), stored.sha256(), stored.storageKey(), component, null));
     }
 }

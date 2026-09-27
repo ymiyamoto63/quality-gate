@@ -55,10 +55,10 @@ quality-gate の仕様の正本です。
 | ドキュメント | 内容 |
 | --- | --- |
 | [01 要件定義書](docs/spec/01-requirements.md) | 背景・スコープ・機能要件・非機能要件・アーキテクチャ・受け入れ基準 |
-| [02 指標・判定仕様](docs/spec/02-metrics-spec.md) | 全 13 指標の定義・計算式・入力形式・境界条件 |
+| [02 指標・判定仕様](docs/spec/02-metrics-spec.md) | 全 12 指標の定義・計算式・入力形式・境界条件 |
 | [03 設計判断と未決事項](docs/spec/03-design-decisions.md) | 構成を決めている設計判断とその理由、未決事項 |
 | [04 技術スタック](docs/spec/04-tech-stack.md) | 構成・OpenAPI 連携・開発環境・採用しなかった選択肢 |
 | [05 方式設計](docs/spec/05-architecture.md) | 状態遷移・判定の実行・正規化・認証認可・エラー処理 |
-| [06 データベース設計](docs/spec/06-database-design.md) | テーブル定義・インデックス・保持期間・Flyway 規約 |
-| [07 API 設計](docs/spec/07-api-design.md) | エンドポイント・認可マトリクス・エラーコード |
+| [06 データベース設計](docs/spec/06-database-design.md) | テーブル構成・インデックス・保持期間（列の定義は `V001__init.sql`） |
+| [07 API 設計](docs/spec/07-api-design.md) | エンドポイント・認可マトリクス・エラーコード（型の正本は `api/openapi.yml`） |
 | [08 画面設計](docs/spec/08-screen-design.md) | 画面遷移・ステータス表現・各画面・アクセシビリティ |

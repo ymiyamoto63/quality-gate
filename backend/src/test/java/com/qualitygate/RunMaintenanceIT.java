@@ -39,7 +39,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @AbstractIntegrationTest
 class RunMaintenanceIT {
 
-    /** M-06 だけを判定する設定。他の指標の成果物を用意せずに判定まで流す。 */
+    /** M-05 だけを判定する設定。他の指標の成果物を用意せずに判定まで流す。 */
     private static final String ONLY_VULNERABILITIES = """
             version: 1
             metrics:
@@ -85,7 +85,7 @@ class RunMaintenanceIT {
         users.save(new UserAccount(Uuid7.generate(), "viewer-user",
                 UserRole.VIEWER, UserStatus.ACTIVE, admin.getId()));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(), "acme",
-                "web-app", admin.getId())).getId();
+                "web-app", "main")).getId();
         mvc = TestSessions.tester(context);
     }
 
@@ -118,15 +118,18 @@ class RunMaintenanceIT {
         Run old = evaluatedRun(Instant.now().minus(Duration.ofDays(800)));
         Run recent = evaluatedRun(Instant.now().minus(Duration.ofDays(100)));
         jdbc.update("UPDATE artifacts SET uploaded_at = now() - interval '100 days'");
-        String recentKey = artifacts.findByRunId(recent.getId()).getFirst().getStorageKey();
+        String recentKey = artifacts.findByRunId(recent.getId()).stream()
+                .filter(a -> a.getType() == ArtifactType.SARIF).findFirst().orElseThrow().getStorageKey();
 
         maintenance.cleanupRetention();
 
         // 2 年を過ぎた Run は判定結果ごと消える
         assertThat(runs.findById(old.getId())).isEmpty();
-        // 90 日を過ぎた成果物は実体だけ消し、削除した事実を残す
+        // 90 日を過ぎた成果物は実体だけ消し、削除した事実を残す。
+        // 合格ラインは Run と同じ期間残す（再評価とリリース判定の根拠になる）
         assertThat(artifacts.findByRunId(recent.getId()))
-                .allSatisfy(a -> assertThat(a.getDeletedAt()).isNotNull());
+                .allSatisfy(a -> assertThat(a.getDeletedAt() == null)
+                        .isEqualTo(a.getType() == ArtifactType.QUALITY_GATE_CONFIG));
         assertThat(artifactStore.exists(recentKey)).isFalse();
         assertThat(runs.findById(recent.getId())).isPresent();
     }
@@ -160,6 +163,6 @@ class RunMaintenanceIT {
         StoredArtifact stored = artifactStore.store(run.getId().toString(), filename,
                 new ByteArrayInputStream(content.getBytes(StandardCharsets.UTF_8)));
         artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(), type, filename,
-                stored.sizeBytes(), stored.sha256(), stored.storageKey(), null, null, null));
+                stored.sizeBytes(), stored.sha256(), stored.storageKey(), null, null));
     }
 }

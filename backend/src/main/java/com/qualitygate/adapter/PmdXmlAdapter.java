@@ -18,14 +18,12 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * PMD XML から M-07（循環的複雑度）を読む。
+ * PMD XML から M-06（循環的複雑度）を読む。
  *
  * <p>ルールセットは {@code reportLevel: 1} で動かす。しきい値超過の検出ではなく
- * <strong>全メソッドの CC 値</strong>を得るためであり、判定は quality-gate 側で行う。
- * ベースコミットとの比較が必要な指標であり、超過分だけでは比較できない。
+ * <strong>全メソッドの CC 値</strong>を得るためであり、判定（15 超か、注意水準か）は quality-gate 側で行う。
  *
- * <p>ここでは「CC 値を持つ関数の一覧」を返すだけで、新規かどうかの判定はしない。
- * 判定はベース側の一覧との比較が必要で、それは evaluate の責務である。
+ * <p>ここでは「CC 値を持つ関数の一覧」を返すだけで、判定は evaluate の責務である。
  */
 @Component
 public class PmdXmlAdapter implements ArtifactAdapter {
@@ -106,20 +104,19 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         String memberName = memberNameOf(message, methodAttribute);
 
         // fingerprint の材料は「モジュール相対パス + 関数の同定子」。行番号を含めない。
-        // リポジトリ相対ではなくモジュール相対を使うのは、base 側と head 側で
+        // リポジトリ相対ではなくモジュール相対を使うのは、計測ごとに
         // チェックアウト先が違っても同じ関数が同じ identity になるようにするため。
         String identity = modulePath + "#" + memberName;
 
-        return new RawFinding("M-07", RULE, Severity.INFO,
+        return new RawFinding("M-06", RULE, Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(memberName, complexity),
                 repoPath, beginLine, context.componentName(), identity,
                 Map.of("complexity", complexity,
-                        "member", memberName,
-                        "scope", context.scope() == null ? "head" : context.scope()));
+                        "member", memberName));
     }
 
     /**
-     * PMD は絶対パスを出す。ベース側と head 側で作業ディレクトリが違うと
+     * PMD は絶対パスを出す。計測ごとに作業ディレクトリが違うと
      * 同じ関数が別物と見なされるため、モジュール相対（{@code src/...} 以下）に寄せる。
      * fingerprint の安定性はこの形に依存する。
      */

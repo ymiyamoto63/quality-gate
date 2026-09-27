@@ -19,7 +19,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 /**
- * k6 の summary JSON から M-03 / M-04 / M-05 を読む（docs/spec/02-metrics-spec.md M-03）。
+ * k6 の summary JSON から M-03（応答時間。到達率は内訳）/ M-04（エラー率）を読む（docs/spec/02-metrics-spec.md M-03）。
  *
  * <p>1 ファイルは 1 回の実行を表す。仕様は 3 回実行して中央値を採るため、
  * CI は同じ Run に 3 ファイルを送る。中央値を取るのは評価器の責務である。
@@ -44,8 +44,7 @@ import java.util.regex.Pattern;
 public class K6SummaryAdapter implements ArtifactAdapter {
 
     static final String M_P95 = "M-03";
-    static final String M_THROUGHPUT = "M-04";
-    static final String M_ERROR_RATE = "M-05";
+    static final String M_ERROR_RATE = "M-04";
 
     /** 計測環境を表すメタデータのキー。 */
     public static final String ENVIRONMENT = "environment";
@@ -110,8 +109,6 @@ public class K6SummaryAdapter implements ArtifactAdapter {
         List<RawMeasurement> measurements = List.of(
                 RawMeasurement.of(M_P95, component, sample.p95Ms(), "ms", sample.toDetail())
                         .withVariant(environment),
-                RawMeasurement.of(M_THROUGHPUT, component, sample.successRate(), "rps",
-                        sample.toDetail()).withVariant(environment),
                 RawMeasurement.of(M_ERROR_RATE, component, sample.errorRatePercent(), "percent",
                         sample.toDetail()).withVariant(environment));
         return NormalizedReport.of(ArtifactType.K6_SUMMARY, measurements, List.of());

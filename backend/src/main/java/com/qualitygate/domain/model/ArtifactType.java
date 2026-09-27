@@ -15,28 +15,21 @@ public enum ArtifactType implements WireValued {
     JACOCO_XML("jacoco-xml", "M-01"),
     LCOV("lcov", "M-01"),
     PIT_XML("pit-xml", "M-02"),
-    K6_SUMMARY("k6-summary", "M-03", "M-04", "M-05"),
-    SARIF("sarif", "M-06", "M-07", "M-12", "M-13"),
-    PMD_XML("pmd-xml", "M-07"),
-    ESLINT_JSON("eslint-json", "M-07"),
+    K6_SUMMARY("k6-summary", "M-03", "M-04"),
+    SARIF("sarif", "M-05", "M-06", "M-11", "M-12"),
+    PMD_XML("pmd-xml", "M-06"),
+    ESLINT_JSON("eslint-json", "M-06"),
     /** すべてのテストの結果（JUnit XML）。 */
-    TEST_JUNIT_XML("test-junit-xml", "M-10", "M-11"),
-    OASDIFF_JSON("oasdiff-json", "M-08"),
-    AXE_JSON("axe-json", "M-09"),
+    TEST_JUNIT_XML("test-junit-xml", "M-09", "M-10"),
+    OASDIFF_JSON("oasdiff-json", "M-07"),
+    AXE_JSON("axe-json", "M-08"),
 
     /**
-     * リポジトリの {@code .quality-gate.yml} そのもの。
+     * 合格ライン（{@code collector/targets/<owner>__<name>.gate.yml}）そのもの。
      *
      * <p>指標を供給しないが、判定に使う合格ラインを運ぶ。
      */
-    QUALITY_GATE_CONFIG("quality-gate-config"),
-
-    /**
-     * ファイルの移動・リネーム（収集ランナーの {@code collector/bin/renames.sh} の出力）。
-     *
-     * <p>指標を供給しないが、移動しただけのファイルの違反を新規・解消として扱わないために使う（指標仕様書 0.4）。
-     */
-    GIT_RENAMES("git-renames");
+    QUALITY_GATE_CONFIG("quality-gate-config");
 
     private final String wire;
     private final List<String> metricIds;

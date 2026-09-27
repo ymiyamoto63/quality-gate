@@ -9,7 +9,6 @@ import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.UserRole;
 import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.domain.repo.UserAccountRepository;
@@ -44,7 +43,6 @@ class RunEvaluationPipelineIT {
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired RunRepository runs;
     @Autowired ArtifactRecordRepository artifacts;
-    @Autowired GateConfigRepository gateConfigs;
     @Autowired ArtifactStore artifactStore;
     @Autowired RunEvaluationPipeline pipeline;
 
@@ -56,7 +54,7 @@ class RunEvaluationPipelineIT {
         UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
                 UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", admin.getId())).getId();
+                "ymiyamoto63", "quality-gate", "main")).getId();
     }
 
     @Test
@@ -79,17 +77,6 @@ class RunEvaluationPipelineIT {
                 .contains("mutation_score")
                 .contains("行目");
         assertThat(runs.findById(run.getId()).orElseThrow().getStatus()).isEqualTo(RunStatus.FAILED);
-    }
-
-    @Test
-    void 設定が不正な場合は設定版を保存しない() {
-        Run run = newRun("3333333333333333333333333333333333333333");
-        attachConfig(run, "version: 1\nexclusion: []\n");
-
-        pipeline.evaluate(run.getId());
-
-        // 検証を通らなかった設定を版として残すと、履歴に不正な設定が混ざる
-        assertThat(gateConfigs.count()).isZero();
     }
 
     @Test
@@ -138,6 +125,6 @@ class RunEvaluationPipelineIT {
                 new ByteArrayInputStream(yaml.getBytes(StandardCharsets.UTF_8)));
         return artifacts.save(new ArtifactRecord(Uuid7.generate(), run.getId(),
                 ArtifactType.QUALITY_GATE_CONFIG, ".quality-gate.yml", stored.sizeBytes(),
-                stored.sha256(), stored.storageKey(), null, null, null));
+                stored.sha256(), stored.storageKey(), null, null));
     }
 }

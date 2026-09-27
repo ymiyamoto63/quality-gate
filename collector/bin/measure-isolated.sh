@@ -10,8 +10,6 @@
 # ランナーのマシンの他のファイル、Docker のソケット、他のジョブの作業領域には触れられない。
 # 権限は落とし（--cap-drop ALL、no-new-privileges）、ランナーの利用者の UID で動かす。
 #
-# 計測プロファイルで ISOLATION=none にすると、コンテナを使わずに measure.sh を直接実行する。
-#
 # 環境変数:
 #   QG_COLLECTOR_BASE_IMAGE  ベースのイメージ（既定: eclipse-temurin:<JAVA_VERSION>-jdk-noble）
 #   QG_COLLECTOR_MEMORY      コンテナのメモリ上限（既定: 6g）
@@ -28,15 +26,7 @@ mkdir -p "$3"
 REPORTS=$(cd "$3" && pwd)
 
 load_profile "$REPOSITORY"
-case "${ISOLATION:-container}" in
-  none)
-    log "計測プロファイルの ISOLATION=none のため、コンテナを使わずに計測します"
-    exec "$COLLECTOR_DIR/bin/measure.sh" "$@"
-    ;;
-  container) ;;
-  *) die "ISOLATION は container か none を指定してください: $ISOLATION" ;;
-esac
-command -v docker >/dev/null || die "docker がありません（ISOLATION=none にすればコンテナを使わずに計測できます）"
+command -v docker >/dev/null || die "docker がありません"
 
 # Node.js の版を完全な版（22.21.1 など）に解決する。.nvmrc には 22 や v22 や lts/* と書かれうる
 node_version() {

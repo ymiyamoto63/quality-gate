@@ -52,34 +52,23 @@ public class ReportNormalizer {
     }
 
     public NormalizedInput normalize(List<ArtifactRecord> artifacts, List<String> exclusions) {
-        return normalize(artifacts, exclusions, Map.of());
-    }
-
-    /**
-     * @param renames ファイルの移動・リネームの対応表（新しいパス → 移動前のパス）。移動前の fingerprint を求めるのに使う
-     */
-    public NormalizedInput normalize(List<ArtifactRecord> artifacts, List<String> exclusions,
-                                     Map<String, String> renames) {
         List<RawMeasurement> measurements = new ArrayList<>();
-        Map<String, IdentifiedFinding> headFindings = new LinkedHashMap<>();
-        Map<String, IdentifiedFinding> baseFindings = new LinkedHashMap<>();
+        Map<String, IdentifiedFinding> findings = new LinkedHashMap<>();
         Set<String> metricsWithData = new java.util.LinkedHashSet<>();
         Map<String, String> parseErrors = new HashMap<>();
 
         for (ArtifactRecord artifact : artifacts) {
             if (!artifact.getType().carriesMetrics()) {
-                // 設定ファイルと移動の記録は指標を運ばない（別に読む）。解析の失敗として WARN を残さない
+                // 設定ファイルは指標を運ばない（別に読む）。解析の失敗として WARN を残さない
                 continue;
             }
             ParseContext context = new ParseContext(artifact.getComponentName(),
-                    artifact.getScope(), exclusions, metadataOf(artifact));
+                    exclusions, metadataOf(artifact));
             try {
                 NormalizedReport report = parse(artifact, context);
                 measurements.addAll(report.measurements());
-                collect(report.findings(), context.isBaseScope() ? baseFindings : headFindings);
-                if (!context.isBaseScope()) {
-                    metricsWithData.addAll(report.metricIdsWithData());
-                }
+                collect(report.findings(), findings);
+                metricsWithData.addAll(report.metricIdsWithData());
             } catch (ArtifactFormatException e) {
                 // 形式不正は再実行しても直らない。当該指標を ERROR とし、理由を残す。
                 log.warn("成果物の解析に失敗しました artifactId={} type={} reason={}",
@@ -89,9 +78,8 @@ public class ReportNormalizer {
             }
         }
 
-        List<IdentifiedFinding> head = List.copyOf(headFindings.values());
-        return new NormalizedInput(measurements, head, List.copyOf(baseFindings.values()),
-                Set.copyOf(metricsWithData), Map.copyOf(parseErrors), RenamedFingerprints.of(head, renames));
+        return new NormalizedInput(measurements, List.copyOf(findings.values()),
+                Set.copyOf(metricsWithData), Map.copyOf(parseErrors));
     }
 
     /**

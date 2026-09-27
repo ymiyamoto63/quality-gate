@@ -16,14 +16,14 @@ import java.util.Set;
  * @param skippableMetrics  スキップ申告を受理してよい指標（指標 ID）
  * @param exclusions        計測除外の glob パターン
  * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
- * @param maxAccessibilityViolations M-09 の合格ライン（critical + serious の件数）
- * @param accessibilityStandard      M-09 の判定基準
- * @param accessibilityPages         M-09 で検査されているべきページ。空なら限定しない
- * @param maxBreakingChanges         M-08 の合格ライン（破壊的変更の件数）
- * @param performance                M-03 / M-04 / M-05 の合格ライン
- * @param testResults                M-10 / M-11 の合格ライン
- * @param maxSecrets                 M-12 の合格ライン（シークレットの件数）
- * @param licenses                   M-13 の合格ライン
+ * @param maxAccessibilityViolations M-08 の合格ライン（critical + serious の件数）
+ * @param accessibilityStandard      M-08 の判定基準
+ * @param accessibilityPages         M-08 で検査されているべきページ。空なら限定しない
+ * @param maxBreakingChanges         M-07 の合格ライン（破壊的変更の件数）
+ * @param performance                M-03 / M-04 の合格ライン
+ * @param testResults                M-09 / M-10 の合格ライン
+ * @param maxSecrets                 M-11 の合格ライン（シークレットの件数）
+ * @param licenses                   M-12 の合格ライン
  */
 public record GateThresholds(
         Set<String> enabledMetrics,
@@ -47,7 +47,7 @@ public record GateThresholds(
         Licenses licenses) {
 
     /**
-     * ライセンスの合格ライン（docs/spec/02-metrics-spec.md M-13）。件数はパッケージの数。
+     * ライセンスの合格ライン（docs/spec/02-metrics-spec.md M-12）。件数はパッケージの数。
      *
      * @param maxForbidden  分類が forbidden のパッケージの上限
      * @param maxRestricted 分類が restricted のパッケージの上限。null なら件数では問わない（WARN にとどめる）
@@ -61,8 +61,8 @@ public record GateThresholds(
      *
      * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
      * @param p95WarnMs      これを超えたら WARN（既定は合格ラインの 80%）
-     * @param arrivalRateRps M-04 の負荷条件（到達率）。実測が 95% を下回ったら WARN
-     * @param errorRatePct   M-05 の合格ライン（% 以下）。半分を超えたら WARN
+     * @param arrivalRateRps 負荷条件（到達率）。M-03 は実測が 95% を下回ったら WARN
+     * @param errorRatePct   M-04 の合格ライン（% 以下）。半分を超えたら WARN
      * @param scenarios      判定すべきシナリオ。summary に無ければ ERROR
      */
     public record Performance(BigDecimal p95Ms, BigDecimal p95WarnMs, BigDecimal arrivalRateRps,
@@ -70,12 +70,12 @@ public record GateThresholds(
     }
 
     /**
-     * テスト結果の合格ライン（docs/spec/02-metrics-spec.md M-10 / M-11）。
+     * テスト結果の合格ライン（docs/spec/02-metrics-spec.md M-09 / M-10）。
      *
-     * @param minSuccessRate     M-10 の合格ライン（成功率 %）
-     * @param minTestCount       M-10 の最小実行件数。下回れば値を確定できない（ERROR）
-     * @param maxSkipped         M-11 のスキップ件数の上限。null なら件数そのものは問わない
-     * @param maxSkippedIncrease M-11 の比較対象 Run からの増加の上限（件）
+     * @param minSuccessRate     M-09 の合格ライン（成功率 %）
+     * @param minTestCount       M-09 の最小実行件数。下回れば値を確定できない（ERROR）
+     * @param maxSkipped         M-10 のスキップ件数の上限。null なら件数そのものは問わない
+     * @param maxSkippedIncrease M-10 の比較対象 Run からの増加の上限（件）
      */
     public record TestResults(BigDecimal minSuccessRate, int minTestCount, Integer maxSkipped,
                               int maxSkippedIncrease) {
@@ -84,16 +84,15 @@ public record GateThresholds(
     public static final String M_BRANCH_COVERAGE = "M-01";
     public static final String M_MUTATION = "M-02";
     public static final String M_PERFORMANCE_P95 = "M-03";
-    public static final String M_THROUGHPUT = "M-04";
-    public static final String M_ERROR_RATE = "M-05";
-    public static final String M_VULNERABILITIES = "M-06";
-    public static final String M_COMPLEXITY = "M-07";
-    public static final String M_BREAKING_CHANGES = "M-08";
-    public static final String M_ACCESSIBILITY = "M-09";
-    public static final String M_TEST_SUCCESS = "M-10";
-    public static final String M_SKIPPED_TESTS = "M-11";
-    public static final String M_SECRETS = "M-12";
-    public static final String M_LICENSES = "M-13";
+    public static final String M_ERROR_RATE = "M-04";
+    public static final String M_VULNERABILITIES = "M-05";
+    public static final String M_COMPLEXITY = "M-06";
+    public static final String M_BREAKING_CHANGES = "M-07";
+    public static final String M_ACCESSIBILITY = "M-08";
+    public static final String M_TEST_SUCCESS = "M-09";
+    public static final String M_SKIPPED_TESTS = "M-10";
+    public static final String M_SECRETS = "M-11";
+    public static final String M_LICENSES = "M-12";
 
     /**
      * 判定器を実装済みの指標。
@@ -102,7 +101,7 @@ public record GateThresholds(
      * 未実装の指標まで判定対象に含めると、すべての Run が ERROR で不合格になる。
      */
     public static final Set<String> IMPLEMENTED_METRICS =
-            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95, M_THROUGHPUT,
+            Set.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95,
                     M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY,
                     M_BREAKING_CHANGES, M_ACCESSIBILITY,
                     M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES);
@@ -111,7 +110,7 @@ public record GateThresholds(
     private static final Map<String, List<String>> METRIC_IDS_OF = Map.ofEntries(
             Map.entry("branch_coverage", List.of(M_BRANCH_COVERAGE)),
             Map.entry("mutation_score", List.of(M_MUTATION)),
-            Map.entry("performance", List.of(M_PERFORMANCE_P95, M_THROUGHPUT, M_ERROR_RATE)),
+            Map.entry("performance", List.of(M_PERFORMANCE_P95, M_ERROR_RATE)),
             Map.entry("vulnerabilities", List.of(M_VULNERABILITIES)),
             Map.entry("cyclomatic_complexity", List.of(M_COMPLEXITY)),
             Map.entry("api_contract", List.of(M_BREAKING_CHANGES)),

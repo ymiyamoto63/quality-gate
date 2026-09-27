@@ -1,7 +1,6 @@
 package com.qualitygate.query;
 
 import com.qualitygate.domain.entity.Finding;
-import com.qualitygate.domain.entity.GateConfig;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
@@ -15,7 +14,6 @@ import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.FindingCriteria;
 import com.qualitygate.domain.repo.FindingRepository;
-import com.qualitygate.domain.repo.GateConfigRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
@@ -55,7 +53,7 @@ public class RunQueryService {
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
 
-    /** 1 ページの既定と上限（docs/spec/07-api-design.md 1.4）。 */
+    /** 1 ページの既定と上限（docs/spec/07-api-design.md）。 */
     static final int DEFAULT_LIMIT = 20;
     static final int MAX_LIMIT = 100;
 
@@ -65,14 +63,13 @@ public class RunQueryService {
     private final FindingRepository findings;
     private final RunSkippedMetricRepository skippedMetrics;
     private final ArtifactRecordRepository artifacts;
-    private final GateConfigRepository gateConfigs;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
     public RunQueryService(RunRepository runs, MonitoredRepositoryRepository repositories,
                            MeasurementRepository measurements, FindingRepository findings,
                            RunSkippedMetricRepository skippedMetrics,
-                           ArtifactRecordRepository artifacts, GateConfigRepository gateConfigs,
+                           ArtifactRecordRepository artifacts,
                            ObjectMapper objectMapper) {
         this.runs = runs;
         this.repositories = repositories;
@@ -80,7 +77,6 @@ public class RunQueryService {
         this.findings = findings;
         this.skippedMetrics = skippedMetrics;
         this.artifacts = artifacts;
-        this.gateConfigs = gateConfigs;
         this.objectMapper = objectMapper;
     }
 
@@ -109,7 +105,7 @@ public class RunQueryService {
                 run.getEvaluatedAt(),
                 run.getCiRunUrl(),
                 failureOf(run),
-                gateConfigOf(run),
+                run.getConfigCommitSha(),
                 categoriesOf(runId, findingCounts),
                 findingSummaryOf(runId),
                 skippedMetricsOf(runId),
@@ -306,17 +302,6 @@ public class RunQueryService {
                         MetricCatalog.of(skip.getMetricId()).name(),
                         skip.getReason(), skip.isAccepted()))
                 .toList();
-    }
-
-    private RunDetailResponse.GateConfigRef gateConfigOf(Run run) {
-        if (run.getGateConfigId() == null) {
-            return null;
-        }
-        Optional<GateConfig> config = gateConfigs.findById(run.getGateConfigId());
-        return new RunDetailResponse.GateConfigRef(run.getGateConfigId(),
-                config.map(GateConfig::getVersion).orElse(null),
-                config.map(GateConfig::getSourceType).orElse(null),
-                config.map(GateConfig::getSourceCommitSha).orElse(null));
     }
 
     /**

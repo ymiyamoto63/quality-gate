@@ -1,5 +1,5 @@
 # shellcheck shell=bash
-# M-03〜05（k6）: バックエンドを起動し、計測プロファイルの k6 シナリオで負荷をかける。
+# M-03 / M-04（k6）: バックエンドを起動し、計測プロファイルの k6 シナリオで負荷をかける。
 # measure.sh が source する（単独では実行しない）。
 
 # シナリオ（collector/targets/）とツールの版（versions.env の K6_VERSION）は quality-gate 側のもの。
@@ -20,16 +20,16 @@ measure_performance() {
   local script="$COLLECTOR_DIR/targets/$PERF_SCRIPT" port=${PERF_BACKEND_PORT:-8080} runs=${PERF_RUNS:-3}
   local warmup=${PERF_WARMUP_SECONDS:-60} duration=${PERF_DURATION_SECONDS:-300} k6 i summary environment jvm
   if [ -n "$PR_NUMBER" ]; then
-    for i in M-03 M-04 M-05; do
+    for i in M-03 M-04; do
       skip "$i" "収集ランナーは PR の計測では負荷試験を実行しない"
     done
     return
   fi
-  [ -f "$script" ] || { fail "M-03〜05: k6 のシナリオがありません（collector/targets/$PERF_SCRIPT）"; return; }
+  [ -f "$script" ] || { fail "M-03 / M-04: k6 のシナリオがありません（collector/targets/$PERF_SCRIPT）"; return; }
   group "負荷試験（k6 ${K6_VERSION}、${runs} 回）"
-  k6=$(k6_bin) || { fail "M-03〜05: k6 を取得できませんでした"; endgroup; return; }
+  k6=$(k6_bin) || { fail "M-03 / M-04: k6 を取得できませんでした"; endgroup; return; }
   read -ra jvm <<< "${PERF_JAVA_OPTS:-}"
-  start_backend M-03〜05 "$port" "$WORK/perf-backend.log" "${PERF_START_TIMEOUT:-120}" "${jvm[@]}" \
+  start_backend M-03 / M-04 "$port" "$WORK/perf-backend.log" "${PERF_START_TIMEOUT:-120}" "${jvm[@]}" \
     || { endgroup; return; }
 
   # 計測環境。名前はトレンドの系列を分ける軸になる（構成を変えたら名前も変える）
@@ -53,7 +53,7 @@ measure_performance() {
         "$k6" run --quiet --no-usage-report "$script"; then
       jq -cn --argjson e "$environment" '{environment: $e}' > "$summary.metadata"
     else
-      warn "M-03〜05: ${i} 回目の k6 が異常終了しました"
+      warn "M-03 / M-04: ${i} 回目の k6 が異常終了しました"
       jq -cn --argjson e "$environment" '{environment: $e, aborted: true}' > "$summary.metadata"
     fi
   done

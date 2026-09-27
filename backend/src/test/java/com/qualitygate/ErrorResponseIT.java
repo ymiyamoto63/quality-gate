@@ -20,7 +20,7 @@ import static com.qualitygate.TestSessions.as;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 要求の誤りは 4xx で返す（07-api-design.md 7 章）。
+ * 要求の誤りは 4xx で返す（07-api-design.md）。
  *
  * <p>Spring MVC が投げる例外（未対応のメソッド、本文の形式、値の型、必須パラメータの欠落など）を
  * 想定外の例外として 500 にすると、利用者の誤りがサーバの異常に見え、エラーのログにも紛れる。
@@ -56,9 +56,9 @@ class ErrorResponseIT {
 
     @Test
     void 未対応の本文の形式は415() {
-        assertThat(mvc.post().uri("/api/v1/repositories")
+        assertThat(mvc.post().uri("/api/v1/users")
                 .with(as("admin-user", "ADMIN"))
-                .contentType(MediaType.TEXT_PLAIN).content("acme/web-app"))
+                .contentType(MediaType.TEXT_PLAIN).content("octocat"))
                 .hasStatus(415)
                 .bodyJson().extractingPath("$.errorCode").isEqualTo("UNSUPPORTED_MEDIA_TYPE");
     }
@@ -89,7 +89,7 @@ class ErrorResponseIT {
 
     @Test
     void 応答できない形式を求められたら406() {
-        assertThat(mvc.get().uri("/api/v1/repositories")
+        assertThat(mvc.get().uri("/api/v1/dashboard")
                 .accept(MediaType.APPLICATION_XML)
                 .with(as("admin-user", "ADMIN")))
                 .hasStatus(406);

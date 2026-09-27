@@ -6,12 +6,11 @@ import trend from './fixtures/trend.json' with { type: 'json' }
 import repositoryDetail from './fixtures/repository-detail.json' with { type: 'json' }
 import runs from './fixtures/runs.json' with { type: 'json' }
 import configInvalid from './fixtures/config-invalid.json' with { type: 'json' }
-import repositories from './fixtures/repositories.json' with { type: 'json' }
 import users from './fixtures/users.json' with { type: 'json' }
 import releaseReport from './fixtures/release-report.json' with { type: 'json' }
 
 /**
- * ログインが要る画面のアクセシビリティ検査（M-09）。
+ * ログインが要る画面のアクセシビリティ検査（M-08）。
  *
  * 応答例は結合テスト（RunQueryApiIT など）が実物の API から書き出したものを使う。
  * 手で書いた例だと、API が変わっても検査は通り続け、実際の画面だけが壊れる。
@@ -31,7 +30,6 @@ const RESPONSES: [RegExp, unknown][] = [
   [/^\/api\/v1\/repositories\/[^/]+\/config$/, configInvalid],
   [/^\/api\/v1\/repositories\/[^/]+\/release-report$/, releaseReport],
   [/^\/api\/v1\/repositories\/[^/]+$/, repositoryDetail],
-  [/^\/api\/v1\/repositories$/, repositories],
   [/^\/api\/v1\/users$/, users],
 ]
 
@@ -79,7 +77,6 @@ const PAGES: Target[] = [
     expected: "'mutation_score' の誤り",
   },
   { path: '/admin/users', name: '利用者管理', expected: 'admin-user', role: 'ADMIN' },
-  { path: '/admin/repositories', name: 'リポジトリ管理', expected: 'acme/web-app', role: 'ADMIN' },
   // 技術的な定義（<details>）を開いた状態で検査する
   {
     path: `/repositories/${REPOSITORY_ID}/release?ref=1111111`,

@@ -134,12 +134,9 @@ function formatBytes(bytes: number): string {
             CI 実行 <span class="qg-visually-hidden">（外部サイト）</span>
             <i class="pi pi-external-link" aria-hidden="true" />
           </a>
-          <span v-if="detail.gateConfig">
-            設定 v{{ detail.gateConfig.version }}（{{
-              detail.gateConfig.sourceType === 'FILE' ? '設定ファイル' : '画面から設定'
-            }}）
+          <span v-if="detail.configCommitSha">
+            合格ライン {{ shortSha(detail.configCommitSha) }}
           </span>
-          <span v-else>設定 既定値</span>
         </p>
 
         <p v-if="detail.baselineRunId" class="qg-muted">

@@ -12,7 +12,7 @@ import java.util.Map;
 import java.util.Objects;
 
 /**
- * M-13 ライセンス違反件数（docs/spec/02-metrics-spec.md M-13）。
+ * M-12 ライセンス違反件数（docs/spec/02-metrics-spec.md M-12）。
  *
  * <p>数えるのは<strong>パッケージ</strong>。ライセンスの分類（Trivy の分類。緩い順に
  * unencumbered / permissive / notice / reciprocal / restricted / forbidden）で判定する。
@@ -51,7 +51,7 @@ public class LicenseEvaluator implements MetricEvaluator {
 
         // パッケージ（とコンポーネント）ごとに、最も緩い分類を採る
         Map<String, List<IdentifiedFinding>> byPackage = new LinkedHashMap<>();
-        for (IdentifiedFinding finding : context.input().headFindingsOf(metricId())) {
+        for (IdentifiedFinding finding : context.input().findingsOf(metricId())) {
             String key = Objects.requireNonNullElse(finding.finding().componentName(), "") + "|"
                     + finding.finding().detail().getOrDefault("package", finding.finding().identity());
             byPackage.computeIfAbsent(key, k -> new ArrayList<>()).add(finding);

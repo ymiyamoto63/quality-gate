@@ -3,7 +3,7 @@ package com.qualitygate.platform.error;
 import org.springframework.http.HttpStatus;
 
 /**
- * API が返す機械可読なエラー識別子（docs/spec/07-api-design.md 7 章）。
+ * API が返す機械可読なエラー識別子（docs/spec/07-api-design.md）。
  *
  * <p>クライアントはこの値で分岐する。{@code title} と {@code detail} は
  * 人間向けであり、文言の改善で変わりうるため依存してはならない。
@@ -22,7 +22,6 @@ public enum ErrorCode {
     RUN_ALREADY_FINALIZED(HttpStatus.CONFLICT, "この Run は既に確定しています"),
     USER_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じ GitHub ログイン名の利用者が既に登録されています"),
     ADMIN_REQUIRED(HttpStatus.CONFLICT, "管理者が 1 人以上必要です"),
-    REPOSITORY_ALREADY_EXISTS(HttpStatus.CONFLICT, "同じリポジトリが既に登録されています"),
     RUN_NOT_EVALUABLE(HttpStatus.CONFLICT, "この Run はまだ判定できる状態ではありません"),
     ARTIFACTS_DELETED(HttpStatus.CONFLICT, "成果物が保持期間を過ぎて削除されています"),
     ARTIFACT_TOO_LARGE(HttpStatus.CONTENT_TOO_LARGE, "成果物のサイズが上限を超えています"),

@@ -2,7 +2,7 @@
 # collect.yml（手動実行）から呼ばれる。単独では起動しない。
 # 対象リポジトリには何も置かない（docs/architecture/collector-runner.md、手順は docs/operations/collector.md）。
 #
-# 計測する指標は M-01〜M-09。M-02（PIT）と M-03〜05（k6 の負荷試験）は PR 以外の計測でだけ実行する。
+# 計測する指標は M-01〜M-08。M-02（PIT）と M-03 / M-04（k6 の負荷試験）は PR 以外の計測でだけ実行する。
 #
 # 必要な設定（Settings → Secrets and variables → Actions。呼び出し側で secrets: inherit）:
 #   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
@@ -11,7 +11,7 @@
 #              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
 #
 # ジョブを 3 つに分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
-# measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh。計測プロファイルの ISOLATION）。
+# measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect-target
 
 on:
@@ -49,10 +49,6 @@ jobs:
   fetch:
     runs-on: self-hosted
     timeout-minutes: 15
-    outputs:
-      java_version: ${{ steps.profile.outputs.java_version }}
-      isolation: ${{ steps.profile.outputs.isolation }}
-      node_version: ${{ steps.node.outputs.node_version }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -68,9 +64,6 @@ jobs:
           {
             echo "owner=${QG_TARGET%%/*}"
             echo "name=${QG_TARGET#*/}"
-            echo "java_version=${JAVA_VERSION:-}"
-            echo "isolation=${ISOLATION:-container}"
-            echo "node_version_file=${NODE_VERSION_FILE:-}"
           } >> "$GITHUB_OUTPUT"
 
       # 対象リポジトリだけを読める、1 時間で失効するトークン。
@@ -96,17 +89,6 @@ jobs:
           QG_BASE: ${{ inputs.base }}
         run: ./collector/bin/fetch.sh "$QG_TARGET" "$RUNNER_TEMP/qg-collector"
 
-      - name: Node.js の版の解決
-        id: node
-        env:
-          NODE_VERSION_FILE: ${{ steps.profile.outputs.node_version_file }}
-        run: |
-          VERSION=""
-          if [ -n "$NODE_VERSION_FILE" ] && [ -f "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE" ]; then
-            VERSION=$(tr -d '[:space:]' < "$RUNNER_TEMP/qg-collector/src/$NODE_VERSION_FILE")
-          fi
-          echo "node_version=${VERSION:-22}" >> "$GITHUB_OUTPUT"
-
       - name: 受け渡し用にまとめる
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
 
@@ -131,18 +113,6 @@ jobs:
           path: ${{ runner.temp }}
       - name: 展開
         run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
-
-      # コンテナを使わない場合（ISOLATION=none）だけ、ランナーに JDK と Node.js を用意する。
-      # コンテナの中の版は collector/runner/Dockerfile で、同じ JAVA_VERSION と .nvmrc から決まる
-      - uses: actions/setup-java@v4
-        if: needs.fetch.outputs.isolation == 'none' && needs.fetch.outputs.java_version != ''
-        with:
-          distribution: temurin
-          java-version: ${{ needs.fetch.outputs.java_version }}
-      - uses: actions/setup-node@v4
-        if: needs.fetch.outputs.isolation == 'none'
-        with:
-          node-version: ${{ needs.fetch.outputs.node_version }}
 
       - name: 計測
         env:

@@ -44,7 +44,7 @@ class EslintJsonAdapterTest {
 
         assertThat(report.findings()).hasSize(4);
         RawFinding first = report.findings().getFirst();
-        assertThat(first.metricId()).isEqualTo("M-07");
+        assertThat(first.metricId()).isEqualTo("M-06");
         assertThat(first.detail()).containsEntry("complexity", 17).containsEntry("member", "loadRuns");
         assertThat(first.filePath()).isEqualTo("frontend/src/stores/runs.ts");
         assertThat(first.line()).isEqualTo(12);
@@ -82,7 +82,7 @@ class EslintJsonAdapterTest {
     }
 
     private static ParseContext context(List<String> exclusions) {
-        return new ParseContext("frontend", "head", exclusions);
+        return new ParseContext("frontend", exclusions);
     }
 
     private static InputStream stream(String text) {

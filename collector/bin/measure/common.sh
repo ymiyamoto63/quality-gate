@@ -1,20 +1,8 @@
 # shellcheck shell=bash
-# 複数の指標の計測で共用するもの（比較元の作業ツリー、サーバの起動、画面のビルド、ツールの用意、Trivy）。
+# 複数の指標の計測で共用するもの（サーバの起動、画面のビルド、ツールの用意、Trivy）。
 # measure.sh が source する（単独では実行しない）。
 
-# --- 比較元（base）の作業ツリー。M-07 の比較元の解析（backend の PMD と frontend の ESLint）で共用する ----
-prepare_base() {
-  [ -n "$BASE_SHA" ] || return 0
-  rm -rf "$WORK/base"
-  git -C "$SRC" worktree add --quiet --detach "$WORK/base" "$BASE_SHA"
-}
-
-cleanup_base() {
-  [ -d "$WORK/base" ] || return 0
-  git -C "$SRC" worktree remove --force "$WORK/base"
-}
-
-# --- サーバの起動（M-03〜05 / M-09 で共用） ----------------------------------------
+# --- サーバの起動（M-03 / M-04 / M-08 で共用） ----------------------------------------
 SERVERS=()
 stop_servers() {
   local pid
@@ -61,7 +49,7 @@ start_backend() {
   fi
 }
 
-# --- 画面のビルド（M-09）。本番と同じビルド結果を使う ---------------------
+# --- 画面のビルド（M-08）。本番と同じビルド結果を使う ---------------------
 FRONTEND_BUILD_OK=0
 build_frontend() {
   group "フロントエンドのビルド（vite build）"
@@ -91,7 +79,7 @@ prepare_tool() {
   )
 }
 
-# --- 画面の起動（M-09） ---------------------------------------------------
+# --- 画面の起動（M-08） ---------------------------------------------------
 # 対象の e2e（API のモック）は使わず、バックエンドの jar とビルドした画面を実際に起動する。
 # 検査のスクリプトとツールの版は quality-gate 側のもの（collector/a11y）
 A11Y_TOOL="$WORK/a11y"
@@ -124,7 +112,7 @@ start_app() {
   APP_URL="http://127.0.0.1:${port}"
 }
 
-# --- Trivy（M-06 / M-12 / M-13 で共用）。コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす ----
+# --- Trivy（M-05 / M-11 / M-12 で共用）。コンテナの中ではイメージに入れたバイナリ、外では版を固定した Docker イメージで動かす ----
 trivy() {
   if [ "${QG_COLLECTOR_IN_CONTAINER:-}" = 1 ]; then
     command trivy "$@"

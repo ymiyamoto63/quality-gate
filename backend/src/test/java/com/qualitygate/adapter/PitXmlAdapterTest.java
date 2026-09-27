@@ -157,7 +157,7 @@ class PitXmlAdapterTest {
     }
 
     private static ParseContext context(List<String> exclusions, Map<String, Object> metadata) {
-        return new ParseContext("backend", "head", exclusions, metadata);
+        return new ParseContext("backend", exclusions, metadata);
     }
 
     private static String mutations(String... statuses) {
