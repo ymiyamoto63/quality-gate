@@ -437,7 +437,7 @@ API 側でも同じ検証を行う（画面の制御は防御ではない）。
 | `useRunStore` | 表示中の Run 詳細 |
 | `useFindingsStore` | 表示中の Run の Finding 一覧と絞り込み条件 |
 | `useTrendStore` | 選択中の指標・期間・ブランチ、取得済み系列 |
-| `useUiStore` | テーマ、トースト（確認ダイアログはストアではなく `AppDialog.vue`） |
+| `useUiStore` | テーマ、トースト |
 
 | 方針 | 内容 |
 | --- | --- |

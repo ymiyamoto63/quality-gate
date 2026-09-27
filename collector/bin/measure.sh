@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-11）。
+# 取得した対象リポジトリで計測し、成果物を reports/ にまとめる（M-01〜M-12）。
 #
 # 使い方: measure.sh <owner/name> <作業ディレクトリ> <reports ディレクトリ>
 #   作業ディレクトリには fetch.sh の出力（src/ と meta.env）があること。
