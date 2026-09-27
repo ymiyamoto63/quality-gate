@@ -6,6 +6,7 @@ import { api, messageOf } from '@/api/client'
 import type { components } from '@/api/schema'
 import { formatDateTime, formatValue, shortSha } from '@/api/format'
 import { verdictToStatus, type DisplayStatus } from '@/api/status'
+import { categoryDetail, summarizeByCategory } from '@/api/category'
 
 type Report = components['schemas']['ReleaseReportResponse']
 type Row = Report['metrics'][number]
@@ -15,8 +16,8 @@ type HistoryItem = components['schemas']['ReleaseHistoryItem']
 /**
  * リリース判定（アプリの画面はこれ 1 つ）。
  *
- * 読み手に経営陣や開発に詳しくない人を想定し、結論（リリース可 / 不可）を最上部に大きく出してから、
- * 指標ごとの合否、各指標の説明と基準の根拠、判定の履歴の順に並べる。判定・理由・説明の文言はサーバが持つ。
+ * 読み手に経営陣や開発に詳しくない人を想定し、結論（リリース可 / 不可）と分野（6 カテゴリ）ごとの合否を
+ * 最上部に出してから、指標ごとの合否、各指標の説明と基準の根拠、判定の履歴の順に並べる。判定・理由・説明の文言はサーバが持つ。
  * 指定が無ければ最新の計測を見せる。タグ・コミットの指定は URL の ?ref= に置き、同じ判定を URL で共有できる。
  */
 const route = useRoute()
@@ -36,6 +37,7 @@ const DECISIONS: Record<Decision, { label: string; status: DisplayStatus }> = {
 }
 
 const decision = computed(() => (report.value ? DECISIONS[report.value.decision] : null))
+const categories = computed(() => summarizeByCategory(report.value?.metrics ?? []))
 const summaries = computed(
   () => new Map((report.value?.guides ?? []).map((g) => [g.metricId, g.summary])),
 )
@@ -147,6 +149,19 @@ function print(): void {
             >、{{ report.counts.failed }} 項目が不合格</template
           >
         </p>
+
+        <!-- 分野ごとの要約。12 指標を読まなくても、どの分野に問題があるかが分かる -->
+        <ul
+          v-if="report.metrics.length > 0"
+          class="qg-release__categories"
+          aria-label="分野ごとの判定"
+        >
+          <li v-for="summary in categories" :key="summary.category" :data-status="summary.status">
+            <span class="qg-release__category-name">{{ summary.category }}</span>
+            <StatusChip :status="summary.status" />
+            <span class="qg-release__category-detail">{{ categoryDetail(summary) }}</span>
+          </li>
+        </ul>
 
         <dl class="qg-release__facts">
           <div v-if="report.run && report.run.tags.length > 0">
@@ -373,6 +388,46 @@ h1 {
   font-size: 1.0625rem;
   margin: 0 0 1rem;
 }
+.qg-release__categories {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+.qg-release__categories li {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 0.15rem 0.5rem;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: var(--radius);
+  padding: 0.5rem 0.75rem;
+  break-inside: avoid;
+}
+/* 色は枠の左端だけ。文言と記号でも分かるので、色が使えない印刷でも意味は変わらない */
+.qg-release__categories li[data-status='PASS'] {
+  border-left-color: var(--status-pass);
+}
+.qg-release__categories li[data-status='FAIL'] {
+  border-left-color: var(--status-fail);
+}
+.qg-release__categories li[data-status='ERROR'] {
+  border-left-color: var(--status-error);
+}
+.qg-release__categories li[data-status='NOT_MEASURED'] {
+  border-left-color: var(--status-neutral);
+}
+.qg-release__category-name {
+  font-weight: bold;
+}
+.qg-release__category-detail {
+  grid-column: 1 / -1;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
 .qg-release__facts {
   display: flex;
   flex-wrap: wrap;
@@ -452,6 +507,9 @@ h2 {
   cursor: pointer;
 }
 @media (max-width: 767px) {
+  .qg-release__categories {
+    grid-template-columns: 1fr;
+  }
   .qg-release__guide dl {
     grid-template-columns: 1fr;
   }
