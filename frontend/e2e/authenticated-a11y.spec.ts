@@ -29,6 +29,9 @@ for (const scheme of COLOR_SCHEMES) {
     // 検査前に中身が描かれていることを確かめる。空のページは必ず「違反 0 件」になる
     await expect(page.getByRole('heading', { name: 'リリース不可' })).toBeVisible()
     await expect(page.getByText('判定の履歴')).toBeVisible()
+    await expect(
+      page.getByRole('list', { name: '分野ごとの判定' }).getByRole('listitem'),
+    ).toHaveCount(6)
 
     // 折りたたまれた中身（主な違反・技術的な定義）も開いて検査する
     for (const summary of await page.locator('details > summary').all()) await summary.click()
