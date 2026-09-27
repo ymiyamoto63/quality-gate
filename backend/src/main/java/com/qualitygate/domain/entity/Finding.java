@@ -17,8 +17,7 @@ import java.util.UUID;
  * 判定の根拠となる個別の違反。
  *
  * <p>解消された違反（{@link FindingState#RESOLVED}）も保存する。データ量は増えるが、
- * Run 詳細の表示が 1 クエリで済み、かつ Run が不変のスナップショットになる。
- * 比較対象 Run が保持期間を過ぎて削除されても表示が壊れない。
+ * Run が不変のスナップショットになり、比較対象 Run が削除されても差分の記録が壊れない。
  */
 @Entity
 @Table(name = "findings")

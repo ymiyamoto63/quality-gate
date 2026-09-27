@@ -17,24 +17,22 @@
 
 | 項目 | 必須 | 備考 |
 | --- | --- | --- |
-| `repository` | ○ | `owner/name`。初めて送られたリポジトリは登録する（既定ブランチは `defaultBranch`、無ければ `main`） |
+| `repository` | ○ | `owner/name`。`QG_REPOSITORY` と違えば `400 VALIDATION_FAILED`。初めて送られたときに登録する（既定ブランチは `defaultBranch`、無ければ `main`） |
 | `commitSha` | ○ | 40 桁の 16 進 |
 | `branch` / `triggeredBy` / `measuredAt` | ○ | 収集ランナーの `triggeredBy` は `collector` |
 | `defaultBranch` | | 計測プロファイルの `DEFAULT_BRANCH`。既存のリポジトリの既定ブランチを更新する（省略時は変えない） |
 | `baseCommitSha` | | 比較元（[指標](../../metrics.md#24-比較元と比較対象-run)） |
-| `configCommitSha` | | 合格ラインを送った quality-gate リポジトリのコミット |
-| `pullRequestNumber` / `ciRunUrl` | | |
+| `ciRunUrl` | | 計測したワークフローの実行 URL。リリース判定の「計測日時」のリンクになる |
 | `tags` | | 計測したコミットを指すタグ（`git tag --points-at`）。リリース判定でタグを解決するのに使う |
-| `skippedMetrics` | | 計測しなかった指標（`metricId`・`reason`）。省略時は全指標を計測したとみなす |
 
-同じコミットへの再送信は `attempt` を増やした新しい Run になる。応答の `detailUrl`（`QG_BASE_URL` から組み立てる Run 詳細の URL）は、収集ランナーのログに直リンクを出すため。
+同じコミットへの再送信は `attempt` を増やした新しい Run になる。応答の `detailUrl`（`QG_BASE_URL` から組み立てる、そのコミットのリリース判定の URL `/?ref=<commitSha>`）は、収集ランナーのログに直リンクを出すため。
 
 ## 3. `POST /api/v1/runs/{runId}/artifacts`
 
 | パート | 内容 |
 | --- | --- |
 | `file` | 成果物 |
-| `type` | `jacoco-xml` / `lcov` / `pit-xml` / `k6-summary` / `sarif` / `pmd-xml` / `eslint-json` / `oasdiff-json` / `axe-json` / `test-junit-xml`、合格ラインは `quality-gate-config`（[指標](../../metrics.md#1-指標の一覧)） |
+| `type` | `jacoco-xml` / `lcov` / `pit-xml` / `k6-summary` / `sarif` / `pmd-xml` / `eslint-json` / `oasdiff-json` / `axe-json` / `test-junit-xml`（[指標](../../metrics.md#1-指標の一覧)） |
 | `component` | `backend` / `frontend`（任意） |
 | `metadata` | JSON オブジェクトの文字列 |
 

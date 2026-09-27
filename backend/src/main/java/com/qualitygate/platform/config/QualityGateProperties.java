@@ -1,5 +1,6 @@
 package com.qualitygate.platform.config;
 
+import com.qualitygate.domain.model.WcagStandard;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
@@ -133,6 +134,14 @@ public record QualityGateProperties(
 
         public Gate {
             disabledMetrics = clean(disabledMetrics);
+            // 綴りを誤った指標を黙って判定し続けないよう、知らない ID は拒否する
+            for (String metricId : disabledMetrics) {
+                if (!metricId.matches("^M-(0[1-9]|1[0-2])$")) {
+                    throw new IllegalArgumentException(
+                            "QG_DISABLED_METRICS には M-01〜M-12 の指標 ID をカンマ区切りで書いてください（設定値: %s）"
+                                    .formatted(metricId));
+                }
+            }
             exclusions = clean(exclusions);
             branchCoverageMin = orDefault(branchCoverageMin, "75");
             mutationScoreMin = orDefault(mutationScoreMin, "60");
@@ -147,8 +156,15 @@ public record QualityGateProperties(
             breakingChangesMax = orDefault(breakingChangesMax, 0);
             accessibilityViolationsMax = orDefault(accessibilityViolationsMax, 0);
             if (accessibilityStandard == null || accessibilityStandard.isBlank()) {
-                accessibilityStandard = "wcag22aa";
+                accessibilityStandard = WcagStandard.DEFAULT.wire();
             }
+            // 判定の途中ではなく起動時に気づけるよう、ここで確かめる
+            if (WcagStandard.find(accessibilityStandard.strip()).isEmpty()) {
+                throw new IllegalArgumentException(
+                        "QG_ACCESSIBILITY_STANDARD は wcag2a / wcag2aa / wcag21a / wcag21aa / wcag22aa のいずれかにしてください（設定値: %s）"
+                                .formatted(accessibilityStandard));
+            }
+            accessibilityStandard = accessibilityStandard.strip();
             accessibilityPages = clean(accessibilityPages);
             testSuccessRateMin = orDefault(testSuccessRateMin, "100");
             // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない

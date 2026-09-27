@@ -17,7 +17,7 @@ import java.util.Map;
  * @param requests        全リクエスト数
  * @param failedRequests  失敗したリクエスト数
  * @param scenarios       シナリオ名 → p95（ms）
- * @param environmentName 計測環境の名前。トレンドの系列を分ける軸
+ * @param environmentName 計測環境の名前。前回値を比べる単位
  * @param environment     計測環境の内訳（runner / cpu / memory / datasetProfile など）
  */
 public record PerformanceSample(

@@ -103,9 +103,7 @@ public record GateThresholds(
                 gate.mutationScoreMin(),
                 Set.copyOf(gate.mutationComponents()),
                 gate.accessibilityViolationsMax(),
-                WcagStandard.find(gate.accessibilityStandard()).orElseThrow(() -> new IllegalArgumentException(
-                        "QG_A11Y_STANDARD は wcag21aa / wcag22aa のいずれかにしてください（設定値: %s）"
-                                .formatted(gate.accessibilityStandard()))),
+                WcagStandard.find(gate.accessibilityStandard()).orElseThrow(),
                 gate.accessibilityPages(),
                 gate.breakingChangesMax(),
                 new Performance(gate.responseTimeP95MaxMs(), gate.arrivalRateRps(), gate.errorRateMaxPct(),
