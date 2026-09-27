@@ -156,7 +156,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | Gradle | この規模では Maven で足り、Spring Boot と周辺プラグインの連携も枯れている |
 | nginx での分離配信 / 別オリジン | コンテナが増える、または CORS とクロスサイト Cookie の設計が要る。独立デプロイの必要が無い |
 | Orval + TanStack Query / openapi-generator | ライブラリが増える、生成物が大きい。必要になれば openapi-fetch の上に載せられる |
-| MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` の向こうに閉じてある |
+| MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` 1 つに閉じてある |
 | Spring WebFlux | 仮想スレッドで足りる |
 | GitHub でのログイン | 経営陣が GitHub のアカウントを持っていないと見られない。画面は見るだけでロールも要らないため、共有のアカウントで足りる |
 
@@ -195,7 +195,7 @@ quality-gate 自身は quality-gate で計測せず（DD-5）、PR の CI で次
 | ヘッダーだけ表示され本文が空のまま。dev server に `http proxy error: /api/v1/me` / `connect ETIMEDOUT 127.0.0.1:8080` | バックエンドに届いていない。起動しているか確かめる。WSL2 では Vite とバックエンドを**同じ環境**で動かす。Windows 側の IDE でバックエンドを動かすなら `.wslconfig` に `networkingMode=mirrored` を設定する |
 | 起動時に `QG_REPOSITORY に計測対象のリポジトリを…` で失敗する | `.env` に `QG_REPOSITORY=owner/name` が無い |
 | 起動時に `QG_LOGIN_PASSWORD に…` / `12 文字以上にしてください` で失敗する | `.env` の `QG_LOGIN_PASSWORD` が無いか短い |
-| 起動時に `QG_ACCESSIBILITY_STANDARD は…`・数値の変換エラーで失敗する | 合格ライン（`QG_*`）の値の形式が不正 |
+| 起動時に `QG_DISABLED_METRICS には…`・数値の変換エラーで失敗する | 合格ライン（`QG_*`）の値の形式が不正 |
 | ログインしても「ユーザー名かパスワードが違います」と出る | `QG_LOGIN_USERNAME`（既定 `quality`）/ `QG_LOGIN_PASSWORD` と違う。アプリを再起動するとセッションが消え、ログインし直しになる |
 
 疎通は Vite を動かしているのと同じ端末から `curl http://127.0.0.1:8080/actuator/health` で確かめられます。

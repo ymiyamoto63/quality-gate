@@ -69,9 +69,8 @@ FRONTEND=${FRONTEND_DIR##*/}
 
 if [ -n "${BACKEND_DIR:-}" ]; then
   upload jacoco-xml "$REPORTS/backend/jacoco.xml" "$BACKEND"
-  # 収集ランナーの PIT は常に全量（変更範囲への絞り込みはしない）
   if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && metric_enabled M-02; then
-    upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND" '{"mutationScope":"all"}'
+    upload pit-xml "$REPORTS/backend/mutations.xml" "$BACKEND"
   fi
   upload pmd-xml "$REPORTS/backend/pmd.xml" "$BACKEND"
   # M-09 / M-10 はすべてのテストの結果（test-junit-xml）

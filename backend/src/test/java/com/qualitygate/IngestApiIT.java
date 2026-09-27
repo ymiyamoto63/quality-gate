@@ -284,27 +284,6 @@ class IngestApiIT {
         assertThat(String.valueOf(response.getBody().get("detail"))).contains("environment.name");
     }
 
-    /**
-     * 実行範囲の違う値は比較できない。範囲の分からない値は前回比の比べようがないため、取り込みの時点で拒否して CI のログに残す。
-     */
-    @Test
-    void PITの成果物に実行範囲が無ければ拒否される() {
-        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), null);
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
-        assertThat(response.getBody()).containsEntry("errorCode", "MUTATION_SCOPE_MISSING");
-        assertThat(String.valueOf(response.getBody().get("detail")))
-                .contains("mutationScope").contains("all");
-    }
-
-    @Test
-    void PITの実行範囲が選択肢に無ければ拒否される() {
-        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "{\"mutationScope\":\"diff\"}");
-
-        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
-        assertThat(response.getBody()).containsEntry("errorCode", "VALIDATION_FAILED");
-    }
-
     @Test
     void metadataがJSONオブジェクトでなければ拒否される() {
         ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "[\"all\"]");
@@ -314,8 +293,8 @@ class IngestApiIT {
     }
 
     @Test
-    void 実行範囲つきのPITの成果物は受理される() {
-        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), "{\"mutationScope\":\"all\"}");
+    void PITの成果物はmetadataなしで受理される() {
+        ResponseEntity<Map<String, Object>> response = uploadPit(createRun(), null);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.ACCEPTED);
     }

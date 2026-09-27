@@ -2,7 +2,6 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
-import com.qualitygate.domain.model.WcagStandard;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
@@ -34,6 +33,15 @@ public class AccessibilityEvaluator implements MetricEvaluator {
 
     private static final String UNIT = "count";
 
+    /** 判定基準（WCAG 2.2 AA）。 */
+    static final String STANDARD = "wcag22aa";
+
+    /**
+     * 基準に含まれる axe-core のタグ。上位の基準は下位の達成基準をすべて含むため累積で持つ。
+     * axe-core には 2.2 の A レベルを表すタグが無く、2.2 で増えた A の達成基準は既存のタグで扱われる。
+     */
+    static final Set<String> STANDARD_TAGS = Set.of("wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa");
+
     @Override
     public String metricId() {
         return GateThresholds.M_ACCESSIBILITY;
@@ -42,7 +50,6 @@ public class AccessibilityEvaluator implements MetricEvaluator {
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds thresholds = context.thresholds();
-        WcagStandard standard = thresholds.accessibilityStandard();
         Coverage coverage = Coverage.of(context.input().measurementsOf(metricId()));
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
@@ -52,7 +59,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         long minor = 0;
         long outOfStandard = 0;
         for (IdentifiedFinding finding : findings) {
-            if (!standard.covers(tagsOf(finding))) {
+            if (tagsOf(finding).stream().noneMatch(STANDARD_TAGS::contains)) {
                 outOfStandard++;
                 continue;
             }
@@ -69,7 +76,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         Map<String, Object> threshold = Map.of(
                 "operator", "<=",
                 "value", thresholds.maxAccessibilityViolations(),
-                "standard", standard.wire());
+                "standard", STANDARD);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("critical", critical);
         detail.put("serious", serious);
@@ -79,18 +86,18 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         detail.put("needsReview", coverage.needsReview());
         detail.put("pages", List.copyOf(coverage.pages()));
         detail.put("failedPages", List.copyOf(coverage.failedPages()));
-        detail.put("standard", standard.wire());
+        detail.put("standard", STANDARD);
         detail.put("engines", List.copyOf(coverage.engines()));
 
         // 違反はすべて残す。基準外や軽微なものも、一覧で見られなければ直しようがない
-        String error = errorOf(coverage, thresholds.accessibilityPages(), standard);
+        String error = errorOf(coverage, thresholds.accessibilityPages());
         if (error != null) {
             return List.of(MetricResult.of(metricId(), null, MeasurementStatus.ERROR, null,
                     UNIT, threshold, error, detail, findings));
         }
 
         Judgement judgement = judge(blocking, critical, serious, moderate, outOfStandard,
-                coverage, standard, context, thresholds);
+                coverage, context, thresholds);
         return List.of(MetricResult.of(metricId(), null, judgement.status(),
                 BigDecimal.valueOf(blocking), UNIT, threshold, judgement.reason(), detail,
                 findings));
@@ -100,7 +107,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
      * 値を確定できない状態。いずれも「検査したつもりで検査していない」ことを
      * 違反 0 件の合格と見分けるためにある。空のページは必ず違反 0 件になる。
      */
-    private static String errorOf(Coverage coverage, List<String> configuredPages, WcagStandard standard) {
+    private static String errorOf(Coverage coverage, List<String> configuredPages) {
         if (!coverage.failedPages().isEmpty()) {
             return "読み込みに失敗したページがあります（%s）。そのページは検査できていません"
                     .formatted(String.join(", ", coverage.failedPages()));
@@ -119,16 +126,16 @@ public class AccessibilityEvaluator implements MetricEvaluator {
                     .formatted(missing.size(), String.join(", ", missing))
                     + "。ログイン切れなどで別のページへ移っていないか確認してください";
         }
-        String narrowed = narrowedRules(coverage, standard);
+        String narrowed = narrowedRules(coverage);
         if (narrowed != null) {
             return "検査したルールが基準 %s より狭いため、違反を見逃している可能性があります（%s）"
-                    .formatted(standard.wire(), narrowed);
+                    .formatted(STANDARD, narrowed);
         }
         return null;
     }
 
     private Judgement judge(long blocking, long critical, long serious, long moderate,
-                            long outOfStandard, Coverage coverage, WcagStandard standard,
+                            long outOfStandard, Coverage coverage,
                             EvaluationContext context, GateThresholds thresholds) {
         int pageCount = coverage.pages().size();
         if (blocking > thresholds.maxAccessibilityViolations()) {
@@ -151,7 +158,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         String noted = notes.isEmpty() ? "" : "。" + String.join("。", notes);
         return new Judgement(MeasurementStatus.PASS,
                 "重大な違反はありません（%d ページを %s で検査%s）"
-                        .formatted(pageCount, standard.wire(), noted));
+                        .formatted(pageCount, STANDARD, noted));
     }
 
     /**
@@ -160,10 +167,10 @@ public class AccessibilityEvaluator implements MetricEvaluator {
      *
      * <p>タグの絞り込みが無ければ axe は全ルールを実行するため、基準は満たしている。
      */
-    private static String narrowedRules(Coverage coverage, WcagStandard standard) {
+    private static String narrowedRules(Coverage coverage) {
         Set<String> missingTags = new TreeSet<>();
         for (List<String> filter : coverage.tagFilters()) {
-            for (String tag : standard.tags()) {
+            for (String tag : STANDARD_TAGS) {
                 if (!filter.contains(tag)) {
                     missingTags.add(tag);
                 }

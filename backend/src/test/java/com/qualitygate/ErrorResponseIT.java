@@ -50,8 +50,8 @@ class ErrorResponseIT {
     }
 
     @Test
-    void 使えない文字を含む指定は400() {
-        assertThat(mvc.get().uri("/api/v1/release?ref=v1..2").with(user(IntegrationCleanup.LOGIN_USERNAME)))
+    void 長すぎる指定は400() {
+        assertThat(mvc.get().uri("/api/v1/release?ref={ref}", "v".repeat(256)).with(user(IntegrationCleanup.LOGIN_USERNAME)))
                 .hasStatus(400)
                 .bodyJson().extractingPath("$.errorCode").isEqualTo("VALIDATION_FAILED");
     }

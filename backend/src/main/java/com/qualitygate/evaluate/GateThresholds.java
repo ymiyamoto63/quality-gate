@@ -1,6 +1,5 @@
 package com.qualitygate.evaluate;
 
-import com.qualitygate.domain.model.WcagStandard;
 import com.qualitygate.platform.config.QualityGateProperties;
 
 import java.math.BigDecimal;
@@ -17,7 +16,6 @@ import java.util.Set;
  * @param exclusions        計測除外の glob パターン
  * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
  * @param maxAccessibilityViolations M-08 の合格ライン（critical + serious の件数）
- * @param accessibilityStandard      M-08 の判定基準
  * @param accessibilityPages         M-08 で検査されているべきページ。空なら限定しない
  * @param maxBreakingChanges         M-07 の合格ライン（破壊的変更の件数）
  * @param performance                M-03 / M-04 の合格ライン
@@ -36,7 +34,6 @@ public record GateThresholds(
         BigDecimal mutationThreshold,
         Set<String> mutationComponents,
         int maxAccessibilityViolations,
-        WcagStandard accessibilityStandard,
         List<String> accessibilityPages,
         int maxBreakingChanges,
         Performance performance,
@@ -103,7 +100,6 @@ public record GateThresholds(
                 gate.mutationScoreMin(),
                 Set.copyOf(gate.mutationComponents()),
                 gate.accessibilityViolationsMax(),
-                WcagStandard.find(gate.accessibilityStandard()).orElseThrow(),
                 gate.accessibilityPages(),
                 gate.breakingChangesMax(),
                 new Performance(gate.responseTimeP95MaxMs(), gate.arrivalRateRps(), gate.errorRateMaxPct(),

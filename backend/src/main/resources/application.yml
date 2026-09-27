@@ -80,7 +80,6 @@ quality-gate:
     complexity-max: ${QG_COMPLEXITY_MAX:}                  # M-06 循環的複雑度（既定 15）
     breaking-changes-max: ${QG_BREAKING_CHANGES_MAX:}      # M-07 件（既定 0）
     accessibility-violations-max: ${QG_ACCESSIBILITY_VIOLATIONS_MAX:}  # M-08 件（既定 0）
-    accessibility-standard: ${QG_ACCESSIBILITY_STANDARD:}  # M-08 wcag21aa / wcag22aa（既定 wcag22aa）
     accessibility-pages: ${QG_ACCESSIBILITY_PAGES:}        # M-08 で検査されているべき画面（例: /,/settings）
     test-success-rate-min: ${QG_TEST_SUCCESS_RATE_MIN:}    # M-09 %（既定 100）
     test-count-min: ${QG_TEST_COUNT_MIN:}                  # M-09 件（既定 1）

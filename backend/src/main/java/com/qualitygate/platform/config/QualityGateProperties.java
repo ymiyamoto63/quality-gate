@@ -1,6 +1,5 @@
 package com.qualitygate.platform.config;
 
-import com.qualitygate.domain.model.WcagStandard;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.math.BigDecimal;
@@ -100,7 +99,6 @@ public record QualityGateProperties(
      * @param complexityMax           M-06 関数の循環的複雑度の上限。超える関数が 1 つでもあれば不合格
      * @param breakingChangesMax      M-07 OpenAPI の破壊的変更の上限（件）
      * @param accessibilityViolationsMax M-08 重大なアクセシビリティ違反の上限（件）
-     * @param accessibilityStandard   M-08 の基準（wcag21aa / wcag22aa）
      * @param accessibilityPages      M-08 で検査されているべき画面。空なら限定しない
      * @param testSuccessRateMin      M-09 テスト成功率の下限（%）
      * @param testCountMin            M-09 実行されたテストの最小件数
@@ -124,7 +122,6 @@ public record QualityGateProperties(
             Integer complexityMax,
             Integer breakingChangesMax,
             Integer accessibilityViolationsMax,
-            String accessibilityStandard,
             List<String> accessibilityPages,
             BigDecimal testSuccessRateMin,
             Integer testCountMin,
@@ -155,16 +152,6 @@ public record QualityGateProperties(
             complexityMax = orDefault(complexityMax, 15);
             breakingChangesMax = orDefault(breakingChangesMax, 0);
             accessibilityViolationsMax = orDefault(accessibilityViolationsMax, 0);
-            if (accessibilityStandard == null || accessibilityStandard.isBlank()) {
-                accessibilityStandard = WcagStandard.DEFAULT.wire();
-            }
-            // 判定の途中ではなく起動時に気づけるよう、ここで確かめる
-            if (WcagStandard.find(accessibilityStandard.strip()).isEmpty()) {
-                throw new IllegalArgumentException(
-                        "QG_ACCESSIBILITY_STANDARD は wcag2a / wcag2aa / wcag21a / wcag21aa / wcag22aa のいずれかにしてください（設定値: %s）"
-                                .formatted(accessibilityStandard));
-            }
-            accessibilityStandard = accessibilityStandard.strip();
             accessibilityPages = clean(accessibilityPages);
             testSuccessRateMin = orDefault(testSuccessRateMin, "100");
             // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
@@ -176,7 +163,7 @@ public record QualityGateProperties(
 
         public static Gate defaults() {
             return new Gate(null, null, null, null, null, null, null, null, null, null, null, null, null, null,
-                    null, null, null, null, null, null, null);
+                    null, null, null, null, null, null);
         }
 
         private static List<String> clean(List<String> values) {

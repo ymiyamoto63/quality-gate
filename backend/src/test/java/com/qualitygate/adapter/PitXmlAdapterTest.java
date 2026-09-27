@@ -22,7 +22,7 @@ class PitXmlAdapterTest {
     void 実際のPITの出力を読める() {
         // PIT 1.20 が quality-gate 自身の SourceLinks / PageCursor に対して出力したもの
         RawMeasurement measurement = parse(resource("/pit/mutations.xml"),
-                context(List.of(), Map.of("mutationScope", "changed")));
+                context(List.of(), Map.of()));
 
         assertThat(measurement.metricId()).isEqualTo("M-02");
         assertThat(measurement.componentName()).isEqualTo("backend");
@@ -104,24 +104,6 @@ class PitXmlAdapterTest {
 
         assertThat(measurement.value()).isNull();
         assertThat(measurement.detail()).containsEntry("totalMutations", 0L);
-    }
-
-    @Test
-    void 実行範囲のメタデータを計測条件として添える() {
-        RawMeasurement measurement = parse(stream(mutations("KILLED")),
-                context(List.of(), Map.of("mutationScope", "all")));
-
-        assertThat(measurement.variant()).isEqualTo("all");
-        assertThat(measurement.detail()).containsEntry("mutationScope", "all");
-    }
-
-    @Test
-    void 実行範囲が無ければ計測条件も持たない() {
-        RawMeasurement measurement = parse(stream(mutations("KILLED")),
-                context(List.of(), Map.of()));
-
-        assertThat(measurement.variant()).isNull();
-        assertThat(measurement.detail()).doesNotContainKey("mutationScope");
     }
 
     @Test

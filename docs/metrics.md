@@ -96,7 +96,6 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 
 | 指標 | `variant` | 表示名 |
 | --- | --- | --- |
-| M-02 | 実行範囲（`mutationScope`。受け付けるのは `all` だけ） | 全量 |
 | M-03 / M-04 | 計測環境の名前（`environment.name`） | 名前そのもの |
 
 ### 2.6 違反（Finding）と fingerprint
@@ -168,18 +167,14 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 対象の pom の PIT の設定は使わない。対象クラスは計測プロファイルの `MUTATION_TARGET_CLASSES` などで決める（[運用](operations.md#42-計測プロファイル)）。
 **テストが 1 件でも失敗していると PIT は動かない**ため、M-02 は ERROR になる。
 
-**取り込みの規則**: `pit-xml` はメタデータ `{"mutationScope": "all"}` が必須（無ければ `422 MUTATION_SCOPE_MISSING`、`all` 以外は `400 VALIDATION_FAILED`）。
-範囲の分からない値を後から正しい系列に振り分けられないため、判定時ではなく取り込み時に拒否する。
-
 **判定**（コンポーネントごと）
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 実行範囲の違う成果物が混在 | ERROR |
-| 2 | ミューテーションが 0 個 | PASS（値なし） |
-| 3 | 失敗（上記）が全体の 10% 超 | ERROR（値なし。生き残ったはずのものが失敗側に紛れうる） |
-| 4 | `QG_MUTATION_SCORE_MIN`（既定 60）未満 | FAIL |
-| 5 | それ以外 | PASS（`TIMED_OUT` が全体の 10% 超＝遅いランナーでスコアが過大に出ている疑い、前回から 2 ポイント以上の低下は理由に書き添える） |
+| 1 | ミューテーションが 0 個 | PASS（値なし） |
+| 2 | 失敗（上記）が全体の 10% 超 | ERROR（値なし。生き残ったはずのものが失敗側に紛れうる） |
+| 3 | `QG_MUTATION_SCORE_MIN`（既定 60）未満 | FAIL |
+| 4 | それ以外 | PASS（`TIMED_OUT` が全体の 10% 超＝遅いランナーでスコアが過大に出ている疑い、前回から 2 ポイント以上の低下は理由に書き添える） |
 
 ちょうど 10% は「超える」に含めない。
 
@@ -347,7 +342,7 @@ serious にはキーボードで操作できない・コントラスト不足な
 | `moderate` | Medium | 件数を理由に書き添える |
 | `minor` | Low | 表示のみ |
 
-- 違反したルールのタグに基準（`QG_ACCESSIBILITY_STANDARD`。既定 `wcag22aa`）のタグが 1 つも無ければ基準外（best-practice や AAA）として、件数（`outOfStandard`）と違反一覧には残すが判定に使わない。書けるのは `wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`
+- 違反したルールのタグに WCAG 2.2 AA のタグ（`wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`）が 1 つも無ければ基準外（best-practice や AAA）として、件数（`outOfStandard`）と違反一覧には残すが判定に使わない
 - axe が判断を保留した要素（`incomplete`）は違反に数えず、件数を `needsReview` に残す
 - `url` のスキームが `http` / `https` / `file` 以外（`chrome-error://` など）の結果は読み込みに失敗した画面とみなす
 

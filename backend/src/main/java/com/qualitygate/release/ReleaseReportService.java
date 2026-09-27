@@ -211,7 +211,7 @@ public class ReleaseReportService {
                 .toList();
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), definition.name(),
                 definition.category().displayName(), m.getComponentName(),
-                MetricCatalog.variantLabel(m.getMetricId(), m.getVariant()), m.getStatus(),
+                m.getVariant(), m.getStatus(),
                 m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason(),
                 shown, related.size());
     }

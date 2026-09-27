@@ -58,7 +58,6 @@ final class EvaluatorTestSupport {
                 integer(take(v, metric, "cyclomatic_complexity", "max_complexity")),
                 integer(take(v, metric, "api_contract", "breaking_changes")),
                 integer(take(v, metric, "accessibility", "max_critical")),
-                (String) take(v, metric, "accessibility", "standard"),
                 list(take(v, metric, "accessibility", "pages")),
                 decimal(take(v, metric, "test_results", "min_success_rate")),
                 integer(take(v, metric, "test_results", "min_test_count")),

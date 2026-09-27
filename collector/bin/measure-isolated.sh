@@ -13,9 +13,8 @@
 # 環境変数:
 #   QG_COLLECTOR_BASE_IMAGE  ベースのイメージ（既定: eclipse-temurin:<JAVA_VERSION>-jdk-noble）
 #   QG_COLLECTOR_MEMORY      コンテナのメモリ上限（既定: 6g）
-#   QG_COLLECTOR_CPUS        コンテナの CPU 上限（既定: 制限しない）
-#   QG_COLLECTOR_DOCKER_ARGS docker run に足す引数（空白区切り）。社内のプロキシを通す場合などに使う
-#                            （例: --env HTTPS_PROXY --env JAVA_TOOL_OPTIONS）
+#   QG_COLLECTOR_DOCKER_ARGS docker run に足す引数（空白区切り）。社内のプロキシを通す場合や CPU の上限などに使う
+#                            （例: --env HTTPS_PROXY --env JAVA_TOOL_OPTIONS --cpus 4）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -27,7 +26,7 @@ REPORTS=$(cd "$2" && pwd)
 load_profile
 command -v docker >/dev/null || die "docker がありません"
 
-# Node.js の版を完全な版（22.21.1 など）に解決する。.nvmrc には 22 や v22 や lts/* と書かれうる
+# Node.js の版を完全な版（22.21.1 など）に解決する。.nvmrc には 22 や v22.21.1 のように書かれている前提
 node_version() {
   local wanted=22 file="$WORK/src/${NODE_VERSION_FILE:-}"
   if [ -n "${NODE_VERSION_FILE:-}" ] && [ -f "$file" ]; then
@@ -35,10 +34,8 @@ node_version() {
   fi
   wanted=${wanted#v}
   curl -fsSL https://nodejs.org/dist/index.json | jq -r --arg w "$wanted" '
-    [.[] | select(
-      if $w == "lts/*" or $w == "lts" or $w == "node" then (.lts != false or $w == "node")
-      else ((.version | ltrimstr("v")) == $w or (.version | ltrimstr("v") | startswith($w + ".")))
-      end)][0].version // empty' | sed 's/^v//'
+    [.[] | select((.version | ltrimstr("v")) == $w or (.version | ltrimstr("v") | startswith($w + ".")))][0].version
+    // empty' | sed 's/^v//'
 }
 
 JAVA=${JAVA_VERSION:-21}
@@ -62,7 +59,6 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
 fi
 
 limits=(--memory "${QG_COLLECTOR_MEMORY:-6g}" --pids-limit 4096)
-[ -z "${QG_COLLECTOR_CPUS:-}" ] || limits+=(--cpus "$QG_COLLECTOR_CPUS")
 read -ra extra <<< "${QG_COLLECTOR_DOCKER_ARGS:-}"
 
 # キャッシュのボリュームは、どの UID でも書けるようにしておく（ボリュームが別の経路で作られていた場合に備える）。

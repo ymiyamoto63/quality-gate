@@ -21,8 +21,6 @@ import java.util.regex.Pattern;
 public class ReleaseRefResolver {
 
     private static final Pattern SHA = Pattern.compile("^[0-9a-fA-F]{7,40}$");
-    /** git のタグ名に使えない文字（空白・制御文字・{@code ~^:?*[\}）と {@code ..} を拒否する。 */
-    private static final Pattern INVALID_TAG = Pattern.compile("[\\s\\p{Cntrl}~^:?*\\[\\\\]|\\.\\.");
     private static final int MAX_LENGTH = 255;
 
     private final RunRepository runs;
@@ -65,10 +63,6 @@ public class ReleaseRefResolver {
         if (ref.length() > MAX_LENGTH) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "タグかコミット SHA は %d 文字以内で指定してください".formatted(MAX_LENGTH));
-        }
-        if (!SHA.matcher(ref).matches()
-                && (INVALID_TAG.matcher(ref).find() || ref.startsWith("/") || ref.endsWith("/"))) {
-            throw new ApiException(ErrorCode.VALIDATION_FAILED, "タグ名として使えない文字を含んでいます: " + ref);
         }
         return ref;
     }

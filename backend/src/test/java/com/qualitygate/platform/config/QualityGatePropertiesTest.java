@@ -47,7 +47,6 @@ class QualityGatePropertiesTest {
         assertThat(gate.errorRateMaxPct()).isEqualByComparingTo("0.1");
         assertThat(gate.complexityMax()).isEqualTo(15);
         assertThat(gate.testSuccessRateMin()).isEqualByComparingTo("100");
-        assertThat(gate.accessibilityStandard()).isEqualTo("wcag22aa");
         assertThat(GateThresholds.from(gate).enabledMetrics()).hasSize(12);
     }
 
@@ -55,7 +54,7 @@ class QualityGatePropertiesTest {
     void 無効にした指標は判定しない() {
         QualityGateProperties.Gate gate = new QualityGateProperties.Gate(List.of("M-03", " M-04 ", ""), null,
                 new BigDecimal("80"), null, null, null, null, null, null, null, null, null, null, null, null, null,
-                null, 0, null, null, null);
+                0, null, null, null);
 
         GateThresholds thresholds = GateThresholds.from(gate);
         assertThat(thresholds.enabledMetrics()).doesNotContain("M-03", "M-04").hasSize(10);
@@ -67,17 +66,9 @@ class QualityGatePropertiesTest {
     @Test
     void 知らない指標IDは起動時に拒否する() {
         assertThatThrownBy(() -> new QualityGateProperties.Gate(List.of("M3"), null, null, null, null, null, null,
-                null, null, null, null, null, null, null, null, null, null, null, null, null, null))
+                null, null, null, null, null, null, null, null, null, null, null, null, null))
                 .isInstanceOf(IllegalArgumentException.class)
                 .hasMessageContaining("QG_DISABLED_METRICS");
     }
 
-    @Test
-    void 未知のWCAGの基準は起動時に拒否する() {
-        assertThatThrownBy(() -> new QualityGateProperties.Gate(null, null, null, null, null, null, null,
-                null, null, null, null, null, null, null, "wcag30", null, null, null, null, null, null))
-                .isInstanceOf(IllegalArgumentException.class)
-                .hasMessageContaining("QG_ACCESSIBILITY_STANDARD")
-                .hasMessageContaining("wcag30");
-    }
 }

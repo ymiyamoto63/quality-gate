@@ -43,7 +43,7 @@ class ReleaseReportApiIT {
     private static final QualityGateProperties.Gate GATE = new QualityGateProperties.Gate(
             GateThresholds.ALL_METRICS.stream().filter(id -> !List.of("M-01", "M-06").contains(id)).toList(),
             List.of("**/generated/**"), new BigDecimal("80"), null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null, null);
+            null, null, null, null, null, null, null, null, null);
 
     private static final String PASSING = "1".repeat(40);
     private static final String FAILING = "2".repeat(40);
@@ -188,7 +188,7 @@ class ReleaseReportApiIT {
         // タグを付けて計測したコミットが無い
         assertThat(mvc.get().uri("/api/v1/release?ref=v9.9.9"))
                 .hasStatus(404).bodyText().contains("タグ v9.9.9 を付けたコミットの計測がありません");
-        assertThat(mvc.get().uri("/api/v1/release?ref=a b")).hasStatus(400);
+        assertThat(mvc.get().uri("/api/v1/release?ref={ref}", "v".repeat(256))).hasStatus(400);
     }
 
     @Test

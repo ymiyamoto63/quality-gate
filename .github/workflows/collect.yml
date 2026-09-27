@@ -27,12 +27,6 @@ on:
       commit:
         description: 計測するコミット（40 桁の SHA）またはタグ（空ならブランチの先頭）。リリース判定にはタグを指定する
         required: false
-      base_branch:
-        description: 比較元を決めるブランチ（空なら既定ブランチ）
-        required: false
-      base:
-        description: 比較元のコミット（40 桁の SHA）またはタグ（空なら自動。タグの計測では前のタグ）
-        required: false
 
 permissions:
   contents: read
@@ -74,8 +68,6 @@ jobs:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           QG_BRANCH: ${{ inputs.branch }}
           QG_COMMIT: ${{ inputs.commit }}
-          QG_BASE_BRANCH: ${{ inputs.base_branch }}
-          QG_BASE: ${{ inputs.base }}
         run: ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
 
       - name: 受け渡し用にまとめる

@@ -4,7 +4,6 @@ import com.qualitygate.domain.entity.ArtifactRecord;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.model.ArtifactType;
-import com.qualitygate.domain.model.MutationScope;
 import com.qualitygate.domain.report.ParseContext;
 import com.qualitygate.domain.repo.ArtifactRecordRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
@@ -27,10 +26,8 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 import java.io.InputStream;
-import java.util.Arrays;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 /** 取り込み（Run 作成・成果物受領・確定）のユースケース。 */
 @Service
@@ -198,23 +195,6 @@ public class IngestService {
 
         if (type.requiresEnvironmentMetadata()) {
             validateEnvironment(node.get("environment"));
-        }
-        if (type == ArtifactType.PIT_XML) {
-            JsonNode scope = node.get(MutationScope.METADATA_KEY);
-            String allowed = Arrays.stream(MutationScope.values()).map(MutationScope::wire)
-                    .collect(Collectors.joining(" / "));
-            if (scope == null || scope.isNull()) {
-                // 変更範囲だけの値と全量の値は比較できない。どちらか分からない値は
-                // 前回比の比べようがない（docs/metrics.md M-02）
-                throw new ApiException(ErrorCode.MUTATION_SCOPE_MISSING,
-                        "PIT の成果物には metadata の %s（%s）が必要です"
-                                .formatted(MutationScope.METADATA_KEY, allowed));
-            }
-            if (!scope.isString() || MutationScope.find(scope.asString()).isEmpty()) {
-                throw new ApiException(ErrorCode.VALIDATION_FAILED,
-                        "metadata の %s は %s のいずれかを指定してください（受信値: %s）"
-                                .formatted(MutationScope.METADATA_KEY, allowed, scope));
-            }
         }
         if (type == ArtifactType.OASDIFF_JSON) {
             JsonNode baseMissing = node.get(ParseContext.BASE_SPEC_MISSING);

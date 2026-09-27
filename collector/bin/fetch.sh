@@ -8,8 +8,6 @@
 #                 .git/config には書き込まない（後続の計測ジョブへ渡さないため）
 #   QG_BRANCH     計測するブランチ（既定: 計測プロファイルの DEFAULT_BRANCH）
 #   QG_COMMIT     計測するコミット（40 桁の SHA）またはタグ（既定: ブランチの先頭）
-#   QG_BASE_BRANCH 比較元を決めるブランチ（既定: DEFAULT_BRANCH）
-#   QG_BASE       比較元のコミット（40 桁の SHA）またはタグ。指定すると下の自動の決め方より優先する
 #   QG_REMOTE_URL clone 元の URL（既定: https://github.com/<owner/name>.git。試験用）
 #
 # 出力:
@@ -24,13 +22,11 @@ load_profile
 REPOSITORY=$QG_REPOSITORY
 
 BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
-BASE_BRANCH=${QG_BASE_BRANCH:-$DEFAULT_BRANCH}
 REMOTE=${QG_REMOTE_URL:-https://github.com/${REPOSITORY}.git}
 
 # 40 桁の SHA か、タグ名として正しい文字列だけを受け付ける（git のコマンドにそのまま渡すため）
 valid_ref() { [[ "$1" =~ ^[0-9a-f]{40}$ ]] || git check-ref-format "refs/tags/$1"; }
 [ -z "${QG_COMMIT:-}" ] || valid_ref "$QG_COMMIT" || die "コミットは 40 桁の SHA かタグ名で指定してください: $QG_COMMIT"
-[ -z "${QG_BASE:-}" ] || valid_ref "$QG_BASE" || die "比較元は 40 桁の SHA かタグ名で指定してください: $QG_BASE"
 
 # SHA ならそのコミット、それ以外はタグが指すコミット（注釈付きタグもたどる）。見つからなければ何も出さない
 resolve_commit() {
@@ -68,17 +64,11 @@ fi
 git checkout --quiet --detach "$COMMIT"
 
 # 比較元（破壊的変更・スキップの増加を数える起点）。
-#   - 指定（QG_BASE）があればそれ
 #   - タグを計測するときは、その前のタグ（リリース判定では「前回のリリースから何が増えたか」を見るため）。
 #     前のタグが無ければ直前のコミット
-#   - 既定ブランチ上の計測なら直前のコミット、それ以外は比較先のブランチとの merge-base
+#   - 既定ブランチ上の計測なら直前のコミット、それ以外（別のブランチ）は既定ブランチとの merge-base
 BASE_LABEL=""
-if [ -n "${QG_BASE:-}" ]; then
-  BASE=$(resolve_commit "$QG_BASE")
-  [ -n "$BASE" ] || die "比較元のコミットまたはタグが見つかりません: $QG_BASE"
-  [ "$BASE" != "$COMMIT" ] || die "比較元が計測するコミットと同じです: $QG_BASE"
-  BASE_LABEL=$QG_BASE
-elif [ "$BRANCH" = "$BASE_BRANCH" ]; then
+if [ "$BRANCH" = "$DEFAULT_BRANCH" ]; then
   BASE=""
   if [ -n "$TAG" ]; then
     BASE_LABEL=$(git describe --tags --abbrev=0 "${COMMIT}~1" 2>/dev/null || true)
@@ -86,7 +76,7 @@ elif [ "$BRANCH" = "$BASE_BRANCH" ]; then
   fi
   [ -n "$BASE" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 else
-  BASE=$(git merge-base "$COMMIT" "origin/${BASE_BRANCH}" || true)
+  BASE=$(git merge-base "$COMMIT" "origin/${DEFAULT_BRANCH}" || true)
   [ "$BASE" != "$COMMIT" ] || BASE=$(git rev-parse --verify --quiet "${COMMIT}~1" || true)
 fi
 

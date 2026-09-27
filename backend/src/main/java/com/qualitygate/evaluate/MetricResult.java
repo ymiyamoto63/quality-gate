@@ -13,7 +13,7 @@ import java.util.Map;
  * @param findingsToPersist 保存すべき違反。<strong>評価器が決める。</strong>
  *        M-06 のアダプタは全関数の CC 値を返すため、全件保存すると
  *        違反でない行が大量に積まれる。何が違反かは判定基準を知る側が決める。
- * @param variant 計測条件（M-02 の実行範囲など）。前回値は条件の一致するものとだけ比べる
+ * @param variant 計測条件（性能の計測環境）。前回値は条件の一致するものとだけ比べる
  */
 public record MetricResult(
         String metricId,
