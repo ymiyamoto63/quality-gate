@@ -29,7 +29,7 @@ measure_performance() {
   group "負荷試験（k6 ${K6_VERSION}、${runs} 回）"
   k6=$(k6_bin) || { fail "M-03 / M-04: k6 を取得できませんでした"; endgroup; return; }
   read -ra jvm <<< "${PERF_JAVA_OPTS:-}"
-  start_backend M-03 / M-04 "$port" "$WORK/perf-backend.log" "${PERF_START_TIMEOUT:-120}" "${jvm[@]}" \
+  start_backend "M-03 / M-04" "$port" "$WORK/perf-backend.log" "${PERF_START_TIMEOUT:-120}" "${jvm[@]}" \
     || { endgroup; return; }
 
   # 計測環境。名前はトレンドの系列を分ける軸になる（構成を変えたら名前も変える）
