@@ -20,6 +20,8 @@ const trend = computed(() => store.trend)
 const METRICS = [
   { metricId: 'M-01', name: 'ブランチカバレッジ' },
   { metricId: 'M-02', name: 'ミューテーションスコア' },
+  { metricId: 'M-03', name: '応答時間 p95' },
+  { metricId: 'M-04', name: 'エラー率' },
   { metricId: 'M-05', name: '重大・高 脆弱性件数' },
   { metricId: 'M-06', name: '循環的複雑度 15 超の関数数' },
   { metricId: 'M-07', name: '破壊的変更件数' },
