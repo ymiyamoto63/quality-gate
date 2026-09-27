@@ -7,6 +7,7 @@
 # 対象のテストコードを実行するため、このスクリプトには認証情報を渡さない。
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
 # 計測しない指標とその理由は reports/skipped-metrics.tsv に書き、submit.sh がスキップとして申告する。
+# 合格ライン（*.gate.yml）で無効（enabled: false）にした指標は計測しない（判定に使われないため。申告もしない）。
 #
 # 指標ごとの計測は collector/bin/measure/ に分けてあり、このスクリプトは準備と実行の順序だけを持つ。
 #
@@ -49,6 +50,14 @@ for metric in backend-tests mutation complexity frontend-tests accessibility \
   source "$MEASURE_DIR/$metric.sh"
 done
 
+# 何を測るかは合格ラインの enabled で決める。計測プロファイル（*.env）は「どう測るか」だけを持つ
+GATE_CONFIG="$COLLECTOR_DIR/targets/${REPOSITORY/\//__}.gate.yml"
+[ -s "$GATE_CONFIG" ] || die "合格ラインがありません: $GATE_CONFIG"
+DISABLED_METRICS=$(disabled_metrics "$GATE_CONFIG") || die "合格ラインを読めませんでした: $GATE_CONFIG"
+if [ -n "$DISABLED_METRICS" ]; then
+  log "合格ラインで無効の指標は計測しません: ${DISABLED_METRICS//$'\n'/ }"
+fi
+
 # M-08。対象アプリを起動して検査する
 measure_app() {
   local label=M-08
@@ -65,23 +74,25 @@ measure_app() {
   rm -rf "$A11Y_TOOL"
 }
 
+# テスト（M-01 / M-09 / M-10）はビルドを兼ね、M-02・M-03 / M-04・M-08 が使う成果物を作るため、常に実行する
 if [ -n "${BACKEND_DIR:-}" ]; then
   measure_backend
-  [ -z "${MUTATION_TARGET_CLASSES:-}" ] || measure_mutation
-  measure_complexity
+  if [ -n "${MUTATION_TARGET_CLASSES:-}" ] && metric_enabled mutation_score; then measure_mutation; fi
+  if metric_enabled cyclomatic_complexity; then measure_complexity; fi
 fi
 if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend
-  measure_frontend_complexity
+  if metric_enabled cyclomatic_complexity; then measure_frontend_complexity; fi
 fi
-if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ]; then
+if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ] && metric_enabled accessibility; then
   build_frontend
   measure_app
 fi
-[ -z "${PERF_SCRIPT:-}" ] || measure_performance
-[ -z "${OPENAPI_PATH:-}" ] || measure_breaking_changes
-measure_vulnerabilities
-measure_licenses
+if [ -n "${PERF_SCRIPT:-}" ] && metric_enabled performance; then measure_performance; fi
+if [ -n "${OPENAPI_PATH:-}" ] && metric_enabled api_contract; then measure_breaking_changes; fi
+# M-05 と M-11 は 1 回の走査で両方を出す
+if metric_enabled vulnerabilities || metric_enabled secrets; then measure_vulnerabilities; fi
+if metric_enabled licenses; then measure_licenses; fi
 
 log "計測結果:"
 (cd "$REPORTS" && find . -type f ! -name '*.env' ! -name '*.tsv' | sort | sed 's/^/  /') >&2

@@ -3,6 +3,9 @@
 # 収集ランナー（collector/bin/submit.sh）が Run ごとにこのファイルを送り、quality-gate はこの内容で判定する（DD-13）。
 # 変更は main にマージした後の計測から効く。画面（S-06）は表示するだけで、編集はできない。
 #
+# 指標の enabled は計測のオン・オフも兼ねる。enabled: false にした指標は、収集ランナーが計測自体を行わない
+# （collector/bin/measure.sh）。計測プロファイル（*.env）の設定はそのまま残しておけばよい。
+#
 # like-chatgpt の .quality-gate.yml との違い:
 #   - mutation_score は対象と同じ（全量・60%）。収集ランナーは PR では PIT を実行せずスキップを申告するため、
 #     skippable_metrics に mutation_score が必要
@@ -29,7 +32,7 @@ metrics:
     threshold: 60
     components: [backend]
   performance:
-    enabled: false
+    enabled: false                # 負荷試験（約 18 分）を止めている。true に戻せば PR 以外の計測で実行する
     p95_ms: 500
     arrival_rate_rps: 50          # k6 のシナリオの到達率の合計と一致させる
     error_rate_pct: 0.1

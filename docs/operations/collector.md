@@ -29,14 +29,14 @@ M-02（PIT）と M-03 / M-04（性能）は時間がかかるため、**PR の�
 | `collector/bin/measure.sh` | 計測して成果物を `reports/` にまとめる。**認証情報を受け取らない**。持つのは準備と実行の順序だけで、指標ごとの計測は `collector/bin/measure/` にある |
 | `collector/bin/measure/` | 指標ごとの計測（`backend-tests.sh` = M-01 Java / M-09 / M-10、`frontend-tests.sh` = M-01 TS / M-09 / M-10、`mutation.sh` = M-02、`performance.sh` = M-03 / M-04、`vulnerabilities.sh` = M-05 / M-11、`complexity.sh` = M-06、`breaking-changes.sh` = M-07、`accessibility.sh` = M-08、`licenses.sh` = M-12）と、複数の指標で共用するもの（`common.sh`。比較元の作業ツリー、サーバと画面の起動、ツールの用意、Trivy）。`measure.sh` が source する |
 | `collector/bin/submit.sh` | Ingest API に送る。合格ライン（`*.gate.yml`）も Run ごとに送る |
-| `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven）。対象の設定に関係なくこの版で計測する |
-| `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium） |
+| `collector/versions.env` | ツールの版（JaCoCo / PIT / PMD / oasdiff / Trivy / Maven / yq）。対象の設定に関係なくこの版で計測する |
+| `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・yq・Playwright と Chromium） |
 | `collector/pmd-ruleset.xml` | M-06 のルールセット（全メソッドの CC を出力する） |
 | `collector/pit/pom.xml` | M-02 で使う PIT 一式の取得用（ビルドはしない。クラスパスを得るだけ） |
 | `collector/a11y/` | M-08 の検査スクリプト（`scan.mjs`）と、Playwright・axe-core の版を固定した `package.json` / `package-lock.json` |
 | `collector/complexity/` | M-06（frontend）の ESLint の設定（`eslint.config.mjs`。`complexity` ルールだけを上限 0 で動かす）と、ESLint・パーサの版を固定した `package.json` / `package-lock.json` |
 | `collector/targets/<owner>__<name>.env` | 計測プロファイル（どう測るか） |
-| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（DD-13。無ければ送信しない） |
+| `collector/targets/<owner>__<name>.gate.yml` | 合格ライン。判定はこのファイルで行う（DD-13。無ければ計測・送信しない）。`enabled` は計測のオン・オフも兼ねる（[1-5](#1-5-計測する指標の切り替え)） |
 | `collector/targets/<owner>__<name>.k6.js` | M-03 / M-04 の負荷試験のシナリオ（k6） |
 
 ### 指標ごとの計測方法
@@ -125,6 +125,36 @@ quality-gate 側で登録の操作はありません。`collector/targets/` の�
 この設定は `execution.skippable_metrics` に `mutation_score` と `performance` を入れています。PR の計測では M-02 と M-03 / M-04 のスキップを申告するため、
 これが無いと申告が受け付けられず、PR の Run の M-02 / M-03 / M-04 が ERROR になります。
 
+### 1-5. 計測する指標の切り替え
+
+指標のオン・オフは、合格ライン（`*.gate.yml`）の `metrics.<指標>.enabled` **1 か所だけ**で切り替えます。
+`measure.sh` は計測の前に合格ラインを読み、`enabled: false` の指標は計測自体を行いません（判定に使われないため、スキップの申告もしません）。
+計測プロファイル（`*.env`）の設定は消したりコメントアウトしたりせず、そのまま残しておけます。戻すときは `enabled: true` にするだけです。
+
+```yaml
+metrics:
+  performance:
+    enabled: false   # 負荷試験（M-03 / M-04）を止める
+```
+
+| 合格ラインの指標 | `enabled: false` で行わない計測 |
+| --- | --- |
+| `mutation_score` | M-02（PIT） |
+| `performance` | M-03 / M-04（k6 の負荷試験） |
+| `cyclomatic_complexity` | M-06（PMD と ESLint） |
+| `api_contract` | M-07（oasdiff） |
+| `accessibility` | M-08（画面のビルドと axe-core の検査） |
+| `vulnerabilities` と `secrets` | M-05 / M-11（Trivy の脆弱性とシークレットの走査）。1 回の走査で両方を出すため、**両方を無効にしたときだけ**走査しない |
+| `licenses` | M-12（Trivy のライセンスの走査） |
+| `branch_coverage` / `test_results` | ビルドとテストは他の指標（M-02・M-03 / M-04・M-08）の成果物も作るため、**無効にしても実行する**（判定に使われないだけ） |
+
+注意:
+
+- 変更はプルリクエストで行い、main にマージした後の計測から効きます（合格ラインと同じ）
+- 計測プロファイルの `PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`A11Y_PAGES`・`OPENAPI_PATH` を空にしても計測しませんが、
+  合格ラインが有効のままだと結果が無いため ERROR になります。止めるときは合格ラインの `enabled` を使ってください
+- 合格ラインは quality-gate と同じく YAML 1.1 の読み方をします（引用符の無い `no` / `off` も false。`"false"` のような文字列は有効のまま）
+
 ## 2. 手動で実行する
 
 計測は手動実行だけです。同じコミットを何度でも計測できます（Run は試行として別に残ります）。
@@ -195,7 +225,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 | キー | 説明 |
 | --- | --- |
-| `MUTATION_TARGET_CLASSES` | ミューテーションを加えるクラス（PIT の `targetClasses`。空白区切り）。**空にすると M-02 を計測しない** |
+| `MUTATION_TARGET_CLASSES` | ミューテーションを加えるクラス（PIT の `targetClasses`。空白区切り）。**空にすると M-02 を計測しない**（止めるときは合格ラインの `enabled` を使う。[1-5](#1-5-計測する指標の切り替え)） |
 | `MUTATION_TARGET_TESTS` | 実行するテスト（空なら `MUTATION_TARGET_CLASSES` と同じ） |
 | `MUTATION_EXCLUDED_CLASSES` | 除外するクラス（起動クラスや設定クラスなど） |
 | `MUTATION_EXCLUDED_TESTS` | 除外するテスト（結合テスト `*IT` など、時間のかかるもの） |
@@ -224,7 +254,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 | キー | 説明 |
 | --- | --- |
-| `A11Y_PAGES` | 検査する画面のパス（空白区切り）。**空にすると M-08 を計測しない** |
+| `A11Y_PAGES` | 検査する画面のパス（空白区切り）。**空にすると M-08 を計測しない**（止めるときは合格ラインの `enabled` を使う。[1-5](#1-5-計測する指標の切り替え)） |
 | `A11Y_READY_SELECTOR` | 描画が済んだと判断できる要素（CSS セレクタ）。空なら通信が落ち着くまで待つだけ |
 | `A11Y_BACKEND_PORT` | バックエンドを起動するポート。対象のフロントエンドの proxy 先に合わせる。**空にするとバックエンドを起動しない**（画面だけで描ける対象） |
 | `A11Y_FRONTEND_PORT` | `vite preview` のポート（既定: 4173） |
@@ -251,7 +281,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 | 権限 | ランナーの利用者の UID で動かし、`--cap-drop ALL` と `no-new-privileges` で権限を落とす。メモリ（既定 6 GB）とプロセス数に上限を付ける |
 | 通信 | 外向きの通信はできる（Maven Central・npm から依存関係を取るため）。M-08 で起動する対象アプリのポートはコンテナの中に閉じ、ランナーのポートを使わない |
 | イメージ | `collector/runner/Dockerfile`。JDK は計測プロファイルの `JAVA_VERSION`、Node.js は対象の `.nvmrc` の版で、初回の計測でビルドする。版と Dockerfile が同じなら作り直さない |
-| Trivy / oasdiff | コンテナの中から Docker は使えないため、`versions.env` の版と同じバイナリをイメージに入れて使う |
+| Trivy / oasdiff / yq | コンテナの中から Docker は使えないため、`versions.env` の版と同じバイナリをイメージに入れて使う |
 
 設定:
 
@@ -286,7 +316,7 @@ like-chatgpt 自身の方式で繰り返しても、検出されるミューテ�
 
 | キー | 説明 |
 | --- | --- |
-| `PERF_SCRIPT` | k6 のシナリオ（`collector/targets/` からの相対）。**空にすると M-03 / M-04 を計測しない** |
+| `PERF_SCRIPT` | k6 のシナリオ（`collector/targets/` からの相対）。**空にすると M-03 / M-04 を計測しない**（止めるときは合格ラインの `enabled` を使う。[1-5](#1-5-計測する指標の切り替え)） |
 | `PERF_BACKEND_PORT` | バックエンドを起動するポート（既定: 8080） |
 | `PERF_ENVIRONMENT` | 計測環境の名前（既定: `collector`）。前回比とトレンドはこの名前ごとに分かれる。**ランナーのマシンや計測条件を変えたら名前も変える** |
 | `PERF_DATASET_PROFILE` | シードデータの名前（任意。記録用） |
@@ -360,7 +390,7 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 ## 対象を追加する
 
 1. `collector/targets/<owner>__<name>.env` を作る（like-chatgpt のものを写して書き換える）
-2. 合格ラインとして `collector/targets/<owner>__<name>.gate.yml` を作る（無いと送信の前に止まる）
+2. 合格ラインとして `collector/targets/<owner>__<name>.gate.yml` を作る（無いと計測の前に止まる）
    （性能を計測するなら `collector/targets/<owner>__<name>.k6.js` も作る。[8 章](#8-m-03--m-04性能)）
 3. 1-2 の App を対象にもインストールする。quality-gate での登録の操作と Ingest Token の追加は要らない（初めて計測が届いたときに登録される）
 
@@ -405,4 +435,5 @@ PR 以外の計測では負荷試験（約 18 分）も実行されます。k6 �
 | M-08 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と合格ライン（`*.gate.yml`）の `accessibility.pages` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
 | PR の Run の M-02 が ERROR（スキップの申告が受け付けられない） | 合格ライン（`*.gate.yml`）の `execution.skippable_metrics` に `mutation_score` が無い（1-4） |
 | 実行してもジョブが始まらない | ランナーが止まっている（[セルフホストランナーの運用](self-hosted-runner.md)） |
-| submit で `合格ラインがありません` | `collector/targets/<owner>__<name>.gate.yml` が無い（[対象を追加する](#対象を追加する)） |
+| `measure` / `submit` で `合格ラインがありません` | `collector/targets/<owner>__<name>.gate.yml` が無い（[対象を追加する](#対象を追加する)） |
+| `measure` で `合格ラインを読めませんでした` | 合格ライン（`*.gate.yml`）が YAML として読めない。yq のエラーがログに出る |
