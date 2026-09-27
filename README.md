@@ -6,9 +6,12 @@
 ## クイックスタート
 
 ```bash
+cp .env.example .env                   # QG_GITHUB_CLIENT_ID / QG_GITHUB_CLIENT_SECRET を書き入れる（空のままだと起動に失敗する）
 docker compose up -d db
-cd backend && ./mvnw spring-boot:run   # http://localhost:8080（GitHub App の設定と .env が必要）
+cd backend && ./mvnw spring-boot:run   # http://localhost:8080
 ```
+
+`.env` を置かずに起動することもできますが、その場合はログインできません。
 
 詳しい手順は [開発環境のセットアップ](docs/development/setup.md) を参照してください。
 

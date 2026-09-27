@@ -2,7 +2,7 @@
 
 | 変数 | 既定値 | 説明 |
 | --- | --- | --- |
-| `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` | ダミー値 | ログイン用 GitHub App の認証情報。未設定でも起動はするが、ログインできない |
+| `QG_GITHUB_CLIENT_ID` / `QG_GITHUB_CLIENT_SECRET` | ダミー値 | ログイン用 GitHub App の認証情報。未設定でも起動はするが、ログインできない。空の値（`QG_GITHUB_CLIENT_ID=`）を設定すると既定値より優先され、起動に失敗する（`compose.yaml` の `full` では空でもダミー値に置き換える） |
 | `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。`compose.yaml` の `db` と一致している |
 | `QG_ARTIFACT_ROOT` | `./data/artifacts` | 成果物の保存先（起動したディレクトリからの相対パス） |
 | `QG_BASE_URL` | `http://localhost:8080` | 取り込み API の応答に含める Run 詳細画面の URL の組み立てに使う |
@@ -15,7 +15,7 @@
 
 `docker compose --profile full` で動かす場合、`app` コンテナに渡るのは `compose.yaml` に列挙した変数だけです
 （`QG_BASE_URL` / `QG_SCHEDULE_ZONE` は渡らないため、使うなら `compose.yaml` に足してください。`QG_INGEST_TOKEN` と `QG_RETENTION_*` は渡ります）。
-DB 接続先と `QG_ARTIFACT_ROOT` はコンテナ用の値で上書きされます。
+DB 接続先と `QG_ARTIFACT_ROOT` はコンテナ用の値で上書きされます（成果物は名前付きボリューム `artifacts` に保存）。
 
 収集ランナーの設定（取り込み先の URL、GitHub App、Ingest Token の写し）はバックエンドではなく、quality-gate リポジトリの
 GitHub Actions の Variables / Secrets に置きます（[収集ランナーで計測する](collector.md#1-3-quality-gate-リポジトリの変数とシークレット)）。
