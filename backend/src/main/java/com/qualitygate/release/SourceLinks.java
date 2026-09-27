@@ -1,4 +1,4 @@
-package com.qualitygate.query;
+package com.qualitygate.release;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
  *
  * <p>URL 形式をサーバ側に置くのは、ホスティング先が変わったときに
  * フロントエンドとバックエンドの両方を直さずに済むようにするため
- * （docs/features/run-detail/design.md）。
+ * （docs/features/release-report/design.md）。
  */
 final class SourceLinks {
 

@@ -24,25 +24,22 @@ class FlywayMigrationIT {
     JdbcTemplate jdbcTemplate;
 
     @Test
-    void 全テーブルが作成される() {
+    void 必要なテーブルだけがある() {
         List<String> tables = jdbcTemplate.queryForList(
                 "select table_name from information_schema.tables where table_schema = 'public'",
                 String.class);
 
-        assertThat(tables).contains(
-                "users", "repositories",
-                "runs", "run_skipped_metrics", "artifacts",
-                "measurements", "findings",
-                "audit_logs",
-                "flyway_schema_history");
+        assertThat(tables).containsExactlyInAnyOrder(
+                "repositories", "runs", "artifacts", "measurements", "findings", "flyway_schema_history");
     }
 
     @Test
-    void トレンド検索用の複合インデックスがある() {
-        List<String> indexes = jdbcTemplate.queryForList(
-                "select indexname from pg_indexes where tablename = 'measurements'", String.class);
+    void 判定は合格と不合格の2値しか持たない() {
+        // 注意（WARN）や部分計測（SKIP）は V002 でやめた。制約で入らないようにする
+        List<String> checks = jdbcTemplate.queryForList(
+                "select pg_get_constraintdef(oid) from pg_constraint where conname in "
+                        + "('runs_verdict_check', 'measurements_status_check')", String.class);
 
-        // 3 年で数百万行になる。期間指定だけでは足りない。
-        assertThat(indexes).contains("ix_measurements_trend");
+        assertThat(checks).hasSize(2).noneMatch(check -> check.contains("WARN") || check.contains("SKIP"));
     }
 }

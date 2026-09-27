@@ -54,22 +54,16 @@ class LicenseEvaluatorTest {
     }
 
     @Test
-    void restrictedと分類不明は既定では警告() {
+    void restrictedと分類不明は合格のまま理由に書き添え違反として残す() {
+        // 利用形態で可否が変わるため件数では落とさないが、確かめられるよう残す
         MetricResult result = evaluate(Map.of(), List.of(
                 license("some-lib", "GPL-3.0-only", "restricted"),
                 license("odd-lib", "Custom", "unknown")));
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).contains("restricted 1 件・分類不明 1 件");
         assertThat(result.detail()).containsEntry("restricted", 1).containsEntry("unknown", 1);
         assertThat(result.findingsToPersist()).hasSize(2);
-    }
-
-    @Test
-    void restrictedの上限を設定すれば超えた分は不合格() {
-        MetricResult result = evaluate(Map.of("max_restricted", 0), List.of(
-                license("some-lib", "GPL-3.0-only", "restricted")));
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
     }
 
     @Test

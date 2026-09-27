@@ -21,8 +21,9 @@ import java.util.TreeMap;
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
  *   <li>エラー率が 5% を超える → ERROR（負荷試験そのものが成立していない）</li>
- *   <li>指標固有の値の確定条件（M-03 のシナリオ欠落など） → ERROR</li>
- *   <li>しきい値に照らして PASS / WARN / FAIL</li>
+ *   <li>実行回数が仕様の 3 回に届かない → ERROR（中央値で判定できない）</li>
+ *   <li>指標固有の値の確定条件（M-03 のシナリオ欠落・負荷条件の未達など） → ERROR</li>
+ *   <li>しきい値に照らして PASS / FAIL</li>
  * </ol>
  */
 abstract class PerformanceEvaluator implements MetricEvaluator {
@@ -30,7 +31,7 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
     /** これを超えるエラー率では、応答時間もスループットも意味を持たない。 */
     static final BigDecimal BROKEN_ERROR_RATE = BigDecimal.valueOf(5);
 
-    /** 仕様が定める実行回数。下回れば中央値の意味が弱まる。 */
+    /** 仕様が定める実行回数。下回れば中央値で判定できない。 */
     static final int EXPECTED_RUNS = 3;
 
     @Override
@@ -66,17 +67,17 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
                     "エラー率 %s%% が 5%% を超えています。負荷試験自体が成立していないため判定しません"
                             .formatted(plain(errorRate)), detail);
         }
+        if (runs.size() < EXPECTED_RUNS) {
+            return result(key, MeasurementStatus.ERROR, null, threshold,
+                    "実行回数が %d 回で、仕様の %d 回に届きません。負荷試験をやり直してください"
+                            .formatted(runs.size(), EXPECTED_RUNS), detail);
+        }
         String undeterminable = undeterminableReason(runs, limits);
         if (undeterminable != null) {
             return result(key, MeasurementStatus.ERROR, null, threshold, undeterminable, detail);
         }
 
         Judgement judgement = judge(value, runs, limits);
-        if (judgement.status() == MeasurementStatus.PASS && runs.size() < EXPECTED_RUNS) {
-            judgement = new Judgement(MeasurementStatus.WARN, judgement.reason()
-                    + "。ただし実行回数が %d 回で、仕様の %d 回に届きません"
-                    .formatted(runs.size(), EXPECTED_RUNS));
-        }
         return result(key, judgement.status(), value, threshold, judgement.reason(), detail);
     }
 

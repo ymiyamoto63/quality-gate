@@ -9,7 +9,7 @@ import org.springframework.web.servlet.HandlerMapping;
 import java.util.Map;
 
 /**
- * パスに {@code {runId}} を含む API（取り込み・Run 詳細など）の間、{@code runId} を MDC に載せる。
+ * パスに {@code {runId}} を含む API（取り込み）の間、{@code runId} を MDC に載せる。
  *
  * <p>コントローラごとに書かずに済むよう、パスの変数から拾う。
  */

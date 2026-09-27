@@ -7,7 +7,7 @@ import java.util.Optional;
  * ミューテーションテストの実行範囲（docs/metrics.md M-02）。
  *
  * <p>収集ランナーは常に全量を計測する。実行範囲は計測条件（{@code variant}）として値に添え、
- * 前回比とトレンドの系列を分ける軸にする（範囲の違う値を比べないため）。
+ * 前回比を比べる単位にする（範囲の違う値を比べないため）。
  */
 public enum MutationScope implements WireValued {
 

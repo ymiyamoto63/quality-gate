@@ -19,7 +19,7 @@ import java.util.Map;
  * <ol>
  *   <li>比較元に OpenAPI 定義が無く、変更も報告されていない → 対象外（新規 API）</li>
  *   <li>破壊的変更（oasdiff の level 3）が合格ラインを超える → FAIL</li>
- *   <li>破壊的になりうる変更（level 2）がある → WARN</li>
+ *   <li>それ以外 → PASS（破壊的になりうる変更（level 2）の件数は理由に書き添える）</li>
  * </ol>
  *
  * <p>件数は違反（変更）から数える。複数の成果物に同じ変更が載っていても、
@@ -77,15 +77,12 @@ public class BreakingChangeEvaluator implements MetricEvaluator {
                     "後方互換性を壊す変更が %d 件あります。".formatted(breaking)
                             + "意図した変更なら API のバージョンを上げてください（/v1 → /v2）");
         }
-        if (warnings > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "破壊的になりうる変更が %d 件あります。利用側への影響を確認してください"
-                            .formatted(warnings));
-        }
-        return new Judgement(MeasurementStatus.PASS, breaking == 0
+        String note = warnings == 0 ? ""
+                : "。破壊的になりうる変更が %d 件あります。利用側への影響を確認してください".formatted(warnings);
+        return new Judgement(MeasurementStatus.PASS, (breaking == 0
                 ? "後方互換性を壊す変更はありません"
                 : "後方互換性を壊す変更が %d 件ありますが、合格ライン %d 件以内です"
-                        .formatted(breaking, maximum));
+                        .formatted(breaking, maximum)) + note);
     }
 
     private static long count(List<IdentifiedFinding> findings, Severity severity) {

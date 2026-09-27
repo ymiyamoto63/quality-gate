@@ -23,8 +23,7 @@ import java.util.Optional;
  *
  * <p>判定の優先順位は次のとおり。
  * <ol>
- *   <li>件数の上限（{@code max_skipped}）を超えた → FAIL</li>
- *   <li>比較対象 Run からの増加が上限（{@code max_skipped_increase}、既定 0）を超えた → FAIL</li>
+ *   <li>比較対象 Run からの増加が上限（{@code QG_SKIPPED_TESTS_INCREASE_MAX}、既定 0）を超えた → FAIL</li>
  *   <li>それ以外 → PASS（比較対象が無ければ増加は判定せず、件数だけを記録する）</li>
  * </ol>
  *
@@ -44,9 +43,10 @@ public class SkippedTestEvaluator implements MetricEvaluator {
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds.TestResults thresholds = context.thresholds().testResults();
         Map<String, Object> threshold = new LinkedHashMap<>();
+        // 件数そのものではなく、比較元からの増加で判定する（画面は「前回から +0 件以内」と描く）
         threshold.put("operator", "<=");
-        threshold.put("value", thresholds.maxSkipped());
-        threshold.put("maxIncrease", thresholds.maxSkippedIncrease());
+        threshold.put("value", thresholds.maxSkippedIncrease());
+        threshold.put("basis", "increase");
 
         List<MetricResult> results = new ArrayList<>();
         TestSuccessEvaluator.tallyByComponent(context).forEach((component, tally) -> {
@@ -71,11 +71,6 @@ public class SkippedTestEvaluator implements MetricEvaluator {
     private static Judgement judge(TestTally tally, Optional<BigDecimal> previous,
                                    GateThresholds.TestResults thresholds) {
         long skipped = tally.skipped();
-        if (thresholds.maxSkipped() != null && skipped > thresholds.maxSkipped()) {
-            return new Judgement(MeasurementStatus.FAIL,
-                    "スキップされたテストが %d 件あり、上限 %d 件を超えています"
-                            .formatted(skipped, thresholds.maxSkipped()));
-        }
         if (previous.isEmpty()) {
             return new Judgement(MeasurementStatus.PASS,
                     "スキップされたテストは %d 件です（比較対象の Run が無いため、増加は判定していません）"

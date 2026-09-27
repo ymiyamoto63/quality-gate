@@ -1,12 +1,8 @@
 package com.qualitygate;
 
 import com.qualitygate.domain.entity.MonitoredRepository;
-import com.qualitygate.domain.entity.UserAccount;
-import com.qualitygate.domain.model.UserRole;
-import com.qualitygate.domain.model.UserStatus;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.domain.repo.UserAccountRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -38,7 +34,6 @@ class ObservabilityIT {
     int port;
 
     @Autowired org.springframework.jdbc.core.JdbcTemplate jdbc;
-    @Autowired UserAccountRepository users;
     @Autowired MonitoredRepositoryRepository repositories;
     @Autowired RunRepository runs;
 
@@ -49,9 +44,6 @@ class ObservabilityIT {
         IntegrationCleanup.deleteAll(jdbc);
         runs.deleteAll();
         repositories.deleteAll();
-        users.deleteAll();
-        UserAccount admin = users.save(new UserAccount(Uuid7.generate(), "ymiyamoto63",
-                UserRole.ADMIN, UserStatus.ACTIVE, null));
         repositories.save(new MonitoredRepository(
                 Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
         client = RestClient.builder()

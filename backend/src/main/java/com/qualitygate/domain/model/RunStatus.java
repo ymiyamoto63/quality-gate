@@ -12,8 +12,7 @@ public enum RunStatus {
     FINALIZED,
     PROCESSING,
     EVALUATED,
-    FAILED,
-    ABANDONED;
+    FAILED;
 
     /** 成果物の追加を受け付けられる状態か。 */
     public boolean acceptsArtifacts() {

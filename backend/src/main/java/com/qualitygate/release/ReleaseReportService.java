@@ -1,55 +1,52 @@
 package com.qualitygate.release;
 
+import com.qualitygate.domain.entity.Finding;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricDefinition;
 import com.qualitygate.domain.metric.MetricGuide;
-import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
-import com.qualitygate.domain.repo.ArtifactRecordRepository;
-import com.qualitygate.config.GateConfigService;
-import com.qualitygate.domain.gate.ConfigValidationException;
+import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.platform.audit.AuditAction;
-import com.qualitygate.platform.audit.AuditLogger;
-import com.qualitygate.platform.error.ApiException;
-import com.qualitygate.platform.security.Actor;
+import com.qualitygate.platform.config.QualityGateProperties;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.UUID;
+import java.util.Set;
 
 /**
- * リリース判定（UC-06）。指定したタグ・コミットで判定済みの Run から、リリースしてよいかの結論を組み立てる。
+ * リリース判定。指定したタグ・コミット（指定が無ければ最新の計測）で判定済みの Run から、
+ * リリースしてよいかの結論を組み立てる。
  *
  * <p>判定し直しはしない。Run の判定時に確定した結果（その時点の合格ライン）をそのまま使う。
  * 見るたびに結論が変わると、リリース判定の証跡にならない。
  *
- * <p>使う Run は、そのコミットの<strong>最新の完全計測</strong>。完全計測が無ければ最新の Run を使い、
- * 部分計測で不合格が無ければ「判定できない」とする（測っていない指標を合格とみなさない）。
- * 近くのコミットの Run では代用しない。別のコードの結果になるため。
+ * <p>使う Run は、そのコミットの最新の判定済みの Run。近くのコミットの Run では代用しない。別のコードの結果になるため。
  */
 @Service
 public class ReleaseReportService {
+
+    /** 不合格の指標ごとに示す違反の上限。全件は開発者が収集ランナーのレポートで見る。 */
+    static final int MAX_FINDINGS = 10;
+    /** 履歴に出す件数。 */
+    static final int HISTORY_LIMIT = 50;
 
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
@@ -57,174 +54,178 @@ public class ReleaseReportService {
     private final MonitoredRepositoryRepository repositories;
     private final RunRepository runs;
     private final MeasurementRepository measurements;
-    private final ArtifactRecordRepository artifacts;
-    private final GateConfigService gateConfigService;
+    private final FindingRepository findings;
     private final ReleaseRefResolver resolver;
-    private final AuditLogger auditLogger;
+    private final QualityGateProperties properties;
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
     public ReleaseReportService(MonitoredRepositoryRepository repositories, RunRepository runs,
-                                MeasurementRepository measurements, ArtifactRecordRepository artifacts,
-                                GateConfigService gateConfigService, ReleaseRefResolver resolver, AuditLogger auditLogger, ObjectMapper objectMapper) {
+                                MeasurementRepository measurements, FindingRepository findings,
+                                ReleaseRefResolver resolver, QualityGateProperties properties,
+                                ObjectMapper objectMapper) {
         this.repositories = repositories;
         this.runs = runs;
         this.measurements = measurements;
-        this.artifacts = artifacts;
-        this.gateConfigService = gateConfigService;
+        this.findings = findings;
         this.resolver = resolver;
-        this.auditLogger = auditLogger;
+        this.properties = properties;
         this.objectMapper = objectMapper;
     }
 
+    /** @param ref タグかコミット SHA。空なら最新の判定済みの計測 */
     @Transactional(readOnly = true)
-    public ReleaseReportResponse report(UUID repositoryId, String ref) {
-        return build(repositoryId, ref);
-    }
+    public ReleaseReportResponse report(String ref) {
+        String fullName = properties.repository();
+        Optional<MonitoredRepository> repository = findRepository();
+        boolean latest = ref == null || ref.isBlank();
 
-    /** CSV の出力用。出力したことを監査ログに残す（判定の証跡を、いつ誰が出したか）。 */
-    @Transactional
-    public ReleaseReportResponse reportForExport(UUID repositoryId, String ref, Actor actor) {
-        ReleaseReportResponse report = build(repositoryId, ref);
-        Map<String, Object> after = new LinkedHashMap<>();
-        after.put("ref", report.ref());
-        after.put("commitSha", report.commitSha());
-        after.put("decision", report.decision().name());
-        after.put("runId", report.run() == null ? null : report.run().runId().toString());
-        auditLogger.record(actor, AuditAction.RELEASE_REPORT_EXPORTED, "REPOSITORY", repositoryId, null, after);
-        return report;
-    }
+        if (repository.isEmpty()) {
+            if (!latest) {
+                // 指定の検証（空白や使えない文字）は、計測が無くても同じように返す
+                resolver.validate(ref);
+            }
+            return notMeasured(fullName, latest ? null : ref.strip(), null,
+                    "まだ 1 度も計測されていません。収集ランナーで計測してから、もう一度確認してください。");
+        }
 
-    private ReleaseReportResponse build(UUID repositoryId, String ref) {
-        MonitoredRepository repository = repositories.findById(repositoryId)
-                .orElseThrow(() -> ApiException.notFound("Repository", repositoryId));
-        ReleaseRefResolver.Resolved resolved = resolver.resolve(repository, ref);
+        List<Run> candidates;
+        String resolvedRef = null;
+        String commitSha;
+        if (latest) {
+            Optional<Run> newest = runs.findFirstByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(
+                    repository.get().getId(), RunStatus.EVALUATED);
+            if (newest.isEmpty()) {
+                return notMeasured(fullName, null, null,
+                        "判定まで終わった計測がありません。収集ランナーで計測してから、もう一度確認してください。");
+            }
+            commitSha = newest.get().getCommitSha();
+            candidates = List.of(newest.get());
+        } else {
+            ReleaseRefResolver.Resolved resolved = resolver.resolve(repository.get(), ref);
+            resolvedRef = resolved.ref();
+            commitSha = resolved.commitSha();
+            candidates = runs.findByRepositoryIdAndCommitShaOrderByMeasuredAtDescAttemptDesc(
+                    repository.get().getId(), commitSha);
+        }
 
-        List<Run> candidates = runs.findByRepositoryIdAndCommitShaOrderByMeasuredAtDescAttemptDesc(
-                repositoryId, resolved.commitSha());
-        List<Run> evaluated = candidates.stream().filter(run -> run.getStatus() == RunStatus.EVALUATED).toList();
-        Run chosen = evaluated.stream().filter(run -> run.getCompleteness() == Completeness.FULL).findFirst()
-                .orElse(evaluated.isEmpty() ? null : evaluated.getFirst());
+        Run chosen = candidates.stream().filter(run -> run.getStatus() == RunStatus.EVALUATED)
+                .findFirst().orElse(null);
+        if (chosen == null) {
+            return notMeasured(fullName, resolvedRef, commitSha, candidates.isEmpty()
+                    ? "このコミットはまだ計測されていません。収集ランナーの commit にタグかコミットを指定して計測してから、もう一度確認してください。"
+                    : "このコミットの計測（%d 件）は、どれも判定まで終わっていません（処理の失敗など）。計測し直してください。"
+                            .formatted(candidates.size()));
+        }
 
-        List<ReleaseReportResponse.ReleaseMetric> rows = chosen == null ? List.of() : rowsOf(chosen);
+        List<ReleaseReportResponse.ReleaseMetric> rows = rowsOf(chosen, fullName);
         ReleaseReportResponse.ReleaseCounts counts = countsOf(rows);
-        String commitUrl = "https://github.com/%s/commit/%s".formatted(repository.fullName(),
-                URLEncoder.encode(resolved.commitSha(), StandardCharsets.UTF_8));
-
+        ReleaseDecision decision = chosen.getVerdict() == Verdict.PASS && counts.failed() == 0
+                ? ReleaseDecision.RELEASABLE
+                : ReleaseDecision.NOT_RELEASABLE;
         return new ReleaseReportResponse(
-                repositoryId,
-                repository.fullName(),
-                resolved.ref(),
-                resolved.type(),
-                resolved.commitSha(),
-                commitUrl,
-                decisionOf(chosen, counts),
-                reasonOf(chosen, candidates.size(), counts, rows),
-                chosen == null ? null : new ReleaseReportResponse.ReleaseRun(chosen.getId(), chosen.getMeasuredAt(),
-                        chosen.getBranch(), chosen.getAttempt(), chosen.getVerdict(), chosen.getCompleteness(),
-                        chosen.getBaseCommitSha()),
-                chosen == null ? candidates.size() : candidates.size() - 1,
-                chosen == null ? null : gateConfigOf(chosen),
+                fullName,
+                resolvedRef,
+                commitSha,
+                SourceLinks.commit(fullName, commitSha),
+                decision,
+                reasonOf(decision, counts, rows),
+                new ReleaseReportResponse.ReleaseRun(chosen.getId(), chosen.getMeasuredAt(), chosen.getBranch(),
+                        chosen.getTags(), chosen.getVerdict(), chosen.getCiRunUrl(), chosen.getBaseCommitSha()),
                 counts,
                 rows,
                 guidesOf(rows));
     }
 
-    static ReleaseDecision decisionOf(Run run, ReleaseReportResponse.ReleaseCounts counts) {
-        if (run == null) {
-            return ReleaseDecision.UNDETERMINED;
+    /** 判定の履歴。同じコミットを何度か計測していれば、最後の判定だけを出す。 */
+    @Transactional(readOnly = true)
+    public ReleaseHistoryResponse history() {
+        Optional<MonitoredRepository> repository = findRepository();
+        if (repository.isEmpty()) {
+            return new ReleaseHistoryResponse(List.of());
         }
-        // 測った範囲に不合格があれば、部分計測でも結論は変わらない
-        if (run.getVerdict() == Verdict.FAIL || counts.failed() + counts.errored() > 0) {
-            return ReleaseDecision.NOT_RELEASABLE;
-        }
-        if (run.getCompleteness() != Completeness.FULL) {
-            return ReleaseDecision.UNDETERMINED;
-        }
-        return run.getVerdict() == Verdict.PASS_WITH_WARNINGS || counts.warned() > 0
-                ? ReleaseDecision.RELEASABLE_WITH_WARNINGS
-                : ReleaseDecision.RELEASABLE;
+        List<Run> evaluated = runs.findByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(
+                repository.get().getId(), RunStatus.EVALUATED, PageRequest.of(0, HISTORY_LIMIT * 4));
+        Set<String> seen = new LinkedHashSet<>();
+        List<ReleaseHistoryResponse.ReleaseHistoryItem> items = evaluated.stream()
+                .filter(run -> seen.add(run.getCommitSha()))
+                .limit(HISTORY_LIMIT)
+                .map(run -> new ReleaseHistoryResponse.ReleaseHistoryItem(run.getMeasuredAt(), run.getCommitSha(),
+                        run.getBranch(), run.getTags(), run.getVerdict(),
+                        run.getTags().isEmpty() ? run.getCommitSha() : run.getTags().getFirst()))
+                .toList();
+        return new ReleaseHistoryResponse(items);
     }
 
-    private static String reasonOf(Run run, int candidateCount, ReleaseReportResponse.ReleaseCounts counts,
+    private Optional<MonitoredRepository> findRepository() {
+        String fullName = properties.repository();
+        int slash = fullName.indexOf('/');
+        return repositories.findByOwnerAndName(fullName.substring(0, slash), fullName.substring(slash + 1));
+    }
+
+    private static ReleaseReportResponse notMeasured(String fullName, String ref, String commitSha, String reason) {
+        return new ReleaseReportResponse(fullName, ref, commitSha,
+                commitSha == null ? null : SourceLinks.commit(fullName, commitSha),
+                ReleaseDecision.NOT_MEASURED, reason, null, new ReleaseReportResponse.ReleaseCounts(0, 0, 0),
+                List.of(), List.of());
+    }
+
+    private static String reasonOf(ReleaseDecision decision, ReleaseReportResponse.ReleaseCounts counts,
                                    List<ReleaseReportResponse.ReleaseMetric> rows) {
-        if (run == null) {
-            return candidateCount == 0
-                    ? "このコミットはまだ計測されていません。収集ランナーの commit にタグかコミットを指定して計測してから、もう一度確認してください。"
-                    : "このコミットの計測（%d 件）は、どれも判定まで終わっていません（処理の失敗など）。計測し直してください。"
-                            .formatted(candidateCount);
+        if (decision == ReleaseDecision.RELEASABLE) {
+            return "判定した %d 件の指標が、すべて合格ラインを満たしています。".formatted(counts.judged());
         }
-        return switch (decisionOf(run, counts)) {
-            case NOT_RELEASABLE -> "%d 件の指標が不合格です（%s）。".formatted(
-                    counts.failed() + counts.errored(), namesOf(rows, MeasurementStatus.FAIL, MeasurementStatus.ERROR))
-                    + (run.getCompleteness() == Completeness.FULL ? "" : "部分計測のため、測っていない指標もあります。");
-            case UNDETERMINED -> "測っていない指標があるため判定できません（%s）。PR ではなく、タグかコミットを指定して計測し直してください。"
-                    .formatted(namesOf(rows, MeasurementStatus.SKIP));
-            case RELEASABLE_WITH_WARNINGS -> "不合格はありませんが、%d 件の指標が注意です（%s）。".formatted(
-                    counts.warned(), namesOf(rows, MeasurementStatus.WARN));
-            case RELEASABLE -> "合否に使う %d 件の指標がすべて合格です。".formatted(counts.judged());
-        };
-    }
-
-    /** 該当した指標の名前（重複なし）。 */
-    private static String namesOf(List<ReleaseReportResponse.ReleaseMetric> rows, MeasurementStatus... statuses) {
-        List<MeasurementStatus> targets = List.of(statuses);
         LinkedHashSet<String> names = new LinkedHashSet<>();
-        rows.stream().filter(row -> targets.contains(row.status()))
-                .forEach(row -> names.add(row.name()));
-        return names.isEmpty() ? "—" : String.join("、", names);
+        rows.stream().filter(row -> row.status() != MeasurementStatus.PASS).forEach(row -> names.add(row.name()));
+        return "%d 件の指標が合格ラインを満たしていません（%s）。".formatted(counts.failed(),
+                names.isEmpty() ? "—" : String.join("、", names));
     }
 
-    private List<ReleaseReportResponse.ReleaseMetric> rowsOf(Run run) {
-        List<Measurement> rows = new ArrayList<>(measurements.findByRunId(run.getId()));
-        rows.sort(Comparator
-                .comparing((Measurement m) -> attentionRank(m.getStatus()))
+    private List<ReleaseReportResponse.ReleaseMetric> rowsOf(Run run, String fullName) {
+        List<Measurement> judged = new ArrayList<>(measurements.findByRunId(run.getId()).stream()
+                .filter(m -> m.getStatus().affectsVerdict())
+                .toList());
+        judged.sort(Comparator
+                .comparing((Measurement m) -> m.getStatus() == MeasurementStatus.PASS ? 1 : 0)
                 .thenComparing(Measurement::getMetricId, MetricCatalog::compareByCatalogOrder)
                 .thenComparing(m -> Objects.toString(m.getComponentName(), ""))
-                .thenComparing(m -> Objects.toString(m.getVariant(), ""))
-                .thenComparing(m -> Objects.toString(m.getScenario(), "")));
-        return rows.stream().map(this::rowOf).toList();
+                .thenComparing(m -> Objects.toString(m.getVariant(), "")));
+        List<Finding> active = judged.stream().anyMatch(m -> m.getStatus() != MeasurementStatus.PASS)
+                ? findings.findActiveByRunId(run.getId())
+                : List.of();
+        return judged.stream().map(m -> rowOf(m, active, run, fullName)).toList();
     }
 
-    /** 先に見るべき順。不合格・計測エラー、注意、未計測、合格、対象外。 */
-    private static int attentionRank(MeasurementStatus status) {
-        return switch (status) {
-            case FAIL, ERROR -> 0;
-            case WARN -> 1;
-            case SKIP -> 2;
-            case PASS -> 3;
-            case NOT_APPLICABLE -> 4;
-        };
-    }
-
-    private ReleaseReportResponse.ReleaseMetric rowOf(Measurement m) {
+    private ReleaseReportResponse.ReleaseMetric rowOf(Measurement m, List<Finding> active, Run run, String fullName) {
         MetricDefinition definition = MetricCatalog.of(m.getMetricId());
+        List<Finding> related = m.getStatus() == MeasurementStatus.PASS ? List.of() : active.stream()
+                .filter(f -> f.getMetricId().equals(m.getMetricId()))
+                .filter(f -> m.getComponentName() == null || m.getComponentName().equals(f.getComponentName()))
+                .sorted(Comparator.comparing(Finding::getSeverity)
+                        .thenComparing(f -> Objects.toString(f.getFilePath(), ""))
+                        .thenComparing(f -> f.getLine() == null ? 0 : f.getLine()))
+                .toList();
+        List<ReleaseReportResponse.ReleaseFinding> shown = related.stream().limit(MAX_FINDINGS)
+                .map(f -> new ReleaseReportResponse.ReleaseFinding(f.getSeverity(), f.getTitle(), locationOf(f),
+                        SourceLinks.blob(fullName, run.getCommitSha(), f.getFilePath(), f.getLine())))
+                .toList();
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), definition.name(),
                 definition.category().displayName(), m.getComponentName(),
-                MetricCatalog.variantLabel(m.getMetricId(), m.getVariant()), m.getScenario(), m.getStatus(),
-                m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason());
+                MetricCatalog.variantLabel(m.getMetricId(), m.getVariant()), m.getStatus(),
+                m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason(),
+                shown, related.size());
+    }
+
+    private static String locationOf(Finding finding) {
+        if (finding.getFilePath() == null || finding.getFilePath().isBlank()) {
+            return null;
+        }
+        return finding.getLine() == null ? finding.getFilePath() : finding.getFilePath() + ":" + finding.getLine();
     }
 
     private static ReleaseReportResponse.ReleaseCounts countsOf(List<ReleaseReportResponse.ReleaseMetric> rows) {
-        int passed = 0;
-        int warned = 0;
-        int failed = 0;
-        int errored = 0;
-        int skipped = 0;
-        for (ReleaseReportResponse.ReleaseMetric row : rows) {
-            switch (row.status()) {
-                case PASS -> passed++;
-                case WARN -> warned++;
-                case FAIL -> failed++;
-                case ERROR -> errored++;
-                case SKIP -> skipped++;
-                case NOT_APPLICABLE -> {
-                    // 測りようがないものは数えない（部分計測の理由にもならない）
-                }
-            }
-        }
-        return new ReleaseReportResponse.ReleaseCounts(passed + warned + failed + errored, passed, warned, failed, errored,
-                skipped);
+        int passed = (int) rows.stream().filter(row -> row.status() == MeasurementStatus.PASS).count();
+        return new ReleaseReportResponse.ReleaseCounts(rows.size(), passed, rows.size() - passed);
     }
 
     private static List<ReleaseReportResponse.ReleaseGuide> guidesOf(List<ReleaseReportResponse.ReleaseMetric> rows) {
@@ -236,18 +237,6 @@ public class ReleaseReportService {
                     guide.basis().name(), guide.basis().label(), guide.rationale(), guide.risk(),
                     guide.definition(), guide.tools());
         }).toList();
-    }
-
-    /** 合格ラインは Run の成果物として残っている（保持期間の削除の対象外）。読めなければ示さない。 */
-    private ReleaseReportResponse.ReleaseGateConfig gateConfigOf(Run run) {
-        try {
-            return gateConfigService.find(artifacts.findByRunId(run.getId()))
-                    .map(config -> new ReleaseReportResponse.ReleaseGateConfig(run.getConfigCommitSha(),
-                            config.exclusions()))
-                    .orElse(null);
-        } catch (ConfigValidationException e) {
-            return null;
-        }
     }
 
     private Map<String, Object> toMap(String json) {
@@ -274,6 +263,10 @@ public class ReleaseReportService {
                 number = new BigDecimal(value.toString());
             } catch (NumberFormatException e) {
                 return null;
+            }
+            if ("increase".equals(threshold.get("basis"))) {
+                // M-10 は件数そのものではなく、比較元からの増加で判定する
+                return "前回から +%s%s 以内".formatted(plain(number), suffix(unit));
             }
             return "%s %s%s".formatted(symbol(op), plain(number), suffix(unit));
         }

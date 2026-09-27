@@ -21,10 +21,9 @@ import java.util.TreeSet;
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
  *   <li>読み込みに失敗したページがある、検査したページが無い、
- *       設定の {@code pages} に検査されていないものがある → ERROR</li>
+ *       設定の {@code pages} に検査されていないものがある、検査したルールが基準より狭い → ERROR</li>
  *   <li>基準内の critical + serious が合格ラインを超える → FAIL</li>
- *   <li>検査したルールが基準より狭い、基準内の moderate がある、
- *       重大な違反が前回より増えた → WARN</li>
+ *   <li>それ以外 → PASS（moderate の件数や前回からの増加は理由に書き添える）</li>
  * </ol>
  *
  * <p><strong>基準（WCAG の版とレベル）に含まれないルールの違反は判定に使わない。</strong>
@@ -84,7 +83,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         detail.put("engines", List.copyOf(coverage.engines()));
 
         // 違反はすべて残す。基準外や軽微なものも、一覧で見られなければ直しようがない
-        String error = errorOf(coverage, thresholds.accessibilityPages());
+        String error = errorOf(coverage, thresholds.accessibilityPages(), standard);
         if (error != null) {
             return List.of(MetricResult.of(metricId(), null, MeasurementStatus.ERROR, null,
                     UNIT, threshold, error, detail, findings));
@@ -101,7 +100,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
      * 値を確定できない状態。いずれも「検査したつもりで検査していない」ことを
      * 違反 0 件の合格と見分けるためにある。空のページは必ず違反 0 件になる。
      */
-    private static String errorOf(Coverage coverage, List<String> configuredPages) {
+    private static String errorOf(Coverage coverage, List<String> configuredPages, WcagStandard standard) {
         if (!coverage.failedPages().isEmpty()) {
             return "読み込みに失敗したページがあります（%s）。そのページは検査できていません"
                     .formatted(String.join(", ", coverage.failedPages()));
@@ -120,6 +119,11 @@ public class AccessibilityEvaluator implements MetricEvaluator {
                     .formatted(missing.size(), String.join(", ", missing))
                     + "。ログイン切れなどで別のページへ移っていないか確認してください";
         }
+        String narrowed = narrowedRules(coverage, standard);
+        if (narrowed != null) {
+            return "検査したルールが基準 %s より狭いため、違反を見逃している可能性があります（%s）"
+                    .formatted(standard.wire(), narrowed);
+        }
         return null;
     }
 
@@ -133,29 +137,21 @@ public class AccessibilityEvaluator implements MetricEvaluator {
                             .formatted(blocking, critical, serious, pageCount));
         }
 
-        String narrowed = narrowedRules(coverage, standard);
-        if (narrowed != null) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "検査したルールが基準 %s より狭いため、違反を見逃している可能性があります（%s）"
-                            .formatted(standard.wire(), narrowed));
-        }
+        List<String> notes = new ArrayList<>();
         if (moderate > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "重大な違反はありませんが、moderate の違反が %d 件あります（%d ページを検査）"
-                            .formatted(moderate, pageCount));
+            notes.add("moderate の違反 %d 件".formatted(moderate));
+        }
+        if (outOfStandard > 0) {
+            notes.add("基準外（best-practice など）の違反 %d 件は判定対象外".formatted(outOfStandard));
         }
         BigDecimal previous = context.previousValue(metricId(), null).orElse(null);
         if (previous != null && BigDecimal.valueOf(blocking).compareTo(previous) > 0) {
-            return new Judgement(MeasurementStatus.WARN,
-                    "重大な違反が前回より増えています（%s 件 → %d 件）"
-                            .formatted(previous.toPlainString(), blocking));
+            notes.add("重大な違反が前回より増えています（%s 件 → %d 件）".formatted(previous.toPlainString(), blocking));
         }
-
-        String outside = outOfStandard == 0 ? ""
-                : "。基準外（best-practice など）の違反 %d 件は判定対象外".formatted(outOfStandard);
+        String noted = notes.isEmpty() ? "" : "。" + String.join("。", notes);
         return new Judgement(MeasurementStatus.PASS,
                 "重大な違反はありません（%d ページを %s で検査%s）"
-                        .formatted(pageCount, standard.wire(), outside));
+                        .formatted(pageCount, standard.wire(), noted));
     }
 
     /**

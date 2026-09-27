@@ -51,45 +51,23 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
         }
 
         BigDecimal value = measurement.value().setScale(2, RoundingMode.HALF_UP);
-        MeasurementStatus status = statusOf(value, previous, thresholds);
-        return MetricResult.of(metricId(), measurement.componentName(), status, value,
-                "percent", threshold, reasonOf(status, value, previous, thresholds),
-                measurement.detail(), List.of());
+        String limit = thresholds.branchCoverageThreshold().stripTrailingZeros().toPlainString();
+        boolean passed = value.compareTo(thresholds.branchCoverageThreshold()) >= 0;
+        String reason = (passed ? "合格ライン %s%% を満たしています（実測 %s%%）" : "合格ライン %s%% を下回っています（実測 %s%%）")
+                .formatted(limit, value.toPlainString())
+                + dropNote(previous, value);
+        return MetricResult.of(metricId(), measurement.componentName(),
+                passed ? MeasurementStatus.PASS : MeasurementStatus.FAIL, value,
+                "percent", threshold, reason, measurement.detail(), List.of());
     }
 
-    private static MeasurementStatus statusOf(BigDecimal value, BigDecimal previous,
-                                              GateThresholds thresholds) {
-        if (value.compareTo(thresholds.branchCoverageThreshold()) < 0) {
-            return MeasurementStatus.FAIL;
+    /** 前回より 1 ポイント以上落ちていれば、合否とは別に書き添える（下降が続いていることに気づけるように）。 */
+    private static String dropNote(BigDecimal previous, BigDecimal value) {
+        if (previous == null || previous.subtract(value).compareTo(BigDecimal.ONE) < 0) {
+            return "";
         }
-        if (value.compareTo(thresholds.branchCoverageWarnBelow()) < 0) {
-            return MeasurementStatus.WARN;
-        }
-        // 合格ラインを満たしていても、前回より 1 ポイント以上落ちていれば注意を出す。
-        // 下降が続いていることに気づかないまま、しきい値を割る直前まで放置されるのを防ぐ。
-        if (previous != null && previous.subtract(value).compareTo(BigDecimal.ONE) >= 0) {
-            return MeasurementStatus.WARN;
-        }
-        return MeasurementStatus.PASS;
-    }
-
-    private static String reasonOf(MeasurementStatus status, BigDecimal value,
-                                   BigDecimal previous, GateThresholds thresholds) {
-        String threshold = thresholds.branchCoverageThreshold().toPlainString();
-        return switch (status) {
-            case FAIL -> "しきい値 %s%% を下回っています（実測 %s%%）"
-                    .formatted(threshold, value.toPlainString());
-            case WARN -> previous != null
-                    && previous.subtract(value).compareTo(BigDecimal.ONE) >= 0
-                    ? "前回より %s ポイント低下しています（%s%% → %s%%）".formatted(
-                            previous.subtract(value).setScale(2, RoundingMode.HALF_UP)
-                                    .toPlainString(),
-                            previous.toPlainString(), value.toPlainString())
-                    : "しきい値 %s%% は満たしていますが、注意水準 %s%% を下回っています"
-                            .formatted(threshold,
-                                    thresholds.branchCoverageWarnBelow().toPlainString());
-            default -> "しきい値 %s%% を満たしています（実測 %s%%）"
-                    .formatted(threshold, value.toPlainString());
-        };
+        return "。前回より %s ポイント低下しています（%s%% → %s%%）".formatted(
+                previous.subtract(value).setScale(2, RoundingMode.HALF_UP).toPlainString(),
+                previous.toPlainString(), value.toPlainString());
     }
 }

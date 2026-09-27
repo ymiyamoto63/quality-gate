@@ -54,7 +54,7 @@ class OpenApiExportIT {
         assertThat(yaml).isNotBlank();
         assertThat(yaml).contains("openapi:");
         assertThat(yaml).contains("/api/v1/runs");
-        assertThat(yaml).contains("/api/v1/dashboard");
+        assertThat(yaml).contains("/api/v1/release");
 
         Files.createDirectories(OUTPUT.getParent());
         Files.writeString(OUTPUT, yaml, StandardCharsets.UTF_8);
@@ -67,22 +67,19 @@ class OpenApiExportIT {
      * <p>springdoc はスキーマ名に Java の単純名を使うため、別の応答に同じ名前の
      * 入れ子レコード（どちらも {@code Item} など）があると、片方の定義がもう片方を
      * 上書きする。<strong>この事故は静かに起きる</strong>。仕様は生成できて、
-     * 型も生成できて、ただ中身が別の型になる。実際に
-     * {@code RunListResponse.Item} と {@code FindingListResponse.Item} で起きた。
+     * 型も生成できて、ただ中身が別の型になる。入れ子レコードには応答ごとに違う名前を付ける。
      */
     @Test
     void 一覧応答が別々の要素スキーマを指している() throws Exception {
         Map<String, Object> schemas = schemasOf(exportedSpec());
 
-        assertThat(itemRefOf(schemas, "RunListResponse", "items")).isEqualTo("RunSummary");
-        assertThat(itemRefOf(schemas, "FindingListResponse", "items")).isEqualTo("FindingItem");
-        assertThat(itemRefOf(schemas, "TrendResponse", "series")).isEqualTo("TrendSeries");
-        assertThat(itemRefOf(schemas, "TrendSeries", "points")).isEqualTo("TrendPoint");
+        assertThat(itemRefOf(schemas, "ReleaseReportResponse", "metrics")).isEqualTo("ReleaseMetric");
+        assertThat(itemRefOf(schemas, "ReleaseMetric", "findings")).isEqualTo("ReleaseFinding");
+        assertThat(itemRefOf(schemas, "ReleaseHistoryResponse", "items")).isEqualTo("ReleaseHistoryItem");
 
         // 名前だけ分かれていても中身が入れ替わっていれば同じ事故になる
-        assertThat(propertiesOf(schemas, "FindingItem")).containsKeys("severity", "sourceUrl");
-        assertThat(propertiesOf(schemas, "RunSummary")).containsKeys("commitSha", "measuredAt");
-        assertThat(propertiesOf(schemas, "TrendPoint")).containsKeys("measuredAt", "value");
+        assertThat(propertiesOf(schemas, "ReleaseFinding")).containsKeys("severity", "location");
+        assertThat(propertiesOf(schemas, "ReleaseHistoryItem")).containsKeys("commitSha", "measuredAt", "ref");
     }
 
     private String exportedSpec() throws Exception {

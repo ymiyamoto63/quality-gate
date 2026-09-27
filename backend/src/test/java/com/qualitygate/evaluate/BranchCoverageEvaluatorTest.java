@@ -40,33 +40,33 @@ class BranchCoverageEvaluatorTest {
     }
 
     @Test
-    void 注意水準を下回ると警告() {
+    void 合格ラインちょうどは合格で中間の段階は無い() {
         List<MetricResult> results = evaluator.evaluate(context(
-                input(List.of(coverage("backend", "77")), List.of(), Set.of("M-01"))));
+                input(List.of(coverage("backend", "75")), List.of(), Set.of("M-01"))));
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
     }
 
     @Test
-    void 注意ラインは設定で変えられる() {
+    void 合格ラインは環境変数で変えられる() {
         GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith("branch_coverage",
-                Map.of("threshold", 75, "warn_below", 90));
+                Map.of("threshold", 90));
         List<MetricResult> results = evaluator.evaluate(new EvaluationContext(EvaluatorTestSupport.run(),
                 thresholds, input(List.of(coverage("backend", "85")), List.of(), Set.of("M-01")),
                 Map.of(), false));
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
-        assertThat(results.getFirst().reason()).contains("注意水準 90%");
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.FAIL);
+        assertThat(results.getFirst().reason()).contains("合格ライン 90% を下回っています");
     }
 
     @Test
-    void 合格していても前回より1ポイント以上落ちれば警告() {
+    void 前回より1ポイント以上落ちれば合格のまま理由に書き添える() {
         // 下降が続いていることに気づかないまま、しきい値を割る直前まで放置されるのを防ぐ
         List<MetricResult> results = evaluator.evaluate(context(
                 input(List.of(coverage("backend", "84")), List.of(), Set.of("M-01")),
                 Map.of("M-01/backend", new BigDecimal("86.5")), true));
 
-        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(results.getFirst().reason()).contains("前回より").contains("低下");
     }
 

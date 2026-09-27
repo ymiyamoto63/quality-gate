@@ -22,10 +22,4 @@ public interface ArtifactStore {
 
     /** ファイル実体を削除する。メタデータの削除は呼び出し側の責務。 */
     void delete(String storageKey);
-
-    /**
-     * 指定時刻より前に書き込まれた保存キーを列挙する。孤児ファイル
-     * （DB に記録の無いファイル）の回収に使う（docs/features/ingest/design.md 3 章）。
-     */
-    java.util.List<String> listKeysWrittenBefore(java.time.Instant before, int limit);
 }

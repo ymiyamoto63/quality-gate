@@ -25,7 +25,8 @@ class LocalFileArtifactStoreTest {
     @BeforeEach
     void setUp() {
         store = new LocalFileArtifactStore(
-                new QualityGateProperties(tempDir, 0, 0, null, null, null));
+                new QualityGateProperties("ymiyamoto63/quality-gate", tempDir, 0, 0, null, null,
+                        new QualityGateProperties.Login(null, "test-login-password-0123"), null));
     }
 
     @Test
@@ -58,9 +59,10 @@ class LocalFileArtifactStoreTest {
     }
 
     @Test
-    void 存在しないキーの読み出しは業務例外になる() {
+    void 存在しないキーの読み出しは失敗する() {
+        // 判定の途中で起きれば、Run は処理失敗として記録される
         assertThatThrownBy(() -> store.open("run-1/missing.xml"))
-                .isInstanceOf(ApiException.class)
+                .isInstanceOf(IllegalStateException.class)
                 .hasMessageContaining("ファイル実体がありません");
     }
 

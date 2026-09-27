@@ -41,7 +41,7 @@ class MutationScoreEvaluatorTest {
                 tally(60, 0, 10, 30, 0))));
 
         assertThat(result.value()).isEqualByComparingTo("60.00");
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
     }
 
     @Test
@@ -54,31 +54,23 @@ class MutationScoreEvaluatorTest {
     }
 
     @Test
-    void 注意水準を下回ると警告() {
-        MetricResult result = single(evaluate(Set.of(), mutation("backend", "changed",
-                tally(64, 0, 36, 0, 0))));
-
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
-        assertThat(result.reason()).contains("注意水準 65%");
-    }
-
-    @Test
-    void TIMED_OUTが1割を超えると過大評価の疑いで警告() {
+    void TIMED_OUTが1割を超えると過大評価の疑いを書き添える() {
         // TIMED_OUT は検出側に数えるため、遅いランナーほどスコアが高く出る
         MetricResult result = single(evaluate(Set.of(), mutation("backend", "all",
                 tally(70, 20, 10, 0, 0))));
 
         assertThat(result.value()).isEqualByComparingTo("90.00");
-        assertThat(result.status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(result.reason()).contains("TIMED_OUT").contains("20.00%");
     }
 
     @Test
-    void TIMED_OUTがちょうど1割なら警告しない() {
+    void TIMED_OUTがちょうど1割なら書き添えない() {
         MetricResult result = single(evaluate(Set.of(), mutation("backend", "all",
                 tally(80, 10, 10, 0, 0))));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).doesNotContain("TIMED_OUT");
     }
 
     @Test
@@ -102,12 +94,12 @@ class MutationScoreEvaluatorTest {
     }
 
     @Test
-    void 前回より2ポイント以上落ちれば警告() {
+    void 前回より2ポイント以上落ちれば理由に書き添える() {
         List<MetricResult> results = evaluate(Set.of(),
                 Map.of(EvaluationContext.key("M-02", "backend", "changed"), new BigDecimal("80")),
                 mutation("backend", "changed", tally(78, 0, 22, 0, 0)));
 
-        assertThat(single(results).status()).isEqualTo(MeasurementStatus.WARN);
+        assertThat(single(results).status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(single(results).reason()).contains("前回より 2.00 ポイント低下");
     }
 
@@ -191,7 +183,7 @@ class MutationScoreEvaluatorTest {
     }
 
     @Test
-    void 対象外は部分計測の理由にも不合格の理由にもならない() {
+    void 対象外は不合格の理由にならない() {
         List<MetricResult> results = List.of(
                 MetricResult.of("M-01", "backend", MeasurementStatus.PASS, BigDecimal.TEN,
                         "percent", Map.of(), "", Map.of(), List.of()),
@@ -199,8 +191,6 @@ class MutationScoreEvaluatorTest {
 
         assertThat(RunEvaluationService.aggregate(results))
                 .isEqualTo(com.qualitygate.domain.model.Verdict.PASS);
-        assertThat(RunEvaluationService.completenessOf(results))
-                .isEqualTo(com.qualitygate.domain.model.Completeness.FULL);
     }
 
     private List<MetricResult> evaluate(Set<String> components, RawMeasurement... measurements) {

@@ -1,26 +1,24 @@
 package com.qualitygate.domain.model;
 
-/** 指標単位の判定ステータス（docs/metrics.md 2.1）。 */
+/**
+ * 指標単位の判定ステータス（docs/metrics.md 2.1）。
+ *
+ * <p>経営陣に示す合否を明確にするため、「注意」や「未計測」の中間の段階は持たない。
+ * 合格ラインを満たせば合格、満たさなければ不合格、測れなければ計測エラー（不合格として扱う）。
+ */
 public enum MeasurementStatus {
     PASS,
-    WARN,
     FAIL,
-    /** 設定で無効化、または CI が申告したスキップ。 */
-    SKIP,
-    /** 提出されるはずの成果物が未提出、または形式不正。 */
+    /** 提出されるはずの成果物が未提出、形式不正、または計測の条件を満たしていない。 */
     ERROR,
     /**
      * ツールの制約により、そのコンポーネントでは計測しようがない
-     * （M-02 の frontend など。docs/metrics.md M-02）。
-     *
-     * <p>{@link #SKIP} と分けるのは、SKIP が「今回は測らなかった」であるのに対し、
-     * こちらは「この先も測る予定がない」ためである。同じ表示にすると、
-     * 未計測の積み残しと誤読される。部分計測（PARTIAL）の理由にもならない。
+     * （M-02 の frontend など。docs/metrics.md M-02）。合否には使わない。
      */
     NOT_APPLICABLE;
 
-    /** Run 全体の集約に影響するか。SKIP・NOT_APPLICABLE は影響しない。 */
+    /** Run 全体の合否に影響するか。 */
     public boolean affectsVerdict() {
-        return this != SKIP && this != NOT_APPLICABLE;
+        return this != NOT_APPLICABLE;
     }
 }

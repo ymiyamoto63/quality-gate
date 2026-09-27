@@ -25,20 +25,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    # 計測対象（QG_REPOSITORY）・ログイン・Ingest Token・合格ライン（QG_*）は .env から渡す
+    env_file:
+      - path: .env
+        required: false
     environment:
       QG_DB_URL: jdbc:postgresql://db:5432/qualitygate
       QG_DB_USERNAME: qualitygate
       QG_DB_PASSWORD: qualitygate
       QG_ARTIFACT_ROOT: /var/lib/quality-gate/artifacts
-      # 未設定・空のときは application.yml と同じ仮の値にする（空文字を渡すとアプリが起動に失敗する。ログインはできない）
-      QG_GITHUB_CLIENT_ID: ${QG_GITHUB_CLIENT_ID:-placeholder-client-id}
-      QG_GITHUB_CLIENT_SECRET: ${QG_GITHUB_CLIENT_SECRET:-placeholder-client-secret}
-      # 収集ランナーが取り込み API に送るトークン（収集ランナーの Secrets の QG_INGEST_TOKEN と同じ値）
-      QG_INGEST_TOKEN: ${QG_INGEST_TOKEN:-}
-      # データ保持期間（日）。未設定（0）ならアプリの既定値（Run 730 / 成果物 90 / 監査ログ 730）
-      QG_RETENTION_RUN_DAYS: ${QG_RETENTION_RUN_DAYS:-0}
-      QG_RETENTION_ARTIFACT_DAYS: ${QG_RETENTION_ARTIFACT_DAYS:-0}
-      QG_RETENTION_AUDIT_LOG_DAYS: ${QG_RETENTION_AUDIT_LOG_DAYS:-0}
       # コンテナで動かすときは JSON 構造化ログにする（ログ基盤で requestId / runId を検索できるように）
       QG_LOG_FORMAT: ${QG_LOG_FORMAT:-ecs}
     ports:

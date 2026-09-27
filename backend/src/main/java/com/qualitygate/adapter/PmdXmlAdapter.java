@@ -21,7 +21,7 @@ import java.util.regex.Pattern;
  * PMD XML から M-06（循環的複雑度）を読む。
  *
  * <p>ルールセットは {@code reportLevel: 1} で動かす。しきい値超過の検出ではなく
- * <strong>全メソッドの CC 値</strong>を得るためであり、判定（15 超か、注意水準か）は quality-gate 側で行う。
+ * <strong>全メソッドの CC 値</strong>を得るためであり、判定（15 超か）は quality-gate 側で行う。
  *
  * <p>ここでは「CC 値を持つ関数の一覧」を返すだけで、判定は evaluate の責務である。
  */

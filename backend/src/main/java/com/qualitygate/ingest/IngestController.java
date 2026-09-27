@@ -53,7 +53,7 @@ public class IngestController {
     public ResponseEntity<CreateRunResponse> createRun(@Valid @RequestBody CreateRunRequest request) {
         Run run = ingestService.createRun(request);
         CreateRunResponse body = new CreateRunResponse(
-                run.getId(), run.getAttempt(), run.getStatus(), ingestService.detailUrl(run.getId()));
+                run.getId(), run.getAttempt(), run.getStatus(), ingestService.detailUrl(run));
         return ResponseEntity.created(URI.create("/api/v1/runs/" + run.getId())).body(body);
     }
 
@@ -83,13 +83,13 @@ public class IngestController {
     @PostMapping("/{runId}/finalize")
     @Operation(summary = "取り込み完了を宣言し、判定する",
             description = "その場で判定し、判定結果を返す。判定に失敗した場合も 200 で、status が FAILED になる"
-                    + "（理由は Run 詳細に表示される）。")
+                    + "（理由は errorCode とサーバのログで確かめる）。")
     public FinalizeResponse finalizeRun(@PathVariable UUID runId) {
         // 確定（トランザクション）を先に終えてから判定する。判定に失敗しても確定は取り消さない
         ingestService.finalizeRun(runId);
         Run run = pipeline.evaluate(runId);
-        return new FinalizeResponse(run.getId(), run.getStatus(), run.getVerdict(), run.getCompleteness(),
-                run.getErrorCode(), ingestService.detailUrl(run.getId()));
+        return new FinalizeResponse(run.getId(), run.getStatus(), run.getVerdict(),
+                run.getErrorCode(), ingestService.detailUrl(run));
     }
 
     private static ArtifactType parseType(String type) {

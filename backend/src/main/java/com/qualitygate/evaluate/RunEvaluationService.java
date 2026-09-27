@@ -3,8 +3,6 @@ package com.qualitygate.evaluate;
 import com.qualitygate.domain.entity.Finding;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.Run;
-import com.qualitygate.domain.entity.RunSkippedMetric;
-import com.qualitygate.domain.model.Completeness;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
@@ -14,7 +12,6 @@ import com.qualitygate.domain.report.NormalizedInput;
 import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import com.qualitygate.domain.repo.RunRepository;
-import com.qualitygate.domain.repo.RunSkippedMetricRepository;
 import com.qualitygate.platform.id.Uuid7;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,18 +46,15 @@ public class RunEvaluationService {
     private static final Logger log = LoggerFactory.getLogger(RunEvaluationService.class);
 
     private final RunRepository runs;
-    private final RunSkippedMetricRepository skippedMetrics;
     private final MeasurementRepository measurements;
     private final FindingRepository findings;
     private final List<MetricEvaluator> evaluators;
     private final ObjectMapper objectMapper;
 
-    @SuppressWarnings("java:S107")
-    public RunEvaluationService(RunRepository runs, RunSkippedMetricRepository skippedMetrics,
+    public RunEvaluationService(RunRepository runs,
                                 MeasurementRepository measurements, FindingRepository findings,
                                 List<MetricEvaluator> evaluators, ObjectMapper objectMapper) {
         this.runs = runs;
-        this.skippedMetrics = skippedMetrics;
         this.measurements = measurements;
         this.findings = findings;
         this.evaluators = evaluators;
@@ -83,7 +77,7 @@ public class RunEvaluationService {
                 input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
         List<MetricResult> results = evaluateAll(context);
 
-        // 再評価でも重複しないよう、この Run の既存の判定結果を置き換える
+        // 同じ Run を判定し直しても重複しないよう、この Run の既存の判定結果を置き換える
         measurements.deleteByRunId(runId);
         findings.deleteByRunId(runId);
         measurements.flush();
@@ -93,11 +87,9 @@ public class RunEvaluationService {
         persistFindings(run, results, baseline);
 
         Verdict verdict = aggregate(results);
-        Completeness completeness = completenessOf(results);
-        run.markEvaluated(verdict, completeness, Instant.now());
+        run.markEvaluated(verdict, Instant.now());
 
-        log.info("判定が完了しました runId={} verdict={} completeness={} 指標={}件",
-                runId, verdict, completeness, results.size());
+        log.info("判定が完了しました runId={} verdict={} 指標={}件", runId, verdict, results.size());
         return run;
     }
 
@@ -105,39 +97,16 @@ public class RunEvaluationService {
         Map<String, MetricEvaluator> byMetric = new HashMap<>();
         evaluators.forEach(e -> byMetric.put(e.metricId(), e));
 
-        // 受理の可否はここで確定する。取り込み時点では設定が未解決だった。
-        Map<String, RunSkippedMetric> declared = new HashMap<>();
-        for (RunSkippedMetric skip : skippedMetrics.findByKeyRunId(context.run().getId())) {
-            skip.decideAcceptance(
-                    context.thresholds().skippableMetrics().contains(skip.getMetricId()));
-            declared.put(skip.getMetricId(), skip);
-        }
-
         List<MetricResult> results = new ArrayList<>();
         for (String metricId : context.thresholds().enabledMetrics().stream().sorted().toList()) {
-            results.addAll(evaluateMetric(metricId, byMetric.get(metricId), declared, context));
+            results.addAll(evaluateMetric(metricId, byMetric.get(metricId), context));
         }
         return results;
     }
 
-    /**
-     * 指標 1 件の判定。優先順位は docs/features/evaluation/design.md 5 章に従う。
-     *
-     * <p>スキップ申告が {@code accepted=false} の場合は SKIP ではなく ERROR とする。
-     * CI が自由にスキップを主張できると fail-closed が骨抜きになるためである。
-     */
+    /** 指標 1 件の判定。優先順位は docs/features/evaluation/design.md 5 章に従う。 */
     private List<MetricResult> evaluateMetric(String metricId, MetricEvaluator evaluator,
-                                              Map<String, RunSkippedMetric> declared,
                                               EvaluationContext context) {
-        RunSkippedMetric skip = declared.get(metricId);
-        if (skip != null) {
-            return List.of(skip.isAccepted()
-                    ? MetricResult.skipped(metricId, skip.getReason())
-                    : MetricResult.error(metricId,
-                            "スキップが申告されましたが、この指標はスキップを許容していません: "
-                                    + skip.getReason()));
-        }
-
         String parseError = context.input().parseErrors().get(metricId);
         if (parseError != null) {
             return List.of(MetricResult.error(metricId, "成果物を解釈できませんでした: " + parseError));
@@ -147,8 +116,8 @@ public class RunEvaluationService {
             // 申告のない未提出は不合格として扱う（fail-closed）。
             // 計測できていないものを合格扱いにすると、計測の破綻に気づけない。
             return List.of(MetricResult.error(metricId,
-                    "成果物が提出されていません。CI（または収集ランナー）から送信されているか確認してください"
-                            + "（意図的に計測しない場合は skippedMetrics で申告してください）"));
+                    "成果物が提出されていません。収集ランナーから送信されているか確認してください"
+                            + "（意図的に計測しない場合は QG_DISABLED_METRICS で判定から外してください）"));
         }
 
         if (evaluator == null) {
@@ -245,29 +214,11 @@ public class RunEvaluationService {
                 finding.componentName(), toJson(finding.detail()));
     }
 
-    /**
-     * FAIL・ERROR があれば不合格。SKIP・NOT_APPLICABLE は集約に影響しない。
-     */
+    /** FAIL・ERROR があれば不合格。NOT_APPLICABLE は集約に影響しない。 */
     static Verdict aggregate(List<MetricResult> results) {
         boolean failed = results.stream().anyMatch(r ->
                 r.status() == MeasurementStatus.FAIL || r.status() == MeasurementStatus.ERROR);
-        if (failed) {
-            return Verdict.FAIL;
-        }
-        return results.stream().anyMatch(r -> r.status() == MeasurementStatus.WARN)
-                ? Verdict.PASS_WITH_WARNINGS
-                : Verdict.PASS;
-    }
-
-    /**
-     * SKIP を 1 つでも含めば部分計測とする。
-     *
-     * <p>NOT_APPLICABLE は含めない。ツールの制約で測りようのないものを部分計測に
-     * 数えると、どの Run も永遠に完全計測にならず、部分計測の警告が意味を失う。
-     */
-    static Completeness completenessOf(List<MetricResult> results) {
-        boolean partial = results.stream().anyMatch(r -> r.status() == MeasurementStatus.SKIP);
-        return partial ? Completeness.PARTIAL : Completeness.FULL;
+        return failed ? Verdict.FAIL : Verdict.PASS;
     }
 
     /**
@@ -278,8 +229,6 @@ public class RunEvaluationService {
      * 例えばリリースのタグ v1.1.0 を計測するとき、比較元は前のタグ v1.0.0 で、
      * 「同じブランチで直前に計測した Run」は v1.1.0 より新しいコミットのこともある。
      *
-     * <p>再評価では前回決めた比較対象を使い続ける。後から計測された Run を比較対象に
-     * すると、過去の Run の「新規 / 解消」が未来の Run との比較に変わってしまう。
      */
     private Optional<Run> findBaseline(Run run) {
         if (run.getBaselineRunId() != null) {
