@@ -31,7 +31,22 @@ GATE_CONFIG="${COLLECTOR_DIR}/targets/${QG_REPOSITORY/\//__}.gate.yml"
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
-# curl の --retry は、一時的な障害（5xx など）を再試行する
+
+# api <説明> <curl の引数...>。応答の本文を標準出力に返す。
+# 失敗したら応答の本文（エラーの理由）を出して止める。5xx の詳細はサーバのログ（「想定外のエラー」）にある
+# 本文はファイルに受ける（再試行のたびに書き直されるため、最後の応答だけが残る）
+api() {
+  local what=$1 body
+  shift
+  body=$(mktemp)
+  if ! curl -sS --fail-with-body -o "$body" "${AUTH[@]}" "$@"; then
+    [ ! -s "$body" ] || { cat "$body"; echo; } >&2
+    rm -f "$body"
+    die "${what}に失敗しました"
+  fi
+  cat "$body"
+  rm -f "$body"
+}
 
 # スキップの申告: 計測プロファイルの SKIP_METRICS と、measure.sh が書いた skipped-metrics.tsv（指標 ID<TAB>理由）
 skipped_json() {
@@ -74,8 +89,8 @@ REQUEST=$(jq -n \
    + (if $pr != "" then {pullRequestNumber: ($pr | tonumber)} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
-RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
-  -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
+# --retry は、一時的な障害（5xx など）を再試行する
+RUN_ID=$(api "Run の作成" --retry 3 -X POST "$API" -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
 echo "Run を作成しました: $RUN_ID"
 
 # upload <type> <file> [component] [metadata]
@@ -90,7 +105,7 @@ upload() {
   [ -n "$metadata" ] && args+=(-F "metadata=${metadata}")
   local query="type=${type}"
   [ -n "$component" ] && query="${query}&component=${component}"
-  curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
+  api "成果物の送信（type=$type ${file##*/}）" --retry 3 -X POST "${API}/${RUN_ID}/artifacts?${query}" "${args[@]}" >/dev/null
   echo "送信しました: type=$type ${component:+component=$component }${file#"$REPORTS"/}"
 }
 
@@ -144,7 +159,7 @@ if [ -n "${PERF_SCRIPT:-}" ] && ! skipped M-03; then
 fi
 
 # 確定するとその場で判定される。判定に時間がかかる Run があるため、再試行はしない（二重に確定すると 409 になる）
-RESULT=$(curl -sS --fail-with-body --max-time 600 -X POST "${API}/${RUN_ID}/finalize" "${AUTH[@]}")
+RESULT=$(api "確定（finalize）" --max-time 600 -X POST "${API}/${RUN_ID}/finalize")
 echo "$RESULT" | jq .
 STATUS=$(echo "$RESULT" | jq -r '.status')
 echo "判定: $(echo "$RESULT" | jq -r '.verdict // "—"')（$(echo "$RESULT" | jq -r '.detailUrl')）"
