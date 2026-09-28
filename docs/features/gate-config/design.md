@@ -6,7 +6,8 @@
 
 - `application.yml` の `quality-gate.gate.*` に環境変数を対応づけ、`QualityGateProperties.Gate` に読む。既定値は `Gate` の中だけに持つ（空の環境変数は未設定として既定値にする）
 - 判定のたびに `GateThresholds.from(gate)` で判定用の値に直す。判定する指標は 12 の指標から `QG_DISABLED_METRICS` を除いたもの
-- 起動時に検証する: 指標 ID（`M-01`〜`M-12`）、WCAG の基準（`wcag2a` / `wcag2aa` / `wcag21a` / `wcag21aa` / `wcag22aa`）、数値の形式。誤りがあれば起動に失敗する
+- 起動時に検証する: `QG_DISABLED_METRICS` の指標 ID（`M-01`〜`M-12`）と数値の形式。誤りがあれば起動に失敗する
+- M-08 の基準は WCAG 2.2 AA に固定で、環境変数では変えない
 - `QG_TEST_COUNT_MIN` は 0 を書かれても 1 とする（0 件の合格は「検証していない」の言い換えにすぎない）
 
 ## 2. 判定に使った合格ラインを残す

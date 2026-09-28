@@ -6,7 +6,7 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 - 計測（ツールの実行）は収集ランナーが行い、quality-gate は送られた成果物を読んで判定する（[アーキテクチャ](architecture.md#3-測定の仕組み収集ランナー)）
 - 合格ラインはアプリの環境変数（`QG_*`）で決める（[合格ライン](features/gate-config/design.md)、[運用](operations.md#24-合格ライン)）
 - 判定の流れ（未提出・形式不正の扱い）は [判定](features/evaluation/design.md) にある
-- **合否は合格 / 不合格の 2 値**。合格ライン内の気になる点（前回からの低下など）は判定理由に書き添えるだけで、合否には影響しない
+- **合否は合格 / 不合格の 2 値**。合格ライン内の気になる点（前回からの低下など）は判定理由に書き添えるだけで、合否には影響しない（リリース判定の画面に判定理由を出すのは合格でない行だけ）
 
 ---
 
@@ -16,12 +16,12 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | --- | --- | --- | --- | --- | --- | --- |
 | M-01 | 機能テスト | ブランチカバレッジ | 75% 以上（backend / frontend それぞれ） | JaCoCo / Vitest（v8） | `jacoco-xml` / `lcov` | `QG_BRANCH_COVERAGE_MIN` |
 | M-02 | 機能テスト | ミューテーションスコア | 60% 以上（backend のみ） | PIT | `pit-xml` | `QG_MUTATION_SCORE_MIN` |
-| M-03 | 性能 | 応答時間 p95 | 到達率 50 req/s の負荷の下で 500ms 以内 | k6 | `k6-summary` | `QG_RESPONSE_TIME_P95_MAX_MS` / `QG_ARRIVAL_RATE_RPS` |
-| M-04 | 性能 | エラー率 | 0.1% 以下 | k6 | `k6-summary` | `QG_ERROR_RATE_MAX_PCT` |
+| M-03 | 性能テスト | 応答時間 p95 | 到達率 50 req/s の負荷の下で 500ms 以内 | k6 | `k6-summary` | `QG_RESPONSE_TIME_P95_MAX_MS` / `QG_ARRIVAL_RATE_RPS` |
+| M-04 | 性能テスト | エラー率 | 0.1% 以下 | k6 | `k6-summary` | `QG_ERROR_RATE_MAX_PCT` |
 | M-05 | セキュリティ | 重大・高 脆弱性件数 | Critical 0 件・High 0 件 | Trivy（SARIF） | `sarif` | `QG_CRITICAL_VULNERABILITIES_MAX` / `QG_HIGH_VULNERABILITIES_MAX` |
 | M-06 | コード構造 | 循環的複雑度 15 超の関数数 | 0 件 | PMD / ESLint | `pmd-xml` / `eslint-json` | `QG_COMPLEXITY_MAX` |
-| M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
-| M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
+| M-07 | 契約・互換性 | 破壊的変更件数（OpenAPI） | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
+| M-08 | 使いやすさ | アクセシビリティ違反 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
 | M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `QG_TEST_SUCCESS_RATE_MIN` |
 | M-10 | 機能テスト | スキップされたテスト数 | 比較対象 Run から増やさない | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_INCREASE_MAX` |
 | M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `QG_SECRETS_MAX` |
@@ -79,7 +79,7 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 そのため `backend/**/generated/**` のようなリポジトリ相対のパターンは JaCoCo に一致しない。**`**/` を先頭に付けた接尾一致で書く**（`**/generated/**`）。
 暗黙に `**/` を補うことはしない。書いたより広い範囲が黙って外れるのを防ぐためである。
 
-除外したファイル数は M-01 / M-02 の内訳（`excludedFiles`）に残り、除外パターンはリリース判定の「前提」に表示される。
+除外したファイル数は M-01 / M-02 の内訳（`measurements.detail` の `excludedFiles`）に残る。除外パターンと除外したファイル数は画面には出さない。
 
 ### 2.4 比較元と比較対象 Run
 
@@ -178,7 +178,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 
 ちょうど 10% は「超える」に含めない。
 
-**対象外（`NOT_APPLICABLE`）の出し方**: 合格ラインの `mutation_score.components` で対象を限定したときだけ、次の行を出す。
+**対象外（`NOT_APPLICABLE`）の出し方**: `QG_MUTATION_COMPONENTS` で対象を限定したときだけ、次の行を出す。
 
 | 状況 | 扱い |
 | --- | --- |
@@ -216,7 +216,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | 計測時間 | 300 秒 |
 | 実行回数 | 3 回。値ごとの**中央値**で判定する |
 | 実行環境 | 他のジョブと同居しない専有のセルフホストランナー。計測環境の名前（`environment.name`）ごとに前回比を分ける |
-| シナリオ | 合格ラインの `performance.scenarios`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
+| シナリオ | `QG_PERF_SCENARIOS`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
 
 **計測方法**: 対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/target/` の k6 シナリオ）で負荷をかける。
 1 回約 6 分 × 3 回。各回の summary を `k6-summary` として送り、メタデータの `environment` に計測環境（名前・CPU 数・メモリ・k6 の版・シードデータ）を入れる。
@@ -321,7 +321,7 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 **定義**: WCAG 2.2 AA を基準に axe-core が自動検出した違反のうち、重大（critical / serious）なものの件数。
 serious にはキーボードで操作できない・コントラスト不足など、実際に利用を妨げる違反が含まれるため、critical と合わせて判定する。
 
-自動検査で検出できるのは WCAG 違反の一部にとどまる。**「重大 0 件」は適合の必要条件であって十分条件ではない**。リリース判定の M-08 の説明に、この旨を書いている。
+自動検査で検出できるのは WCAG 違反の一部にとどまる。**「重大 0 件」は適合の必要条件であって十分条件ではない**。
 
 **計測方法**: 対象のバックエンドの jar と `vite build` した画面（`vite preview`）を計測用のコンテナの中で起動し、
 計測プロファイルの `A11Y_PAGES` の各画面をライト・ダークの 2 通りで開いて、WCAG 2.2 AA のタグ（`wcag2a` 〜 `wcag22aa`）で axe-core を実行する。
@@ -460,5 +460,5 @@ SARIF の成果物には、走査した対象をメタデータ `scanners` で�
 導入直後の 1〜2 週間は、しきい値を緩める期間ではなく**計測そのものが信頼できるかを確かめる期間**とし、次を確認する。
 
 - 性能の 3 回実行の変動係数が 20% 以内に収まっているか
-- `QG_EXCLUSIONS` で意図せず広い範囲を外していないか（M-01 / M-02 の `excludedFiles`）
+- `QG_EXCLUSIONS` で意図せず広い範囲を外していないか（M-01 / M-02 の `excludedFiles`。画面には出ないため DB の `measurements.detail` で確かめる）
 - ERROR（成果物の未提出・形式不正）が出ていないか

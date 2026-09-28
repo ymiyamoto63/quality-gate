@@ -8,7 +8,7 @@
 収集ランナー（submit.sh）
   → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId, detailUrl}
   → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202
-  → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {status, verdict, completeness}
+  → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {runId, status, verdict, errorCode, detailUrl}
 ```
 
 確定すると判定まで行って結果を返す（DD-15）。判定の中身は [判定](../evaluation/design.md)。
@@ -47,14 +47,14 @@
 - 1 ファイル 50MB（`ARTIFACT_TOO_LARGE`）、1 Run 合計 200MB を超えたら拒否する。通信としての上限（`spring.servlet.multipart`）はそれより少し大きい 60MB にし、理由のわかるエラーを返せるようにしている
 
 **保存の順序**: ファイルを先に保存し、成功してから DB に記録する。逆順だと「参照先の無い記録」という扱いにくい壊れ方をする。
-記録されずに残ったファイル（孤児）は日次バッチが消す（[保持期間](../retention/design.md)）。
+保存の後で Run の合計の上限を超えたら、保存したファイルをその場で消す。それ以外の理由で記録に失敗したファイルは残るが、記録が無いため判定には使われない（自動で消す仕組みは持たない）。
 
 ## 4. `POST /api/v1/runs/{runId}/finalize`
 
-取り込みを確定し、その場で合格ラインの解決・正規化・判定を行い、`status` / `verdict` / `completeness` を返す。
+取り込みを確定し、その場で正規化・判定を行い、`status` / `verdict` / `errorCode` と、リリース判定の URL（`detailUrl`）を返す。
 
 - 確定は判定の前に別のトランザクションで行い、判定に失敗しても取り消さない（Run を `FAILED` として残す）
-- 判定に失敗しても 200 で、`status` が `FAILED`、`errorCode` に理由（`CONFIG_VALIDATION_FAILED` / `EVALUATION_FAILED`）が入る
+- 判定に失敗しても 200 で、`status` が `FAILED`、`errorCode` に理由（`EVALUATION_FAILED`）が入る。`verdict` は null
 - 確定済みの Run への `finalize` は `409 RUN_ALREADY_FINALIZED`（二重に判定しない）
 - 収集ランナーは `FAILED` ならワークフローを失敗にし、判定結果の `FAIL` では失敗にしない
 
@@ -71,9 +71,10 @@
 
 ```bash
 TOKEN=<.env の QG_INGEST_TOKEN>
+REPO=<.env の QG_REPOSITORY>
 RUN_ID=$(curl -s -X POST http://localhost:8080/api/v1/runs \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
-  -d "{\"repository\":\"example/sample\",\"commitSha\":\"$(git rev-parse HEAD)\",
+  -d "{\"repository\":\"$REPO\",\"commitSha\":\"$(git rev-parse HEAD)\",
        \"branch\":\"main\",\"triggeredBy\":\"local\",
        \"measuredAt\":\"$(date -u +%FT%TZ)\"}" | sed -E 's/.*"runId":"([^"]+)".*/\1/')
 
@@ -82,4 +83,4 @@ curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=jacoco
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/finalize" -H "Authorization: Bearer $TOKEN"   # 判定結果が返る
 ```
 
-合格ラインを送らないとシステムの既定値で判定され、送っていない指標は ERROR になる。収集ランナーと同じ流れを手元で動かす方法は [運用](../../operations.md#6-手元で試す)。
+判定にはアプリの環境変数（`QG_*`）の合格ラインを使う。`QG_DISABLED_METRICS` に無い指標のうち、成果物を送っていないものは ERROR になる。`repository` は `.env` の `QG_REPOSITORY` と同じ値にする（違うと 400）。収集ランナーと同じ流れを手元で動かす方法は [運用](../../operations.md#6-手元で試す)。
