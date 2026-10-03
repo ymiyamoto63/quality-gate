@@ -33,3 +33,6 @@ playwright-report/
 
 # セルフホストランナー本体（認証情報・バイナリを含む）
 actions-runner/
+
+# Python
+__pycache__/

@@ -8,7 +8,7 @@
 - ログインは全員で共有する 1 つのアカウントです（GitHub のアカウントは要りません）
 
 計測は quality-gate 側の**収集ランナー**（GitHub Actions + 専有のセルフホストランナー）が対象リポジトリを取得して行います。**対象リポジトリには何も置きません**。
-アプリは送られた成果物（JaCoCo / lcov / PIT / k6 / SARIF / PMD / ESLint / oasdiff / axe-core / JUnit XML）を取り込み、合格ラインで判定して保存します。
+アプリは送られた成果物を取り込み、合格ラインで判定して保存します。取り込める形式は JaCoCo / lcov / PIT / k6 / SARIF / PMD / ESLint / oasdiff / axe-core / JUnit XML です。
 
 ```
 対象リポジトリ ──clone──▶ 収集ランナー（取得 → 計測 → 送信）──Ingest API──▶ quality-gate（判定・保存・画面）◀── ブラウザ
@@ -66,4 +66,4 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（ユーザー名
 | 取り込み（Ingest API） | [requirements](docs/features/ingest/requirements.md) | [design](docs/features/ingest/design.md) |
 | 認証（共有アカウント） | [requirements](docs/features/auth/requirements.md) | [design](docs/features/auth/design.md) |
 
-API の型の正本は実装から生成した [`api/openapi.yml`](api/openapi.yml)、DB の列の定義の正本は [`db/migration/`](backend/src/main/resources/db/migration/) です。
+API の型の正本は実装から生成した [`api/openapi.yml`](api/openapi.yml)、DB スキーマの正本は [`db/migration/`](backend/src/main/resources/db/migration/) です。
