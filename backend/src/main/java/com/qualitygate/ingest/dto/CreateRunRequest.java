@@ -9,7 +9,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
-@Schema(description = "Run の作成要求。CI が計測開始時に送信する。")
+@Schema(description = "Run の作成要求。収集ランナーが計測結果を送る前に送信する。")
 public record CreateRunRequest(
 
         @Schema(description = "owner/name 形式。quality-gate の計測対象（QG_REPOSITORY）と一致しなければ拒否する",
@@ -30,14 +30,6 @@ public record CreateRunRequest(
 
         @NotBlank
         String branch,
-
-        @Schema(description = "対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。"
-                + "省略すると登録済みの値のまま（新規は main）")
-        @Size(min = 1, max = 255)
-        String defaultBranch,
-
-        @NotBlank
-        String triggeredBy,
 
         String ciRunUrl,
 

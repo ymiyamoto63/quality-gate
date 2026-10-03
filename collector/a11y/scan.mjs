@@ -3,7 +3,7 @@
 // 起動済みの対象アプリの画面を開き、axe-core で検査して、結果を axe-json（analyze() の戻り値の配列）に書き出す。
 // 画面はライト・ダークの両方で検査する（配色はテーマごとに別の値で、片方の合格は他方を保証しない）。
 //
-// 読み込めなかった画面の結果は書き出さない。quality-gate は設定の pages に無い画面を ERROR にするため、
+// 読み込めなかった画面の結果は書き出さない。quality-gate は QG_ACCESSIBILITY_PAGES の画面の結果が無いと ERROR にするため、
 // 検査の失敗が合格に見えることはない。
 //
 // 環境変数:
@@ -15,7 +15,7 @@ import { writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
 import { AxeBuilder } from '@axe-core/playwright'
 
-// WCAG 2.2 AA（指標仕様書 M-08）。対象の e2e と同じタグにしている
+// WCAG 2.2 AA（docs/metrics.md M-08）。対象の e2e と同じタグにしている
 const TAGS = ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa', 'wcag22aa']
 const COLOR_SCHEMES = ['light', 'dark']
 const TIMEOUT_MS = 30_000

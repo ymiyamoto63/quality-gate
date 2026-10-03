@@ -32,12 +32,10 @@ REQUEST=$(jq -n \
   --arg commitSha "$COMMIT_SHA" \
   --arg baseCommitSha "$BASE_SHA" \
   --arg branch "$BRANCH" \
-  --arg defaultBranch "$DEFAULT_BRANCH" \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --arg tags "${TAGS:-}" \
-  '{repository: $repository, commitSha: $commitSha, branch: $branch, defaultBranch: $defaultBranch,
-    triggeredBy: "collector", measuredAt: $measuredAt,
+  '{repository: $repository, commitSha: $commitSha, branch: $branch, measuredAt: $measuredAt,
     tags: ($tags | split(" ") | map(select(. != "")))}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')

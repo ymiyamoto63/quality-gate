@@ -5,10 +5,8 @@ package com.qualitygate.domain.metric;
  *
  * @param metricId 指標 ID（{@code M-01} など）
  * @param name     画面に出す名称
- * @param category 属するカテゴリ
  */
 public record MetricDefinition(
         String metricId,
-        String name,
-        MetricCategory category) {
+        String name) {
 }

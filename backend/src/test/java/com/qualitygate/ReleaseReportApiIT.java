@@ -65,7 +65,7 @@ class ReleaseReportApiIT {
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", "main")).getId();
+                "ymiyamoto63", "quality-gate")).getId();
         mvc = MockMvcTester.create(MockMvcBuilders.webAppContextSetup(context).apply(springSecurity())
                 .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/")
                         .with(user(IntegrationCleanup.LOGIN_USERNAME)))
@@ -84,7 +84,6 @@ class ReleaseReportApiIT {
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
                     json.extractingPath("$.repositoryFullName").isEqualTo("ymiyamoto63/quality-gate");
-                    json.extractingPath("$.ref").isEqualTo("1111111");
                     json.extractingPath("$.commitSha").isEqualTo(PASSING);
                     json.extractingPath("$.commitUrl")
                             .isEqualTo("https://github.com/ymiyamoto63/quality-gate/commit/" + PASSING);
@@ -139,7 +138,6 @@ class ReleaseReportApiIT {
         assertThat(mvc.get().uri("/api/v1/release"))
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
-                    json.extractingPath("$.ref").isNull();
                     json.extractingPath("$.commitSha").isEqualTo(REMEASURED);
                     json.extractingPath("$.decision").isEqualTo("RELEASABLE");
                 });
@@ -177,7 +175,6 @@ class ReleaseReportApiIT {
         assertThat(mvc.get().uri("/api/v1/release?ref={ref}", "release/2026-09"))
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
-                    json.extractingPath("$.ref").isEqualTo("release/2026-09");
                     json.extractingPath("$.commitSha").isEqualTo(FAILING);
                     json.extractingPath("$.decision").isEqualTo("NOT_RELEASABLE");
                 });
@@ -220,7 +217,7 @@ class ReleaseReportApiIT {
 
     /** 分岐 20 のうち {@code covered} を通り、循環的複雑度 {@code complexity} の関数が 1 つある計測。 */
     private void evaluated(String commitSha, String measuredAt, int covered, int complexity) {
-        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main", "collector",
+        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main",
                 Instant.parse(measuredAt), runs.findMaxAttempt(repositoryId, commitSha) + 1);
         // 前のリリースと比べた計測（PASSING の比較元は計測していないコミット）
         if (PASSING.equals(commitSha)) {

@@ -38,14 +38,6 @@ export function readCookie(name: string): string | null {
   return null
 }
 
-/** ProblemDetail（RFC 9457）から機械可読なエラーコードを取り出す。 */
-export function errorCodeOf(error: unknown): string {
-  if (error && typeof error === 'object' && 'errorCode' in error) {
-    return String((error as { errorCode: unknown }).errorCode)
-  }
-  return 'UNKNOWN'
-}
-
 /** 画面に出すメッセージ。title / detail は人間向けであり、分岐には使わない。 */
 export function messageOf(error: unknown, fallback = '処理に失敗しました'): string {
   if (error && typeof error === 'object') {

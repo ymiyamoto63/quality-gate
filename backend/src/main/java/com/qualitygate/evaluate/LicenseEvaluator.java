@@ -84,9 +84,13 @@ public class LicenseEvaluator implements MetricEvaluator {
         if (forbidden > maxForbidden) {
             status = MeasurementStatus.FAIL;
             reason = "使用禁止のライセンスのパッケージが %d 件あります".formatted(forbidden) + note;
-        } else {
+        } else if (forbidden == 0) {
             status = MeasurementStatus.PASS;
             reason = "使用禁止のライセンスのパッケージはありません（%d パッケージを確認）".formatted(byPackage.size()) + note;
+        } else {
+            status = MeasurementStatus.PASS;
+            reason = "使用禁止のライセンスのパッケージが %d 件ありますが、合格ライン %d 件以内です"
+                    .formatted(forbidden, maxForbidden) + note;
         }
         return List.of(MetricResult.of(metricId(), null, status, BigDecimal.valueOf(forbidden),
                 "count", threshold, reason, detail, violations));

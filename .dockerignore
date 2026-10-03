@@ -1,0 +1,14 @@
+# Docker のビルドに送るものを絞る。Dockerfile が使うのは backend/・frontend/・api/ だけ。
+# 手元のビルド結果（target/ に古いマイグレーションが残っていることもある）や node_modules、
+# .env（秘密の値）をイメージのビルドに持ち込まない
+**/target/
+**/node_modules/
+**/dist/
+**/*.tsbuildinfo
+frontend/test-results/
+frontend/playwright-report/
+.git/
+.env
+.env.local
+data/
+actions-runner/

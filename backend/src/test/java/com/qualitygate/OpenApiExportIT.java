@@ -78,7 +78,7 @@ class OpenApiExportIT {
         assertThat(itemRefOf(schemas, "ReleaseHistoryResponse", "items")).isEqualTo("ReleaseHistoryItem");
 
         // 名前だけ分かれていても中身が入れ替わっていれば同じ事故になる
-        assertThat(propertiesOf(schemas, "ReleaseFinding")).containsKeys("severity", "location");
+        assertThat(propertiesOf(schemas, "ReleaseFinding")).containsKeys("title", "location");
         assertThat(propertiesOf(schemas, "ReleaseHistoryItem")).containsKeys("commitSha", "measuredAt", "ref");
     }
 

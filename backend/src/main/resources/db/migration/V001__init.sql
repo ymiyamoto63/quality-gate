@@ -6,7 +6,6 @@ CREATE TABLE repositories (
     id              uuid         PRIMARY KEY,
     owner           varchar(39)  NOT NULL,
     name            varchar(100) NOT NULL,
-    default_branch  varchar(255) NOT NULL,
     created_at      timestamptz  NOT NULL DEFAULT now(),
     CONSTRAINT repositories_full_name_key UNIQUE (owner, name)
 );
@@ -20,7 +19,6 @@ CREATE TABLE runs (
     base_commit_sha      char(40),
     branch               varchar(255) NOT NULL,
     attempt              integer      NOT NULL DEFAULT 1,
-    triggered_by         varchar(64)  NOT NULL,
     ci_run_url           varchar(512),
     measured_at          timestamptz  NOT NULL,
     tags                 text[]       NOT NULL DEFAULT '{}',

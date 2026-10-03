@@ -8,6 +8,11 @@ import com.qualitygate.domain.report.RawFinding;
 import com.qualitygate.domain.report.RawMeasurement;
 import com.qualitygate.platform.config.QualityGateProperties;
 import com.qualitygate.platform.id.Uuid7;
+import org.springframework.boot.context.properties.bind.BindHandler;
+import org.springframework.boot.context.properties.bind.Bindable;
+import org.springframework.boot.context.properties.bind.Binder;
+import org.springframework.boot.context.properties.bind.handler.NoUnboundElementsBindHandler;
+import org.springframework.boot.context.properties.source.MapConfigurationPropertySource;
 
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -25,7 +30,7 @@ final class EvaluatorTestSupport {
     static Run run() {
         return new Run(Uuid7.generate(), Uuid7.generate(),
                 "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main",
-                "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
+                Instant.parse("2026-09-22T00:00:00Z"), 1);
     }
 
     static EvaluationContext context(NormalizedInput input) {
@@ -40,51 +45,19 @@ final class EvaluatorTestSupport {
     }
 
     /**
-     * 既定の合格ラインのうち、1 つの指標の値だけを差し替えた合格ライン。
-     * キーは指標ごとの短い名前（環境変数 {@code QG_*} に対応する）。知らないキーは例外にする。
+     * 既定の合格ラインのうち、指定した項目だけを差し替えた合格ライン。
+     * キーは application.yml の {@code quality-gate.gate.*} と同じ名前（例: {@code secrets-max}）で、
+     * 本番と同じ変換（カンマ区切りの一覧・既定値の補完）を通る。知らないキーは例外にする。
      */
-    static GateThresholds thresholdsWith(String metric, Map<String, Object> values) {
-        Map<String, Object> v = new HashMap<>(values);
-        QualityGateProperties.Gate gate = new QualityGateProperties.Gate(null, null,
-                decimal(take(v, metric, "branch_coverage", "threshold")),
-                decimal(take(v, metric, "mutation_score", "threshold")),
-                list(take(v, metric, "mutation_score", "components")),
-                decimal(take(v, metric, "performance", "p95_ms")),
-                decimal(take(v, metric, "performance", "arrival_rate_rps")),
-                decimal(take(v, metric, "performance", "error_rate_pct")),
-                list(take(v, metric, "performance", "scenarios")),
-                integer(take(v, metric, "vulnerabilities", "max_critical")),
-                integer(take(v, metric, "vulnerabilities", "max_high")),
-                integer(take(v, metric, "cyclomatic_complexity", "max_complexity")),
-                integer(take(v, metric, "api_contract", "breaking_changes")),
-                integer(take(v, metric, "accessibility", "max_critical")),
-                list(take(v, metric, "accessibility", "pages")),
-                decimal(take(v, metric, "test_results", "min_success_rate")),
-                integer(take(v, metric, "test_results", "min_test_count")),
-                integer(take(v, metric, "test_results", "max_skipped_increase")),
-                integer(take(v, metric, "secrets", "max_secrets")),
-                integer(take(v, metric, "licenses", "max_forbidden")));
-        if (!v.isEmpty()) {
-            throw new IllegalArgumentException("合格ラインに無い項目です: " + metric + " " + v.keySet());
-        }
+    static GateThresholds thresholdsWith(Map<String, Object> properties) {
+        Map<String, Object> source = new HashMap<>();
+        properties.forEach((key, value) -> source.put("gate." + key,
+                value instanceof List<?> list ? String.join(",", list.stream().map(String::valueOf).toList())
+                        : String.valueOf(value)));
+        QualityGateProperties.Gate gate = new Binder(new MapConfigurationPropertySource(source))
+                .bindOrCreate("gate", Bindable.of(QualityGateProperties.Gate.class),
+                        new NoUnboundElementsBindHandler(BindHandler.DEFAULT));
         return GateThresholds.from(gate);
-    }
-
-    private static Object take(Map<String, Object> values, String metric, String target, String key) {
-        return metric.equals(target) ? values.remove(key) : null;
-    }
-
-    private static BigDecimal decimal(Object value) {
-        return value == null ? null : new BigDecimal(value.toString());
-    }
-
-    private static Integer integer(Object value) {
-        return value == null ? null : ((Number) value).intValue();
-    }
-
-    @SuppressWarnings("unchecked")
-    private static List<String> list(Object value) {
-        return (List<String>) value;
     }
 
     static NormalizedInput input(List<RawMeasurement> measurements,

@@ -44,9 +44,6 @@ public class Run {
     @Column(nullable = false)
     private int attempt = 1;
 
-    @Column(name = "triggered_by", nullable = false)
-    private String triggeredBy;
-
     @Column(name = "ci_run_url")
     private String ciRunUrl;
 
@@ -85,12 +82,11 @@ public class Run {
     }
 
     public Run(UUID id, UUID repositoryId, String commitSha, String branch,
-               String triggeredBy, Instant measuredAt, int attempt) {
+               Instant measuredAt, int attempt) {
         this.id = id;
         this.repositoryId = repositoryId;
         this.commitSha = commitSha;
         this.branch = branch;
-        this.triggeredBy = triggeredBy;
         this.measuredAt = measuredAt;
         this.attempt = attempt;
         this.status = RunStatus.CREATED;

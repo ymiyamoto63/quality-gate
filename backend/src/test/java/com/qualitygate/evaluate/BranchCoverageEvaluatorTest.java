@@ -49,8 +49,8 @@ class BranchCoverageEvaluatorTest {
 
     @Test
     void 合格ラインは環境変数で変えられる() {
-        GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith("branch_coverage",
-                Map.of("threshold", 90));
+        GateThresholds thresholds = EvaluatorTestSupport.thresholdsWith(
+                Map.of("branch-coverage-min", 90));
         List<MetricResult> results = evaluator.evaluate(new EvaluationContext(EvaluatorTestSupport.run(),
                 thresholds, input(List.of(coverage("backend", "85")), List.of(), Set.of("M-01")),
                 Map.of(), false));

@@ -41,13 +41,13 @@ class SecretEvaluatorTest {
 
     @Test
     void 上限までは合格() {
-        MetricResult result = evaluate(Map.of("max_secrets", 1), List.of(secret("jwt", "a.ts")));
+        MetricResult result = evaluate(Map.of("secrets-max", 1), List.of(secret("jwt", "a.ts")));
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
     }
 
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
-        EvaluationContext context = new EvaluationContext(run(), thresholdsWith("secrets", config),
+        EvaluationContext context = new EvaluationContext(run(), thresholdsWith(config),
                 input(List.of(), findings, Set.of("M-11")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);

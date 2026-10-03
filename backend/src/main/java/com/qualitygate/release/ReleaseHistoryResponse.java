@@ -13,7 +13,6 @@ public record ReleaseHistoryResponse(@NotNull List<ReleaseHistoryItem> items) {
     public record ReleaseHistoryItem(
             @NotNull Instant measuredAt,
             @NotNull String commitSha,
-            @NotNull String branch,
             @NotNull @Schema(description = "計測したコミットを指すタグ") List<String> tags,
             @NotNull Verdict verdict,
             @NotNull @Schema(description = "リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA）") String ref) {

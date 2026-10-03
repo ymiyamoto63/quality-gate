@@ -128,7 +128,7 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
-    /** @description Run の作成要求。CI が計測開始時に送信する。 */
+    /** @description Run の作成要求。収集ランナーが計測結果を送る前に送信する。 */
     CreateRunRequest: {
       /** @description 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する */
       baseCommitSha?: string
@@ -136,8 +136,6 @@ export interface components {
       ciRunUrl?: string
       /** @description 計測対象のコミット SHA（40 桁） */
       commitSha: string
-      /** @description 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。省略すると登録済みの値のまま（新規は main） */
-      defaultBranch?: string
       /** Format: date-time */
       measuredAt: string
       /**
@@ -147,17 +145,10 @@ export interface components {
       repository: string
       /** @description 計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。リリース判定でタグをコミットに解決するのに使う */
       tags?: string[]
-      triggeredBy: string
     }
     CreateRunResponse: {
-      /** Format: int32 */
-      attempt?: number
-      /** @description リリース判定の画面（このコミット）への直リンク。CI のログに出して、その場から飛べるようにする */
-      detailUrl?: string
       /** Format: uuid */
       runId?: string
-      /** @enum {string} */
-      status?: 'CREATED' | 'UPLOADING' | 'FINALIZED' | 'PROCESSING' | 'EVALUATED' | 'FAILED'
     }
     /** @description 確定と判定の結果。収集ランナーはこれをログに出す */
     FinalizeResponse: {
@@ -165,8 +156,6 @@ export interface components {
       detailUrl?: string
       /** @description 処理失敗の理由のコード。判定済みなら null */
       errorCode?: string
-      /** Format: uuid */
-      runId?: string
       /**
        * @description EVALUATED（判定済み）か FAILED（処理失敗）
        * @enum {string}
@@ -193,8 +182,6 @@ export interface components {
     ReleaseFinding: {
       /** @description ファイルと行（backend/src/Foo.java:42 など） */
       location: string | null
-      /** @enum {string} */
-      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
       title: string
       /** @description GitHub の該当箇所 */
       url: string | null
@@ -217,7 +204,6 @@ export interface components {
       tools: string
     }
     ReleaseHistoryItem: {
-      branch: string
       commitSha: string
       /** Format: date-time */
       measuredAt: string
@@ -232,7 +218,6 @@ export interface components {
       items: components['schemas']['ReleaseHistoryItem'][]
     }
     ReleaseMetric: {
-      category: string
       componentName: string | null
       /**
        * Format: int32
@@ -270,8 +255,6 @@ export interface components {
       guides: components['schemas']['ReleaseGuide'][]
       /** @description 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない */
       metrics: components['schemas']['ReleaseMetric'][]
-      /** @description 指定したタグ・コミット。最新の計測を見ているときは null */
-      ref: string | null
       repositoryFullName: string
       /** @description 判定に使った計測。未計測なら null */
       run: components['schemas']['ReleaseRun']
@@ -279,24 +262,12 @@ export interface components {
     ReleaseRun: {
       /** @description 比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ */
       baseCommitSha: string | null
-      branch: string
       /** @description 計測したワークフローの実行 URL */
       ciRunUrl: string | null
       /** Format: date-time */
       measuredAt: string
-      /** Format: uuid */
-      runId: string
       /** @description 計測したコミットを指すタグ */
       tags: string[]
-      /** @enum {string} */
-      verdict: 'PASS' | 'FAIL'
-    }
-    UploadArtifactResponse: {
-      /** Format: uuid */
-      artifactId?: string
-      sha256?: string
-      /** Format: int64 */
-      sizeBytes?: number
     }
   }
   responses: never
@@ -383,8 +354,8 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
-      200: {
+      /** @description Created */
+      201: {
         headers: {
           [name: string]: unknown
         }
@@ -416,14 +387,12 @@ export interface operations {
       }
     }
     responses: {
-      /** @description OK */
-      200: {
+      /** @description Accepted */
+      202: {
         headers: {
           [name: string]: unknown
         }
-        content: {
-          '*/*': components['schemas']['UploadArtifactResponse']
-        }
+        content?: never
       }
     }
   }

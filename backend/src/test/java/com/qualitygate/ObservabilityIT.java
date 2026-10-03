@@ -45,7 +45,7 @@ class ObservabilityIT {
         runs.deleteAll();
         repositories.deleteAll();
         repositories.save(new MonitoredRepository(
-                Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
+                Uuid7.generate(), "ymiyamoto63", "quality-gate"));
         client = RestClient.builder()
                 .baseUrl("http://localhost:" + port)
                 .defaultStatusHandler(status -> true, (req, res) -> { })

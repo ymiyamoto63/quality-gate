@@ -8,7 +8,6 @@ import com.qualitygate.domain.report.RawMeasurement;
 import org.junit.jupiter.api.Test;
 
 import java.math.BigDecimal;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -46,7 +45,7 @@ class SkippedTestEvaluatorTest {
 
     @Test
     void 増加の上限までは合格() {
-        MetricResult result = evaluate(Map.of("max_skipped_increase", 2),
+        MetricResult result = evaluate(Map.of("skipped-tests-increase-max", 2),
                 List.of(report("backend", 10, 0, 0, 3, 0)),
                 Map.of(EvaluationContext.key("M-10", "backend"), BigDecimal.ONE)).getFirst();
 
@@ -64,7 +63,7 @@ class SkippedTestEvaluatorTest {
 
     @Test
     void 合格ラインは前回からの増加で示す() {
-        MetricResult result = evaluate(Map.of("max_skipped_increase", 2),
+        MetricResult result = evaluate(Map.of("skipped-tests-increase-max", 2),
                 List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
 
         assertThat(result.threshold()).containsEntry("value", 2).containsEntry("basis", "increase");
@@ -89,7 +88,7 @@ class SkippedTestEvaluatorTest {
         RawFinding skipped = new RawFinding("M-10", "skipped", Severity.INFO,
                 "A.a はスキップされました", null, null, "backend", "A#a", Map.of());
         EvaluationContext context = new EvaluationContext(run(),
-                thresholdsWith("test_results", Map.of()),
+                thresholdsWith(Map.of()),
                 input(List.of(report("backend", 1, 0, 0, 1, 0)),
                         List.of(new IdentifiedFinding("fp-a", skipped)), Set.of("M-10")),
                 Map.of(), false);
@@ -99,9 +98,8 @@ class SkippedTestEvaluatorTest {
 
     private List<MetricResult> evaluate(Map<String, Object> config, List<RawMeasurement> measurements,
                                         Map<String, BigDecimal> previous) {
-        Map<String, Object> values = new HashMap<>(config);
         EvaluationContext context = new EvaluationContext(run(),
-                thresholdsWith("test_results", values),
+                thresholdsWith(config),
                 input(measurements, List.of(), Set.of("M-09", "M-10")),
                 previous, !previous.isEmpty());
         return evaluator.evaluate(context);

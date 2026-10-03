@@ -21,8 +21,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PerformanceEvaluatorTest {
 
     private static final Map<String, Object> PERFORMANCE = Map.of(
-            "p95_ms", 500, "arrival_rate_rps", 50, "error_rate_pct", 0.1,
-            "scenarios", List.of("dashboard"));
+            "response-time-p95-max-ms", 500, "arrival-rate-rps", 50, "error-rate-max-pct", 0.1,
+            "perf-scenarios", List.of("dashboard"));
 
     @Test
     void 三回の中央値で判定する() {
@@ -135,10 +135,10 @@ class PerformanceEvaluatorTest {
                     sample.toDetail()).withVariant(sample.environmentName()));
         }
         Run run = new Run(Uuid7.generate(), Uuid7.generate(),
-                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main", "ci",
+                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main",
                 Instant.parse("2026-09-22T00:00:00Z"), 1);
         EvaluationContext context = new EvaluationContext(run,
-                thresholdsWith("performance", PERFORMANCE),
+                thresholdsWith(PERFORMANCE),
                 input(measurements, List.of(), Set.of(evaluator.metricId())),
                 Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);

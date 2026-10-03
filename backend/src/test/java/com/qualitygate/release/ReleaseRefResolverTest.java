@@ -25,7 +25,7 @@ class ReleaseRefResolverTest {
     private static final String COMMIT = "a".repeat(40);
 
     private final RunRepository runs = mock(RunRepository.class);
-    private final MonitoredRepository repository = new MonitoredRepository(UUID.randomUUID(), "o", "r", null);
+    private final MonitoredRepository repository = new MonitoredRepository(UUID.randomUUID(), "o", "r");
     private final ReleaseRefResolver resolver = new ReleaseRefResolver(runs);
 
     @BeforeEach
@@ -38,11 +38,8 @@ class ReleaseRefResolverTest {
     void タグは計測時に送られたタグからコミットに解決する() {
         when(runs.findLatestCommitShaByTag(repository.getId(), "release/2026-09")).thenReturn(Optional.of(COMMIT));
 
-        var resolved = resolver.resolve(repository, " release/2026-09 ");
-
-        assertThat(resolved.ref()).isEqualTo("release/2026-09");
-        assertThat(resolved.type()).isEqualTo(ReleaseRefResolver.RefType.TAG);
-        assertThat(resolved.commitSha()).isEqualTo(COMMIT);
+        // 前後の空白は除いてから探す
+        assertThat(resolver.resolve(repository, " release/2026-09 ")).isEqualTo(COMMIT);
     }
 
     @Test
@@ -58,18 +55,12 @@ class ReleaseRefResolverTest {
     void 短いSHAは計測済みのRunから完全なSHAにする() {
         when(runs.findCommitShasLike(any(), eq("aaaaaaa%"))).thenReturn(List.of(COMMIT));
 
-        var resolved = resolver.resolve(repository, "AAAAAAA");
-
-        assertThat(resolved.type()).isEqualTo(ReleaseRefResolver.RefType.COMMIT);
-        assertThat(resolved.commitSha()).isEqualTo(COMMIT);
+        assertThat(resolver.resolve(repository, "AAAAAAA")).isEqualTo(COMMIT);
     }
 
     @Test
     void 計測していない短いSHAは指定のまま返す() {
-        var resolved = resolver.resolve(repository, "abcdef1");
-
-        assertThat(resolved.type()).isEqualTo(ReleaseRefResolver.RefType.COMMIT);
-        assertThat(resolved.commitSha()).isEqualTo("abcdef1");
+        assertThat(resolver.resolve(repository, "abcdef1")).isEqualTo("abcdef1");
     }
 
     @Test
