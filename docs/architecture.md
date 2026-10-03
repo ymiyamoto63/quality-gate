@@ -133,6 +133,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | `submit` | `reports/` を Ingest API に送り、確定する。処理失敗（`FAILED`）ならジョブを失敗にする。判定結果の不合格ではジョブを失敗にしない | Ingest Token | 1 分未満 |
 
 ジョブ間の受け渡しは Actions の成果物で行う（取得したソース `collector-source` は 1 日、計測結果 `collector-reports` は 7 日で消える）。
+成果物を誰がどこに作り、どう取り込まれるかは [3.9 成果物の流れ](#39-成果物の流れ) にまとめてある。
 
 ### 3.4 比較元とタグ
 
@@ -193,6 +194,52 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | バックエンドの中で Docker を使って計測する | バックエンドのホストに Docker ソケット（実質 root）を渡し、DB と同じ場所で対象のコードを動かすことになる |
 | ランナー機に常駐する収集デーモン | 監視・再起動・ログの仕組みを自前で持つ必要があり、この規模には過剰 |
 | 対象リポジトリの CI から送る | 対象ごとにワークフローと設定の保守が要り、計測条件もそろわない |
+
+### 3.9 成果物の流れ
+
+ここでいう**成果物**は、計測ツールが出力するレポートのファイル（JaCoCo の XML、Trivy の SARIF など）のこと。GitHub Actions の「成果物（artifact）」とは別物で、Actions の成果物はジョブ間でこのファイル群を受け渡す入れ物として使う。
+
+```
+ ① 作成           ② 受け渡し          ③ 送信              ④ 保管                       ⑤ 判定
+ measure ジョブ ──▶ Actions の成果物 ──▶ submit ジョブ ──▶ quality-gate アプリ ──────▶ quality-gate アプリ
+ 計測ツールが       collector-reports    submit.sh が       ArtifactStore に保存し、      finalize でアダプタが読み、
+ reports/ に書く    （7 日で消える）       Ingest API に送る   artifacts テーブルに記録       measurements / findings に書く
+```
+
+| 段階 | 誰が | どこに | 何をする |
+| --- | --- | --- | --- |
+| ① 作成 | 計測ツール（`measure.sh` が `collector/bin/measure/*.sh` の順に呼ぶ） | ランナーのマシンの `$RUNNER_TEMP/qg-reports/`（計測用のコンテナにマウントした `reports/`） | 各ツールがレポートを決まったパスに書く（下表）。出なかったファイルはそのまま無い |
+| ② 受け渡し | `measure` ジョブ → `submit` ジョブ | Actions の成果物 `collector-reports`（7 日で消える） | `reports/` をまるごと渡す。`measure` の作業領域はこの後で消す |
+| ③ 送信 | `submit.sh`（`submit` ジョブ） | Ingest API（`QG_BASE_URL`、Ingest Token） | Run を作り、ファイルを 1 つずつ `type` / `component` / `metadata` を付けてアップロードし、最後に `finalize` する。**無いファイルは送らない** |
+| ④ 保管 | quality-gate アプリ（`ingest`） | ファイル: `QG_ARTIFACT_ROOT/<runId>/<成果物 ID>_<ファイル名>`（`ArtifactStore`）<br>記録: `artifacts` テーブル（種別・サイズ・SHA-256・保存場所） | 受け取った時点では**パースしない**。サイズの上限と必須のメタデータだけを検証して保存する |
+| ⑤ 判定 | quality-gate アプリ（`pipeline`） | `measurements` / `findings` テーブル、`runs.verdict` | `finalize` の中で、保存したファイルを `type` に対応するアダプタで読み、正規化 → 判定する（[判定](features/evaluation/design.md)）。送られなかった指標は `ERROR` |
+
+`reports/` の `meta.env`（計測したコミット・比較元・タグなど）・`versions.env`（ツールの版）・`openapi-head.yml` / `openapi-base.yml`（oasdiff の入力）は成果物としては送らない。`submit.sh` が `meta.env` を読んで、Run を作る要求（`POST /api/v1/runs`）の中身にする。
+
+**成果物ごとの対応**
+
+| `reports/` 内のファイル | 作るツール（スクリプト） | `type` | `component` | `metadata` | 指標 | 送る条件 |
+| --- | --- | --- | --- | --- | --- | --- |
+| `backend/jacoco.xml` | JaCoCo（`backend-tests.sh`） | `jacoco-xml` | backend | — | M-01 | `BACKEND_DIR` がある |
+| `tests/backend/TEST-*.xml` | Surefire / Failsafe（`backend-tests.sh`） | `test-junit-xml` | backend | — | M-09 / M-10 | 同上（ファイルごとに送る） |
+| `backend/mutations.xml` | PIT（`mutation.sh`） | `pit-xml` | backend | — | M-02 | `MUTATION_TARGET_CLASSES` があり、M-02 を止めていない |
+| `backend/pmd.xml` | PMD（`complexity.sh`） | `pmd-xml` | backend | — | M-06 | `BACKEND_DIR` がある |
+| `frontend-coverage/lcov.info` | Vitest（v8）（`frontend-tests.sh`） | `lcov` | frontend | — | M-01 | `FRONTEND_DIR` がある |
+| `tests/frontend/junit.xml` | Vitest（`frontend-tests.sh`） | `test-junit-xml` | frontend | — | M-09 / M-10 | 同上 |
+| `frontend/eslint.json` | ESLint（`complexity.sh`） | `eslint-json` | frontend | — | M-06 | 同上 |
+| `frontend/axe-results.json` | Playwright + axe-core（`accessibility.sh`） | `axe-json` | frontend | — | M-08 | `A11Y_PAGES` がある |
+| `oasdiff.json` | oasdiff（`breaking-changes.sh`） | `oasdiff-json` | backend | 比較元に API 定義が無ければ `{"baseSpecMissing":true}` | M-07 | `OPENAPI_PATH` がある |
+| `trivy.sarif` | Trivy（`vulnerabilities.sh`） | `sarif` | なし | `{"scanners":["vuln","secret"]}` | M-05 / M-11 | 常に |
+| `trivy-license.sarif` | Trivy（`licenses.sh`） | `sarif` | なし | `{"scanners":["license"]}` | M-12 | 常に |
+| `perf/k6-summary-*.json` | k6（`performance.sh`） | `k6-summary` | backend | 隣の `.metadata` の中身（`environment`、異常終了なら `aborted: true`） | M-03 / M-04 | `PERF_SCRIPT` があり、M-03 を止めていない（1 回の実行 = 1 ファイル） |
+
+`component` は計測プロファイルの `BACKEND_DIR` / `FRONTEND_DIR` の末尾のディレクトリ名で、表は既定の `backend` / `frontend` の場合。
+
+**保管した成果物の扱い**
+
+- 確定前に同じ `type`・同じファイル名を送り直すと置き換える（古いファイルはコミット後に消す）
+- 確定後は追加も置き換えもできない（`409 RUN_ALREADY_FINALIZED`）。判定済みの結論は、成果物ごと変わらない
+- ファイルは自動では消さない。Run を削除すると `artifacts` の行は CASCADE で消えるが、ファイルの実体は `QG_ARTIFACT_ROOT` に残る
 
 ---
 
