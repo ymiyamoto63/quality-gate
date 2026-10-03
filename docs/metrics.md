@@ -292,7 +292,7 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 
 ### M-07 OpenAPI の破壊的変更件数
 
-**定義**: 比較元と計測したコミットの OpenAPI 定義を oasdiff で比べ、後方互換性を壊す変更（エンドポイントの削除、必須パラメータの追加、応答のフィールドの削除・型変更、enum 値の削除など）を数える。
+**定義**: 比較元と計測したコミットの OpenAPI 定義を oasdiff で比べ、後方互換性を壊す変更を数える。エンドポイントの削除、必須パラメータの追加、応答のフィールドの削除・型変更、enum 値の削除などが該当する。
 
 **計測方法**: 計測プロファイルの `OPENAPI_PATH` にコミットされている定義を head と比較元から取り出し、`oasdiff breaking <base> <head> --format json` を実行する。
 比較元に定義が無ければ、メタデータ `{"baseSpecMissing": true}` を付けて空の結果を送る。
@@ -412,7 +412,7 @@ frontend は Vitest に junit reporter を足して出した `junit.xml` を `te
 
 ### M-12 ライセンス違反件数
 
-**定義**: Trivy のライセンスの分類（緩い順に unencumbered / permissive / notice / reciprocal / restricted / forbidden、分からなければ unknown）が forbidden のパッケージ数。
+**定義**: Trivy がライセンスを forbidden に分類したパッケージの数。Trivy の分類は緩い順に unencumbered / permissive / notice / reciprocal / restricted / forbidden で、分類できないものは unknown になる。
 
 **計測方法**: 同じ作業ツリーを `trivy fs --scanners license` で走査し、メタデータ `{"scanners":["license"]}` を添えて送る。
 **深刻度で絞らない**。1 つのパッケージに複数のライセンスが並ぶ場合は選べる（OR）とみなして最も緩いものを採るため、MIT などの緩いライセンスも見る必要がある
