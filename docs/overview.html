@@ -391,7 +391,7 @@ NOT_APPLICABLE は影響しない</pre>
 
 <section id="database">
 <h2>10. データベース</h2>
-<p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> で作り、<code>V002__simplify.sql</code> で機能を絞りました（利用者・監査ログ・セッション・スキップの申告のテーブルを削除）。現在のテーブルは次の 5 つです。</p>
+<p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> で作り、<code>V002__simplify.sql</code> で機能を絞り（利用者・監査ログ・セッション・スキップの申告のテーブルを削除）、<code>V003__drop_unused_columns.sql</code> で使われなくなった列を消しました。現在のテーブルは次の 5 つです。</p>
 
 <h3>10.1 設計方針</h3>
 <div class="table-wrap"><table>
@@ -474,7 +474,6 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>component_name</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>コンポーネント（backend / frontend）</td></tr>
     <tr><td><code>metadata</code></td><td><code>jsonb</code></td><td class="c"></td><td></td><td></td><td>成果物に付けて送られたメタデータ（性能の計測環境など）</td></tr>
     <tr><td><code>uploaded_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>アップロード日時</td></tr>
-    <tr><td><code>deleted_at</code></td><td><code>timestamptz</code></td><td class="c"></td><td></td><td></td><td>ファイル実体を削除した日時。メタデータは残す</td></tr>
   </tbody>
 </table></div>
 <p class="cons">① <code>artifacts_unique_key</code> UNIQUE (run_id, type, filename)</p><h4><code>measurements</code></h4>
@@ -487,7 +486,6 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>repository_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → repositories.id（CASCADE）</td><td>Run から複製（検索用）</td></tr>
     <tr><td><code>metric_id</code></td><td><code>varchar(8)</code></td><td class="c">○</td><td></td><td></td><td>指標 ID（M-01〜M-12）</td></tr>
     <tr><td><code>component_name</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>コンポーネント。M-01・M-02・M-09・M-10 だけ値を持つ</td></tr>
-    <tr><td><code>scenario</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>性能のシナリオ名</td></tr>
     <tr><td><code>variant</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>計測条件（性能の計測環境名）。前回値はこれが一致する行から引く</td></tr>
     <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>判定ステータス</td></tr>
     <tr><td><code>value</code></td><td><code>numeric(12,4)</code></td><td class="c"></td><td></td><td></td><td>計測値。NULL は「計測していない」、0 は「計測して 0」</td></tr>
@@ -499,7 +497,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>Run から複製（検索用）</td></tr>
   </tbody>
 </table></div>
-<p class="cons">① <code>ux_measurements_key</code> UNIQUE (run_id, metric_id, COALESCE(component_name, ''), COALESCE(scenario, ''), COALESCE(variant, ''))。NULL を取りうる列を含むため式インデックスで守る<br>② PASS / FAIL / ERROR / NOT_APPLICABLE</p><h4><code>findings</code></h4>
+<p class="cons">① <code>ux_measurements_key</code> UNIQUE (run_id, metric_id, COALESCE(component_name, ''), COALESCE(variant, ''))。NULL を取りうる列を含むため式インデックスで守る<br>② PASS / FAIL / ERROR / NOT_APPLICABLE</p><h4><code>findings</code></h4>
 <p class="tbl-desc">判定の根拠となる個々の違反。比較対象 Run と fingerprint を比べて、新規 / 継続 / 解消を決める</p>
 <div class="table-wrap"><table class="def">
   <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>

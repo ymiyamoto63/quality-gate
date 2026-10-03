@@ -14,7 +14,7 @@
 # 環境変数（コンテナのイメージが設定する）:
 #   QG_A11Y_TOOL_DIR    M-08 の検査ツールと Chromium を取得済みのディレクトリ
 #   QG_COMPLEXITY_TOOL_DIR  M-06（フロントエンド）の ESLint を取得済みのディレクトリ
-#   QG_COLLECTOR_CACHE  PMD などを置くキャッシュ（任意。既定: ~/.cache/quality-gate-collector）
+# PMD と k6 は ~/.cache/quality-gate-collector に取得する（HOME はキャッシュ用のボリューム）。
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -25,7 +25,7 @@ WORK=$(cd "$1" && pwd)
 mkdir -p "$2"
 REPORTS=$(cd "$2" && pwd)
 SRC="$WORK/src"
-CACHE=${QG_COLLECTOR_CACHE:-$HOME/.cache/quality-gate-collector}
+CACHE="$HOME/.cache/quality-gate-collector"
 
 load_profile
 load_env "$WORK/meta.env"

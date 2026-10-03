@@ -11,12 +11,7 @@ import org.hibernate.type.SqlTypes;
 import java.time.Instant;
 import java.util.UUID;
 
-/**
- * 取り込んだ成果物のメタデータ。
- *
- * <p>{@code deletedAt} はファイル実体を削除したことを表す。メタデータは残すため、
- * 保持期間を過ぎても「このとき何を取り込んだか」は追える。
- */
+/** 取り込んだ成果物のメタデータ。実体は ArtifactStore（ローカルファイル）に置く。 */
 @Entity
 @Table(name = "artifacts")
 public class ArtifactRecord {
@@ -51,9 +46,6 @@ public class ArtifactRecord {
 
     @Column(name = "uploaded_at", nullable = false)
     private Instant uploadedAt = Instant.now();
-
-    @Column(name = "deleted_at")
-    private Instant deletedAt;
 
     protected ArtifactRecord() {
     }
@@ -111,14 +103,5 @@ public class ArtifactRecord {
 
     public Instant getUploadedAt() {
         return uploadedAt;
-    }
-
-    /** 保持期間を過ぎてファイル実体を消したことを記録する。メタデータは残す。 */
-    public void markDeleted(Instant at) {
-        this.deletedAt = at;
-    }
-
-    public Instant getDeletedAt() {
-        return deletedAt;
     }
 }

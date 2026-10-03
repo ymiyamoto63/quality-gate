@@ -38,9 +38,4 @@ public enum Severity {
         }
         return INFO;
     }
-
-    /** M-05 の判定対象（重大・高）か。 */
-    public boolean isBlocking() {
-        return this == CRITICAL || this == HIGH;
-    }
 }

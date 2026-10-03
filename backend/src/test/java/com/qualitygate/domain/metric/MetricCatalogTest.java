@@ -53,14 +53,6 @@ class MetricCatalogTest {
         assertThat(ids).containsExactly("M-01", "M-99");
     }
 
-    /** 差分の良し悪しの向き。増えれば良い指標と、減れば良い指標がある。 */
-    @Test
-    void 値の向きを指標ごとに持つ() {
-        assertThat(MetricCatalog.of("M-01").higherIsBetter()).isTrue();
-        assertThat(MetricCatalog.of("M-03").higherIsBetter()).isFalse();
-        assertThat(MetricCatalog.of("M-05").higherIsBetter()).isFalse();
-    }
-
     @Test
     void カテゴリの宣言順が表示順になる() {
         assertThat(List.of(MetricCategory.values()).stream()

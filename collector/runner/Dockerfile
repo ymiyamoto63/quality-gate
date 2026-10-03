@@ -5,8 +5,8 @@
 #
 # JDK の版は計測プロファイルの JAVA_VERSION、Node.js の版は対象の .nvmrc で決まるため、
 # measure-isolated.sh が版ごとにビルドする（同じ版なら Docker のキャッシュで再ビルドしない）。
-ARG JAVA_VERSION=21
-ARG BASE_IMAGE=eclipse-temurin:${JAVA_VERSION}-jdk-noble
+# ベースのイメージ（JDK 入り）は measure-isolated.sh が渡す
+ARG BASE_IMAGE
 FROM ${BASE_IMAGE}
 
 ARG NODE_VERSION

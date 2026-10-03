@@ -296,7 +296,7 @@ CREATED ─(成果物)→ UPLOADING ─(finalize)→ FINALIZED → PROCESSING �
 
 ## 5. データベース
 
-DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql` と、機能を絞った `V002__simplify.sql`）で、ここでは繰り返さない。
+DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql`、機能を絞った `V002__simplify.sql`、使われなくなった列を消した `V003__drop_unused_columns.sql`）で、ここでは繰り返さない。
 
 ### 5.1 方針
 
@@ -330,8 +330,8 @@ repositories ──▶ runs ──┬──▶ artifacts
 
 - `status` は `PASS` / `FAIL` / `ERROR` / `NOT_APPLICABLE`。`threshold` に判定に使った合格ラインを残す（環境変数を後から変えても、判定済みの根拠が分かる）
 - `variant` は値どうしを比べられるかを分ける計測条件（性能の計測環境名）。前回値は `variant` の一致する行からだけ引く
-- `component_name` / `scenario` / `variant` は NULL を取りうるため、一意性は `COALESCE` を挟んだ式インデックス（`ux_measurements_key`）で守る
-- 前回値（`previous_value`）は判定時に焼き付ける。比較対象 Run が消えても前回比の表示が壊れない
+- `component_name` / `variant` は NULL を取りうるため、一意性は `COALESCE` を挟んだ式インデックス（`ux_measurements_key`）で守る
+- 前回値（`previous_value`）は判定時に焼き付ける。比較対象 Run が消えても、判定したときの前回値を辿れる
 
 ### 5.3 インデックス
 
@@ -352,7 +352,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 | 適用済みのファイル | コメントも含めて変更しない（Flyway のチェックサムが変わり、適用済みの DB で検証に失敗する）。修正は新しいマイグレーションで行う。そのため `V001__init.sql` の先頭のコメントは旧パス（`docs/spec/06-database-design.md`）を指したままになっている（この章のこと） |
 | 検証 | `FlywayMigrationIT` が空の DB に全マイグレーションを適用する |
 
-本番の運用を始める前に、それまでのマイグレーションを `V001__init.sql` 1 本にまとめた。機能を絞ったときの変更（利用者・監査ログ・スキップの申告・セッションのテーブルの削除、PR の Run の削除、注意を合格に・未計測を計測エラーに寄せる変換）は `V002__simplify.sql` にある。
+本番の運用を始める前に、それまでのマイグレーションを `V001__init.sql` 1 本にまとめた。機能を絞ったときの変更（利用者・監査ログ・スキップの申告・セッションのテーブルの削除、PR の Run の削除、注意を合格に・未計測を計測エラーに寄せる変換）は `V002__simplify.sql`、その後に使われなくなった列（`measurements.scenario`・`artifacts.deleted_at`）の削除は `V003__drop_unused_columns.sql` にある。
 
 ---
 
@@ -496,7 +496,7 @@ quality-gate 自身も WCAG 2.2 AA を満たす。PR の CI で axe-core の cri
 | # | 要件 |
 | --- | --- |
 | A-1 | すべての機能をキーボードだけで操作できる |
-| A-2 | フォーカスを常に見えるようにする。PrimeVue の既定のリングを消さない |
+| A-2 | フォーカスを常に見えるようにする。`:focus-visible` のリング（`tokens.css`）を消さない |
 | A-3 | ステータスを色だけで伝えない（7.3） |
 | A-5 | 見出しレベルを飛ばさない。各画面に `<h1>` が 1 つ |
 | A-6 | 入力欄に `<label>` を関連付ける。エラーは `aria-describedby` で結び、`aria-invalid` を付ける |

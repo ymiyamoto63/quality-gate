@@ -44,10 +44,6 @@ public class MonitoredRepository {
         this.defaultBranch = defaultBranch;
     }
 
-    public String fullName() {
-        return owner + "/" + name;
-    }
-
     public UUID getId() {
         return id;
     }

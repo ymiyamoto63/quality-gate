@@ -36,10 +36,6 @@ public class Measurement {
     @Column(name = "metric_id", nullable = false, length = 8)
     private String metricId;
 
-    /** シナリオ単位の判定（M-03 の性能シナリオなど）に使う。M-01 などでは null。 */
-    @Column
-    private String scenario;
-
     @Column(name = "component_name")
     private String componentName;
 
@@ -123,10 +119,6 @@ public class Measurement {
 
     public String getVariant() {
         return variant;
-    }
-
-    public String getScenario() {
-        return scenario;
     }
 
     public MeasurementStatus getStatus() {
