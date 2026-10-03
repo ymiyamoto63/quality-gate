@@ -296,7 +296,7 @@ CREATED ─(成果物)→ UPLOADING ─(finalize)→ FINALIZED → PROCESSING �
 
 ## 5. データベース
 
-DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql`、機能を絞った `V002__simplify.sql`、使われなくなった列を消した `V003__drop_unused_columns.sql`）で、ここでは繰り返さない。
+DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql`）で、ここでは繰り返さない。
 
 ### 5.1 方針
 
@@ -349,10 +349,10 @@ repositories ──▶ runs ──┬──▶ artifacts
 | 項目 | 規約 |
 | --- | --- |
 | 配置と命名 | `backend/src/main/resources/db/migration/V<連番3桁>__<snake_case の説明>.sql` |
-| 適用済みのファイル | コメントも含めて変更しない（Flyway のチェックサムが変わり、適用済みの DB で検証に失敗する）。修正は新しいマイグレーションで行う。そのため `V001__init.sql` の先頭のコメントは旧パス（`docs/spec/06-database-design.md`）を指したままになっている（この章のこと） |
+| 適用済みのファイル | コメントも含めて変更しない（Flyway のチェックサムが変わり、適用済みの DB で検証に失敗する）。修正は新しいマイグレーションで行う |
 | 検証 | `FlywayMigrationIT` が空の DB に全マイグレーションを適用する |
 
-本番の運用を始める前に、それまでのマイグレーションを `V001__init.sql` 1 本にまとめた。機能を絞ったときの変更（利用者・監査ログ・スキップの申告・セッションのテーブルの削除、PR の Run の削除、注意を合格に・未計測を計測エラーに寄せる変換）は `V002__simplify.sql`、その後に使われなくなった列（`measurements.scenario`・`artifacts.deleted_at`）の削除は `V003__drop_unused_columns.sql` にある。
+本番の運用を始める前に、それまでのマイグレーション（機能を絞ったときのテーブル・列の削除を含む）を `V001__init.sql` 1 本にまとめ直した。まとめ直す前のマイグレーションを適用した DB は検証に失敗するため、作り直す（`docker compose down -v` など）。
 
 ---
 

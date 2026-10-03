@@ -391,7 +391,7 @@ NOT_APPLICABLE は影響しない</pre>
 
 <section id="database">
 <h2>10. データベース</h2>
-<p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> で作り、<code>V002__simplify.sql</code> で機能を絞り（利用者・監査ログ・セッション・スキップの申告のテーブルを削除）、<code>V003__drop_unused_columns.sql</code> で使われなくなった列を消しました。現在のテーブルは次の 5 つです。</p>
+<p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> 1 本で作ります。現在のテーブルは次の 5 つです。</p>
 
 <h3>10.1 設計方針</h3>
 <div class="table-wrap"><table>
