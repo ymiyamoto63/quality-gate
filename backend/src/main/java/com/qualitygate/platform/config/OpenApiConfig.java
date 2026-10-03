@@ -13,7 +13,7 @@ import java.util.List;
  * 生成される OpenAPI 仕様のメタ情報。
  *
  * <p>ここで生成された {@code api/openapi.yml} が、フロントエンドの型生成
- * （openapi-typescript）と M-07（破壊的変更の検出）の入力になる。
+ * （openapi-typescript）の入力になる。
  */
 @Configuration
 public class OpenApiConfig {
@@ -28,8 +28,8 @@ public class OpenApiConfig {
                                 リポジトリの品質指標を計測・判定・可視化する API。
 
                                 認証は 2 経路ある。
-                                - 参照・操作 API: GitHub OAuth ログイン後のセッション Cookie
-                                - Ingest API: リポジトリ単位の Ingest Token（書き込み専用）
+                                - 参照 API: 共有のアカウントでログインした後のセッション Cookie
+                                - Ingest API: 収集ランナー用の Ingest Token（書き込み専用）
                                 """)
                         .license(new License().name("Proprietary")))
                 .servers(List.of(new Server().url("/").description("同一オリジン")));

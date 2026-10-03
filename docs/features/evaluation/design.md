@@ -45,7 +45,7 @@
 | `AxeJsonAdapter` | `axe-json` | M-08 |
 | `JUnitXmlAdapter` | `test-junit-xml` | M-09 / M-10 |
 
-XML は外部実体参照と外部 DTD を無効にして読み（`SafeXml`）、JSON は深さとサイズに上限を設ける。いずれもストリーミングで読む。
+XML は外部実体参照と外部 DTD を無効にし（`SafeXml`）、StAX でストリーミングで読む。JSON は Jackson で木構造に読み、入れ子の深さや文字列の長さは Jackson の既定の上限に任せる。ファイルの大きさは取り込み時の上限（1 ファイル 50MB）で抑える。
 
 ## 5. 指標ごとの判定
 
