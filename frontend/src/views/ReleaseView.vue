@@ -15,7 +15,7 @@ type HistoryItem = components['schemas']['ReleaseHistoryItem']
 /**
  * リリース判定（アプリの画面はこれ 1 つ）。
  *
- * 読み手に経営陣や開発に詳しくない人を想定し、結論（リリース可 / 不可）を最上部に大きく出してから、
+ * 読み手に経営陣をはじめ開発に携わらない方を想定し、結論（リリース可 / 不可）を最上部に大きく出してから、
  * 指標ごとの合否、各指標の説明と基準の根拠、判定の履歴の順に並べる。判定・理由・説明の文言はサーバが持つ。
  * 指定が無ければ最新の計測を見せる。タグ・コミットの指定は URL の ?ref= に置き、同じ判定を URL で共有できる。
  */
@@ -126,7 +126,7 @@ function print(): void {
     <p v-else-if="state === 'error'" role="alert">{{ errorMessage }}</p>
 
     <template v-else-if="report && decision">
-      <!-- 結論を最初に置く。経営陣はここだけ読めば足りるようにする -->
+      <!-- 結論を最初に置く。ここを見れば結論がすぐ分かるようにする -->
       <section
         class="qg-release__decision"
         :data-decision="report.decision"
