@@ -1,15 +1,12 @@
 package com.qualitygate.release;
 
 import com.qualitygate.domain.model.MeasurementStatus;
-import com.qualitygate.domain.model.Severity;
-import com.qualitygate.domain.model.Verdict;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotNull;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
-import java.util.UUID;
 
 /**
  * リリース判定。指定したタグ・コミット（指定が無ければ最新の計測）の、全指標の合否と説明。
@@ -20,7 +17,6 @@ import java.util.UUID;
 @Schema(description = "リリース判定。判定済みの計測（Run）から組み立てる")
 public record ReleaseReportResponse(
         @NotNull String repositoryFullName,
-        @NotNull @Schema(nullable = true, description = "指定したタグ・コミット。最新の計測を見ているときは null") String ref,
         @NotNull @Schema(nullable = true, description = "判定したコミット。計測が 1 件も無ければ null") String commitSha,
         @NotNull @Schema(nullable = true) String commitUrl,
         @NotNull ReleaseDecision decision,
@@ -34,11 +30,8 @@ public record ReleaseReportResponse(
         List<ReleaseGuide> guides) {
 
     public record ReleaseRun(
-            @NotNull UUID runId,
             @NotNull Instant measuredAt,
-            @NotNull String branch,
             @NotNull @Schema(description = "計測したコミットを指すタグ") List<String> tags,
-            @NotNull Verdict verdict,
             @NotNull @Schema(nullable = true, description = "計測したワークフローの実行 URL") String ciRunUrl,
             @NotNull @Schema(nullable = true,
                     description = "比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ")
@@ -52,7 +45,6 @@ public record ReleaseReportResponse(
     public record ReleaseMetric(
             @NotNull String metricId,
             @NotNull String name,
-            @NotNull String category,
             @NotNull @Schema(nullable = true) String componentName,
             @NotNull @Schema(nullable = true) String variantLabel,
             @NotNull @Schema(description = "PASS（合格）/ FAIL（不合格）/ ERROR（計測できなかった。不合格として扱う）")
@@ -66,7 +58,6 @@ public record ReleaseReportResponse(
     }
 
     public record ReleaseFinding(
-            @NotNull Severity severity,
             @NotNull String title,
             @NotNull @Schema(nullable = true, description = "ファイルと行（backend/src/Foo.java:42 など）") String location,
             @NotNull @Schema(nullable = true, description = "GitHub の該当箇所") String url) {

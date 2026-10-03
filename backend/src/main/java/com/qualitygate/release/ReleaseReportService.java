@@ -5,7 +5,6 @@ import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.metric.MetricCatalog;
-import com.qualitygate.domain.metric.MetricDefinition;
 import com.qualitygate.domain.metric.MetricGuide;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
@@ -85,26 +84,23 @@ public class ReleaseReportService {
                 // 指定の検証（空白や使えない文字）は、計測が無くても同じように返す
                 resolver.validate(ref);
             }
-            return notMeasured(fullName, latest ? null : ref.strip(), null,
+            return notMeasured(fullName, null,
                     "まだ 1 度も計測されていません。収集ランナーで計測してから、もう一度確認してください。");
         }
 
         List<Run> candidates;
-        String resolvedRef = null;
         String commitSha;
         if (latest) {
             Optional<Run> newest = runs.findFirstByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(
                     repository.get().getId(), RunStatus.EVALUATED);
             if (newest.isEmpty()) {
-                return notMeasured(fullName, null, null,
+                return notMeasured(fullName, null,
                         "判定まで終わった計測がありません。収集ランナーで計測してから、もう一度確認してください。");
             }
             commitSha = newest.get().getCommitSha();
             candidates = List.of(newest.get());
         } else {
-            ReleaseRefResolver.Resolved resolved = resolver.resolve(repository.get(), ref);
-            resolvedRef = resolved.ref();
-            commitSha = resolved.commitSha();
+            commitSha = resolver.resolve(repository.get(), ref);
             candidates = runs.findByRepositoryIdAndCommitShaOrderByMeasuredAtDescAttemptDesc(
                     repository.get().getId(), commitSha);
         }
@@ -112,7 +108,7 @@ public class ReleaseReportService {
         Run chosen = candidates.stream().filter(run -> run.getStatus() == RunStatus.EVALUATED)
                 .findFirst().orElse(null);
         if (chosen == null) {
-            return notMeasured(fullName, resolvedRef, commitSha, candidates.isEmpty()
+            return notMeasured(fullName, commitSha, candidates.isEmpty()
                     ? "このコミットはまだ計測されていません。収集ランナーの commit にタグかコミットを指定して計測してから、もう一度確認してください。"
                     : "このコミットの計測（%d 件）は、どれも判定まで終わっていません（処理の失敗など）。計測し直してください。"
                             .formatted(candidates.size()));
@@ -125,13 +121,12 @@ public class ReleaseReportService {
                 : ReleaseDecision.NOT_RELEASABLE;
         return new ReleaseReportResponse(
                 fullName,
-                resolvedRef,
                 commitSha,
                 SourceLinks.commit(fullName, commitSha),
                 decision,
                 reasonOf(decision, counts, rows),
-                new ReleaseReportResponse.ReleaseRun(chosen.getId(), chosen.getMeasuredAt(), chosen.getBranch(),
-                        chosen.getTags(), chosen.getVerdict(), chosen.getCiRunUrl(), chosen.getBaseCommitSha()),
+                new ReleaseReportResponse.ReleaseRun(chosen.getMeasuredAt(), chosen.getTags(),
+                        chosen.getCiRunUrl(), chosen.getBaseCommitSha()),
                 counts,
                 rows,
                 guidesOf(rows));
@@ -151,7 +146,7 @@ public class ReleaseReportService {
                 .filter(run -> seen.add(run.getCommitSha()))
                 .limit(HISTORY_LIMIT)
                 .map(run -> new ReleaseHistoryResponse.ReleaseHistoryItem(run.getMeasuredAt(), run.getCommitSha(),
-                        run.getBranch(), run.getTags(), run.getVerdict(),
+                        run.getTags(), run.getVerdict(),
                         run.getTags().isEmpty() ? run.getCommitSha() : run.getTags().getFirst()))
                 .toList();
         return new ReleaseHistoryResponse(items);
@@ -163,8 +158,8 @@ public class ReleaseReportService {
         return repositories.findByOwnerAndName(fullName.substring(0, slash), fullName.substring(slash + 1));
     }
 
-    private static ReleaseReportResponse notMeasured(String fullName, String ref, String commitSha, String reason) {
-        return new ReleaseReportResponse(fullName, ref, commitSha,
+    private static ReleaseReportResponse notMeasured(String fullName, String commitSha, String reason) {
+        return new ReleaseReportResponse(fullName, commitSha,
                 commitSha == null ? null : SourceLinks.commit(fullName, commitSha),
                 ReleaseDecision.NOT_MEASURED, reason, null, new ReleaseReportResponse.ReleaseCounts(0, 0, 0),
                 List.of(), List.of());
@@ -197,7 +192,6 @@ public class ReleaseReportService {
     }
 
     private ReleaseReportResponse.ReleaseMetric rowOf(Measurement m, List<Finding> active, Run run, String fullName) {
-        MetricDefinition definition = MetricCatalog.of(m.getMetricId());
         List<Finding> related = m.getStatus() == MeasurementStatus.PASS ? List.of() : active.stream()
                 .filter(f -> f.getMetricId().equals(m.getMetricId()))
                 .filter(f -> m.getComponentName() == null || m.getComponentName().equals(f.getComponentName()))
@@ -206,11 +200,11 @@ public class ReleaseReportService {
                         .thenComparing(f -> f.getLine() == null ? 0 : f.getLine()))
                 .toList();
         List<ReleaseReportResponse.ReleaseFinding> shown = related.stream().limit(MAX_FINDINGS)
-                .map(f -> new ReleaseReportResponse.ReleaseFinding(f.getSeverity(), f.getTitle(), locationOf(f),
+                .map(f -> new ReleaseReportResponse.ReleaseFinding(f.getTitle(), locationOf(f),
                         SourceLinks.blob(fullName, run.getCommitSha(), f.getFilePath(), f.getLine())))
                 .toList();
-        return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), definition.name(),
-                definition.category().displayName(), m.getComponentName(),
+        return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), MetricCatalog.of(m.getMetricId()).name(),
+                m.getComponentName(),
                 m.getVariant(), m.getStatus(),
                 m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason(),
                 shown, related.size());

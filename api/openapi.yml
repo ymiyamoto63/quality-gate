@@ -295,14 +295,6 @@ components:
           - string
           - "null"
           description: ファイルと行（backend/src/Foo.java:42 など）
-        severity:
-          type: string
-          enum:
-          - CRITICAL
-          - HIGH
-          - MEDIUM
-          - LOW
-          - INFO
         title:
           type: string
         url:
@@ -312,7 +304,6 @@ components:
           description: GitHub の該当箇所
       required:
       - location
-      - severity
       - title
       - url
     ReleaseGuide:
@@ -355,8 +346,6 @@ components:
     ReleaseHistoryItem:
       type: object
       properties:
-        branch:
-          type: string
         commitSha:
           type: string
         measuredAt:
@@ -376,7 +365,6 @@ components:
           - PASS
           - FAIL
       required:
-      - branch
       - commitSha
       - measuredAt
       - ref
@@ -394,8 +382,6 @@ components:
     ReleaseMetric:
       type: object
       properties:
-        category:
-          type: string
         componentName:
           type:
           - string
@@ -444,7 +430,6 @@ components:
           - string
           - "null"
       required:
-      - category
       - componentName
       - findingCount
       - findings
@@ -490,11 +475,6 @@ components:
           description: 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない
           items:
             $ref: "#/components/schemas/ReleaseMetric"
-        ref:
-          type:
-          - string
-          - "null"
-          description: 指定したタグ・コミット。最新の計測を見ているときは null
         repositoryFullName:
           type: string
         run:
@@ -509,7 +489,6 @@ components:
       - decisionReason
       - guides
       - metrics
-      - ref
       - repositoryFullName
       - run
     ReleaseRun:
@@ -520,8 +499,6 @@ components:
           - string
           - "null"
           description: 比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ
-        branch:
-          type: string
         ciRunUrl:
           type:
           - string
@@ -530,27 +507,16 @@ components:
         measuredAt:
           type: string
           format: date-time
-        runId:
-          type: string
-          format: uuid
         tags:
           type: array
           description: 計測したコミットを指すタグ
           items:
             type: string
-        verdict:
-          type: string
-          enum:
-          - PASS
-          - FAIL
       required:
       - baseCommitSha
-      - branch
       - ciRunUrl
       - measuredAt
-      - runId
       - tags
-      - verdict
     UploadArtifactResponse:
       type: object
       properties:

@@ -84,7 +84,6 @@ class ReleaseReportApiIT {
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
                     json.extractingPath("$.repositoryFullName").isEqualTo("ymiyamoto63/quality-gate");
-                    json.extractingPath("$.ref").isEqualTo("1111111");
                     json.extractingPath("$.commitSha").isEqualTo(PASSING);
                     json.extractingPath("$.commitUrl")
                             .isEqualTo("https://github.com/ymiyamoto63/quality-gate/commit/" + PASSING);
@@ -139,7 +138,6 @@ class ReleaseReportApiIT {
         assertThat(mvc.get().uri("/api/v1/release"))
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
-                    json.extractingPath("$.ref").isNull();
                     json.extractingPath("$.commitSha").isEqualTo(REMEASURED);
                     json.extractingPath("$.decision").isEqualTo("RELEASABLE");
                 });
@@ -177,7 +175,6 @@ class ReleaseReportApiIT {
         assertThat(mvc.get().uri("/api/v1/release?ref={ref}", "release/2026-09"))
                 .hasStatusOk().bodyJson().satisfies(content -> {
                     var json = content.assertThat();
-                    json.extractingPath("$.ref").isEqualTo("release/2026-09");
                     json.extractingPath("$.commitSha").isEqualTo(FAILING);
                     json.extractingPath("$.decision").isEqualTo("NOT_RELEASABLE");
                 });

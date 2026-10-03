@@ -193,8 +193,6 @@ export interface components {
     ReleaseFinding: {
       /** @description ファイルと行（backend/src/Foo.java:42 など） */
       location: string | null
-      /** @enum {string} */
-      severity: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO'
       title: string
       /** @description GitHub の該当箇所 */
       url: string | null
@@ -217,7 +215,6 @@ export interface components {
       tools: string
     }
     ReleaseHistoryItem: {
-      branch: string
       commitSha: string
       /** Format: date-time */
       measuredAt: string
@@ -232,7 +229,6 @@ export interface components {
       items: components['schemas']['ReleaseHistoryItem'][]
     }
     ReleaseMetric: {
-      category: string
       componentName: string | null
       /**
        * Format: int32
@@ -270,8 +266,6 @@ export interface components {
       guides: components['schemas']['ReleaseGuide'][]
       /** @description 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない */
       metrics: components['schemas']['ReleaseMetric'][]
-      /** @description 指定したタグ・コミット。最新の計測を見ているときは null */
-      ref: string | null
       repositoryFullName: string
       /** @description 判定に使った計測。未計測なら null */
       run: components['schemas']['ReleaseRun']
@@ -279,17 +273,12 @@ export interface components {
     ReleaseRun: {
       /** @description 比較元のコミット。破壊的変更・スキップの増加はここからの差で数える。タグで計測したときは前のタグ */
       baseCommitSha: string | null
-      branch: string
       /** @description 計測したワークフローの実行 URL */
       ciRunUrl: string | null
       /** Format: date-time */
       measuredAt: string
-      /** Format: uuid */
-      runId: string
       /** @description 計測したコミットを指すタグ */
       tags: string[]
-      /** @enum {string} */
-      verdict: 'PASS' | 'FAIL'
     }
     UploadArtifactResponse: {
       /** Format: uuid */

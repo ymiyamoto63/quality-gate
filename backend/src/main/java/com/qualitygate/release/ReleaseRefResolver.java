@@ -29,29 +29,16 @@ public class ReleaseRefResolver {
         this.runs = runs;
     }
 
-    /** 指定の種類。 */
-    public enum RefType {
-        TAG,
-        COMMIT
-    }
-
-    /**
-     * @param ref       利用者が指定した文字列（前後の空白を除いたもの）
-     * @param commitSha 解決したコミット SHA。計測していない短い SHA は指定のまま
-     */
-    public record Resolved(String ref, RefType type, String commitSha) {
-    }
-
-    public Resolved resolve(MonitoredRepository repository, String input) {
+    /** @return 解決したコミット SHA。計測していない短い SHA は指定のまま */
+    public String resolve(MonitoredRepository repository, String input) {
         String ref = validate(input);
         if (SHA.matcher(ref).matches()) {
             return resolveCommit(repository, ref.toLowerCase(Locale.ROOT));
         }
-        String commitSha = runs.findLatestCommitShaByTag(repository.getId(), ref)
+        return runs.findLatestCommitShaByTag(repository.getId(), ref)
                 .orElseThrow(() -> new ApiException(ErrorCode.RESOURCE_NOT_FOUND,
                         ("タグ %s を付けたコミットの計測がありません。収集ランナーでタグを指定して計測するか、"
                                 + "コミット SHA で指定してください").formatted(ref)));
-        return new Resolved(ref, RefType.TAG, commitSha);
     }
 
     /** 指定を検証し、前後の空白を除いたものを返す。 */
@@ -68,12 +55,12 @@ public class ReleaseRefResolver {
     }
 
     /** 計測していない短い SHA は完全な SHA にできないが、判定は「未計測」で変わらないため止めない。 */
-    private Resolved resolveCommit(MonitoredRepository repository, String sha) {
+    private String resolveCommit(MonitoredRepository repository, String sha) {
         List<String> measured = runs.findCommitShasLike(repository.getId(), sha + "%");
         if (measured.size() > 1) {
             throw new ApiException(ErrorCode.VALIDATION_FAILED,
                     "%s は複数のコミットに一致します。もっと長く指定してください".formatted(sha));
         }
-        return new Resolved(sha, RefType.COMMIT, measured.isEmpty() ? sha : measured.getFirst());
+        return measured.isEmpty() ? sha : measured.getFirst();
     }
 }
