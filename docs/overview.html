@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>quality-gate 仕様概要</title>
+<style>
+:root {
+  --bg: #f7f6f3; --surface: #ffffff; --text: #1f1e1b; --muted: #5f5d57;
+  --border: #e2e0da; --accent: #2f5bd3; --accent-soft: #e8eefc;
+  --pass: #0ca30c; --fail: #d03b3b; --error: #ec835a; --neutral: #898781;
+  --code-bg: #f0eee9;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161614; --surface: #1f1f1c; --text: #ecebe7; --muted: #a8a59e;
+    --border: #34332f; --accent: #8aa8ff; --accent-soft: #232b40; --code-bg: #2a2926;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #161614; --surface: #1f1f1c; --text: #ecebe7; --muted: #a8a59e;
+  --border: #34332f; --accent: #8aa8ff; --accent-soft: #232b40; --code-bg: #2a2926;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font-family: "Hiragino Sans", "Noto Sans JP", "Yu Gothic UI", system-ui, sans-serif;
+  line-height: 1.75; font-size: 15px;
+}
+.layout { max-width: 1280px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 40px; }
+.wrap { min-width: 0; padding: 32px 0 80px; }
+header.hero { padding: 24px 0 8px; }
+header.hero p.kicker { margin: 0; color: var(--muted); font-size: 13px; letter-spacing: .08em; }
+h1 { font-size: 30px; margin: 4px 0 12px; line-height: 1.35; }
+h2 { font-size: 21px; margin: 48px 0 14px; padding-bottom: 6px; border-bottom: 2px solid var(--border); }
+h3 { font-size: 16px; margin: 24px 0 8px; }
+p { margin: 8px 0; }
+.lead { font-size: 17px; }
+.pipe { list-style: none; padding: 0; margin: 16px 0; display: grid; gap: 14px; }
+.pipe-step { position: relative; margin: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px;
+  display: grid; grid-template-columns: 150px repeat(3, minmax(0, 1fr)); gap: 4px 16px; font-size: 14px; line-height: 1.6; }
+.pipe-step:not(:last-child)::after { content: "↓"; position: absolute; left: 24px; bottom: -17px; color: var(--muted); font-size: 14px; line-height: 1; z-index: 1; background: var(--bg); padding: 0 2px; }
+.pipe-head { display: flex; gap: 8px; align-items: flex-start; }
+.pipe-head b { display: block; font-size: 15px; }
+.pipe-head .pipe-sub { display: block; color: var(--muted); font-size: 12px; }
+.pipe-head .pipe-no { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: var(--surface); font-weight: 700; font-size: 13px; line-height: 1; display: inline-flex; align-items: center; justify-content: center; }
+.pipe-cell { margin: 0; min-width: 0; overflow-wrap: anywhere; }
+.pipe-cell > span { display: block; font-size: 11px; font-weight: 600; color: var(--muted); }
+table.art { font-size: 13px; }
+table.art th, table.art td { padding: 8px 10px; }
+table.art td:nth-child(1), table.art td:nth-child(3), table.art td:nth-child(6) { white-space: nowrap; }
+@media (max-width: 860px) {
+  .pipe-step { grid-template-columns: 1fr; }
+}
+h4 { font-size: 15px; margin: 28px 0 4px; }
+.tbl-desc { color: var(--muted); font-size: 14px; margin: 0 0 4px; }
+.cons { font-size: 13px; color: var(--muted); margin: 4px 0 0; line-height: 1.7; }
+table.def td:nth-child(1), table.def td:nth-child(2) { white-space: nowrap; }
+table.def td.c { text-align: center; }
+.er-wrap { overflow-x: auto; margin: 12px 0; padding: 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+svg.er { display: block; width: 100%; min-width: 720px; height: auto; font-family: inherit; }
+.er-ent rect { fill: var(--surface); stroke: var(--text-soft, var(--muted)); stroke-width: 1.2; }
+.er-hdr { fill: var(--accent-soft); }
+.er-title { font-size: 13px; font-weight: 700; fill: var(--text); }
+.er-en { font-size: 11px; fill: var(--muted); font-family: ui-monospace, Menlo, Consolas, monospace; }
+.er-attr { font-size: 12px; fill: var(--text); }
+.er-key { font-size: 10px; font-weight: 700; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.er-pk { fill: var(--accent); } .er-fk { fill: var(--muted); }
+.er-line { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.er-dash { stroke-dasharray: 5 4; }
+.er-mark { fill: none; stroke: var(--muted); stroke-width: 1.4; }
+.er-opt { fill: var(--surface); stroke: var(--muted); stroke-width: 1.4; }
+.er-note, .er-card { font-size: 11px; fill: var(--muted); }
+.er-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 13px; color: var(--muted); margin: 0 0 8px; }
+html { scroll-behavior: smooth; }
+@media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+section { scroll-margin-top: 16px; }
+nav.toc { position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding: 40px 0 24px; }
+nav.toc .toc-title { margin: 0 0 10px 12px; font-size: 12px; font-weight: 600; letter-spacing: .08em; color: var(--muted); }
+nav.toc ol { list-style: none; margin: 0; padding: 0; border-left: 2px solid var(--border); }
+nav.toc li { margin: 0; }
+nav.toc a {
+  display: block; margin-left: -2px; padding: 6px 12px; border-left: 2px solid transparent;
+  font-size: 14px; line-height: 1.5; color: var(--muted); text-decoration: none;
+}
+nav.toc a:hover { color: var(--text); border-left-color: var(--muted); }
+nav.toc a[aria-current="true"] { color: var(--accent); border-left-color: var(--accent); font-weight: 600; }
+nav.toc a:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+code { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .88em;
+  background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+.cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 16px 0; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
+.card h3 { margin: 0 0 6px; font-size: 15px; }
+.card p { margin: 0; color: var(--muted); font-size: 14px; }
+.table-wrap { overflow-x: auto; margin: 12px 0; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); }
+table { border-collapse: collapse; width: 100%; font-size: 14px; }
+th, td { text-align: left; padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+th { background: var(--accent-soft); font-weight: 600; white-space: nowrap; }
+tr:last-child td { border-bottom: none; }
+td.id { white-space: nowrap; font-weight: 600; }
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 8px; margin: 16px 0; }
+.flow .step { flex: 1 1 160px; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+.flow .step b { display: block; font-size: 14px; }
+.flow .step span { font-size: 13px; color: var(--muted); }
+.flow .arrow { align-self: center; color: var(--muted); font-size: 18px; }
+.callout { border-left: 4px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0; }
+.status { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.dot { font-size: 14px; }
+.pass .dot { color: var(--pass); } .fail .dot { color: var(--fail); }
+.err .dot { color: var(--error); } .neu .dot { color: var(--neutral); }
+pre { background: var(--code-bg); padding: 12px 16px; border-radius: 8px; overflow-x: auto; font-size: 13px; line-height: 1.6; }
+ul { padding-left: 1.3em; margin: 8px 0; }
+li { margin: 3px 0; }
+footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
+@media (max-width: 860px) {
+  .layout { display: block; padding: 0 16px; }
+  nav.toc { position: static; max-height: none; padding: 20px 0 0; }
+  nav.toc ol { border-left: none; display: flex; flex-wrap: wrap; gap: 6px; }
+  nav.toc a { margin-left: 0; padding: 3px 10px; font-size: 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); }
+  nav.toc a[aria-current="true"] { border-color: var(--accent); }
+}
+@media (max-width: 640px) {
+  .wrap { padding: 20px 0 60px; }
+  h1 { font-size: 24px; }
+  .flow .arrow { display: none; }
+}
+@media print {
+  nav.toc { display: none; }
+  .layout { display: block; }
+  body { background: #fff; }
+}
+</style>
+</head>
+<body>
+<div class="layout">
+<nav class="toc" aria-label="目次">
+  <p class="toc-title">目次</p>
+  <ol>
+    <li><a href="#features">1. 主な特徴</a></li>
+    <li><a href="#flow">2. 全体の流れ</a></li>
+    <li><a href="#usecases">3. ユースケース</a></li>
+    <li><a href="#metrics">4. 12 の品質指標</a></li>
+    <li><a href="#judge">5. 判定のルール</a></li>
+    <li><a href="#screen">6. 画面</a></li>
+    <li><a href="#collector">7. 収集ランナー</a></li>
+    <li><a href="#artifacts">8. 成果物の流れ</a></li>
+    <li><a href="#backend">9. バックエンド</a></li>
+    <li><a href="#database">10. データベース</a></li>
+    <li><a href="#api">11. API</a></li>
+    <li><a href="#config">12. 主な設定</a></li>
+    <li><a href="#nfr">13. 非機能要件・制約</a></li>
+  </ol>
+</nav>
+<main class="wrap">
+
+<header class="hero">
+  <p class="kicker">QUALITY-GATE ／ 仕様概要</p>
+  <h1>1 つのアプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
+  <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定し、<strong>リリース可 / リリース不可</strong>を、開発に携わっていない方を含め、誰にでもひと目で分かる形で示す社内向け Web アプリケーションです。</p>
+</header>
+
+<section id="features">
+<h2>1. 主な特徴</h2>
+<div class="cards">
+  <div class="card"><h3>画面はリリース判定の 1 枚だけ</h3><p>最上部に結論を大きく表示し、その下に基準ごとの合否・根拠・履歴を並べる。印刷して PDF の証跡にできる。</p></div>
+  <div class="card"><h3>合否は 2 値</h3><p>指標は「合格 / 不合格」だけ。測れなかった指標は計測エラーとして不合格に数える（fail-closed）。</p></div>
+  <div class="card"><h3>合格ラインは環境変数</h3><p><code>QG_*</code> で決める。判定に使った値は計測ごとに保存され、後から変えても過去の結論は変わらない。</p></div>
+  <div class="card"><h3>共有アカウントでログイン</h3><p>全員で 1 つのアカウントを共有。GitHub アカウントは不要。ロールも持たない。</p></div>
+  <div class="card"><h3>対象リポジトリには何も置かない</h3><p>計測は quality-gate 側の収集ランナーが対象を clone して行う。対象チームに保守を求めない。</p></div>
+  <div class="card"><h3>マージはブロックしない</h3><p>可視化に徹する。しきい値の妥当性を実績で確かめる前のブロックはゲートを形骸化させるため。</p></div>
+</div>
+</section>
+
+<section id="flow">
+<h2>2. 全体の流れ</h2>
+<div class="flow" role="list">
+  <div class="step" role="listitem"><b>対象リポジトリ</b><span>private。読み取り専用トークンで clone</span></div>
+  <div class="arrow" aria-hidden="true">→</div>
+  <div class="step" role="listitem"><b>収集ランナー</b><span>GitHub Actions（専有のセルフホストランナー）で fetch → measure → submit</span></div>
+  <div class="arrow" aria-hidden="true">→</div>
+  <div class="step" role="listitem"><b>quality-gate アプリ</b><span>Ingest API で取り込み → 正規化 → 判定 → 保存</span></div>
+  <div class="arrow" aria-hidden="true">→</div>
+  <div class="step" role="listitem"><b>ブラウザ</b><span>リリース判定の画面を閲覧・印刷</span></div>
+</div>
+<div class="table-wrap"><table>
+  <thead><tr><th>要素</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td>収集ランナー</td><td>対象を取得して計測し、成果物を Ingest API に送る。計測方法とツールの版は <code>collector/</code> に置く</td></tr>
+    <tr><td>quality-gate アプリ</td><td>Spring Boot 1 プロセス。成果物を取り込み、合格ラインで判定して保存する。<strong>テストやスキャンは実行しない</strong></td></tr>
+    <tr><td>PostgreSQL 17</td><td>Run・指標値・違反を保存</td></tr>
+    <tr><td>成果物ストア</td><td>取り込んだ元の成果物（ローカル FS、<code>QG_ARTIFACT_ROOT</code>）</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li>実行に必要なのは <strong>PostgreSQL と Spring Boot の 2 プロセスだけ</strong>。判定は取り込みの確定時にその場で行い、キュー・キャッシュ・バッチは持たない</li>
+  <li>Vue 3 の SPA を Spring Boot に同梱し同一オリジンで配信（CORS 不要、HttpOnly セッション Cookie で認証）</li>
+  <li>バックエンドは GitHub API を呼ばない。比較元やタグは収集ランナーが clone した履歴から求めて送る</li>
+</ul>
+</section>
+
+<section id="usecases">
+<h2>3. ユースケース</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>UC</th><th>利用者</th><th>シナリオ</th></tr></thead>
+  <tbody>
+    <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルとアプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
+    <tr><td class="id">UC-02</td><td>開発者</td><td>収集ランナーでブランチ・コミット・タグを指定して計測すると、その場で判定される</td></tr>
+    <tr><td class="id">UC-06</td><td>リリース判断者・開発者</td><td>リリース判定会議で最新の計測（またはタグ）の結論と全基準の合否を見て、PDF を証跡として残す</td></tr>
+    <tr><td class="id">UC-07</td><td>リリース判断者</td><td>判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる</td></tr>
+    <tr><td class="id">UC-08</td><td>開発者</td><td>リリース不可のとき、不合格の基準の理由と主な違反（関数・CVE・画面）から直す場所を確かめる</td></tr>
+  </tbody>
+</table></div>
+</section>
+
+<section id="metrics">
+<h2>4. 12 の品質指標</h2>
+<p>対象は <strong>Java / Spring Boot（Maven）+ Vue 3（npm + Vitest）のモノレポ</strong>。M-01・M-02・M-09・M-10 は backend / frontend ごとに判定し、その他は Run 全体で 1 つの値にします。</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>ID</th><th>カテゴリ</th><th>指標</th><th>既定の合格ライン</th><th>計測ツール</th><th>環境変数</th></tr></thead>
+  <tbody>
+    <tr><td class="id">M-01</td><td>機能テスト</td><td>ブランチカバレッジ</td><td>75% 以上（各コンポーネント）</td><td>JaCoCo / Vitest (v8)</td><td><code>QG_BRANCH_COVERAGE_MIN</code></td></tr>
+    <tr><td class="id">M-02</td><td>機能テスト</td><td>ミューテーションスコア</td><td>60% 以上（backend のみ）</td><td>PIT</td><td><code>QG_MUTATION_SCORE_MIN</code></td></tr>
+    <tr><td class="id">M-03</td><td>性能</td><td>応答時間 p95</td><td>50 req/s の負荷下で 500ms 以内</td><td>k6</td><td><code>QG_RESPONSE_TIME_P95_MAX_MS</code></td></tr>
+    <tr><td class="id">M-04</td><td>性能</td><td>エラー率</td><td>0.1% 以下</td><td>k6</td><td><code>QG_ERROR_RATE_MAX_PCT</code></td></tr>
+    <tr><td class="id">M-05</td><td>セキュリティ</td><td>重大・高 脆弱性件数</td><td>Critical 0・High 0</td><td>Trivy (SARIF)</td><td><code>QG_CRITICAL_/HIGH_VULNERABILITIES_MAX</code></td></tr>
+    <tr><td class="id">M-06</td><td>コード構造</td><td>循環的複雑度 15 超の関数数</td><td>0 件</td><td>PMD / ESLint</td><td><code>QG_COMPLEXITY_MAX</code></td></tr>
+    <tr><td class="id">M-07</td><td>契約・互換性</td><td>OpenAPI の破壊的変更件数</td><td>0 件</td><td>oasdiff</td><td><code>QG_BREAKING_CHANGES_MAX</code></td></tr>
+    <tr><td class="id">M-08</td><td>使いやすさ</td><td>アクセシビリティ重大違反件数</td><td>critical / serious 0 件</td><td>Playwright + axe-core</td><td><code>QG_ACCESSIBILITY_VIOLATIONS_MAX</code></td></tr>
+    <tr><td class="id">M-09</td><td>機能テスト</td><td>テスト成功率</td><td>100%</td><td>JUnit XML</td><td><code>QG_TEST_SUCCESS_RATE_MIN</code></td></tr>
+    <tr><td class="id">M-10</td><td>機能テスト</td><td>スキップされたテスト数</td><td>比較対象 Run から増やさない</td><td>JUnit XML</td><td><code>QG_SKIPPED_TESTS_INCREASE_MAX</code></td></tr>
+    <tr><td class="id">M-11</td><td>セキュリティ</td><td>シークレット検出件数</td><td>0 件</td><td>Trivy (SARIF)</td><td><code>QG_SECRETS_MAX</code></td></tr>
+    <tr><td class="id">M-12</td><td>セキュリティ</td><td>ライセンス違反件数</td><td>forbidden 0 パッケージ</td><td>Trivy (SARIF)</td><td><code>QG_FORBIDDEN_LICENSES_MAX</code></td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（計測プロファイルの <code>DISABLED_METRICS</code> にも同じものを書く）</li>
+  <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
+</ul>
+</section>
+
+<section id="judge">
+<h2>5. 判定のルール</h2>
+<h3>指標のステータス</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>ステータス</th><th>条件</th><th>リリース判定への影響</th></tr></thead>
+  <tbody>
+    <tr><td><span class="status pass"><span class="dot" aria-hidden="true">●</span>合格 <code>PASS</code></span></td><td>合格ラインを満たす</td><td>—</td></tr>
+    <tr><td><span class="status fail"><span class="dot" aria-hidden="true">■</span>不合格 <code>FAIL</code></span></td><td>合格ラインを満たさない</td><td>リリース不可</td></tr>
+    <tr><td><span class="status err"><span class="dot" aria-hidden="true">◆</span>計測エラー <code>ERROR</code></span></td><td>成果物の未提出・形式不正・メタデータ不足・計測条件を満たさない</td><td>リリース不可（不合格として扱う）</td></tr>
+    <tr><td><span class="status neu"><span class="dot" aria-hidden="true">—</span>対象外 <code>NOT_APPLICABLE</code></span></td><td>ツールの制約で測れない（M-02 の frontend など）</td><td>影響しない（表に出さない）</td></tr>
+  </tbody>
+</table></div>
+<pre>FAIL または ERROR が 1 つ以上  → FAIL（リリース不可）
+それ以外                       → PASS（リリース可）
+NOT_APPLICABLE は影響しない</pre>
+<div class="callout"><strong>測っていないものを合格とみなさない（fail-closed）</strong>ことが quality-gate の根幹です。結論は「リリース可 / リリース不可 / 未計測」の 3 つで、「注意」のような中間段階は持ちません。前回からの低下など気になる点は判定理由に書き添えるだけです。</div>
+<h3>比較元・比較対象 Run</h3>
+<ul>
+  <li><strong>比較元</strong>（M-07 の起点）: 既定ブランチは直前のコミット、他のブランチは merge-base、タグは前のタグ</li>
+  <li><strong>比較対象 Run</strong>（前回比・違反の新規/継続/解消・M-10 の起点）: 比較元コミットの判定済み Run、無ければ同じブランチの直前の判定済み Run</li>
+  <li>違反は <code>sha256(指標ID + 同定子)</code> の fingerprint で Run をまたいで追跡する（行番号は含めない）</li>
+</ul>
+<h3>Run のライフサイクル</h3>
+<pre>CREATED ─(成果物)→ UPLOADING ─(finalize)→ FINALIZED → PROCESSING ─┬→ EVALUATED
+                                                                  └→ FAILED（処理失敗。計測し直す）</pre>
+<p>Run は「1 コミットに対する 1 回の計測・判定」で、<strong>確定後は不変</strong>。処理失敗 <code>FAILED</code> と判定結果の不合格 <code>verdict = FAIL</code> は別物です。同じコミットへの再送信は <code>attempt</code> を増やした新しい Run になります。</p>
+</section>
+
+<section id="screen">
+<h2>6. 画面（リリース判定）</h2>
+<p>パスは <code>/</code>（<code>?ref=&lt;タグかコミット&gt;</code> で指定可）。上から次の順に並べます。</p>
+<ol>
+  <li><strong>結論</strong> — リリース可 / リリース不可 / 未計測 を大きく表示</li>
+  <li><strong>品質基準ごとの合否</strong> — 不合格の指標には理由と主な違反（深刻な順に最大 10 件、GitHub の該当箇所へのリンク）</li>
+  <li><strong>各指標の説明と基準の根拠</strong> — 根拠の種類（外部基準 / 業界の目安 / チーム判断）と、満たさないと何が起きるか</li>
+  <li><strong>判定の履歴</strong> — 新しい順、最大 50 件。各判定を開ける</li>
+</ol>
+<div class="table-wrap"><table>
+  <thead><tr><th>要件</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>結論の安定性</td><td>同じ指定なら何度開いても結論が変わらない（判定し直さない。近くのコミットで代用しない）</td></tr>
+    <tr><td>出力</td><td>印刷して PDF にできる（CSV 出力は持たない）</td></tr>
+    <tr><td>ステータス表現</td><td>ラベル・記号・アイコン・色を常に同時に使い、色だけで合否を伝えない</td></tr>
+    <tr><td>テーマ</td><td>ライト / ダーク / OS 追従</td></tr>
+    <tr><td>レスポンシブ</td><td>768px 未満では指標の表をカード形式に変形（375px 幅で確認）</td></tr>
+    <tr><td>アクセシビリティ</td><td>quality-gate 自身も WCAG 2.2 AA を満たす。CI で axe-core の critical / serious 0 件を確認</td></tr>
+  </tbody>
+</table></div>
+<p>他の画面はログイン（<code>/login</code>）と「見つからない」のみです。</p>
+</section>
+
+<section id="collector">
+<h2>7. 収集ランナー（計測の仕組み）</h2>
+<p><code>.github/workflows/collect.yml</code> を手動実行（ブランチ・コミット・タグを指定）すると、3 つのジョブで計測します。</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>ジョブ</th><th>やること</th><th>認証情報</th><th>所要時間</th></tr></thead>
+  <tbody>
+    <tr><td class="id"><code>fetch</code></td><td>GitHub App の読み取り専用トークン（1 時間）で clone し、計測コミット・比較元・タグを決める</td><td>App の秘密鍵</td><td>1 分未満</td></tr>
+    <tr><td class="id"><code>measure</code></td><td>コンテナの中でビルド・テスト・解析し、成果物を <code>reports/</code> にまとめる</td><td><strong>なし</strong></td><td>数分〜20 分以上</td></tr>
+    <tr><td class="id"><code>submit</code></td><td>Run 作成 → 成果物アップロード → 確定。処理失敗ならジョブ失敗（不合格では失敗にしない）</td><td>Ingest Token</td><td>1 分未満</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li><strong>専有のセルフホストランナー 1 台</strong>で直列に実行（性能計測の条件をそろえ、社内の quality-gate に届くようにするため）</li>
+  <li>計測コンテナは <code>--cap-drop ALL</code>・<code>no-new-privileges</code>・メモリ上限付きで、Docker ソケットや認証情報を見せない</li>
+  <li>テストが失敗しても計測は止めない。成果物が出なかった指標は ERROR になる</li>
+  <li>PR は計測しない。部分計測（スキップの申告）も持たない</li>
+</ul>
+</section>
+
+<section id="artifacts">
+<h2>8. 成果物の流れ</h2>
+<p><strong>成果物</strong>は、計測ツールが出力するレポートのファイル（JaCoCo の XML、Trivy の SARIF など）のことです。収集ランナーが<strong>作って送り</strong>、quality-gate アプリが<strong>保管して判定に使い</strong>ます。対象リポジトリには何も書き込みません。</p>
+<ol class="pipe">
+  <li class="pipe-step">
+    <div class="pipe-head"><span class="pipe-no">1</span><div><b>作成</b><span class="pipe-sub">measure ジョブ</span></div></div>
+    <p class="pipe-cell"><span>誰が</span>計測ツール（<code>measure.sh</code> が呼ぶ JaCoCo・Trivy・k6 など）</p>
+    <p class="pipe-cell"><span>どこに</span>ランナーのマシンの <code>reports/</code>（計測用コンテナにマウント）</p>
+    <p class="pipe-cell"><span>何を</span>各ツールがレポートを決まったパスに書く。出なかったファイルは無いまま</p>
+  </li>
+  <li class="pipe-step">
+    <div class="pipe-head"><span class="pipe-no">2</span><div><b>受け渡し</b><span class="pipe-sub">measure → submit</span></div></div>
+    <p class="pipe-cell"><span>誰が</span>GitHub Actions</p>
+    <p class="pipe-cell"><span>どこに</span>Actions の成果物 <code>collector-reports</code>（7 日で消える）</p>
+    <p class="pipe-cell"><span>何を</span><code>reports/</code> をまるごと次のジョブへ渡す</p>
+  </li>
+  <li class="pipe-step">
+    <div class="pipe-head"><span class="pipe-no">3</span><div><b>送信</b><span class="pipe-sub">submit ジョブ</span></div></div>
+    <p class="pipe-cell"><span>誰が</span><code>submit.sh</code></p>
+    <p class="pipe-cell"><span>どこに</span>Ingest API（Ingest Token で認証）</p>
+    <p class="pipe-cell"><span>何を</span>Run を作り、ファイルを 1 つずつ <code>type</code>・<code>component</code>・<code>metadata</code> 付きで送り、最後に確定（finalize）する。無いファイルは送らない</p>
+  </li>
+  <li class="pipe-step">
+    <div class="pipe-head"><span class="pipe-no">4</span><div><b>保管</b><span class="pipe-sub">quality-gate アプリ</span></div></div>
+    <p class="pipe-cell"><span>誰が</span>取り込み（<code>ingest</code>）</p>
+    <p class="pipe-cell"><span>どこに</span>ファイル: <code>QG_ARTIFACT_ROOT/&lt;runId&gt;/&lt;ID&gt;_&lt;ファイル名&gt;</code><br>記録: <code>artifacts</code> テーブル</p>
+    <p class="pipe-cell"><span>何を</span>この時点では中身を読まない。サイズ上限と必須のメタデータだけ検証して保存する</p>
+  </li>
+  <li class="pipe-step">
+    <div class="pipe-head"><span class="pipe-no">5</span><div><b>判定</b><span class="pipe-sub">quality-gate アプリ</span></div></div>
+    <p class="pipe-cell"><span>誰が</span>判定の流れ（<code>pipeline</code>）</p>
+    <p class="pipe-cell"><span>どこに</span><code>measurements</code>・<code>findings</code> テーブル、<code>runs.verdict</code></p>
+    <p class="pipe-cell"><span>何を</span>確定の中で、保存したファイルを種別ごとのアダプタで読み、正規化 → 判定する。送られなかった指標は計測エラー</p>
+  </li>
+</ol>
+<div class="callout">GitHub Actions の「成果物（artifact）」は、ジョブ間でこのファイル群を受け渡す入れ物として使うだけです（② 受け渡し）。quality-gate アプリが判定に使うのは、④ で Ingest API から受け取って保管したファイルです。</div>
+
+<h3>成果物ごとの対応</h3>
+<p><code>reports/</code> 内のどのファイルを、どの種別（<code>type</code>）で送り、どの指標の判定に使うかの一覧です。<code>component</code> は計測プロファイルの <code>BACKEND_DIR</code> / <code>FRONTEND_DIR</code> の末尾のディレクトリ名です。</p>
+<div class="table-wrap"><table class="art">
+  <thead><tr><th><code>reports/</code> 内のファイル</th><th>作るツール</th><th><code>type</code></th><th><code>component</code></th><th><code>metadata</code></th><th>指標</th><th>送る条件</th></tr></thead>
+  <tbody>
+    <tr><td><code>backend/jacoco.xml</code></td><td>JaCoCo</td><td><code>jacoco-xml</code></td><td>backend</td><td>—</td><td class="id">M-01</td><td><code>BACKEND_DIR</code> がある</td></tr>
+    <tr><td><code>tests/backend/TEST-*.xml</code></td><td>Surefire / Failsafe</td><td><code>test-junit-xml</code></td><td>backend</td><td>—</td><td class="id">M-09 / M-10</td><td>同上（ファイルごとに送る）</td></tr>
+    <tr><td><code>backend/mutations.xml</code></td><td>PIT</td><td><code>pit-xml</code></td><td>backend</td><td>—</td><td class="id">M-02</td><td><code>MUTATION_TARGET_CLASSES</code> がある</td></tr>
+    <tr><td><code>backend/pmd.xml</code></td><td>PMD</td><td><code>pmd-xml</code></td><td>backend</td><td>—</td><td class="id">M-06</td><td><code>BACKEND_DIR</code> がある</td></tr>
+    <tr><td><code>frontend-coverage/lcov.info</code></td><td>Vitest（v8）</td><td><code>lcov</code></td><td>frontend</td><td>—</td><td class="id">M-01</td><td><code>FRONTEND_DIR</code> がある</td></tr>
+    <tr><td><code>tests/frontend/junit.xml</code></td><td>Vitest</td><td><code>test-junit-xml</code></td><td>frontend</td><td>—</td><td class="id">M-09 / M-10</td><td>同上</td></tr>
+    <tr><td><code>frontend/eslint.json</code></td><td>ESLint</td><td><code>eslint-json</code></td><td>frontend</td><td>—</td><td class="id">M-06</td><td>同上</td></tr>
+    <tr><td><code>frontend/axe-results.json</code></td><td>Playwright + axe-core</td><td><code>axe-json</code></td><td>frontend</td><td>—</td><td class="id">M-08</td><td><code>A11Y_PAGES</code> がある</td></tr>
+    <tr><td><code>oasdiff.json</code></td><td>oasdiff</td><td><code>oasdiff-json</code></td><td>backend</td><td>比較元に API 定義が無ければ <code>baseSpecMissing</code></td><td class="id">M-07</td><td><code>OPENAPI_PATH</code> がある</td></tr>
+    <tr><td><code>trivy.sarif</code></td><td>Trivy</td><td><code>sarif</code></td><td>—</td><td><code>scanners: vuln, secret</code></td><td class="id">M-05 / M-11</td><td>常に</td></tr>
+    <tr><td><code>trivy-license.sarif</code></td><td>Trivy</td><td><code>sarif</code></td><td>—</td><td><code>scanners: license</code></td><td class="id">M-12</td><td>常に</td></tr>
+    <tr><td><code>perf/k6-summary-*.json</code></td><td>k6</td><td><code>k6-summary</code></td><td>backend</td><td>計測環境 <code>environment</code>（異常終了なら <code>aborted</code>）</td><td class="id">M-03 / M-04</td><td><code>PERF_SCRIPT</code> がある（1 回の実行 = 1 ファイル）</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li>止めた指標（<code>DISABLED_METRICS</code>）の成果物は作らず、送らない</li>
+  <li><code>meta.env</code>（計測したコミット・比較元・タグ）は成果物として送らず、Run を作る要求の中身にする。<code>versions.env</code>（ツールの版）と oasdiff の入力（<code>openapi-*.yml</code>）も送らない</li>
+  <li>確定前に同じ種別・同じファイル名を送り直すと置き換わる。確定後は追加も置き換えもできず、判定済みの結論は変わらない</li>
+  <li>ファイルは自動では消さない。Run を削除しても、ファイルの実体は <code>QG_ARTIFACT_ROOT</code> に残る</li>
+</ul>
+</section>
+
+<section id="backend">
+<h2>9. バックエンド</h2>
+<h3>モジュール構成（<code>com.qualitygate</code>）</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>モジュール</th><th>役割</th></tr></thead>
+  <tbody>
+    <tr><td><code>ingest</code></td><td>取り込み API、Ingest Token 認証、成果物の受領と保管、リポジトリ登録</td></tr>
+    <tr><td><code>pipeline</code></td><td>正規化 → 判定の流れ（確定から呼ぶ）</td></tr>
+    <tr><td><code>adapter</code></td><td>ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, eslint, junit, oasdiff, axe）</td></tr>
+    <tr><td><code>normalize</code> / <code>evaluate</code></td><td>正規化と fingerprint 生成 / 合格ラインの適用・指標判定・Run の集約</td></tr>
+    <tr><td><code>release</code> / <code>query</code></td><td>リリース判定と履歴 / ログイン状態</td></tr>
+    <tr><td><code>domain</code> / <code>platform</code> / <code>config</code></td><td>エンティティ等 / 設定・ArtifactStore・例外・可観測性 / Security と SPA 配信</td></tr>
+  </tbody>
+</table></div>
+<p><code>adapter</code> と <code>evaluate</code> は互いを知らない、などの依存規則を ArchUnit で検証します。指標やツール形式の追加は、アダプタと判定器の追加で完結します。</p>
+</section>
+
+<section id="database">
+<h2>10. データベース</h2>
+<p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> で作り、<code>V002__simplify.sql</code> で機能を絞りました（利用者・監査ログ・セッション・スキップの申告のテーブルを削除）。現在のテーブルは次の 5 つです。</p>
+
+<h3>10.1 設計方針</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>方針</th><th>理由</th></tr></thead>
+  <tbody>
+    <tr><td>主キー</td><td><code>uuid</code>（UUIDv7 をアプリで採番）</td><td>API に出る ID を推測しにくくしつつ、時系列順でインデックスの局所性を保つ</td></tr>
+    <tr><td>日時</td><td><code>timestamptz</code>（UTC）</td><td>表示するときにタイムゾーンを適用する</td></tr>
+    <tr><td>列挙</td><td><code>varchar</code> + <code>CHECK</code> 制約</td><td><code>ENUM</code> 型は値の追加に DDL が要る</td></tr>
+    <tr><td>半構造データ</td><td><code>jsonb</code></td><td>指標ごとに違う内訳を持つ。検索に使う値は列にする</td></tr>
+    <tr><td>数値</td><td>判定に関わる値は <code>numeric</code></td><td>丸めで境界値（75.0% など）の判定が変わらないようにする</td></tr>
+    <tr><td>削除</td><td>自動では消さない。消すときは Run を物理削除し、子の行は CASCADE で消える</td><td>論理削除フラグは全クエリに条件が増える</td></tr>
+  </tbody>
+</table></div>
+
+<h3>10.2 論理設計（ER 図）</h3>
+<div class="er-wrap"><svg class="er" viewBox="0 0 910 680" role="img" aria-labelledby="er-title er-desc"><title id="er-title">quality-gate の ER 図</title><desc id="er-desc">リポジトリ 1 件に Run が 0 件以上。Run 1 件に成果物・指標の判定結果・違反がそれぞれ 0 件以上。Run は比較対象 Run を 0 か 1 件参照する。指標の判定結果は検索用にリポジトリも参照する。</desc><path class="er-line" d="M250,250H300"/><path class="er-mark" d="M258,243V257M264,243V257"/><path class="er-mark" d="M288,250L300,243M288,250L300,250M288,250L300,257"/><circle class="er-opt" cx="282" cy="250" r="4"/><path class="er-line" d="M530,90H590V60H660"/><path class="er-mark" d="M522,83V97M516,83V97"/><path class="er-mark" d="M648,60L660,53M648,60L660,60M648,60L660,67"/><circle class="er-opt" cx="642" cy="60" r="4"/><path class="er-line" d="M530,180H610V250H660"/><path class="er-mark" d="M522,173V187M516,173V187"/><path class="er-mark" d="M648,250L660,243M648,250L660,250M648,250L660,257"/><circle class="er-opt" cx="642" cy="250" r="4"/><path class="er-line" d="M530,300H630V520H660"/><path class="er-mark" d="M522,293V307M516,293V307"/><path class="er-mark" d="M648,520L660,513M648,520L660,520M648,520L660,527"/><circle class="er-opt" cx="642" cy="520" r="4"/><path class="er-line er-dash" d="M130,330V440H645V400H660"/><path class="er-mark" d="M123,322H137M123,316H137"/><path class="er-mark" d="M648,400L660,393M648,400L660,400M648,400L660,407"/><circle class="er-opt" cx="642" cy="400" r="4"/><text class="er-note" x="142" y="432">検索用に複製（repository_id・measured_at）</text><path class="er-line er-dash" d="M370,330V364H460V330"/><path class="er-mark" d="M370,342L363,330M370,342L370,330M370,342L377,330"/><circle class="er-opt" cx="370" cy="348" r="4"/><path class="er-mark" d="M453,338H467"/><circle class="er-opt" cx="460" cy="345" r="4"/><text class="er-note" x="415" y="382" text-anchor="middle">比較対象 Run（自己参照・0..1）</text><g class="er-ent"><rect x="20" y="190" width="230" height="140" rx="8"/><path class="er-hdr" d="M28,190H242a8,8 0 0 1 8,8V220H20V198a8,8 0 0 1 8,-8Z"/><text class="er-title" x="32" y="210">リポジトリ</text><text class="er-en" x="238" y="210" text-anchor="end">repositories</text><text class="er-key er-pk" x="32" y="236">PK</text><text class="er-attr" x="62" y="236">ID</text><text class="er-attr" x="62" y="256">オーナー</text><text class="er-attr" x="62" y="276">リポジトリ名</text><text class="er-attr" x="62" y="296">既定ブランチ</text><text class="er-attr" x="62" y="316">登録日時</text></g><g class="er-ent"><rect x="300" y="50" width="230" height="280" rx="8"/><path class="er-hdr" d="M308,50H522a8,8 0 0 1 8,8V80H300V58a8,8 0 0 1 8,-8Z"/><text class="er-title" x="312" y="70">Run（計測・判定）</text><text class="er-en" x="518" y="70" text-anchor="end">runs</text><text class="er-key er-pk" x="312" y="96">PK</text><text class="er-attr" x="342" y="96">ID</text><text class="er-key er-fk" x="312" y="116">FK</text><text class="er-attr" x="342" y="116">リポジトリ</text><text class="er-attr" x="342" y="136">コミット</text><text class="er-attr" x="342" y="156">試行回数</text><text class="er-attr" x="342" y="176">ブランチ</text><text class="er-attr" x="342" y="196">比較元コミット</text><text class="er-attr" x="342" y="216">タグ</text><text class="er-key er-fk" x="312" y="236">FK</text><text class="er-attr" x="342" y="236">比較対象 Run</text><text class="er-attr" x="342" y="256">状態</text><text class="er-attr" x="342" y="276">判定（合格 / 不合格）</text><text class="er-attr" x="342" y="296">計測日時</text><text class="er-attr" x="342" y="316">判定日時</text></g><g class="er-ent"><rect x="660" y="10" width="230" height="160" rx="8"/><path class="er-hdr" d="M668,10H882a8,8 0 0 1 8,8V40H660V18a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="30">成果物</text><text class="er-en" x="878" y="30" text-anchor="end">artifacts</text><text class="er-key er-pk" x="672" y="56">PK</text><text class="er-attr" x="702" y="56">ID</text><text class="er-key er-fk" x="672" y="76">FK</text><text class="er-attr" x="702" y="76">Run</text><text class="er-attr" x="702" y="96">種別</text><text class="er-attr" x="702" y="116">ファイル名</text><text class="er-attr" x="702" y="136">コンポーネント</text><text class="er-attr" x="702" y="156">保存場所</text></g><g class="er-ent"><rect x="660" y="200" width="230" height="240" rx="8"/><path class="er-hdr" d="M668,200H882a8,8 0 0 1 8,8V230H660V208a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="220">指標の判定結果</text><text class="er-en" x="878" y="220" text-anchor="end">measurements</text><text class="er-key er-pk" x="672" y="246">PK</text><text class="er-attr" x="702" y="246">ID</text><text class="er-key er-fk" x="672" y="266">FK</text><text class="er-attr" x="702" y="266">Run</text><text class="er-key er-fk" x="672" y="286">FK</text><text class="er-attr" x="702" y="286">リポジトリ（複製）</text><text class="er-attr" x="702" y="306">指標 ID</text><text class="er-attr" x="702" y="326">コンポーネント</text><text class="er-attr" x="702" y="346">計測条件</text><text class="er-attr" x="702" y="366">ステータス</text><text class="er-attr" x="702" y="386">値</text><text class="er-attr" x="702" y="406">合格ライン</text><text class="er-attr" x="702" y="426">前回値</text></g><g class="er-ent"><rect x="660" y="470" width="230" height="180" rx="8"/><path class="er-hdr" d="M668,470H882a8,8 0 0 1 8,8V500H660V478a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="490">違反</text><text class="er-en" x="878" y="490" text-anchor="end">findings</text><text class="er-key er-pk" x="672" y="516">PK</text><text class="er-attr" x="702" y="516">ID</text><text class="er-key er-fk" x="672" y="536">FK</text><text class="er-attr" x="702" y="536">Run</text><text class="er-attr" x="702" y="556">指標 ID</text><text class="er-attr" x="702" y="576">fingerprint</text><text class="er-attr" x="702" y="596">新規 / 継続 / 解消</text><text class="er-attr" x="702" y="616">深刻度</text><text class="er-attr" x="702" y="636">ファイル・行</text></g></svg></div>
+<p class="er-legend"><span>PK 主キー</span><span>FK 外部キー</span><span>｜｜ 1</span><span>○＜ 0 以上</span><span>破線: 複製・自己参照</span></p>
+<div class="table-wrap"><table>
+  <thead><tr><th>関連</th><th>多重度</th><th>意味</th></tr></thead>
+  <tbody>
+    <tr><td>リポジトリ → Run</td><td>1 : 0..N</td><td>1 つのリポジトリを何度も計測する。同じコミットの再計測は試行回数を増やした別の Run</td></tr>
+    <tr><td>Run → 成果物</td><td>1 : 0..N</td><td>収集ランナーが送った JaCoCo・SARIF などのファイル</td></tr>
+    <tr><td>Run → 指標の判定結果</td><td>1 : 0..N</td><td>指標 × コンポーネント × シナリオ × 計測条件ごとに 1 行</td></tr>
+    <tr><td>Run → 違反</td><td>1 : 0..N</td><td>不合格の根拠になった関数・CVE・画面の要素など</td></tr>
+    <tr><td>Run → 比較対象 Run</td><td>N : 0..1</td><td>前回比・違反の新規 / 継続 / 解消・スキップの増加を数える起点。比較対象が消えても判定済みの値は残る（前回値を焼き付けているため）</td></tr>
+    <tr><td>リポジトリ → 指標の判定結果</td><td>1 : 0..N</td><td>Run を経由せずに指標の値を時系列で引くための複製</td></tr>
+  </tbody>
+</table></div>
+
+<h3>10.3 物理設計（テーブル定義）</h3>
+<p>「NOT NULL」の ○ は NULL を許さない列です。「キー・制約」の丸数字は、各表の下の制約を指します。</p>
+<h4><code>repositories</code></h4>
+<p class="tbl-desc">計測対象のリポジトリ。<code>QG_REPOSITORY</code> の 1 行だけになる。初めて計測が届いたときに作られる</p>
+<div class="table-wrap"><table class="def">
+  <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7（アプリで採番）</td></tr>
+    <tr><td><code>owner</code></td><td><code>varchar(39)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>GitHub のオーナー名</td></tr>
+    <tr><td><code>name</code></td><td><code>varchar(100)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>リポジトリ名</td></tr>
+    <tr><td><code>default_branch</code></td><td><code>varchar(255)</code></td><td class="c">○</td><td></td><td></td><td>既定ブランチ。計測ごとに更新する</td></tr>
+    <tr><td><code>created_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>初めて計測が届いた日時</td></tr>
+  </tbody>
+</table></div>
+<p class="cons">① <code>repositories_full_name_key</code> UNIQUE (owner, name)</p><h4><code>runs</code></h4>
+<p class="tbl-desc">1 つのコミットに対する 1 回の計測・判定。確定後は不変。同じコミットの再送信は <code>attempt</code> を増やした新しい行になる</p>
+<div class="table-wrap"><table class="def">
+  <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7</td></tr>
+    <tr><td><code>repository_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → repositories.id（CASCADE）／UQ ①</td><td>計測対象</td></tr>
+    <tr><td><code>commit_sha</code></td><td><code>char(40)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>計測したコミット</td></tr>
+    <tr><td><code>base_commit_sha</code></td><td><code>char(40)</code></td><td class="c"></td><td></td><td></td><td>比較元のコミット（収集ランナーが求めて送る）</td></tr>
+    <tr><td><code>branch</code></td><td><code>varchar(255)</code></td><td class="c">○</td><td></td><td></td><td>計測したブランチ</td></tr>
+    <tr><td><code>attempt</code></td><td><code>integer</code></td><td class="c">○</td><td><code>1</code></td><td>UQ ①</td><td>同じコミットの何回目の計測か</td></tr>
+    <tr><td><code>triggered_by</code></td><td><code>varchar(64)</code></td><td class="c">○</td><td></td><td></td><td>計測を起動した主体（収集ランナーが送る）</td></tr>
+    <tr><td><code>ci_run_url</code></td><td><code>varchar(512)</code></td><td class="c"></td><td></td><td></td><td>計測したワークフローの実行 URL</td></tr>
+    <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>計測日時</td></tr>
+    <tr><td><code>tags</code></td><td><code>text[]</code></td><td class="c">○</td><td><code>&#x27;{}&#x27;</code></td><td></td><td>計測したコミットを指すタグ。リリース判定でタグを解決するのに使う</td></tr>
+    <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分・M-10 の起点）</td></tr>
+    <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>処理の状態</td></tr>
+    <tr><td><code>verdict</code></td><td><code>varchar(24)</code></td><td class="c"></td><td></td><td>CHECK ③</td><td>判定結果。判定前は NULL</td></tr>
+    <tr><td><code>error_code</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>処理失敗（FAILED）の理由</td></tr>
+    <tr><td><code>error_detail</code></td><td><code>text</code></td><td class="c"></td><td></td><td></td><td>処理失敗の詳細</td></tr>
+    <tr><td><code>created_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>作成日時</td></tr>
+    <tr><td><code>evaluated_at</code></td><td><code>timestamptz</code></td><td class="c"></td><td></td><td></td><td>判定日時</td></tr>
+  </tbody>
+</table></div>
+<p class="cons">① <code>runs_attempt_key</code> UNIQUE (repository_id, commit_sha, attempt)<br>② CREATED / UPLOADING / FINALIZED / PROCESSING / EVALUATED / FAILED<br>③ PASS / FAIL</p><h4><code>artifacts</code></h4>
+<p class="tbl-desc">取り込んだ成果物のメタデータ。ファイルの実体はローカル FS（<code>QG_ARTIFACT_ROOT</code>）に置く</p>
+<div class="table-wrap"><table class="def">
+  <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7</td></tr>
+    <tr><td><code>run_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → runs.id（CASCADE）／UQ ①</td><td>取り込んだ Run</td></tr>
+    <tr><td><code>type</code></td><td><code>varchar(32)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>成果物の種別（<code>jacoco-xml</code> など）</td></tr>
+    <tr><td><code>filename</code></td><td><code>varchar(255)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>ファイル名</td></tr>
+    <tr><td><code>size_bytes</code></td><td><code>bigint</code></td><td class="c">○</td><td></td><td></td><td>サイズ（1 ファイル 50MB、Run 合計 200MB まで）</td></tr>
+    <tr><td><code>sha256</code></td><td><code>char(64)</code></td><td class="c">○</td><td></td><td></td><td>ファイルのハッシュ</td></tr>
+    <tr><td><code>storage_key</code></td><td><code>varchar(512)</code></td><td class="c">○</td><td></td><td></td><td>成果物ストア上の保存場所</td></tr>
+    <tr><td><code>component_name</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>コンポーネント（backend / frontend）</td></tr>
+    <tr><td><code>metadata</code></td><td><code>jsonb</code></td><td class="c"></td><td></td><td></td><td>成果物に付けて送られたメタデータ（性能の計測環境など）</td></tr>
+    <tr><td><code>uploaded_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>アップロード日時</td></tr>
+    <tr><td><code>deleted_at</code></td><td><code>timestamptz</code></td><td class="c"></td><td></td><td></td><td>ファイル実体を削除した日時。メタデータは残す</td></tr>
+  </tbody>
+</table></div>
+<p class="cons">① <code>artifacts_unique_key</code> UNIQUE (run_id, type, filename)</p><h4><code>measurements</code></h4>
+<p class="tbl-desc">指標ごとの判定結果。判定に使った合格ラインと前回値を焼き付け、後から環境変数を変えても判定の根拠が変わらないようにする</p>
+<div class="table-wrap"><table class="def">
+  <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7</td></tr>
+    <tr><td><code>run_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → runs.id（CASCADE）</td><td>判定した Run</td></tr>
+    <tr><td><code>repository_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → repositories.id（CASCADE）</td><td>Run から複製（検索用）</td></tr>
+    <tr><td><code>metric_id</code></td><td><code>varchar(8)</code></td><td class="c">○</td><td></td><td></td><td>指標 ID（M-01〜M-12）</td></tr>
+    <tr><td><code>component_name</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>コンポーネント。M-01・M-02・M-09・M-10 だけ値を持つ</td></tr>
+    <tr><td><code>scenario</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>性能のシナリオ名</td></tr>
+    <tr><td><code>variant</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>計測条件（性能の計測環境名）。前回値はこれが一致する行から引く</td></tr>
+    <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>判定ステータス</td></tr>
+    <tr><td><code>value</code></td><td><code>numeric(12,4)</code></td><td class="c"></td><td></td><td></td><td>計測値。NULL は「計測していない」、0 は「計測して 0」</td></tr>
+    <tr><td><code>unit</code></td><td><code>varchar(16)</code></td><td class="c"></td><td></td><td></td><td>単位</td></tr>
+    <tr><td><code>threshold</code></td><td><code>jsonb</code></td><td class="c"></td><td></td><td></td><td>判定に使った合格ライン。必ず <code>{operator, value}</code> を含む</td></tr>
+    <tr><td><code>previous_value</code></td><td><code>numeric(12,4)</code></td><td class="c"></td><td></td><td></td><td>比較対象 Run の値（判定時に焼き付ける）</td></tr>
+    <tr><td><code>reason</code></td><td><code>varchar(512)</code></td><td class="c"></td><td></td><td></td><td>判定理由（画面に出す文）</td></tr>
+    <tr><td><code>detail</code></td><td><code>jsonb</code></td><td class="c"></td><td></td><td></td><td>指標ごとの内訳</td></tr>
+    <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>Run から複製（検索用）</td></tr>
+  </tbody>
+</table></div>
+<p class="cons">① <code>ux_measurements_key</code> UNIQUE (run_id, metric_id, COALESCE(component_name, ''), COALESCE(scenario, ''), COALESCE(variant, ''))。NULL を取りうる列を含むため式インデックスで守る<br>② PASS / FAIL / ERROR / NOT_APPLICABLE</p><h4><code>findings</code></h4>
+<p class="tbl-desc">判定の根拠となる個々の違反。比較対象 Run と fingerprint を比べて、新規 / 継続 / 解消を決める</p>
+<div class="table-wrap"><table class="def">
+  <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
+  <tbody>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7</td></tr>
+    <tr><td><code>run_id</code></td><td><code>uuid</code></td><td class="c">○</td><td></td><td>FK → runs.id（CASCADE）／UQ ①</td><td>違反を見つけた Run</td></tr>
+    <tr><td><code>metric_id</code></td><td><code>varchar(8)</code></td><td class="c">○</td><td></td><td></td><td>指標 ID</td></tr>
+    <tr><td><code>fingerprint</code></td><td><code>char(64)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td><code>sha256(指標 ID + 同定子)</code>。行番号は含めない</td></tr>
+    <tr><td><code>state</code></td><td><code>varchar(12)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>比較対象 Run との差分</td></tr>
+    <tr><td><code>severity</code></td><td><code>varchar(12)</code></td><td class="c">○</td><td></td><td>CHECK ③</td><td>深刻度</td></tr>
+    <tr><td><code>rule_id</code></td><td><code>varchar(255)</code></td><td class="c"></td><td></td><td></td><td>ルール ID・CVE など</td></tr>
+    <tr><td><code>title</code></td><td><code>varchar(512)</code></td><td class="c">○</td><td></td><td></td><td>違反の見出し</td></tr>
+    <tr><td><code>file_path</code></td><td><code>varchar(1024)</code></td><td class="c"></td><td></td><td></td><td>ファイルのパス</td></tr>
+    <tr><td><code>line</code></td><td><code>integer</code></td><td class="c"></td><td></td><td></td><td>行番号</td></tr>
+    <tr><td><code>component_name</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>コンポーネント</td></tr>
+    <tr><td><code>detail</code></td><td><code>jsonb</code></td><td class="c"></td><td></td><td></td><td>違反ごとの詳細</td></tr>
+  </tbody>
+</table></div>
+<p class="cons">① <code>findings_unique_key</code> UNIQUE (run_id, fingerprint)<br>② NEW / CONTINUING / RESOLVED / INITIAL<br>③ CRITICAL / HIGH / MEDIUM / LOW / INFO</p>
+
+<h3>10.4 インデックス</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>名前</th><th>テーブル・列</th><th>使うクエリ</th></tr></thead>
+  <tbody>
+    <tr><td><code>ix_runs_latest</code></td><td>runs (repository_id, measured_at DESC, attempt DESC) WHERE status = 'EVALUATED'</td><td>最新の判定済み Run、判定の履歴（部分インデックス）</td></tr>
+    <tr><td><code>ix_runs_list</code></td><td>runs (repository_id, branch, measured_at DESC)</td><td>比較対象 Run（同じブランチの直前の Run）</td></tr>
+    <tr><td><code>ix_runs_tags</code></td><td>runs USING gin (tags)</td><td>タグからコミットを解決する</td></tr>
+    <tr><td><code>ix_measurements_run</code></td><td>measurements (run_id)</td><td>Run の指標の一覧</td></tr>
+    <tr><td><code>ix_measurements_trend</code></td><td>measurements (repository_id, metric_id, measured_at DESC)</td><td>指標の値を時系列で引く</td></tr>
+    <tr><td><code>ix_findings_run</code></td><td>findings (run_id, metric_id, state)</td><td>不合格の指標の主な違反</td></tr>
+  </tbody>
+</table></div>
+<p>このほか、主キーと UNIQUE 制約（<code>ux_measurements_key</code> を含む）にもインデックスが付きます。計測は手動で対象は 1 つのため件数は少なく、集計用のテーブルは持ちません。</p>
+</section>
+
+<section id="api">
+<h2>11. API</h2>
+<p>ベースパス <code>/api/v1</code>、JSON（アップロードのみ multipart）。正本は実装から生成した <code>api/openapi.yml</code> で、フロントエンドの型もそこから生成します。エラーは RFC 9457 Problem Details に <code>errorCode</code>・<code>traceId</code> を足して返します。</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>メソッド</th><th>パス</th><th>用途</th><th>認可</th></tr></thead>
+  <tbody>
+    <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）</td><td>Ingest Token</td></tr>
+    <tr><td>POST</td><td><code>/runs/{runId}/artifacts</code></td><td>成果物のアップロード（1 ファイル 50MB / Run 合計 200MB まで）</td><td>Ingest Token</td></tr>
+    <tr><td>POST</td><td><code>/runs/{runId}/finalize</code></td><td>確定し、その場で判定して結果を返す</td><td>Ingest Token</td></tr>
+    <tr><td>POST</td><td><code>/login</code>, <code>/logout</code></td><td>ログイン / ログアウト</td><td>公開 / ログイン</td></tr>
+    <tr><td>GET</td><td><code>/me</code></td><td>ログイン中のユーザー名</td><td>ログイン</td></tr>
+    <tr><td>GET</td><td><code>/release?ref=</code></td><td>リリース判定（ref 省略で最新）</td><td>ログイン</td></tr>
+    <tr><td>GET</td><td><code>/release/history</code></td><td>判定の履歴（最大 50 件）</td><td>ログイン</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li>Ingest Token は書き込み専用で参照 API は呼べない。交換時は新旧をカンマ区切りで並べる</li>
+  <li>セッションは HttpOnly の <code>JSESSIONID</code> Cookie。状態を変える操作には CSRF トークン（<code>X-XSRF-TOKEN</code>）が必要</li>
+  <li><code>/actuator/health</code> は公開、<code>/actuator/prometheus</code> はログインが必要</li>
+</ul>
+</section>
+
+<section id="config">
+<h2>12. 主な設定（環境変数）</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>変数</th><th>既定値</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td><code>QG_REPOSITORY</code></td><td>（必須）</td><td>計測対象（<code>owner/name</code>）。違うリポジトリの送信は拒否</td></tr>
+    <tr><td><code>QG_LOGIN_USERNAME</code> / <code>QG_LOGIN_PASSWORD</code></td><td><code>quality</code> / （必須）</td><td>共有ログイン。パスワードは 12 文字以上</td></tr>
+    <tr><td><code>QG_INGEST_TOKEN</code></td><td>なし</td><td>未設定なら取り込み API はすべて 401</td></tr>
+    <tr><td><code>QG_DB_URL</code> ほか</td><td>localhost の PostgreSQL</td><td>接続先 DB</td></tr>
+    <tr><td><code>QG_ARTIFACT_ROOT</code></td><td><code>./data/artifacts</code></td><td>成果物の保存先</td></tr>
+    <tr><td><code>QG_BASE_URL</code></td><td><code>http://localhost:8080</code></td><td>応答に載せるリリース判定 URL の組み立て</td></tr>
+    <tr><td><code>QG_LOG_FORMAT</code></td><td>テキスト</td><td><code>ecs</code> / <code>logstash</code> / <code>gelf</code> で JSON ログ</td></tr>
+    <tr><td><code>QG_DISABLED_METRICS</code> / <code>QG_EXCLUSIONS</code></td><td>空</td><td>判定しない指標 / 計測から除くファイル</td></tr>
+    <tr><td>合格ライン（<code>QG_*_MIN</code> / <code>_MAX</code>）</td><td>指標の既定値</td><td>「4. 12 の品質指標」を参照</td></tr>
+  </tbody>
+</table></div>
+<pre>cp .env.example .env                   # QG_LOGIN_PASSWORD と QG_INGEST_TOKEN を設定
+docker compose up -d db
+cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
+</section>
+
+<section id="nfr">
+<h2>13. 非機能要件と制約</h2>
+<div class="table-wrap"><table>
+  <thead><tr><th>項目</th><th>内容</th></tr></thead>
+  <tbody>
+    <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + アプリ 1 プロセス（Docker Compose）</td></tr>
+    <tr><td>性能の目安</td><td>リリース判定の表示 p95 1.0 秒、確定から判定結果の応答まで p95 60 秒</td></tr>
+    <tr><td>可用性</td><td>quality-gate の障害が対象の開発を止めない。DB は日次バックアップ</td></tr>
+    <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数でログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>
+    <tr><td>運用</td><td><code>/actuator/health</code>、Prometheus メトリクス、相関 ID（<code>requestId</code> / <code>runId</code>）付きログ</td></tr>
+    <tr><td>自身の品質</td><td>quality-gate 自身は計測対象にせず、PR の CI（<code>ci.yml</code>）で単体・結合テスト、静的検査、生成物の同期、アクセシビリティ、脆弱性を確認</td></tr>
+  </tbody>
+</table></div>
+<h3>制約</h3>
+<ul>
+  <li>社内専用・単一テナント。共有アカウントのため、誰が見たかは記録しない</li>
+  <li>計測できるのは Maven + npm / Vitest のモノレポのみ。ミューテーションテストは backend のみ</li>
+  <li>自動のアクセシビリティ検査は WCAG 違反の一部しか検出できない（手動確認を併用）</li>
+</ul>
+</section>
+
+<footer>
+  出典: <code>README.md</code>、<code>docs/architecture.md</code>、<code>docs/metrics.md</code>、<code>docs/operations.md</code>、<code>docs/features/*/requirements.md</code>。詳細な定義はそれぞれの文書を参照してください。
+</footer>
+
+</main>
+</div>
+<script>
+(() => {
+  const links = [...document.querySelectorAll('nav.toc a')];
+  const byId = new Map(links.map(a => [a.getAttribute('href').slice(1), a]));
+  const mark = id => links.forEach(a => a.setAttribute('aria-current', a === byId.get(id) ? 'true' : 'false'));
+  if (!('IntersectionObserver' in window)) return;
+  const io = new IntersectionObserver(entries => {
+    const visible = entries.filter(e => e.isIntersecting).sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+    if (visible.length) mark(visible[0].target.id);
+  }, { rootMargin: '0px 0px -70% 0px' });
+  document.querySelectorAll('main section[id]').forEach(s => io.observe(s));
+})();
+</script>
+</body>
+</html>

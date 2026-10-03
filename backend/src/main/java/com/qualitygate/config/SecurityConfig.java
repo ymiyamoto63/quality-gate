@@ -33,7 +33,7 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
  * </ul>
  *
  * <p>ロールは無い。ログインした人は全員、同じリリース判定を見る。見るだけで、画面から変えられるものは無い。
- * 経営陣が GitHub のアカウントを持っていなくても見られるよう、GitHub のログインは使わない。
+ * GitHub のアカウントを持っていない方も見られるよう、GitHub のログインは使わない。
  *
  * <p>SPA を同一オリジンで配信するため CORS 設定は行わない。
  */

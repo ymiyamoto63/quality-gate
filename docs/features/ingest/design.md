@@ -1,6 +1,7 @@
 # 取り込み（Ingest API）: 設計
 
 要件は [requirements.md](requirements.md)。送り手の収集ランナーは [アーキテクチャ](../../architecture.md#3-測定の仕組み収集ランナー)、手順は [運用](../../operations.md)。
+成果物を誰がどこに作り、どのファイルをどの `type` で送るかは [アーキテクチャ 3.9 成果物の流れ](../../architecture.md#39-成果物の流れ) にある。
 
 ## 1. 流れ
 
@@ -8,7 +9,7 @@
 収集ランナー（submit.sh）
   → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId, detailUrl}
   → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202
-  → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {status, verdict, completeness}
+  → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {status, verdict, errorCode, detailUrl}
 ```
 
 確定すると判定まで行って結果を返す（DD-15）。判定の中身は [判定](../evaluation/design.md)。
@@ -46,15 +47,17 @@
 - 確定前に同じ種別・同じファイル名を再送すると置き換える。古いファイルはコミット後に消す
 - 1 ファイル 50MB（`ARTIFACT_TOO_LARGE`）、1 Run 合計 200MB を超えたら拒否する。通信としての上限（`spring.servlet.multipart`）はそれより少し大きい 60MB にし、理由のわかるエラーを返せるようにしている
 
+**保存先**: `QG_ARTIFACT_ROOT/<runId>/<成果物 ID>_<ファイル名>`（`ArtifactStore`）。成果物 ID を前に付け、再送や種別違いの同名ファイルが既存のファイルを上書きしないようにする。メタデータ（種別・サイズ・SHA-256・保存場所）は `artifacts` テーブルに記録する。
+
 **保存の順序**: ファイルを先に保存し、成功してから DB に記録する。逆順だと「参照先の無い記録」という扱いにくい壊れ方をする。
-記録されずに残ったファイル（孤児）は日次バッチが消す（[保持期間](../retention/design.md)）。
+記録されずに残ったファイル（孤児）は判定に使われないだけで、自動では消さない（日次バッチは持たない）。
 
 ## 4. `POST /api/v1/runs/{runId}/finalize`
 
-取り込みを確定し、その場で合格ラインの解決・正規化・判定を行い、`status` / `verdict` / `completeness` を返す。
+取り込みを確定し、その場で合格ラインの解決・正規化・判定を行い、`status` / `verdict` / `errorCode` / `detailUrl` を返す。
 
 - 確定は判定の前に別のトランザクションで行い、判定に失敗しても取り消さない（Run を `FAILED` として残す）
-- 判定に失敗しても 200 で、`status` が `FAILED`、`errorCode` に理由（`CONFIG_VALIDATION_FAILED` / `EVALUATION_FAILED`）が入る
+- 判定に失敗しても 200 で、`status` が `FAILED`、`errorCode` に理由（`EVALUATION_FAILED`）が入る
 - 確定済みの Run への `finalize` は `409 RUN_ALREADY_FINALIZED`（二重に判定しない）
 - 収集ランナーは `FAILED` ならワークフローを失敗にし、判定結果の `FAIL` では失敗にしない
 

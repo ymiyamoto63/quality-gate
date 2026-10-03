@@ -1,6 +1,6 @@
 package com.qualitygate.release;
 
-/** リリース判定の結論。経営陣に示すため、「注意あり」のような中間の結論は持たない。 */
+/** リリース判定の結論。誰が見ても明確な結論にするため、「注意あり」のような中間の結論は持たない。 */
 public enum ReleaseDecision {
     /** 判定したすべての指標が合格ラインを満たしている。 */
     RELEASABLE,
