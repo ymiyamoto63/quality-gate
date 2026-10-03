@@ -158,7 +158,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | Orval + TanStack Query / openapi-generator | ライブラリが増える、生成物が大きい。必要になれば openapi-fetch の上に載せられる |
 | MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` 1 つに閉じてある |
 | Spring WebFlux | 仮想スレッドで足りる |
-| GitHub でのログイン | 経営陣が GitHub のアカウントを持っていないと見られない。画面は見るだけでロールも要らないため、共有のアカウントで足りる |
+| GitHub でのログイン | GitHub のアカウントを持っていない方が見られない。画面は見るだけでロールも要らないため、共有のアカウントで足りる |
 
 ## 8. 実装上の注意（気づきにくい点）
 
