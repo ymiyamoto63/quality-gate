@@ -156,7 +156,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 
 <header class="hero">
   <p class="kicker">QUALITY-GATE ／ 仕様概要</p>
-  <h1>1 つのアプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
+  <h1>1 つの対象アプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
   <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定し、<strong>リリース可 / リリース不可</strong>を、開発に携わっていない方を含め、誰にでもひと目で分かる形で示す社内向け Web アプリケーションです。</p>
 </header>
 
@@ -201,9 +201,9 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 
 <section id="quickstart">
 <h2>3. 最初の測定結果までの手順</h2>
-<p>アプリを起動してから、リリース判定の画面で最初の結論を見るまでの流れです。大きく<strong>事前設定 → 測定 → 結果確認</strong>の 3 段階で、初回の準備は 1 回だけ行います。詳しい手順は <code>docs/operations.md</code> を参照してください。</p>
+<p>quality-gate アプリを起動してから、リリース判定の画面で最初の結論を見るまでの流れです。大きく<strong>事前設定 → 測定 → 結果確認</strong>の 3 段階で、初回の準備は 1 回だけ行います。詳しい手順は <code>docs/operations.md</code> を参照してください。</p>
 <div class="flow" role="list">
-  <div class="step" role="listitem"><b>① 事前設定</b><span>アプリ・ランナー・GitHub・計測プロファイルを準備（初回のみ）</span></div>
+  <div class="step" role="listitem"><b>① 事前設定</b><span>quality-gate アプリ・ランナー・GitHub・計測プロファイルを準備（初回のみ）</span></div>
   <div class="arrow" aria-hidden="true">→</div>
   <div class="step" role="listitem"><b>② 測定</b><span>collect ワークフローを手動実行（数分〜）</span></div>
   <div class="arrow" aria-hidden="true">→</div>
@@ -214,17 +214,17 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 <div class="table-wrap"><table>
   <thead><tr><th>#</th><th>やること</th><th>場所</th><th>ポイント</th></tr></thead>
   <tbody>
-    <tr><td class="id">1</td><td><code>.env</code> を作り、アプリを起動する</td><td>アプリを動かすマシン</td><td><code>QG_REPOSITORY</code>（対象の <code>owner/name</code>）、<code>QG_LOGIN_PASSWORD</code>（12 文字以上）、<code>QG_INGEST_TOKEN</code> は必須。合格ラインは書かなければ既定値</td></tr>
+    <tr><td class="id">1</td><td><code>.env</code> を作り、quality-gate アプリを起動する</td><td>quality-gate アプリを動かすマシン</td><td><code>QG_REPOSITORY</code>（計測対象リポジトリの <code>owner/name</code>）、<code>QG_LOGIN_PASSWORD</code>（12 文字以上）、<code>QG_INGEST_TOKEN</code> は必須。合格ラインは書かなければ既定値</td></tr>
     <tr><td class="id">2</td><td>セルフホストランナーを 1 台登録する</td><td>ランナーのマシン（Linux x64）</td><td>Docker・git・curl・jq が必要。<strong>Settings → Actions → Runners</strong> で <code>Idle</code> になれば完了</td></tr>
     <tr><td class="id">3</td><td>対象を読む GitHub App を作り、対象にインストールする</td><td>GitHub</td><td>対象が private のときだけ。権限は <strong>Contents: Read-only</strong>。秘密鍵をダウンロードしておく</td></tr>
-    <tr><td class="id">4</td><td>quality-gate リポジトリに変数とシークレットを設定する</td><td>GitHub（<strong>Settings → Secrets and variables → Actions</strong>）</td><td>Variables: <code>QG_BASE_URL</code>・<code>QG_COLLECTOR_APP_ID</code>／Secrets: <code>QG_COLLECTOR_APP_PRIVATE_KEY</code>・<code>QG_INGEST_TOKEN</code>（アプリと同じ値）</td></tr>
-    <tr><td class="id">5</td><td>計測プロファイル <code>collector/target/profile.env</code> を書き、main にマージする</td><td>quality-gate リポジトリ</td><td><code>QG_REPOSITORY</code> をアプリと一致させる。止める指標は <code>DISABLED_METRICS</code> とアプリの <code>QG_DISABLED_METRICS</code> の<strong>両方</strong>に書く</td></tr>
+    <tr><td class="id">4</td><td>quality-gate リポジトリに変数とシークレットを設定する</td><td>GitHub（<strong>Settings → Secrets and variables → Actions</strong>）</td><td>Variables: <code>QG_BASE_URL</code>・<code>QG_COLLECTOR_APP_ID</code>／Secrets: <code>QG_COLLECTOR_APP_PRIVATE_KEY</code>・<code>QG_INGEST_TOKEN</code>（quality-gate アプリと同じ値）</td></tr>
+    <tr><td class="id">5</td><td>計測プロファイル <code>collector/target/profile.env</code> を書き、main にマージする</td><td>quality-gate リポジトリ</td><td><code>QG_REPOSITORY</code> を quality-gate アプリの設定と一致させる。止める指標は <code>DISABLED_METRICS</code> と quality-gate アプリの <code>QG_DISABLED_METRICS</code> の<strong>両方</strong>に書く</td></tr>
   </tbody>
 </table></div>
 <pre>cp .env.example .env                              # QG_REPOSITORY・QG_LOGIN_PASSWORD・QG_INGEST_TOKEN を書き入れる
 openssl rand -hex 32                              # Ingest Token の作り方の例
-docker compose --profile full up -d --build       # DB とアプリを起動 → http://localhost:8080</pre>
-<div class="callout">対象リポジトリには何も置きません。アプリの <code>QG_REPOSITORY</code> と計測プロファイルの <code>QG_REPOSITORY</code>、アプリと GitHub の <code>QG_INGEST_TOKEN</code> がそれぞれ一致していることが、最初の計測を通すための要点です。</div>
+docker compose --profile full up -d --build       # DB と quality-gate アプリを起動 → http://localhost:8080</pre>
+<div class="callout">対象リポジトリには何も置きません。quality-gate アプリの <code>QG_REPOSITORY</code> と計測プロファイルの <code>QG_REPOSITORY</code>、quality-gate アプリと GitHub の <code>QG_INGEST_TOKEN</code> がそれぞれ一致していることが、最初の計測を通すための要点です。</div>
 
 <h3>3.2 測定</h3>
 <ol>
@@ -232,11 +232,11 @@ docker compose --profile full up -d --build       # DB とアプリを起動 →
   <li>入力を指定して実行する。最初は <code>branch</code>・<code>commit</code> とも空（既定ブランチの最新コミット）でよい。リリース判定に使うときは <code>commit</code> にタグ（例: <code>v1.2.0</code>）を入れる</li>
   <li><code>fetch</code> → <code>measure</code> → <code>submit</code> の 3 ジョブが順に動く。所要時間は負荷試験が無効なら数分、有効なら約 18 分を加える。初回は計測用コンテナのビルドに数分かかる</li>
 </ol>
-<p>手元で試すときは、ワークフローと同じスクリプトを直接実行できます（その場合も結果はアプリに取り込まれます）。</p>
+<p>手元で試すときは、ワークフローと同じスクリプトを直接実行できます（その場合も結果は quality-gate アプリに取り込まれます）。</p>
 <pre>WORK=/tmp/qg-collector
 ./collector/bin/fetch.sh "$WORK"
 ./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
-QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;アプリの QG_INGEST_TOKEN&gt; \
+QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの QG_INGEST_TOKEN&gt; \
   ./collector/bin/submit.sh "$WORK/reports"</pre>
 
 <h3>3.3 結果確認</h3>
@@ -250,9 +250,9 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;アプリの QG_INGEST_TOK
   <thead><tr><th>最初の結果でよくあること</th><th>原因と対処</th></tr></thead>
   <tbody>
     <tr><td>ジョブが始まらない</td><td>セルフホストランナーが止まっている（<code>Idle</code> になっているか確かめる）</td></tr>
-    <tr><td><code>submit</code> の Run 作成が 401</td><td>GitHub の Secret とアプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
-    <tr><td><code>submit</code> の Run 作成が 400</td><td>計測プロファイルとアプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
-    <tr><td>計測していない指標が計測エラー</td><td><code>DISABLED_METRICS</code> にだけ書き、アプリの <code>QG_DISABLED_METRICS</code> に書いていない</td></tr>
+    <tr><td><code>submit</code> の Run 作成が 401</td><td>GitHub の Secret とquality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
+    <tr><td><code>submit</code> の Run 作成が 400</td><td>計測プロファイルとquality-gate アプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
+    <tr><td>計測していない指標が計測エラー</td><td><code>DISABLED_METRICS</code> にだけ書き、quality-gate アプリの <code>QG_DISABLED_METRICS</code> に書いていない</td></tr>
     <tr><td>M-07 が対象外</td><td>初回は比較元に OpenAPI 定義が無いため。異常ではない</td></tr>
   </tbody>
 </table></div>
@@ -264,7 +264,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;アプリの QG_INGEST_TOK
 <div class="table-wrap"><table>
   <thead><tr><th>UC</th><th>利用者</th><th>シナリオ</th></tr></thead>
   <tbody>
-    <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルとアプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
+    <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルとquality-gate アプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
     <tr><td class="id">UC-02</td><td>開発者</td><td>収集ランナーでブランチ・コミット・タグを指定して計測すると、その場で判定される</td></tr>
     <tr><td class="id">UC-06</td><td>リリース判断者・開発者</td><td>リリース判定会議で最新の計測（またはタグ）の結論と全基準の合否を見て、PDF を証跡として残す</td></tr>
     <tr><td class="id">UC-07</td><td>リリース判断者</td><td>判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる</td></tr>
@@ -458,7 +458,7 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>項目</th><th>方針</th><th>理由</th></tr></thead>
   <tbody>
-    <tr><td>主キー</td><td><code>uuid</code>（UUIDv7 をアプリで採番）</td><td>API に出る ID を推測しにくくしつつ、時系列順でインデックスの局所性を保つ</td></tr>
+    <tr><td>主キー</td><td><code>uuid</code>（UUIDv7 を quality-gate アプリで採番）</td><td>API に出る ID を推測しにくくしつつ、時系列順でインデックスの局所性を保つ</td></tr>
     <tr><td>日時</td><td><code>timestamptz</code>（UTC）</td><td>表示するときにタイムゾーンを適用する</td></tr>
     <tr><td>列挙</td><td><code>varchar</code> + <code>CHECK</code> 制約</td><td><code>ENUM</code> 型は値の追加に DDL が要る</td></tr>
     <tr><td>半構造データ</td><td><code>jsonb</code></td><td>指標ごとに違う内訳を持つ。検索に使う値は列にする</td></tr>
@@ -489,7 +489,7 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table class="def">
   <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
   <tbody>
-    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7（アプリで採番）</td></tr>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7（quality-gate アプリで採番）</td></tr>
     <tr><td><code>owner</code></td><td><code>varchar(39)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>GitHub のオーナー名</td></tr>
     <tr><td><code>name</code></td><td><code>varchar(100)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>リポジトリ名</td></tr>
     <tr><td><code>created_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>初めて計測が届いた日時</td></tr>
@@ -640,7 +640,7 @@ cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>項目</th><th>内容</th></tr></thead>
   <tbody>
-    <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + アプリ 1 プロセス（Docker Compose）</td></tr>
+    <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + quality-gate アプリ 1 プロセス（Docker Compose）</td></tr>
     <tr><td>性能の目安</td><td>リリース判定の表示 p95 1.0 秒、確定から判定結果の応答まで p95 60 秒</td></tr>
     <tr><td>可用性</td><td>quality-gate の障害が対象の開発を止めない。DB は日次バックアップ</td></tr>
     <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数でログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>
