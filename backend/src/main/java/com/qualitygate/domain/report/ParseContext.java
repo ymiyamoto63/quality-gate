@@ -1,9 +1,11 @@
 package com.qualitygate.domain.report;
 
 import java.nio.file.FileSystems;
+import java.nio.file.Path;
 import java.nio.file.PathMatcher;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * パースに必要な周辺情報。
@@ -28,6 +30,9 @@ public record ParseContext(String componentName, List<String> exclusions,
      * {@code license}）。Trivy の {@code --scanners} と同じ書き方。あれば走査した対象の指標だけに値を与える。
      */
     public static final String SCANNERS = "scanners";
+
+    /** glob ごとのマッチャ。カバレッジのレポートではファイルの数だけ照合するため、作り直さない。 */
+    private static final Map<String, PathMatcher> MATCHERS = new ConcurrentHashMap<>();
 
     public ParseContext(String componentName, List<String> exclusions) {
         this(componentName, exclusions, Map.of());
@@ -64,7 +69,7 @@ public record ParseContext(String componentName, List<String> exclusions,
     }
 
     private static boolean matches(String glob, String path) {
-        PathMatcher matcher = FileSystems.getDefault().getPathMatcher("glob:" + glob);
-        return matcher.matches(java.nio.file.Path.of(path));
+        return MATCHERS.computeIfAbsent(glob, g -> FileSystems.getDefault().getPathMatcher("glob:" + g))
+                .matches(Path.of(path));
     }
 }

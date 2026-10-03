@@ -24,7 +24,7 @@ public final class MetricCatalog {
             new MetricDefinition("M-06", "循環的複雑度 15 超の関数数", MetricCategory.STRUCTURE),
             new MetricDefinition("M-07", "破壊的変更件数", MetricCategory.CONTRACT),
             new MetricDefinition("M-08", "アクセシビリティ違反", MetricCategory.USABILITY),
-            // 要件定義の後に追加した指標。カテゴリは既存の表に合わせる
+            // 後から追加した指標。カテゴリは既存の表に合わせる
             new MetricDefinition("M-09", "テスト成功率", MetricCategory.FUNCTIONAL),
             new MetricDefinition("M-10", "スキップされたテスト数", MetricCategory.FUNCTIONAL),
             new MetricDefinition("M-11", "シークレット検出件数", MetricCategory.SECURITY),
@@ -54,7 +54,7 @@ public final class MetricCatalog {
                 new MetricDefinition(metricId, metricId, MetricCategory.FUNCTIONAL));
     }
 
-    /** 指標 ID を要件定義の並び（M-01, M-02, …）で比較する。 */
+    /** 指標 ID をこの一覧の並び（M-01, M-02, …）で比較する。 */
     public static int compareByCatalogOrder(String left, String right) {
         return Integer.compare(indexOf(left), indexOf(right));
     }

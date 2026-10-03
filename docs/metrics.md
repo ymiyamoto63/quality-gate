@@ -178,7 +178,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 
 ちょうど 10% は「超える」に含めない。
 
-**対象外（`NOT_APPLICABLE`）の出し方**: 合格ラインの `mutation_score.components` で対象を限定したときだけ、次の行を出す。
+**対象外（`NOT_APPLICABLE`）の出し方**: `QG_MUTATION_COMPONENTS` で対象を限定したときだけ、次の行を出す。
 
 | 状況 | 扱い |
 | --- | --- |
@@ -216,7 +216,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | 計測時間 | 300 秒 |
 | 実行回数 | 3 回。値ごとの**中央値**で判定する |
 | 実行環境 | 他のジョブと同居しない専有のセルフホストランナー。計測環境の名前（`environment.name`）ごとに前回比を分ける |
-| シナリオ | 合格ラインの `performance.scenarios`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
+| シナリオ | `QG_PERF_SCENARIOS`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
 
 **計測方法**: 対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/target/` の k6 シナリオ）で負荷をかける。
 1 回約 6 分 × 3 回。各回の summary を `k6-summary` として送り、メタデータの `environment` に計測環境（名前・CPU 数・メモリ・k6 の版・シードデータ）を入れる。

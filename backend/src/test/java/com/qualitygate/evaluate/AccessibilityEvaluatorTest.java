@@ -53,7 +53,7 @@ class AccessibilityEvaluatorTest {
 
     @Test
     void 設定で許容した件数までは合格() {
-        MetricResult result = evaluate(Map.of("max_critical", 1),
+        MetricResult result = evaluate(Map.of("accessibility-violations-max", 1),
                 List.of(scan(List.of("/login"))),
                 List.of(violation("/login", "image-alt", Severity.CRITICAL, "wcag2a")));
 
@@ -94,7 +94,7 @@ class AccessibilityEvaluatorTest {
 
     @Test
     void 重大な違反が前回より増えれば合格ライン内でも理由に書き添える() {
-        MetricResult result = evaluate(Map.of("max_critical", 5),
+        MetricResult result = evaluate(Map.of("accessibility-violations-max", 5),
                 Map.of(EvaluationContext.key("M-08", null), BigDecimal.ONE),
                 List.of(scan(List.of("/"))), List.of(
                         violation("/", "image-alt", Severity.CRITICAL, "wcag2a"),
@@ -128,7 +128,7 @@ class AccessibilityEvaluatorTest {
     @Test
     void 設定したページが検査されていなければ計測エラー() {
         // ログイン切れで /login に飛ばされた場合、/runs/:id は検査されない
-        MetricResult result = evaluate(Map.of("pages", List.of("/login", "/runs/:id", "/")),
+        MetricResult result = evaluate(Map.of("accessibility-pages", List.of("/login", "/runs/:id", "/")),
                 List.of(scan(List.of("/login"))), List.of());
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.ERROR);
@@ -137,7 +137,7 @@ class AccessibilityEvaluatorTest {
 
     @Test
     void 複数の成果物で検査したページを合わせて照合する() {
-        MetricResult result = evaluate(Map.of("pages", List.of("/login", "/runs/:id/findings")),
+        MetricResult result = evaluate(Map.of("accessibility-pages", List.of("/login", "/runs/:id/findings")),
                 List.of(scan(List.of("/login")), scan(List.of("/runs/:id/findings"))),
                 List.of());
 
@@ -201,7 +201,7 @@ class AccessibilityEvaluatorTest {
                                   List<RawMeasurement> scans, List<IdentifiedFinding> findings) {
         NormalizedInput input = input(scans, findings, Set.of("M-08"));
         EvaluationContext context = new EvaluationContext(run(),
-                thresholdsWith("accessibility", config), input, previous, !previous.isEmpty());
+                thresholdsWith(config), input, previous, !previous.isEmpty());
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);
         return results.getFirst();

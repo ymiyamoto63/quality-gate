@@ -13,14 +13,15 @@ import com.qualitygate.platform.storage.ArtifactStore;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import tools.jackson.core.JacksonException;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
+import java.io.IOException;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -54,7 +55,7 @@ public class ReportNormalizer {
     public NormalizedInput normalize(List<ArtifactRecord> artifacts, List<String> exclusions) {
         List<RawMeasurement> measurements = new ArrayList<>();
         Map<String, IdentifiedFinding> findings = new LinkedHashMap<>();
-        Set<String> metricsWithData = new java.util.LinkedHashSet<>();
+        Set<String> metricsWithData = new LinkedHashSet<>();
         Map<String, String> parseErrors = new HashMap<>();
 
         for (ArtifactRecord artifact : artifacts) {
@@ -95,27 +96,16 @@ public class ReportNormalizer {
                         "この形式のアダプタが未実装です: " + artifact.getType().wire()));
         try (InputStream in = artifactStore.open(artifact.getStorageKey())) {
             return adapter.parse(in, context);
-        } catch (java.io.IOException e) {
+        } catch (IOException e) {
             throw new ArtifactFormatException(
                     "成果物を読み出せませんでした: " + artifact.getFilename(), e);
         }
     }
 
-    /**
-     * 取り込み時に JSON オブジェクトであることを検証済みのため、通常は失敗しない。
-     * 検証の導入前に取り込まれた成果物に備え、読めなければメタデータ無しとして扱う。
-     */
+    /** 取り込み時に JSON オブジェクトであることを検証済み（IngestService）。 */
     private Map<String, Object> metadataOf(ArtifactRecord artifact) {
         String metadata = artifact.getMetadata();
-        if (metadata == null || metadata.isBlank()) {
-            return Map.of();
-        }
-        try {
-            return objectMapper.readValue(metadata, JSON_OBJECT);
-        } catch (JacksonException e) {
-            log.warn("成果物のメタデータを読めませんでした artifactId={}", artifact.getId());
-            return Map.of();
-        }
+        return metadata == null || metadata.isBlank() ? Map.of() : objectMapper.readValue(metadata, JSON_OBJECT);
     }
 
     private Optional<ArtifactAdapter> adapterFor(ArtifactRecord artifact) {

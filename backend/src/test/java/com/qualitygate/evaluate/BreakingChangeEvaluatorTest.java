@@ -90,7 +90,7 @@ class BreakingChangeEvaluatorTest {
     private MetricResult evaluate(int maximum, List<RawMeasurement> measurements,
                                   List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(),
-                thresholdsWith("api_contract", Map.of("breaking_changes", maximum)),
+                thresholdsWith(Map.of("breaking-changes-max", maximum)),
                 input(measurements, findings, Set.of("M-07")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);

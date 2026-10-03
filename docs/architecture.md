@@ -404,16 +404,17 @@ API の仕様は起動中のアプリの `/swagger-ui.html` でも見られる�
 | `errorCode` | HTTP | 意味 |
 | --- | --- | --- |
 | `VALIDATION_FAILED` | 400 | 入力の検証エラー（`violations` に詳細） |
-| `UNAUTHENTICATED` / `TOKEN_INVALID` | 401 | 未認証 / Ingest Token が不正 |
 | `FORBIDDEN` | 403 | CSRF トークンが無いなど |
 | `RESOURCE_NOT_FOUND` | 404 | 対象が無い（存在しない URL も含む） |
 | `METHOD_NOT_ALLOWED` / `NOT_ACCEPTABLE` | 405 / 406 | 使えないメソッド / 応答できない形式 |
 | `RUN_ALREADY_FINALIZED` | 409 | 確定済みの Run への操作 |
 | `ARTIFACT_TOO_LARGE` | 413 | 1 ファイル 50MB、または Run 合計 200MB の超過 |
 | `UNSUPPORTED_MEDIA_TYPE` | 415 | 本文の形式に対応していない |
-| `ARTIFACT_TYPE_UNKNOWN` / `ARTIFACT_FORMAT_INVALID` | 422 | 未知の成果物種別 / 形式が不正 |
+| `ARTIFACT_TYPE_UNKNOWN` | 422 | 未知の成果物種別 |
 | `PERFORMANCE_METADATA_MISSING` | 422 | 性能の `environment` が無い |
 | `INTERNAL_ERROR` | 500 | 想定外の例外 |
+
+未認証（ログインしていない、または Ingest Token が無い・一致しない）は、本文の無い 401 を返す。
 
 ### 6.4 OpenAPI 仕様の生成
 

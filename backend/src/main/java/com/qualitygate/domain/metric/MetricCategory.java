@@ -3,7 +3,7 @@ package com.qualitygate.domain.metric;
 /**
  * 指標のカテゴリ（docs/metrics.md 1 章）。
  *
- * <p>宣言順が画面での表示順になる。要件定義の表と同じ並びに保つこと。
+ * <p>宣言順が画面での表示順になる。docs/metrics.md 1 章の表と同じ並びに保つこと。
  */
 public enum MetricCategory {
 

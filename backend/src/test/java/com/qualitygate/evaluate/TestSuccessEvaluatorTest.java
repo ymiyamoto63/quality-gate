@@ -8,7 +8,6 @@ import com.qualitygate.domain.report.RawFinding;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.junit.jupiter.api.Test;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -74,7 +73,7 @@ class TestSuccessEvaluatorTest {
 
     @Test
     void 合格ラインを緩めれば失敗があっても合格で失敗の件数を書き添える() {
-        List<MetricResult> results = evaluate(Map.of("min_success_rate", 95),
+        List<MetricResult> results = evaluate(Map.of("test-success-rate-min", 95),
                 List.of(report("backend", 99, 1, 0, 0, 0)), List.of());
 
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
@@ -94,10 +93,8 @@ class TestSuccessEvaluatorTest {
     private List<MetricResult> evaluate(Map<String, Object> config,
                                         List<RawMeasurement> measurements,
                                         List<IdentifiedFinding> findings) {
-        Map<String, Object> values = new HashMap<>(Map.of("min_success_rate", 100, "min_test_count", 1));
-        values.putAll(config);
         EvaluationContext context = new EvaluationContext(run(),
-                thresholdsWith("test_results", values),
+                thresholdsWith(config),
                 input(measurements, findings, Set.of("M-09", "M-10")), Map.of(), false);
         return evaluator.evaluate(context);
     }

@@ -74,8 +74,17 @@ class LicenseEvaluatorTest {
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
     }
 
+    @Test
+    void 合格ラインを緩めて合格したときは使用禁止の件数を理由に書く() {
+        MetricResult result = evaluate(Map.of("forbidden-licenses-max", 1), List.of(
+                license("left-pad", "WTFPL", "forbidden")));
+
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).startsWith("使用禁止のライセンスのパッケージが 1 件ありますが、合格ライン 1 件以内です");
+    }
+
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
-        EvaluationContext context = new EvaluationContext(run(), thresholdsWith("licenses", config),
+        EvaluationContext context = new EvaluationContext(run(), thresholdsWith(config),
                 input(List.of(), findings, Set.of("M-12")), Map.of(), false);
         List<MetricResult> results = evaluator.evaluate(context);
         assertThat(results).hasSize(1);

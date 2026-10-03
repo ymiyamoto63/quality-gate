@@ -177,8 +177,8 @@ class MutationScoreEvaluatorTest {
     private static EvaluationContext context(Set<String> components,
                                              Map<String, BigDecimal> previous,
                                              List<RawMeasurement> measurements) {
-        GateThresholds thresholds = thresholdsWith("mutation_score",
-                Map.of("threshold", 60, "components", List.copyOf(components)));
+        GateThresholds thresholds = thresholdsWith(
+                Map.of("mutation-score-min", 60, "mutation-components", List.copyOf(components)));
         NormalizedInput input = input(measurements, List.of(), Set.of("M-02"));
         return new EvaluationContext(run(), thresholds, input, previous, !previous.isEmpty());
     }
