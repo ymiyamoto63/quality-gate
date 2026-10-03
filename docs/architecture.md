@@ -62,7 +62,7 @@ quality-gate の構成、測定の仕組み、バックエンドの構造、デ�
 | DD-11 | 性能計測の条件 | **到達率 50 req/s を負荷条件として固定し、その下で p95 と エラー率を判定する**。到達率は指標にせず M-03 の前提として確かめる。計測は他のジョブと同居しない専有のセルフホストランナーで行う | スループットを結果として測ると合否が負荷のかけ方で変わる。共有の実行環境ではノイズで値が揺れ、絶対値で判定できない |
 | DD-12 | ミューテーションテスト | **PIT を使い、backend だけを対象にする**。frontend は `NOT_APPLICABLE`（対象外）とし、合否に使わない | PIT は JVM 専用。業務ロジックはバックエンドに寄っている |
 | DD-17 | リリース判定のための計測 | **タグを指定して計測でき、比較元は前のタグにする**。比較対象 Run は比較元コミットの Run を優先する | 前回のリリースからの変更全体で増加（破壊的変更・スキップ）を数える。手動の計測は順不同のため、直前に計測した Run がリリースより新しいことがある |
-| DD-22 | 対象の登録 | **計測プロファイル（`collector/target/profile.env`）とアプリの `QG_REPOSITORY` に同じリポジトリを書く**。バックエンドは初めて計測が届いたときにリポジトリを登録し、`QG_REPOSITORY` と違う送信は拒否する | 取り違えた送信で別のアプリの結果が混ざらないようにする |
+| DD-22 | 対象の登録 | **計測プロファイル（`collector/targets/<名前>/profile.env`。使う対象は Variable `QG_TARGET` で選ぶ）とアプリの `QG_REPOSITORY` に同じリポジトリを書く**。バックエンドは初めて計測が届いたときにリポジトリを登録し、`QG_REPOSITORY` と違う送信は拒否する | 取り違えた送信で別のアプリの結果が混ざらないようにする |
 
 ### 判定
 
@@ -123,8 +123,8 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | `collector/versions.env` | ツールの版（JaCoCo・PMD・PIT・oasdiff・Trivy・Maven・k6） |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium・ESLint） |
 | `collector/a11y/` / `collector/complexity/` / `collector/pit/` / `collector/pmd-ruleset.xml` | M-08 の検査スクリプト、M-06（frontend）の ESLint の設定、PIT の取得用 pom、M-06（backend）のルールセット |
-| `collector/target/profile.env` | 計測プロファイル（計測対象と、**どう測るか**・何を測らないか） |
-| `collector/target/k6.js` | 負荷試験のシナリオ（性能を測る場合） |
+| `collector/targets/<名前>/profile.env` | 計測対象ごとの計測プロファイル（計測対象と、**どう測るか**・何を測らないか）。使う対象は Actions の Variable `QG_TARGET` で選ぶ |
+| `collector/targets/<名前>/k6.js` | 計測対象ごとの負荷試験のシナリオ（性能を測る場合） |
 
 | ジョブ | やること | 認証情報 | 所要時間 |
 | --- | --- | --- | --- |

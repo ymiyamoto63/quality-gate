@@ -75,5 +75,6 @@ docker run --rm --init \
   -v "$WORK:$WORK" -v "$REPORTS:$REPORTS" \
   -v "$COLLECTOR_DIR:$COLLECTOR_DIR:ro" \
   -v quality-gate-collector-home:/cache/home \
+  --env QG_TARGET \
   -w "$WORK" \
   "$IMAGE" "$COLLECTOR_DIR/bin/measure.sh" "$WORK" "$REPORTS"

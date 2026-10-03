@@ -26,11 +26,17 @@ load_env() {
   done < "$file"
 }
 
-# 計測プロファイル（計測対象は 1 つだけ）
-PROFILE="$COLLECTOR_DIR/target/profile.env"
+# 計測対象ごとの設定（計測プロファイルと k6 のシナリオ）は collector/targets/<名前>/ に置く。
+# どれを使うかは環境変数 QG_TARGET で選ぶ（収集ワークフローは入力 target か Actions の Variable QG_TARGET を渡す）。
+# 一度に計測する対象は 1 つだけ（quality-gate アプリの QG_REPOSITORY と一致させる）
 
-# 計測プロファイルと版の定義を読む
+# 計測プロファイルと版の定義を読む。TARGET_DIR（対象の設定のディレクトリ）と PROFILE を決める
 load_profile() {
+  [ -n "${QG_TARGET:-}" ] || die "QG_TARGET が未設定です（collector/targets/ のディレクトリ名を指定する）"
+  [[ "$QG_TARGET" =~ ^[A-Za-z0-9._-]+$ ]] && [ "$QG_TARGET" != . ] && [ "$QG_TARGET" != .. ] \
+    || die "QG_TARGET は collector/targets/ のディレクトリ名で指定してください: $QG_TARGET"
+  TARGET_DIR="$COLLECTOR_DIR/targets/$QG_TARGET"
+  PROFILE="$TARGET_DIR/profile.env"
   [ -f "$PROFILE" ] || die "計測プロファイルがありません: $PROFILE"
   load_env "$COLLECTOR_DIR/versions.env"
   load_env "$PROFILE"

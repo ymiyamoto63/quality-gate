@@ -1,4 +1,4 @@
-// qg-test-target の負荷試験（M-03 / M-04）。収集ランナーの measure.sh が実行する。原本は qg-test-target の docs/quality-gate/k6.js
+// qg-test-target の負荷試験（M-03 / M-04）。収集ランナーの measure.sh が実行する（QG_TARGET=qg-test-target）
 // 仕様: docs/metrics.md M-03、手順: docs/operations.md 4.4
 //
 //   負荷モデル   constant-arrival-rate（到達率を固定し、VU 数は固定しない）

@@ -154,6 +154,7 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 
 | 種別 | 名前 | 値 |
 | --- | --- | --- |
+| Variables | `QG_TARGET` | 計測対象（`collector/targets/` のディレクトリ名。例: `qg-test-target`）。4.1 |
 | Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`） |
 | Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体） |
@@ -169,11 +170,22 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 
 ### 4.1 手順
 
-1. `collector/target/profile.env`（計測プロファイル）を書き換える（4.2）
-2. 性能を計測するなら `collector/target/k6.js`（負荷試験のシナリオ）も書き換える（4.4）
+計測対象ごとの設定は `collector/targets/<名前>/` に置きます（計測プロファイル `profile.env` と、負荷試験のシナリオ `k6.js`）。
+どの対象を計測するかは、quality-gate リポジトリの Actions の Variable `QG_TARGET`（ディレクトリ名）で選びます。収集ワークフローの入力 `target` を指定すると、その実行だけ別の対象を計測できます。
+
+対象を追加するとき（最初の 1 回だけ）:
+
+1. `collector/targets/<名前>/profile.env`（計測プロファイル）を作る（4.2。既存の対象のものを写して書き換える）
+2. 性能を計測するなら同じディレクトリに `k6.js`（負荷試験のシナリオ）を作る（4.4）
 3. 3.3 の App を対象にインストールする
-4. アプリの `QG_REPOSITORY` を同じリポジトリにし、合格ライン（2.4）を決める
-5. プルリクエストで main にマージする
+4. プルリクエストで main にマージする
+
+計測対象を切り替えるとき（マージは不要）:
+
+1. Actions の Variable `QG_TARGET` を、切り替え先のディレクトリ名にする（3.4）
+2. アプリの `QG_REPOSITORY` を、その計測プロファイルの `QG_REPOSITORY` と同じにし、合格ライン（2.4。`QG_DISABLED_METRICS`・`QG_PERF_SCENARIOS`・`QG_ACCESSIBILITY_PAGES`・`QG_EXCLUSIONS` など対象に合わせる値を含む）を決めて再起動する
+
+quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` とアプリの `QG_REPOSITORY` がずれていると、送信が取り込みで拒否されます。
 
 計測できるのは Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけです。使わない側は計測プロファイルで空にしてください。
 設定したら、合格ラインを確定する前に一度計測してベースラインを確かめ、対象自身のビルドと結果が一致するかを確かめます（4.5）。
@@ -203,7 +215,7 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 | `A11Y_READY_SELECTOR` | 空 | 描画が済んだと判断できる要素（CSS セレクタ）。空なら通信が落ち着くまで待つだけ |
 | `A11Y_BACKEND_PORT` | 空 | M-08 でバックエンドを起動するポート。対象のフロントエンドの proxy 先に合わせる。空ならバックエンドを起動しない |
 | `A11Y_FRONTEND_PORT` / `A11Y_START_TIMEOUT` | `4173` / `120` | `vite preview` のポート / 起動を待つ秒数 |
-| `PERF_SCRIPT` | 空 | M-03 / M-04 の k6 シナリオ（`collector/target/` からの相対）。空なら計測しない |
+| `PERF_SCRIPT` | 空 | M-03 / M-04 の k6 シナリオ（`collector/targets/<名前>/` からの相対）。空なら計測しない |
 | `PERF_ENVIRONMENT` | `collector` | 計測環境の名前。前回比はこの名前ごとに分かれます。**ランナーのマシンや計測条件を変えたら名前も変える** |
 | `PERF_DATASET_PROFILE` | 空 | シードデータの名前（記録用） |
 | `PERF_BACKEND_PORT` / `PERF_START_TIMEOUT` | `8080` / `120` | バックエンドを起動するポート / 起動を待つ秒数 |
@@ -220,7 +232,7 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 前者で計測を止め、後者で判定から外します。片方だけだと、計測しない指標が判定に残って計測エラー（不合格）になるか、判定しない指標を測って時間を使います。
 
 ```bash
-# 計測プロファイル（collector/target/profile.env）
+# 計測プロファイル（collector/targets/<名前>/profile.env）
 DISABLED_METRICS=M-03 M-04
 # アプリの環境変数
 QG_DISABLED_METRICS=M-03,M-04
@@ -239,7 +251,7 @@ QG_DISABLED_METRICS=M-03,M-04
 
 ### 4.4 負荷試験のシナリオ
 
-`collector/target/k6.js` に k6 のシナリオを書きます（既存のものを写して書き換えます）。スクリプトには `PERF_BASE_URL`・`PERF_SUMMARY`・`PERF_WARMUP_SECONDS`・`PERF_DURATION_SECONDS` が環境変数で渡ります。
+`collector/targets/<名前>/k6.js` に k6 のシナリオを書きます（既存のものを写して書き換えます）。スクリプトには `PERF_BASE_URL`・`PERF_SUMMARY`・`PERF_WARMUP_SECONDS`・`PERF_DURATION_SECONDS` が環境変数で渡ります。
 
 - 計測区間のシナリオに `phase: measure`、ウォームアップに `phase: warmup` のタグを付ける
 - シナリオ名（`options.scenarios` のキー）をアプリの `QG_PERF_SCENARIOS` と一致させ、シナリオごとに `http_req_duration{scenario:<名前>}` のしきい値を書く（k6 はしきい値のあるタグ付きの指標だけを出力する）
@@ -320,6 +332,7 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 
 ```bash
 WORK=/tmp/qg-collector
+export QG_TARGET=qg-test-target   # 計測する対象（collector/targets/ のディレクトリ名）
 # private リポジトリなら GH_TOKEN に読み取り権限のあるトークンを入れる
 ./collector/bin/fetch.sh "$WORK"
 ./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
@@ -327,7 +340,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
   ./collector/bin/submit.sh "$WORK/reports"
 ```
 
-- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます
+- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。`QG_TARGET` はどのスクリプトにも必要です
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - 負荷試験が有効なら約 18 分かかります。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 
@@ -350,7 +363,9 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 | 症状 | 主な原因と対処 |
 | --- | --- |
 | 実行してもジョブが始まらない | ランナーが止まっている（3.5） |
-| `fetch` が `計測プロファイルがありません` | `collector/target/profile.env` が無い |
+| `fetch` が `QG_TARGET が未設定です` | Actions の Variable `QG_TARGET` が無い（3.4）。入力 `target` でも指定できる |
+| `fetch` が `計測プロファイルがありません` | `collector/targets/<QG_TARGET>/profile.env` が無い（`QG_TARGET` の綴りを確かめる） |
+| `submit` が 400 で止まる | 計測プロファイルの `QG_REPOSITORY` とアプリの `QG_REPOSITORY` が違う（アプリのログに「計測対象のリポジトリは … です」と出る）。`QG_TARGET` とアプリの設定をそろえる |
 | `fetch` が `could not read Username` / `Repository not found` | App が対象にインストールされていない、Contents の権限が無い、または `QG_COLLECTOR_APP_ID` が未設定で private を取得しようとした |
 | `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
