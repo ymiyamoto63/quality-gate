@@ -135,7 +135,7 @@ class PerformanceEvaluatorTest {
                     sample.toDetail()).withVariant(sample.environmentName()));
         }
         Run run = new Run(Uuid7.generate(), Uuid7.generate(),
-                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main", "ci",
+                "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main",
                 Instant.parse("2026-09-22T00:00:00Z"), 1);
         EvaluationContext context = new EvaluationContext(run,
                 thresholdsWith(PERFORMANCE),

@@ -68,16 +68,12 @@ public class IngestService {
         MonitoredRepository repository = repositories
                 .findByOwnerAndName(request.owner(), request.name())
                 .orElseGet(() -> register(request));
-        if (request.defaultBranch() != null && !request.defaultBranch().equals(repository.getDefaultBranch())) {
-            repository.setDefaultBranch(request.defaultBranch());
-        }
 
         // 同一コミットへの再送信は上書きせず、attempt を増やした新しい Run とする。
         int attempt = runs.findMaxAttempt(repository.getId(), request.commitSha()) + 1;
 
         Run run = new Run(Uuid7.generate(), repository.getId(), request.commitSha(),
-                request.branch(), request.triggeredBy(),
-                request.measuredAt(), attempt);
+                request.branch(), request.measuredAt(), attempt);
         run.setBaseCommitSha(request.baseCommitSha());
         run.setCiRunUrl(request.ciRunUrl());
         run.setTags(request.tagsOrEmpty());
@@ -89,12 +85,11 @@ public class IngestService {
 
     private MonitoredRepository register(CreateRunRequest request) {
         log.info("リポジトリを登録しました repository={}", request.repository());
-        return repositories.save(new MonitoredRepository(Uuid7.generate(), request.owner(), request.name(),
-                request.defaultBranch() == null ? "main" : request.defaultBranch()));
+        return repositories.save(new MonitoredRepository(Uuid7.generate(), request.owner(), request.name()));
     }
 
     @Transactional
-    public ArtifactRecord storeArtifact(UUID runId,
+    public void storeArtifact(UUID runId,
                                         ArtifactType type, String filename,
                                         String componentName, String metadata,
                                         InputStream content, long declaredSize) {
@@ -147,7 +142,6 @@ public class IngestService {
                 componentName, metadata);
         artifacts.save(record);
         run.markUploading();
-        return record;
     }
 
     private void deleteAfterCommit(String storageKey) {

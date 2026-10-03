@@ -51,7 +51,7 @@ class RunEvaluationPipelineIT {
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", "main")).getId();
+                "ymiyamoto63", "quality-gate")).getId();
     }
 
     @Test
@@ -86,7 +86,7 @@ class RunEvaluationPipelineIT {
 
     private Run newRun(String commitSha) {
         Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main",
-                "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
+                Instant.parse("2026-09-22T00:00:00Z"), 1);
         run.finalizeIngest();
         return runs.save(run);
     }

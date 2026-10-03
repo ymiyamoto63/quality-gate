@@ -65,7 +65,7 @@ class ReleaseReportApiIT {
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", "main")).getId();
+                "ymiyamoto63", "quality-gate")).getId();
         mvc = MockMvcTester.create(MockMvcBuilders.webAppContextSetup(context).apply(springSecurity())
                 .defaultRequest(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get("/")
                         .with(user(IntegrationCleanup.LOGIN_USERNAME)))
@@ -217,7 +217,7 @@ class ReleaseReportApiIT {
 
     /** 分岐 20 のうち {@code covered} を通り、循環的複雑度 {@code complexity} の関数が 1 つある計測。 */
     private void evaluated(String commitSha, String measuredAt, int covered, int complexity) {
-        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main", "collector",
+        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main",
                 Instant.parse(measuredAt), runs.findMaxAttempt(repositoryId, commitSha) + 1);
         // 前のリリースと比べた計測（PASSING の比較元は計測していないコミット）
         if (PASSING.equals(commitSha)) {

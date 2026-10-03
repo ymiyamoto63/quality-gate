@@ -30,7 +30,7 @@ final class EvaluatorTestSupport {
     static Run run() {
         return new Run(Uuid7.generate(), Uuid7.generate(),
                 "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0", "main",
-                "ci", Instant.parse("2026-09-22T00:00:00Z"), 1);
+                Instant.parse("2026-09-22T00:00:00Z"), 1);
     }
 
     static EvaluationContext context(NormalizedInput input) {

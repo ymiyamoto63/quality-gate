@@ -55,7 +55,7 @@ class IngestApiIT {
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
         repositories.save(new MonitoredRepository(
-                Uuid7.generate(), "ymiyamoto63", "quality-gate", "main"));
+                Uuid7.generate(), "ymiyamoto63", "quality-gate"));
 
 
         client = RestClient.builder()
@@ -75,16 +75,12 @@ class IngestApiIT {
                         "repository", REPOSITORY,
                         "commitSha", COMMIT,
                         "branch", "main",
-                        "triggeredBy", "github-actions",
                         "measuredAt", "2026-09-21T02:10:00Z",
                         "tags", java.util.List.of("v1.2.0", "release/2026-09")))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID runId = UUID.fromString(String.valueOf(created.getBody().get("runId")));
-        assertThat(created.getBody()).containsEntry("attempt", 1);
-        // リンクはこのコミットのリリース判定の画面
-        assertThat(String.valueOf(created.getBody().get("detailUrl"))).endsWith("/?ref=" + COMMIT);
         assertThat(runs.findById(runId).orElseThrow().getTags()).containsExactly("v1.2.0", "release/2026-09");
 
         // 成果物をアップロードする
@@ -116,7 +112,9 @@ class IngestApiIT {
 
         assertThat(finalized.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(finalized.getBody()).containsEntry("status", "EVALUATED")
-                .containsKeys("verdict", "detailUrl");
+                .containsKey("verdict");
+        // リンクはこのコミットのリリース判定の画面
+        assertThat(String.valueOf(finalized.getBody().get("detailUrl"))).endsWith("/?ref=" + COMMIT);
         assertThat(runs.findById(runId).orElseThrow().getStatus()).isEqualTo(RunStatus.EVALUATED);
 
         // 確定後の成果物追加は 409
@@ -137,7 +135,6 @@ class IngestApiIT {
                 .uri("/api/v1/runs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toBodilessEntity();
 
@@ -152,7 +149,7 @@ class IngestApiIT {
                     .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                            "triggeredBy", "ci", "measuredAt", "2026-09-21T02:10:00Z",
+                            "measuredAt", "2026-09-21T02:10:00Z",
                             "tags", java.util.List.of(tag)))
                     .retrieve().toEntity(JSON_OBJECT);
 
@@ -168,7 +165,6 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN + "x")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toBodilessEntity();
 
@@ -176,20 +172,18 @@ class IngestApiIT {
     }
 
     @Test
-    void 計測対象のリポジトリは初めての送信で既定ブランチとともに登録される() {
+    void 計測対象のリポジトリは初めての送信で登録される() {
         repositories.deleteAll();
         ResponseEntity<Map<String, Object>> response = client.post()
                 .uri("/api/v1/runs")
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "feature/x",
-                        "defaultBranch", "develop", "triggeredBy", "collector",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
-        assertThat(repositories.findByOwnerAndName("ymiyamoto63", "quality-gate")).hasValueSatisfying(repository ->
-                assertThat(repository.getDefaultBranch()).isEqualTo("develop"));
+        assertThat(repositories.findByOwnerAndName("ymiyamoto63", "quality-gate")).isPresent();
     }
 
     /** quality-gate は 1 つのアプリだけを見る。取り違えた送信で別のアプリの結果が混ざらないようにする。 */
@@ -200,7 +194,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
-                        "triggeredBy", "collector", "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -381,7 +375,6 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "triggeredBy", "ci",
                         "measuredAt", "2026-09-21T02:10:00Z"))
                 .retrieve().toEntity(JSON_OBJECT);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);

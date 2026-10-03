@@ -7,8 +7,8 @@
 
 ```
 収集ランナー（submit.sh）
-  → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId, detailUrl}
-  → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202
+  → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId}
+  → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202（本文なし）
   → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {status, verdict, errorCode, detailUrl}
 ```
 
@@ -18,15 +18,14 @@
 
 | 項目 | 必須 | 備考 |
 | --- | --- | --- |
-| `repository` | ○ | `owner/name`。`QG_REPOSITORY` と違えば `400 VALIDATION_FAILED`。初めて送られたときに登録する（既定ブランチは `defaultBranch`、無ければ `main`） |
+| `repository` | ○ | `owner/name`。`QG_REPOSITORY` と違えば `400 VALIDATION_FAILED`。初めて送られたときに登録する |
 | `commitSha` | ○ | 40 桁の 16 進 |
-| `branch` / `triggeredBy` / `measuredAt` | ○ | 収集ランナーの `triggeredBy` は `collector` |
-| `defaultBranch` | | 計測プロファイルの `DEFAULT_BRANCH`。既存のリポジトリの既定ブランチを更新する（省略時は変えない） |
+| `branch` / `measuredAt` | ○ | 計測したブランチと日時。比較対象 Run（同じブランチの直前の計測）を探すのと、並べる順に使う |
 | `baseCommitSha` | | 比較元（[指標](../../metrics.md#24-比較元と比較対象-run)） |
 | `ciRunUrl` | | 計測したワークフローの実行 URL。リリース判定の「計測日時」のリンクになる |
 | `tags` | | 計測したコミットを指すタグ（`git tag --points-at`）。リリース判定でタグを解決するのに使う |
 
-同じコミットへの再送信は `attempt` を増やした新しい Run になる。応答の `detailUrl`（`QG_BASE_URL` から組み立てる、そのコミットのリリース判定の URL `/?ref=<commitSha>`）は、収集ランナーのログに直リンクを出すため。
+同じコミットへの再送信は `attempt` を増やした新しい Run になる。応答は以降の呼び出しに使う `runId` だけ。
 
 ## 3. `POST /api/v1/runs/{runId}/artifacts`
 
@@ -55,6 +54,7 @@
 ## 4. `POST /api/v1/runs/{runId}/finalize`
 
 取り込みを確定し、その場で合格ラインの解決・正規化・判定を行い、`status` / `verdict` / `errorCode` / `detailUrl` を返す。
+`detailUrl`（`QG_BASE_URL` から組み立てる、そのコミットのリリース判定の URL `/?ref=<commitSha>`）は、収集ランナーのログに直リンクを出すため。
 
 - 確定は判定の前に別のトランザクションで行い、判定に失敗しても取り消さない（Run を `FAILED` として残す）
 - 判定に失敗しても 200 で、`status` が `FAILED`、`errorCode` に理由（`EVALUATION_FAILED`）が入る
@@ -77,7 +77,7 @@ TOKEN=<.env の QG_INGEST_TOKEN>
 RUN_ID=$(curl -s -X POST http://localhost:8080/api/v1/runs \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"repository\":\"example/sample\",\"commitSha\":\"$(git rev-parse HEAD)\",
-       \"branch\":\"main\",\"triggeredBy\":\"local\",
+       \"branch\":\"main\",
        \"measuredAt\":\"$(date -u +%FT%TZ)\"}" | sed -E 's/.*"runId":"([^"]+)".*/\1/')
 
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=jacoco-xml&component=backend" \
@@ -85,4 +85,4 @@ curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=jacoco
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/finalize" -H "Authorization: Bearer $TOKEN"   # 判定結果が返る
 ```
 
-合格ラインを送らないとシステムの既定値で判定され、送っていない指標は ERROR になる。収集ランナーと同じ流れを手元で動かす方法は [運用](../../operations.md#6-手元で試す)。
+合格ラインはアプリの環境変数（`QG_*`）で決まり、送っていない成果物の指標は ERROR になる（`QG_DISABLED_METRICS` で外した指標を除く）。収集ランナーと同じ流れを手元で動かす方法は [運用](../../operations.md#6-手元で試す)。

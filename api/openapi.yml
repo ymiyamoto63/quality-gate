@@ -81,12 +81,12 @@ paths:
               $ref: "#/components/schemas/CreateRunRequest"
         required: true
       responses:
-        "200":
+        "201":
           content:
             '*/*':
               schema:
                 $ref: "#/components/schemas/CreateRunResponse"
-          description: OK
+          description: Created
       summary: Run を作成する
       tags:
       - Ingest
@@ -128,12 +128,8 @@ paths:
               required:
               - file
       responses:
-        "200":
-          content:
-            '*/*':
-              schema:
-                $ref: "#/components/schemas/UploadArtifactResponse"
-          description: OK
+        "202":
+          description: Accepted
       summary: 成果物をアップロードする
       tags:
       - Ingest
@@ -163,7 +159,7 @@ components:
   schemas:
     CreateRunRequest:
       type: object
-      description: Run の作成要求。CI が計測開始時に送信する。
+      description: Run の作成要求。収集ランナーが計測結果を送る前に送信する。
       properties:
         baseCommitSha:
           type: string
@@ -179,12 +175,6 @@ components:
           description: 計測対象のコミット SHA（40 桁）
           minLength: 1
           pattern: "^[0-9a-f]{40}$"
-        defaultBranch:
-          type: string
-          description: 対象リポジトリの既定ブランチ（計測プロファイルの DEFAULT_BRANCH）。省略すると登録済みの値のまま（新規は
-            main）
-          maxLength: 255
-          minLength: 1
         measuredAt:
           type: string
           format: date-time
@@ -204,36 +194,17 @@ components:
             pattern: "^(?!/)(?!.*\\.\\.)(?!.*/$)[^\\s\\p{Cntrl}~^:?*\\[\\\\]+$"
           maxItems: 100
           minItems: 0
-        triggeredBy:
-          type: string
-          minLength: 1
       required:
       - branch
       - commitSha
       - measuredAt
       - repository
-      - triggeredBy
     CreateRunResponse:
       type: object
       properties:
-        attempt:
-          type: integer
-          format: int32
-        detailUrl:
-          type: string
-          description: リリース判定の画面（このコミット）への直リンク。CI のログに出して、その場から飛べるようにする
         runId:
           type: string
           format: uuid
-        status:
-          type: string
-          enum:
-          - CREATED
-          - UPLOADING
-          - FINALIZED
-          - PROCESSING
-          - EVALUATED
-          - FAILED
     FinalizeResponse:
       type: object
       description: 確定と判定の結果。収集ランナーはこれをログに出す
@@ -244,9 +215,6 @@ components:
         errorCode:
           type: string
           description: 処理失敗の理由のコード。判定済みなら null
-        runId:
-          type: string
-          format: uuid
         status:
           type: string
           description: EVALUATED（判定済み）か FAILED（処理失敗）
@@ -517,14 +485,3 @@ components:
       - ciRunUrl
       - measuredAt
       - tags
-    UploadArtifactResponse:
-      type: object
-      properties:
-        artifactId:
-          type: string
-          format: uuid
-        sha256:
-          type: string
-        sizeBytes:
-          type: integer
-          format: int64

@@ -320,7 +320,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 
 | テーブル | 内容 | 要点 |
 | --- | --- | --- |
-| `repositories` | 計測対象（`QG_REPOSITORY` の 1 行） | 初めて計測が届いたときに作られる。`default_branch` は計測ごとに更新する |
+| `repositories` | 計測対象（`QG_REPOSITORY` の 1 行） | 初めて計測が届いたときに作られる |
 | `runs` | 1 コミットに対する 1 回の計測・判定 | `(repository_id, commit_sha, attempt)` で一意。`verdict` は `PASS` / `FAIL`。`baseline_run_id` は比較対象 Run、`tags` はリリース判定でタグを解決するのに使う |
 | `artifacts` | 成果物のメタデータ | 実体はローカルファイル（`ArtifactStore`） |
 | `measurements` | 指標ごとの判定結果 | 下記 |

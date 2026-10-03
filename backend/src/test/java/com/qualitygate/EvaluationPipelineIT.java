@@ -138,7 +138,7 @@ class EvaluationPipelineIT {
     void setUp() {
         IntegrationCleanup.deleteAll(jdbc);
         repositoryId = repositories.save(new MonitoredRepository(Uuid7.generate(),
-                "ymiyamoto63", "quality-gate", "main")).getId();
+                "ymiyamoto63", "quality-gate")).getId();
     }
 
     @Test
@@ -622,7 +622,7 @@ class EvaluationPipelineIT {
     private Run createRun(Instant measuredAt) {
         int attempt = runs.findMaxAttempt(repositoryId, commitOf(measuredAt)) + 1;
         Run run = new Run(Uuid7.generate(), repositoryId, commitOf(measuredAt), "main",
-                "github-actions", measuredAt, attempt);
+                measuredAt, attempt);
         run.finalizeIngest();
         Run saved = runs.save(run);
         attachPerformance(saved);

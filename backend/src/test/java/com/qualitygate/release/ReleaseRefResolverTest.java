@@ -25,7 +25,7 @@ class ReleaseRefResolverTest {
     private static final String COMMIT = "a".repeat(40);
 
     private final RunRepository runs = mock(RunRepository.class);
-    private final MonitoredRepository repository = new MonitoredRepository(UUID.randomUUID(), "o", "r", null);
+    private final MonitoredRepository repository = new MonitoredRepository(UUID.randomUUID(), "o", "r");
     private final ReleaseRefResolver resolver = new ReleaseRefResolver(runs);
 
     @BeforeEach
