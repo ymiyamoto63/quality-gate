@@ -2,7 +2,7 @@
 # M-03 / M-04（k6）: バックエンドを起動し、計測プロファイルの k6 シナリオで負荷をかける。
 # measure.sh が source する（単独では実行しない）。
 
-# シナリオ（collector/target/）とツールの版（versions.env の K6_VERSION）は quality-gate 側のもの。
+# シナリオ（collector/targets/<QG_TARGET>/）とツールの版（versions.env の K6_VERSION）は quality-gate 側のもの。
 # 1 回に ウォームアップ + 計測 の時間がかかる。PERF_RUNS 回（既定 3 回）実行する。
 # 中央値は quality-gate が取る（docs/metrics.md M-03）
 k6_bin() {
@@ -17,9 +17,9 @@ k6_bin() {
 }
 
 measure_performance() {
-  local script="$COLLECTOR_DIR/target/$PERF_SCRIPT" port=${PERF_BACKEND_PORT:-8080} runs=${PERF_RUNS:-3}
+  local script="$TARGET_DIR/$PERF_SCRIPT" port=${PERF_BACKEND_PORT:-8080} runs=${PERF_RUNS:-3}
   local warmup=${PERF_WARMUP_SECONDS:-60} duration=${PERF_DURATION_SECONDS:-300} k6 i summary environment jvm progress eta
-  [ -f "$script" ] || { fail "M-03 / M-04: k6 のシナリオがありません（collector/target/$PERF_SCRIPT）"; return; }
+  [ -f "$script" ] || { fail "M-03 / M-04: k6 のシナリオがありません（collector/targets/$QG_TARGET/$PERF_SCRIPT）"; return; }
   group "負荷試験（k6 ${K6_VERSION}、${runs} 回）"
   k6=$(k6_bin) || { fail "M-03 / M-04: k6 を取得できませんでした"; endgroup; return; }
   read -ra jvm <<< "${PERF_JAVA_OPTS:-}"

@@ -6,7 +6,7 @@
 
 | UC | 利用者 | シナリオ |
 | --- | --- | --- |
-| UC-01 | 開発者 | 計測プロファイル（`collector/target/profile.env`）とアプリの `QG_REPOSITORY` に対象を書き、計測できるようにする |
+| UC-01 | 開発者 | 計測プロファイル（`collector/targets/<名前>/profile.env`）を用意し、Actions の Variable `QG_TARGET` とアプリの `QG_REPOSITORY` で対象を選び、計測できるようにする |
 | UC-02 | 開発者 | 収集ランナーでブランチ・コミット・タグを指定して計測すると、判定結果が生成される |
 
 ## 機能要件

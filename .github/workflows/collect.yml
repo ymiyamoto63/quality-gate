@@ -1,13 +1,15 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture.md 3 章、手順は docs/operations.md）。
 #
-# 起動は手動実行だけ（DD-7）。計測対象は collector/target/profile.env の 1 つだけで、ブランチ（またはコミット・タグ）を指定して計測する。
+# 起動は手動実行だけ（DD-7）。計測対象は collector/targets/<QG_TARGET>/ の 1 つで、ブランチ（またはコミット・タグ）を指定して計測する。
+# QG_TARGET は入力 target、空なら Actions の Variable QG_TARGET。対象を切り替えるときは Variable とアプリの QG_REPOSITORY を一緒に変える。
 # リリース判定に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
 # 計測する指標は M-01〜M-12（計測プロファイルの DISABLED_METRICS に書いたものは除く）。
 #
 # 必要な設定（Settings → Secrets and variables → Actions）:
-#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
+#   Variables: QG_TARGET                     計測対象（collector/targets/ のディレクトリ名。例: qg-test-target）
+#              QG_BASE_URL                   取り込み先の quality-gate の URL
 #              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
 #   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
 #              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
@@ -15,12 +17,15 @@
 # ジョブを 3 つ（fetch → measure → submit）に分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect
-# 画面に出す名前（例: collect main / collect v1.2.0）
-run-name: collect ${{ inputs.commit || inputs.branch || 'default' }}
+# 画面に出す名前（例: collect qg-test-target main / collect qg-test-target v1.2.0）
+run-name: collect ${{ inputs.target || vars.QG_TARGET }} ${{ inputs.commit || inputs.branch || 'default' }}
 
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: 計測対象（collector/targets/ のディレクトリ名。空なら Variable の QG_TARGET）
+        required: false
       branch:
         description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH）
         required: false
@@ -30,6 +35,10 @@ on:
 
 permissions:
   contents: read
+
+# 計測対象。すべてのジョブのスクリプトが collector/targets/$QG_TARGET/ を読む（値の検査は lib.sh の load_profile）
+env:
+  QG_TARGET: ${{ inputs.target || vars.QG_TARGET }}
 
 jobs:
   fetch:

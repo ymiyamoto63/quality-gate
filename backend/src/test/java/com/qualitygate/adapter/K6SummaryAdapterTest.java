@@ -70,7 +70,7 @@ class K6SummaryAdapterTest {
 
     @Test
     void 収集ランナーのk6シナリオの出力を読める() throws Exception {
-        // collector/target/k6.js（like-chatgpt） を k6 1.8 で実行した実物（計測 10 秒）。
+        // collector/targets/like-chatgpt/k6.js を k6 1.8 で実行した実物（計測 10 秒）。
         // handleSummary が http_reqs{phase:measure} の rate を「件数 ÷ 計測秒数」に直している
         NormalizedReport report;
         try (var in = K6SummaryAdapterTest.class.getResourceAsStream("/k6/handle-summary-k6-1.8.json")) {

@@ -218,7 +218,7 @@ M-01・M-02・M-03 / M-04 は違反を作らない。比較対象 Run と finger
 | 実行環境 | 他のジョブと同居しない専有のセルフホストランナー。計測環境の名前（`environment.name`）ごとに前回比を分ける |
 | シナリオ | `QG_PERF_SCENARIOS`。シナリオ単位の p95 は `http_req_duration{scenario:<名前>}` から読む |
 
-**計測方法**: 対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/target/` の k6 シナリオ）で負荷をかける。
+**計測方法**: 対象のバックエンドの jar を起動し、計測プロファイルの `PERF_SCRIPT`（`collector/targets/<名前>/` の k6 シナリオ）で負荷をかける。
 1 回約 6 分 × 3 回。各回の summary を `k6-summary` として送り、メタデータの `environment` に計測環境（名前・CPU 数・メモリ・k6 の版・シードデータ）を入れる。
 k6 が異常終了した回は `aborted: true` を付けて送る。
 
