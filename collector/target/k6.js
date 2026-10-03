@@ -1,5 +1,5 @@
-// like-chatgpt の負荷試験（M-03 / M-04）。収集ランナーの measure.sh が実行する。
-// 仕様: docs/metrics.md M-03、手順: docs/operations.md 4.5
+// qg-test-target の負荷試験（M-03 / M-04）。収集ランナーの measure.sh が実行する。原本は qg-test-target の docs/quality-gate/k6.js
+// 仕様: docs/metrics.md M-03、手順: docs/operations.md 4.4
 //
 //   負荷モデル   constant-arrival-rate（到達率を固定し、VU 数は固定しない）
 //   ウォームアップ 60 秒。phase=warmup のタグを付け、集計（phase=measure）から除く
@@ -7,7 +7,7 @@
 //   到達率       合計 50 req/s（quality-gate の QG_ARRIVAL_RATE_RPS と一致させる）
 //
 // 対象は API だけ（静的アセットは含めない）。バックエンドの jar を直接叩く。
-// like-chatgpt の API は外部のサービスを呼ばず、メモリ上のデータだけで応答する。
+// すべて GET で、シードデータがある限り 2xx しか返さない。負荷中にデータは変わらない。
 //
 // 環境変数（measure.sh が渡す）:
 //   PERF_BASE_URL          バックエンドの URL（例: http://127.0.0.1:8080）
@@ -48,10 +48,10 @@ export const options = {
       preAllocatedVUs: 100,
       tags: { phase: 'warmup' },
     },
-    // シナリオ名は quality-gate の QG_PERF_SCENARIOS と一致させる
-    chat: measured('chat', 25),
-    suggest: measured('suggest', 15),
-    monitoring: measured('monitoring', 10),
+    // シナリオ名は quality-gate の QG_PERF_SCENARIOS（list,filter,detail）と一致させる
+    list: measured('list', 20),
+    filter: measured('filter', 15),
+    detail: measured('detail', 15),
   },
   // k6 はしきい値を定義したタグ付きの部分指標だけを summary に出す。
   // 合否は quality-gate が判定するため、ここでは必ず満たす条件を書いて出力だけさせる。
@@ -59,53 +59,54 @@ export const options = {
     'http_req_duration{phase:measure}': ['p(95)>=0'],
     'http_reqs{phase:measure}': ['count>=0'],
     'http_req_failed{phase:measure}': ['rate>=0'],
-    'http_req_duration{scenario:chat}': ['p(95)>=0'],
-    'http_req_duration{scenario:suggest}': ['p(95)>=0'],
-    'http_req_duration{scenario:monitoring}': ['p(95)>=0'],
+    'http_req_duration{scenario:list}': ['p(95)>=0'],
+    'http_req_duration{scenario:filter}': ['p(95)>=0'],
+    'http_req_duration{scenario:detail}': ['p(95)>=0'],
   },
 };
 
-const JSON_HEADERS = { headers: { 'Content-Type': 'application/json' } };
-
-// 応答の組み立て方が違う入力を混ぜる（キーワード照合・複数ターンの流れ・FAQ・該当なし）
-const MESSAGES = [
-  '担当者別の件数を教えて',
-  'カテゴリ別の内訳',
-  '日別の推移',
-  'サマリーを見せて',
-  'ダッシュボード',
-  '新規問い合わせ',
-  'CPU 使用率が高い原因を教えて',
-  '請求書の再発行方法',
-  'こんにちは',
-];
-const SUGGEST_INPUTS = ['担', '担当', 'カテ', '請求', '新規', ''];
+const STATUSES = ['TODO', 'IN_PROGRESS', 'DONE'];
+// 一致件数が違う入力を混ぜる（英語・日本語・キーワードなし）
+const KEYWORDS = ['report', 'fix', '会議', ''];
 
 function pick(items) {
   return items[Math.floor(Math.random() * items.length)];
 }
 
-export function chat() {
-  const res = http.post(`${BASE_URL}/api/chat`, JSON.stringify({ message: pick(MESSAGES) }), JSON_HEADERS);
-  check(res, { 'chat 200': (r) => r.status === 200 });
+// シードの id を実行時に取得する（id を決め打ちしない）。
+export function setup() {
+  const res = http.get(`${BASE_URL}/api/tasks?size=100`);
+  const ids = res.json('items').map((t) => t.id);
+  if (ids.length === 0) {
+    throw new Error('シードのタスクが 0 件のため負荷試験を中断する');
+  }
+  return { ids };
 }
 
-export function suggest() {
-  const res = http.post(`${BASE_URL}/api/suggest`, JSON.stringify({ text: pick(SUGGEST_INPUTS) }), JSON_HEADERS);
-  check(res, { 'suggest 200': (r) => r.status === 200 });
+export function list() {
+  const res = http.get(`${BASE_URL}/api/tasks`);
+  check(res, { 'list 200': (r) => r.status === 200 });
 }
 
-export function monitoring() {
-  const res = http.get(`${BASE_URL}/api/monitoring/snapshot`);
-  check(res, { 'monitoring 200': (r) => r.status === 200 });
+export function filter() {
+  // 非 ASCII は必ず符号化する（符号化しないと Tomcat が 400 で拒否する）
+  const keyword = pick(KEYWORDS);
+  const keywordParam = keyword === '' ? '' : `&keyword=${encodeURIComponent(keyword)}`;
+  const res = http.get(`${BASE_URL}/api/tasks?status=${pick(STATUSES)}${keywordParam}&size=10`);
+  check(res, { 'filter 200': (r) => r.status === 200 });
 }
 
-/** ウォームアップは 3 つの API を計測区間と同じ比率で叩く。 */
-export function mixed() {
+export function detail(data) {
+  const res = http.get(`${BASE_URL}/api/tasks/${pick(data.ids)}`);
+  check(res, { 'detail 200': (r) => r.status === 200 });
+}
+
+/** ウォームアップは 3 種の API を計測区間と同じ比率（20:15:15）で叩く。 */
+export function mixed(data) {
   const r = Math.random() * 50;
-  if (r < 25) chat();
-  else if (r < 40) suggest();
-  else monitoring();
+  if (r < 20) list();
+  else if (r < 35) filter();
+  else detail(data);
 }
 
 // k6 の rate は「件数 ÷ テスト全体の時間」のため、ウォームアップの時間まで分母に入り、
