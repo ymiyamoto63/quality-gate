@@ -4,8 +4,8 @@ info:
     リポジトリの品質指標を計測・判定・可視化する API。
 
     認証は 2 経路ある。
-    - 参照・操作 API: GitHub OAuth ログイン後のセッション Cookie
-    - Ingest API: リポジトリ単位の Ingest Token（書き込み専用）
+    - 参照 API: 共有のアカウントでログインした後のセッション Cookie
+    - Ingest API: 収集ランナー用の Ingest Token（書き込み専用）
   license:
     name: Proprietary
   title: quality-gate API
@@ -14,7 +14,7 @@ servers:
 - description: 同一オリジン
   url: /
 tags:
-- description: CI からの計測結果の取り込み
+- description: 収集ランナーからの計測結果の取り込み
   name: Ingest
 - description: リリース判定
   name: Release

@@ -138,24 +138,25 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
   <ol>
     <li><a href="#features">1. 主な特徴</a></li>
     <li><a href="#flow">2. 全体の流れ</a></li>
-    <li><a href="#usecases">3. ユースケース</a></li>
-    <li><a href="#metrics">4. 12 の品質指標</a></li>
-    <li><a href="#judge">5. 判定のルール</a></li>
-    <li><a href="#screen">6. 画面</a></li>
-    <li><a href="#collector">7. 収集ランナー</a></li>
-    <li><a href="#artifacts">8. 成果物の流れ</a></li>
-    <li><a href="#backend">9. バックエンド</a></li>
-    <li><a href="#database">10. データベース</a></li>
-    <li><a href="#api">11. API</a></li>
-    <li><a href="#config">12. 主な設定</a></li>
-    <li><a href="#nfr">13. 非機能要件・制約</a></li>
+    <li><a href="#quickstart">3. 最初の測定結果まで</a></li>
+    <li><a href="#usecases">4. ユースケース</a></li>
+    <li><a href="#metrics">5. 12 の品質指標</a></li>
+    <li><a href="#judge">6. 判定のルール</a></li>
+    <li><a href="#screen">7. 画面</a></li>
+    <li><a href="#collector">8. 収集ランナー</a></li>
+    <li><a href="#artifacts">9. 成果物の流れ</a></li>
+    <li><a href="#backend">10. バックエンド</a></li>
+    <li><a href="#database">11. データベース</a></li>
+    <li><a href="#api">12. API</a></li>
+    <li><a href="#config">13. 主な設定</a></li>
+    <li><a href="#nfr">14. 非機能要件・制約</a></li>
   </ol>
 </nav>
 <main class="wrap">
 
 <header class="hero">
   <p class="kicker">QUALITY-GATE ／ 仕様概要</p>
-  <h1>1 つのアプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
+  <h1>1 つの対象アプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
   <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定し、<strong>リリース可 / リリース不可</strong>を、開発に携わっていない方を含め、誰にでもひと目で分かる形で示す社内向け Web アプリケーションです。</p>
 </header>
 
@@ -198,12 +199,72 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 </ul>
 </section>
 
+<section id="quickstart">
+<h2>3. 最初の測定結果までの手順</h2>
+<p>quality-gate アプリを起動してから、リリース判定の画面で最初の結論を見るまでの流れです。大きく<strong>事前設定 → 測定 → 結果確認</strong>の 3 段階で、初回の準備は 1 回だけ行います。詳しい手順は <code>docs/operations.md</code> を参照してください。</p>
+<div class="flow" role="list">
+  <div class="step" role="listitem"><b>① 事前設定</b><span>quality-gate アプリ・ランナー・GitHub・計測プロファイルを準備（初回のみ）</span></div>
+  <div class="arrow" aria-hidden="true">→</div>
+  <div class="step" role="listitem"><b>② 測定</b><span>collect ワークフローを手動実行（数分〜）</span></div>
+  <div class="arrow" aria-hidden="true">→</div>
+  <div class="step" role="listitem"><b>③ 結果確認</b><span>ジョブのログとリリース判定の画面で結論を見る</span></div>
+</div>
+
+<h3>3.1 事前設定（初回のみ）</h3>
+<div class="table-wrap"><table>
+  <thead><tr><th>#</th><th>やること</th><th>場所</th><th>ポイント</th></tr></thead>
+  <tbody>
+    <tr><td class="id">1</td><td><code>.env</code> を作り、quality-gate アプリを起動する</td><td>quality-gate アプリを動かすマシン</td><td><code>QG_REPOSITORY</code>（計測対象リポジトリの <code>owner/name</code>）、<code>QG_LOGIN_PASSWORD</code>（12 文字以上）、<code>QG_INGEST_TOKEN</code> は必須。合格ラインは書かなければ既定値</td></tr>
+    <tr><td class="id">2</td><td>セルフホストランナーを 1 台登録する</td><td>ランナーのマシン（Linux x64）</td><td>Docker・git・curl・jq が必要。<strong>Settings → Actions → Runners</strong> で <code>Idle</code> になれば完了</td></tr>
+    <tr><td class="id">3</td><td>対象を読む GitHub App を作り、対象にインストールする</td><td>GitHub</td><td>対象が private のときだけ。権限は <strong>Contents: Read-only</strong>。秘密鍵をダウンロードしておく</td></tr>
+    <tr><td class="id">4</td><td>quality-gate リポジトリに変数とシークレットを設定する</td><td>GitHub（<strong>Settings → Secrets and variables → Actions</strong>）</td><td>Variables: <code>QG_BASE_URL</code>・<code>QG_COLLECTOR_APP_ID</code>／Secrets: <code>QG_COLLECTOR_APP_PRIVATE_KEY</code>・<code>QG_INGEST_TOKEN</code>（quality-gate アプリと同じ値）</td></tr>
+    <tr><td class="id">5</td><td>計測プロファイル <code>collector/target/profile.env</code> を書き、main にマージする</td><td>quality-gate リポジトリ</td><td><code>QG_REPOSITORY</code> を quality-gate アプリの設定と一致させる。止める指標は <code>DISABLED_METRICS</code> と quality-gate アプリの <code>QG_DISABLED_METRICS</code> の<strong>両方</strong>に書く</td></tr>
+  </tbody>
+</table></div>
+<pre>cp .env.example .env                              # QG_REPOSITORY・QG_LOGIN_PASSWORD・QG_INGEST_TOKEN を書き入れる
+openssl rand -hex 32                              # Ingest Token の作り方の例
+docker compose --profile full up -d --build       # DB と quality-gate アプリを起動 → http://localhost:8080</pre>
+<div class="callout">対象リポジトリには何も置きません。quality-gate アプリの <code>QG_REPOSITORY</code> と計測プロファイルの <code>QG_REPOSITORY</code>、quality-gate アプリと GitHub の <code>QG_INGEST_TOKEN</code> がそれぞれ一致していることが、最初の計測を通すための要点です。</div>
+
+<h3>3.2 測定</h3>
+<ol>
+  <li>quality-gate リポジトリの <strong>Actions → collect → Run workflow</strong> を開く</li>
+  <li>入力を指定して実行する。最初は <code>branch</code>・<code>commit</code> とも空（既定ブランチの最新コミット）でよい。リリース判定に使うときは <code>commit</code> にタグ（例: <code>v1.2.0</code>）を入れる</li>
+  <li><code>fetch</code> → <code>measure</code> → <code>submit</code> の 3 ジョブが順に動く。所要時間は負荷試験が無効なら数分、有効なら約 18 分を加える。初回は計測用コンテナのビルドに数分かかる</li>
+</ol>
+<p>手元で試すときは、ワークフローと同じスクリプトを直接実行できます（その場合も結果は quality-gate アプリに取り込まれます）。</p>
+<pre>WORK=/tmp/qg-collector
+./collector/bin/fetch.sh "$WORK"
+./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
+QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの QG_INGEST_TOKEN&gt; \
+  ./collector/bin/submit.sh "$WORK/reports"</pre>
+
+<h3>3.3 結果確認</h3>
+<ol>
+  <li><code>submit</code> ジョブのログで、<code>Run を作成しました: &lt;runId&gt;</code>・送信したファイル・<code>判定: PASS</code>（または <code>FAIL</code>）とリリース判定の URL を確かめる。処理失敗のときだけ <code>submit</code> ジョブが失敗する（判定が不合格でもジョブは成功）</li>
+  <li>quality-gate の画面（<code>/</code>）を開き、<code>QG_LOGIN_USERNAME</code>（既定 <code>quality</code>）と <code>QG_LOGIN_PASSWORD</code> でログインする</li>
+  <li>最上部の結論（リリース可 / リリース不可）と、品質基準ごとの合否を見る。不合格・計測エラーの指標は理由と主な違反から原因を確かめる</li>
+  <li>必要なら「PDF として保存（印刷）」で証跡を残す。<code>measure</code> ジョブの成果物 <code>collector-reports</code>（7 日保持）で送った内容も確認できる</li>
+</ol>
+<div class="table-wrap"><table>
+  <thead><tr><th>最初の結果でよくあること</th><th>原因と対処</th></tr></thead>
+  <tbody>
+    <tr><td>ジョブが始まらない</td><td>セルフホストランナーが止まっている（<code>Idle</code> になっているか確かめる）</td></tr>
+    <tr><td><code>submit</code> の Run 作成が 401</td><td>GitHub の Secret とquality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
+    <tr><td><code>submit</code> の Run 作成が 400</td><td>計測プロファイルとquality-gate アプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
+    <tr><td>計測していない指標が計測エラー</td><td><code>DISABLED_METRICS</code> にだけ書き、quality-gate アプリの <code>QG_DISABLED_METRICS</code> に書いていない</td></tr>
+    <tr><td>M-07 が対象外</td><td>初回は比較元に OpenAPI 定義が無いため。異常ではない</td></tr>
+  </tbody>
+</table></div>
+<p>最初の計測はベースラインです。合格ラインを確定する前に、対象自身のビルド（カバレッジ・テスト件数など）と結果が一致するかを確かめてください。判定し直す機能は無いため、設定を直したら計測し直します。</p>
+</section>
+
 <section id="usecases">
-<h2>3. ユースケース</h2>
+<h2>4. ユースケース</h2>
 <div class="table-wrap"><table>
   <thead><tr><th>UC</th><th>利用者</th><th>シナリオ</th></tr></thead>
   <tbody>
-    <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルとアプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
+    <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルとquality-gate アプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
     <tr><td class="id">UC-02</td><td>開発者</td><td>収集ランナーでブランチ・コミット・タグを指定して計測すると、その場で判定される</td></tr>
     <tr><td class="id">UC-06</td><td>リリース判断者・開発者</td><td>リリース判定会議で最新の計測（またはタグ）の結論と全基準の合否を見て、PDF を証跡として残す</td></tr>
     <tr><td class="id">UC-07</td><td>リリース判断者</td><td>判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる</td></tr>
@@ -213,7 +274,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 </section>
 
 <section id="metrics">
-<h2>4. 12 の品質指標</h2>
+<h2>5. 12 の品質指標</h2>
 <p>対象は <strong>Java / Spring Boot（Maven）+ Vue 3（npm + Vitest）のモノレポ</strong>。M-01・M-02・M-09・M-10 は backend / frontend ごとに判定し、その他は Run 全体で 1 つの値にします。</p>
 <div class="table-wrap"><table>
   <thead><tr><th>ID</th><th>カテゴリ</th><th>指標</th><th>既定の合格ライン</th><th>計測ツール</th><th>環境変数</th></tr></thead>
@@ -239,7 +300,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 </section>
 
 <section id="judge">
-<h2>5. 判定のルール</h2>
+<h2>6. 判定のルール</h2>
 <h3>指標のステータス</h3>
 <div class="table-wrap"><table>
   <thead><tr><th>ステータス</th><th>条件</th><th>リリース判定への影響</th></tr></thead>
@@ -267,7 +328,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="screen">
-<h2>6. 画面（リリース判定）</h2>
+<h2>7. 画面（リリース判定）</h2>
 <p>パスは <code>/</code>（<code>?ref=&lt;タグかコミット&gt;</code> で指定可）。上から次の順に並べます。</p>
 <ol>
   <li><strong>結論</strong> — リリース可 / リリース不可 / 未計測 を大きく表示</li>
@@ -290,7 +351,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="collector">
-<h2>7. 収集ランナー（計測の仕組み）</h2>
+<h2>8. 収集ランナー（計測の仕組み）</h2>
 <p><code>.github/workflows/collect.yml</code> を手動実行（ブランチ・コミット・タグを指定）すると、3 つのジョブで計測します。</p>
 <div class="table-wrap"><table>
   <thead><tr><th>ジョブ</th><th>やること</th><th>認証情報</th><th>所要時間</th></tr></thead>
@@ -309,7 +370,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="artifacts">
-<h2>8. 成果物の流れ</h2>
+<h2>9. 成果物の流れ</h2>
 <p><strong>成果物</strong>は、計測ツールが出力するレポートのファイル（JaCoCo の XML、Trivy の SARIF など）のことです。収集ランナーが<strong>作って送り</strong>、quality-gate アプリが<strong>保管して判定に使い</strong>ます。対象リポジトリには何も書き込みません。</p>
 <ol class="pipe">
   <li class="pipe-step">
@@ -373,7 +434,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="backend">
-<h2>9. バックエンド</h2>
+<h2>10. バックエンド</h2>
 <h3>モジュール構成（<code>com.qualitygate</code>）</h3>
 <div class="table-wrap"><table>
   <thead><tr><th>モジュール</th><th>役割</th></tr></thead>
@@ -390,14 +451,14 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="database">
-<h2>10. データベース</h2>
+<h2>11. データベース</h2>
 <p>DBMS は PostgreSQL 17。列の定義の正本は <code>backend/src/main/resources/db/migration/</code> で、Flyway で適用します。<code>V001__init.sql</code> 1 本で作ります。現在のテーブルは次の 5 つです。</p>
 
-<h3>10.1 設計方針</h3>
+<h3>11.1 設計方針</h3>
 <div class="table-wrap"><table>
   <thead><tr><th>項目</th><th>方針</th><th>理由</th></tr></thead>
   <tbody>
-    <tr><td>主キー</td><td><code>uuid</code>（UUIDv7 をアプリで採番）</td><td>API に出る ID を推測しにくくしつつ、時系列順でインデックスの局所性を保つ</td></tr>
+    <tr><td>主キー</td><td><code>uuid</code>（UUIDv7 を quality-gate アプリで採番）</td><td>API に出る ID を推測しにくくしつつ、時系列順でインデックスの局所性を保つ</td></tr>
     <tr><td>日時</td><td><code>timestamptz</code>（UTC）</td><td>表示するときにタイムゾーンを適用する</td></tr>
     <tr><td>列挙</td><td><code>varchar</code> + <code>CHECK</code> 制約</td><td><code>ENUM</code> 型は値の追加に DDL が要る</td></tr>
     <tr><td>半構造データ</td><td><code>jsonb</code></td><td>指標ごとに違う内訳を持つ。検索に使う値は列にする</td></tr>
@@ -406,8 +467,8 @@ NOT_APPLICABLE は影響しない</pre>
   </tbody>
 </table></div>
 
-<h3>10.2 論理設計（ER 図）</h3>
-<div class="er-wrap"><svg class="er" viewBox="0 0 910 680" role="img" aria-labelledby="er-title er-desc"><title id="er-title">quality-gate の ER 図</title><desc id="er-desc">リポジトリ 1 件に Run が 0 件以上。Run 1 件に成果物・指標の判定結果・違反がそれぞれ 0 件以上。Run は比較対象 Run を 0 か 1 件参照する。指標の判定結果は検索用にリポジトリも参照する。</desc><path class="er-line" d="M250,250H300"/><path class="er-mark" d="M258,243V257M264,243V257"/><path class="er-mark" d="M288,250L300,243M288,250L300,250M288,250L300,257"/><circle class="er-opt" cx="282" cy="250" r="4"/><path class="er-line" d="M530,90H590V60H660"/><path class="er-mark" d="M522,83V97M516,83V97"/><path class="er-mark" d="M648,60L660,53M648,60L660,60M648,60L660,67"/><circle class="er-opt" cx="642" cy="60" r="4"/><path class="er-line" d="M530,180H610V250H660"/><path class="er-mark" d="M522,173V187M516,173V187"/><path class="er-mark" d="M648,250L660,243M648,250L660,250M648,250L660,257"/><circle class="er-opt" cx="642" cy="250" r="4"/><path class="er-line" d="M530,300H630V520H660"/><path class="er-mark" d="M522,293V307M516,293V307"/><path class="er-mark" d="M648,520L660,513M648,520L660,520M648,520L660,527"/><circle class="er-opt" cx="642" cy="520" r="4"/><path class="er-line er-dash" d="M130,330V440H645V400H660"/><path class="er-mark" d="M123,322H137M123,316H137"/><path class="er-mark" d="M648,400L660,393M648,400L660,400M648,400L660,407"/><circle class="er-opt" cx="642" cy="400" r="4"/><text class="er-note" x="142" y="432">検索用に複製（repository_id・measured_at）</text><path class="er-line er-dash" d="M370,330V364H460V330"/><path class="er-mark" d="M370,342L363,330M370,342L370,330M370,342L377,330"/><circle class="er-opt" cx="370" cy="348" r="4"/><path class="er-mark" d="M453,338H467"/><circle class="er-opt" cx="460" cy="345" r="4"/><text class="er-note" x="415" y="382" text-anchor="middle">比較対象 Run（自己参照・0..1）</text><g class="er-ent"><rect x="20" y="190" width="230" height="140" rx="8"/><path class="er-hdr" d="M28,190H242a8,8 0 0 1 8,8V220H20V198a8,8 0 0 1 8,-8Z"/><text class="er-title" x="32" y="210">リポジトリ</text><text class="er-en" x="238" y="210" text-anchor="end">repositories</text><text class="er-key er-pk" x="32" y="236">PK</text><text class="er-attr" x="62" y="236">ID</text><text class="er-attr" x="62" y="256">オーナー</text><text class="er-attr" x="62" y="276">リポジトリ名</text><text class="er-attr" x="62" y="296">既定ブランチ</text><text class="er-attr" x="62" y="316">登録日時</text></g><g class="er-ent"><rect x="300" y="50" width="230" height="280" rx="8"/><path class="er-hdr" d="M308,50H522a8,8 0 0 1 8,8V80H300V58a8,8 0 0 1 8,-8Z"/><text class="er-title" x="312" y="70">Run（計測・判定）</text><text class="er-en" x="518" y="70" text-anchor="end">runs</text><text class="er-key er-pk" x="312" y="96">PK</text><text class="er-attr" x="342" y="96">ID</text><text class="er-key er-fk" x="312" y="116">FK</text><text class="er-attr" x="342" y="116">リポジトリ</text><text class="er-attr" x="342" y="136">コミット</text><text class="er-attr" x="342" y="156">試行回数</text><text class="er-attr" x="342" y="176">ブランチ</text><text class="er-attr" x="342" y="196">比較元コミット</text><text class="er-attr" x="342" y="216">タグ</text><text class="er-key er-fk" x="312" y="236">FK</text><text class="er-attr" x="342" y="236">比較対象 Run</text><text class="er-attr" x="342" y="256">状態</text><text class="er-attr" x="342" y="276">判定（合格 / 不合格）</text><text class="er-attr" x="342" y="296">計測日時</text><text class="er-attr" x="342" y="316">判定日時</text></g><g class="er-ent"><rect x="660" y="10" width="230" height="160" rx="8"/><path class="er-hdr" d="M668,10H882a8,8 0 0 1 8,8V40H660V18a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="30">成果物</text><text class="er-en" x="878" y="30" text-anchor="end">artifacts</text><text class="er-key er-pk" x="672" y="56">PK</text><text class="er-attr" x="702" y="56">ID</text><text class="er-key er-fk" x="672" y="76">FK</text><text class="er-attr" x="702" y="76">Run</text><text class="er-attr" x="702" y="96">種別</text><text class="er-attr" x="702" y="116">ファイル名</text><text class="er-attr" x="702" y="136">コンポーネント</text><text class="er-attr" x="702" y="156">保存場所</text></g><g class="er-ent"><rect x="660" y="200" width="230" height="240" rx="8"/><path class="er-hdr" d="M668,200H882a8,8 0 0 1 8,8V230H660V208a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="220">指標の判定結果</text><text class="er-en" x="878" y="220" text-anchor="end">measurements</text><text class="er-key er-pk" x="672" y="246">PK</text><text class="er-attr" x="702" y="246">ID</text><text class="er-key er-fk" x="672" y="266">FK</text><text class="er-attr" x="702" y="266">Run</text><text class="er-key er-fk" x="672" y="286">FK</text><text class="er-attr" x="702" y="286">リポジトリ（複製）</text><text class="er-attr" x="702" y="306">指標 ID</text><text class="er-attr" x="702" y="326">コンポーネント</text><text class="er-attr" x="702" y="346">計測条件</text><text class="er-attr" x="702" y="366">ステータス</text><text class="er-attr" x="702" y="386">値</text><text class="er-attr" x="702" y="406">合格ライン</text><text class="er-attr" x="702" y="426">前回値</text></g><g class="er-ent"><rect x="660" y="470" width="230" height="180" rx="8"/><path class="er-hdr" d="M668,470H882a8,8 0 0 1 8,8V500H660V478a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="490">違反</text><text class="er-en" x="878" y="490" text-anchor="end">findings</text><text class="er-key er-pk" x="672" y="516">PK</text><text class="er-attr" x="702" y="516">ID</text><text class="er-key er-fk" x="672" y="536">FK</text><text class="er-attr" x="702" y="536">Run</text><text class="er-attr" x="702" y="556">指標 ID</text><text class="er-attr" x="702" y="576">fingerprint</text><text class="er-attr" x="702" y="596">新規 / 継続 / 解消</text><text class="er-attr" x="702" y="616">深刻度</text><text class="er-attr" x="702" y="636">ファイル・行</text></g></svg></div>
+<h3>11.2 論理設計（ER 図）</h3>
+<div class="er-wrap"><svg class="er" viewBox="0 0 910 680" role="img" aria-labelledby="er-title er-desc"><title id="er-title">quality-gate の ER 図</title><desc id="er-desc">リポジトリ 1 件に Run が 0 件以上。Run 1 件に成果物・指標の判定結果・違反がそれぞれ 0 件以上。Run は比較対象 Run を 0 か 1 件参照する。指標の判定結果は検索用にリポジトリも参照する。</desc><path class="er-line" d="M250,250H300"/><path class="er-mark" d="M258,243V257M264,243V257"/><path class="er-mark" d="M288,250L300,243M288,250L300,250M288,250L300,257"/><circle class="er-opt" cx="282" cy="250" r="4"/><path class="er-line" d="M530,90H590V60H660"/><path class="er-mark" d="M522,83V97M516,83V97"/><path class="er-mark" d="M648,60L660,53M648,60L660,60M648,60L660,67"/><circle class="er-opt" cx="642" cy="60" r="4"/><path class="er-line" d="M530,180H610V250H660"/><path class="er-mark" d="M522,173V187M516,173V187"/><path class="er-mark" d="M648,250L660,243M648,250L660,250M648,250L660,257"/><circle class="er-opt" cx="642" cy="250" r="4"/><path class="er-line" d="M530,300H630V520H660"/><path class="er-mark" d="M522,293V307M516,293V307"/><path class="er-mark" d="M648,520L660,513M648,520L660,520M648,520L660,527"/><circle class="er-opt" cx="642" cy="520" r="4"/><path class="er-line er-dash" d="M130,310V440H645V400H660"/><path class="er-mark" d="M123,302H137M123,296H137"/><path class="er-mark" d="M648,400L660,393M648,400L660,400M648,400L660,407"/><circle class="er-opt" cx="642" cy="400" r="4"/><text class="er-note" x="142" y="432">検索用に複製（repository_id・measured_at）</text><path class="er-line er-dash" d="M370,330V364H460V330"/><path class="er-mark" d="M370,342L363,330M370,342L370,330M370,342L377,330"/><circle class="er-opt" cx="370" cy="348" r="4"/><path class="er-mark" d="M453,338H467"/><circle class="er-opt" cx="460" cy="345" r="4"/><text class="er-note" x="415" y="382" text-anchor="middle">比較対象 Run（自己参照・0..1）</text><g class="er-ent"><rect x="20" y="190" width="230" height="120" rx="8"/><path class="er-hdr" d="M28,190H242a8,8 0 0 1 8,8V220H20V198a8,8 0 0 1 8,-8Z"/><text class="er-title" x="32" y="210">リポジトリ</text><text class="er-en" x="238" y="210" text-anchor="end">repositories</text><text class="er-key er-pk" x="32" y="236">PK</text><text class="er-attr" x="62" y="236">ID</text><text class="er-attr" x="62" y="256">オーナー</text><text class="er-attr" x="62" y="276">リポジトリ名</text><text class="er-attr" x="62" y="296">登録日時</text></g><g class="er-ent"><rect x="300" y="50" width="230" height="280" rx="8"/><path class="er-hdr" d="M308,50H522a8,8 0 0 1 8,8V80H300V58a8,8 0 0 1 8,-8Z"/><text class="er-title" x="312" y="70">Run（計測・判定）</text><text class="er-en" x="518" y="70" text-anchor="end">runs</text><text class="er-key er-pk" x="312" y="96">PK</text><text class="er-attr" x="342" y="96">ID</text><text class="er-key er-fk" x="312" y="116">FK</text><text class="er-attr" x="342" y="116">リポジトリ</text><text class="er-attr" x="342" y="136">コミット</text><text class="er-attr" x="342" y="156">試行回数</text><text class="er-attr" x="342" y="176">ブランチ</text><text class="er-attr" x="342" y="196">比較元コミット</text><text class="er-attr" x="342" y="216">タグ</text><text class="er-key er-fk" x="312" y="236">FK</text><text class="er-attr" x="342" y="236">比較対象 Run</text><text class="er-attr" x="342" y="256">状態</text><text class="er-attr" x="342" y="276">判定（合格 / 不合格）</text><text class="er-attr" x="342" y="296">計測日時</text><text class="er-attr" x="342" y="316">判定日時</text></g><g class="er-ent"><rect x="660" y="10" width="230" height="160" rx="8"/><path class="er-hdr" d="M668,10H882a8,8 0 0 1 8,8V40H660V18a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="30">成果物</text><text class="er-en" x="878" y="30" text-anchor="end">artifacts</text><text class="er-key er-pk" x="672" y="56">PK</text><text class="er-attr" x="702" y="56">ID</text><text class="er-key er-fk" x="672" y="76">FK</text><text class="er-attr" x="702" y="76">Run</text><text class="er-attr" x="702" y="96">種別</text><text class="er-attr" x="702" y="116">ファイル名</text><text class="er-attr" x="702" y="136">コンポーネント</text><text class="er-attr" x="702" y="156">保存場所</text></g><g class="er-ent"><rect x="660" y="200" width="230" height="240" rx="8"/><path class="er-hdr" d="M668,200H882a8,8 0 0 1 8,8V230H660V208a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="220">指標の判定結果</text><text class="er-en" x="878" y="220" text-anchor="end">measurements</text><text class="er-key er-pk" x="672" y="246">PK</text><text class="er-attr" x="702" y="246">ID</text><text class="er-key er-fk" x="672" y="266">FK</text><text class="er-attr" x="702" y="266">Run</text><text class="er-key er-fk" x="672" y="286">FK</text><text class="er-attr" x="702" y="286">リポジトリ（複製）</text><text class="er-attr" x="702" y="306">指標 ID</text><text class="er-attr" x="702" y="326">コンポーネント</text><text class="er-attr" x="702" y="346">計測条件</text><text class="er-attr" x="702" y="366">ステータス</text><text class="er-attr" x="702" y="386">値</text><text class="er-attr" x="702" y="406">合格ライン</text><text class="er-attr" x="702" y="426">前回値</text></g><g class="er-ent"><rect x="660" y="470" width="230" height="180" rx="8"/><path class="er-hdr" d="M668,470H882a8,8 0 0 1 8,8V500H660V478a8,8 0 0 1 8,-8Z"/><text class="er-title" x="672" y="490">違反</text><text class="er-en" x="878" y="490" text-anchor="end">findings</text><text class="er-key er-pk" x="672" y="516">PK</text><text class="er-attr" x="702" y="516">ID</text><text class="er-key er-fk" x="672" y="536">FK</text><text class="er-attr" x="702" y="536">Run</text><text class="er-attr" x="702" y="556">指標 ID</text><text class="er-attr" x="702" y="576">fingerprint</text><text class="er-attr" x="702" y="596">新規 / 継続 / 解消</text><text class="er-attr" x="702" y="616">深刻度</text><text class="er-attr" x="702" y="636">ファイル・行</text></g></svg></div>
 <p class="er-legend"><span>PK 主キー</span><span>FK 外部キー</span><span>｜｜ 1</span><span>○＜ 0 以上</span><span>破線: 複製・自己参照</span></p>
 <div class="table-wrap"><table>
   <thead><tr><th>関連</th><th>多重度</th><th>意味</th></tr></thead>
@@ -421,14 +482,14 @@ NOT_APPLICABLE は影響しない</pre>
   </tbody>
 </table></div>
 
-<h3>10.3 物理設計（テーブル定義）</h3>
+<h3>11.3 物理設計（テーブル定義）</h3>
 <p>「NOT NULL」の ○ は NULL を許さない列です。「キー・制約」の丸数字は、各表の下の制約を指します。</p>
 <h4><code>repositories</code></h4>
 <p class="tbl-desc">計測対象のリポジトリ。<code>QG_REPOSITORY</code> の 1 行だけになる。初めて計測が届いたときに作られる</p>
 <div class="table-wrap"><table class="def">
   <thead><tr><th>列名</th><th>型</th><th>NOT NULL</th><th>既定値</th><th>キー・制約</th><th>説明</th></tr></thead>
   <tbody>
-    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7（アプリで採番）</td></tr>
+    <tr><td><code>id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>PK</td><td>UUIDv7（quality-gate アプリで採番）</td></tr>
     <tr><td><code>owner</code></td><td><code>varchar(39)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>GitHub のオーナー名</td></tr>
     <tr><td><code>name</code></td><td><code>varchar(100)</code></td><td class="c">○</td><td></td><td>UQ ①</td><td>リポジトリ名</td></tr>
     <tr><td><code>created_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td><code>now()</code></td><td></td><td>初めて計測が届いた日時</td></tr>
@@ -516,7 +577,7 @@ NOT_APPLICABLE は影響しない</pre>
 </table></div>
 <p class="cons">① <code>findings_unique_key</code> UNIQUE (run_id, fingerprint)<br>② NEW / CONTINUING / RESOLVED / INITIAL<br>③ CRITICAL / HIGH / MEDIUM / LOW / INFO</p>
 
-<h3>10.4 インデックス</h3>
+<h3>11.4 インデックス</h3>
 <div class="table-wrap"><table>
   <thead><tr><th>名前</th><th>テーブル・列</th><th>使うクエリ</th></tr></thead>
   <tbody>
@@ -532,7 +593,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="api">
-<h2>11. API</h2>
+<h2>12. API</h2>
 <p>ベースパス <code>/api/v1</code>、JSON（アップロードのみ multipart）。正本は実装から生成した <code>api/openapi.yml</code> で、フロントエンドの型もそこから生成します。エラーは RFC 9457 Problem Details に <code>errorCode</code>・<code>traceId</code> を足して返します。</p>
 <div class="table-wrap"><table>
   <thead><tr><th>メソッド</th><th>パス</th><th>用途</th><th>認可</th></tr></thead>
@@ -554,7 +615,7 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="config">
-<h2>12. 主な設定（環境変数）</h2>
+<h2>13. 主な設定（環境変数）</h2>
 <div class="table-wrap"><table>
   <thead><tr><th>変数</th><th>既定値</th><th>内容</th></tr></thead>
   <tbody>
@@ -566,7 +627,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>QG_BASE_URL</code></td><td><code>http://localhost:8080</code></td><td>応答に載せるリリース判定 URL の組み立て</td></tr>
     <tr><td><code>QG_LOG_FORMAT</code></td><td>テキスト</td><td><code>ecs</code> / <code>logstash</code> / <code>gelf</code> で JSON ログ</td></tr>
     <tr><td><code>QG_DISABLED_METRICS</code> / <code>QG_EXCLUSIONS</code></td><td>空</td><td>判定しない指標 / 計測から除くファイル</td></tr>
-    <tr><td>合格ライン（<code>QG_*_MIN</code> / <code>_MAX</code>）</td><td>指標の既定値</td><td>「4. 12 の品質指標」を参照</td></tr>
+    <tr><td>合格ライン（<code>QG_*_MIN</code> / <code>_MAX</code>）</td><td>指標の既定値</td><td>「5. 12 の品質指標」を参照</td></tr>
   </tbody>
 </table></div>
 <pre>cp .env.example .env                   # QG_LOGIN_PASSWORD と QG_INGEST_TOKEN を設定
@@ -575,11 +636,11 @@ cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
 </section>
 
 <section id="nfr">
-<h2>13. 非機能要件と制約</h2>
+<h2>14. 非機能要件と制約</h2>
 <div class="table-wrap"><table>
   <thead><tr><th>項目</th><th>内容</th></tr></thead>
   <tbody>
-    <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + アプリ 1 プロセス（Docker Compose）</td></tr>
+    <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + quality-gate アプリ 1 プロセス（Docker Compose）</td></tr>
     <tr><td>性能の目安</td><td>リリース判定の表示 p95 1.0 秒、確定から判定結果の応答まで p95 60 秒</td></tr>
     <tr><td>可用性</td><td>quality-gate の障害が対象の開発を止めない。DB は日次バックアップ</td></tr>
     <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数でログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>

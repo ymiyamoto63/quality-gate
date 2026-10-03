@@ -12,7 +12,7 @@ quality-gate/
 ├ backend/     Spring Boot（Maven Wrapper 同梱。src/main/resources/db/migration/ に Flyway）
 ├ frontend/    Vue 3 SPA（src/api/schema.d.ts は生成物。e2e/ に Playwright + axe-core）
 ├ api/         openapi.yml（バックエンドから生成）
-├ collector/   収集ランナー（計測スクリプト・計測プロファイル・合格ライン・ツールの版）
+├ collector/   収集ランナー（計測スクリプト・計測プロファイル・ツールの版。合格ラインはアプリの環境変数）
 ├ docs/        ドキュメント
 ├ .github/workflows/  ci.yml（PR の CI）/ collect.yml（収集ランナー）
 ├ compose.yaml PostgreSQL（プロファイル full でアプリも）

@@ -34,7 +34,7 @@ import java.util.UUID;
  */
 @RestController
 @RequestMapping("/api/v1/runs")
-@Tag(name = "Ingest", description = "CI からの計測結果の取り込み")
+@Tag(name = "Ingest", description = "収集ランナーからの計測結果の取り込み")
 public class IngestController {
 
     private final IngestService ingestService;
