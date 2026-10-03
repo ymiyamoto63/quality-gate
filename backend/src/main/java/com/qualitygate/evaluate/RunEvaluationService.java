@@ -25,6 +25,7 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -77,12 +78,6 @@ public class RunEvaluationService {
                 input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
         List<MetricResult> results = evaluateAll(context);
 
-        // 同じ Run を判定し直しても重複しないよう、この Run の既存の判定結果を置き換える
-        measurements.deleteByRunId(runId);
-        findings.deleteByRunId(runId);
-        measurements.flush();
-        findings.flush();
-
         persistMeasurements(run, results, context);
         persistFindings(run, results, baseline);
 
@@ -134,23 +129,20 @@ public class RunEvaluationService {
      * 判定結果を保存する。
      *
      * <p>比較対象 Run の値を {@code previousValue} として複製する。参照時に
-     * 比較対象を引き直すのではなく Run に焼き付けるのは、比較対象が保持期間を
-     * 過ぎて削除されても「前回比 +0.5」の表示が壊れないようにするためである。
+     * 比較対象を引き直すのではなく Run に焼き付けるのは、比較対象の Run が
+     * 消されても、判定したときの前回値を後から辿れるようにするためである。
      *
      * <p>前回値は計測条件（{@code variant}）の一致するものに限る。条件の違う値との
      * 差は、改善や悪化ではなく条件の違いを表すだけだからである。
      */
     private void persistMeasurements(Run run, List<MetricResult> results,
                                      EvaluationContext context) {
-        for (MetricResult result : results) {
-            BigDecimal previous = context.previousValue(result.metricId(),
-                    result.componentName(), result.variant()).orElse(null);
-            measurements.save(new Measurement(Uuid7.generate(), run.getId(),
-                    run.getRepositoryId(), result.metricId(), result.componentName(),
-                    result.variant(), result.status(), result.value(), result.unit(),
-                    toJson(result.threshold()),
-                    previous, result.reason(), toJson(result.detail()), run.getMeasuredAt()));
-        }
+        measurements.saveAll(results.stream().map(result -> new Measurement(Uuid7.generate(), run.getId(),
+                run.getRepositoryId(), result.metricId(), result.componentName(),
+                result.variant(), result.status(), result.value(), result.unit(),
+                toJson(result.threshold()),
+                context.previousValue(result.metricId(), result.componentName(), result.variant()).orElse(null),
+                result.reason(), toJson(result.detail()), run.getMeasuredAt())).toList());
     }
 
     /**
@@ -160,36 +152,32 @@ public class RunEvaluationService {
      * 不変のスナップショットに保ち、比較対象が削除されても表示が壊れないようにするため。
      */
     private void persistFindings(Run run, List<MetricResult> results, Optional<Run> baseline) {
-        Set<String> baselineFingerprints = baseline
-                .map(b -> Set.copyOf(findings.findActiveFingerprints(b.getId())))
-                .orElse(Set.of());
+        // 比較対象の違反のうち、解消済みでないもの（fingerprint ごと）
+        Map<String, Finding> baselineActive = new LinkedHashMap<>();
+        baseline.ifPresent(b -> findings.findActiveByRunId(b.getId())
+                .forEach(f -> baselineActive.put(f.getFingerprint(), f)));
 
+        List<Finding> toSave = new ArrayList<>();
         Set<String> current = new HashSet<>();
         for (MetricResult result : results) {
             for (IdentifiedFinding finding : result.findingsToPersist()) {
                 current.add(finding.fingerprint());
-                FindingState state = stateOf(finding.fingerprint(), baselineFingerprints,
+                FindingState state = stateOf(finding.fingerprint(), baselineActive.keySet(),
                         baseline.isPresent());
-                findings.save(toEntity(run, finding, state));
+                toSave.add(toEntity(run, finding, state));
             }
         }
 
         // 比較対象に存在し、今回は無くなったものが「解消された違反」。
         // 現在の Run に属する行として保存する。
-        baseline.ifPresent(b -> saveResolved(run, b, current));
-    }
-
-    private void saveResolved(Run run, Run baseline, Set<String> current) {
-        for (Finding previous : findings.findByRunId(baseline.getId())) {
-            if (previous.getState() == FindingState.RESOLVED
-                    || current.contains(previous.getFingerprint())) {
-                continue;
-            }
-            findings.save(new Finding(Uuid7.generate(), run.getId(), previous.getMetricId(),
-                    previous.getFingerprint(), FindingState.RESOLVED, previous.getSeverity(),
-                    previous.getRuleId(), previous.getTitle(), previous.getFilePath(),
-                    previous.getLine(), previous.getComponentName(), previous.getDetail()));
-        }
+        baselineActive.values().stream()
+                .filter(previous -> !current.contains(previous.getFingerprint()))
+                .map(previous -> new Finding(Uuid7.generate(), run.getId(), previous.getMetricId(),
+                        previous.getFingerprint(), FindingState.RESOLVED, previous.getSeverity(),
+                        previous.getRuleId(), previous.getTitle(), previous.getFilePath(),
+                        previous.getLine(), previous.getComponentName(), previous.getDetail()))
+                .forEach(toSave::add);
+        findings.saveAll(toSave);
     }
 
     /**
@@ -228,15 +216,8 @@ public class RunEvaluationService {
      * <p>比較元コミットを優先するのは、計測が手動で順不同になるため（DD-7 / DD-17）。
      * 例えばリリースのタグ v1.1.0 を計測するとき、比較元は前のタグ v1.0.0 で、
      * 「同じブランチで直前に計測した Run」は v1.1.0 より新しいコミットのこともある。
-     *
      */
     private Optional<Run> findBaseline(Run run) {
-        if (run.getBaselineRunId() != null) {
-            Optional<Run> previous = runs.findById(run.getBaselineRunId());
-            if (previous.isPresent()) {
-                return previous;
-            }
-        }
         String base = run.getBaseCommitSha();
         if (base != null && !base.equals(run.getCommitSha())) {
             Optional<Run> atBase = runs.findFirstByRepositoryIdAndCommitShaAndStatusOrderByAttemptDesc(

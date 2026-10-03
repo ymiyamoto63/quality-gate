@@ -8,7 +8,7 @@
 #
 # 必須の環境変数:
 #   QG_BASE_URL      取り込み先の quality-gate の URL
-#   QG_INGEST_TOKEN  quality-gate の Ingest Token（すべての対象で共通）
+#   QG_INGEST_TOKEN  quality-gate の Ingest Token（アプリの QG_INGEST_TOKEN と同じ値）
 # 任意の環境変数:
 #   QG_CI_RUN_URL    収集ワークフローの実行 URL
 #
@@ -26,7 +26,6 @@ load_profile
 
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
-# curl の --retry は、一時的な障害（5xx など）を再試行する
 
 REQUEST=$(jq -n \
   --arg repository "$QG_REPOSITORY" \
@@ -43,6 +42,7 @@ REQUEST=$(jq -n \
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
+# --retry は一時的な障害（5xx など）を再試行する
 RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
   -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
 echo "Run を作成しました: $RUN_ID"

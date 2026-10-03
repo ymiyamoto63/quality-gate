@@ -8,7 +8,6 @@
 #                 .git/config には書き込まない（後続の計測ジョブへ渡さないため）
 #   QG_BRANCH     計測するブランチ（既定: 計測プロファイルの DEFAULT_BRANCH）
 #   QG_COMMIT     計測するコミット（40 桁の SHA）またはタグ（既定: ブランチの先頭）
-#   QG_REMOTE_URL clone 元の URL（既定: https://github.com/<owner/name>.git。試験用）
 #
 # 出力:
 #   <作業ディレクトリ>/src       対象リポジトリ（全履歴。比較元・タグを求めるのと、比較元の OpenAPI 定義を読むのに使う）
@@ -22,7 +21,6 @@ load_profile
 REPOSITORY=$QG_REPOSITORY
 
 BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
-REMOTE=${QG_REMOTE_URL:-https://github.com/${REPOSITORY}.git}
 
 # 40 桁の SHA か、タグ名として正しい文字列だけを受け付ける（git のコマンドにそのまま渡すため）
 valid_ref() { [[ "$1" =~ ^[0-9a-f]{40}$ ]] || git check-ref-format "refs/tags/$1"; }
@@ -49,7 +47,7 @@ fi
 rm -rf "$WORK/src"
 mkdir -p "$WORK"
 log "取得します: $REPOSITORY（branch=$BRANCH）"
-"${GIT[@]}" clone --quiet --no-checkout "$REMOTE" "$WORK/src"
+"${GIT[@]}" clone --quiet --no-checkout "https://github.com/${REPOSITORY}.git" "$WORK/src"
 cd "$WORK/src"
 
 HEAD_REF="origin/${BRANCH}"

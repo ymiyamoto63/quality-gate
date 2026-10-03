@@ -18,8 +18,8 @@ const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS'])
  * 更新系のリクエストに CSRF トークンを付ける。
  *
  * サーバは XSRF-TOKEN Cookie でトークンを渡し、X-XSRF-TOKEN ヘッダで送り返すことを求める。
- * Cookie 認証で CSRF 対策を省くと、外部サイトから利用者の権限で利用者の追加や設定変更が
- * 実行できてしまう（docs/architecture.md 6.1）。
+ * Cookie 認証で CSRF 対策を省くと、外部サイトからログイン中の利用者になりすまして
+ * 更新系の操作（ログアウトなど）を実行できてしまう（docs/architecture.md 6.1）。
  */
 api.use({
   onRequest({ request }) {

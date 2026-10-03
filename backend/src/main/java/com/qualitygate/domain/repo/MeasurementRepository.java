@@ -9,7 +9,4 @@ import java.util.UUID;
 public interface MeasurementRepository extends JpaRepository<Measurement, UUID> {
 
     List<Measurement> findByRunId(UUID runId);
-
-    void deleteByRunId(UUID runId);
-
 }

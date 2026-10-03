@@ -61,7 +61,7 @@ public class RunEvaluationPipeline {
             evaluateOrThrow(runId);
         } catch (RuntimeException e) {
             log.error("判定に失敗しました runId={}", runId, e);
-            markFailed(runId, EVALUATION_FAILED, e.getMessage());
+            markFailed(runId, e.getMessage());
         } finally {
             MDC.remove(CorrelationIds.RUN_ID);
         }
@@ -70,9 +70,7 @@ public class RunEvaluationPipeline {
 
     private void evaluateOrThrow(UUID runId) {
         List<ArtifactRecord> records = artifacts.findByRunId(runId);
-
         GateThresholds thresholds = GateThresholds.from(properties.gate());
-
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
 
         log.info("正規化が完了しました runId={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
@@ -83,9 +81,9 @@ public class RunEvaluationPipeline {
     }
 
     /** 判定のトランザクションはロールバック済み。処理失敗の記録だけを別に保存する。 */
-    private void markFailed(UUID runId, String errorCode, String detail) {
+    private void markFailed(UUID runId, String detail) {
         runs.findById(runId).ifPresent(run -> {
-            run.markFailed(errorCode, detail == null ? "" : detail);
+            run.markFailed(EVALUATION_FAILED, detail == null ? "" : detail);
             runs.save(run);
         });
     }

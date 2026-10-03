@@ -12,13 +12,10 @@ public interface FindingRepository extends JpaRepository<Finding, UUID> {
 
     List<Finding> findByRunId(UUID runId);
 
-    void deleteByRunId(UUID runId);
-
-    /** 比較対象 Run の fingerprint 集合。差分（新規 / 継続 / 解消）の算出に使う。 */
-    @Query("select f.fingerprint from Finding f where f.runId = :runId and f.state <> 'RESOLVED'")
-    List<String> findActiveFingerprints(@Param("runId") UUID runId);
-
-    /** 解消済みを除いた違反。リリース判定で、不合格の指標の主な違反を示すのに使う。 */
+    /**
+     * 解消済みを除いた違反。比較対象 Run との差分（新規 / 継続 / 解消）の算出と、
+     * リリース判定で不合格の指標の主な違反を示すのに使う。
+     */
     @Query("select f from Finding f where f.runId = :runId and f.state <> 'RESOLVED'")
     List<Finding> findActiveByRunId(@Param("runId") UUID runId);
 }

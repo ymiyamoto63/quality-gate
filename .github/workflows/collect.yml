@@ -45,10 +45,9 @@ jobs:
         run: |
           source collector/bin/lib.sh
           load_profile
-          QG_TARGET=$QG_REPOSITORY
           {
-            echo "owner=${QG_TARGET%%/*}"
-            echo "name=${QG_TARGET#*/}"
+            echo "owner=${QG_REPOSITORY%%/*}"
+            echo "name=${QG_REPOSITORY#*/}"
           } >> "$GITHUB_OUTPUT"
 
       # 対象リポジトリだけを読める、1 時間で失効するトークン。

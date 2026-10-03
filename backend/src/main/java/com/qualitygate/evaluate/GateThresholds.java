@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.MetricDefinition;
 import com.qualitygate.platform.config.QualityGateProperties;
 
 import java.math.BigDecimal;
@@ -76,10 +78,10 @@ public record GateThresholds(
     public static final String M_SECRETS = "M-11";
     public static final String M_LICENSES = "M-12";
 
-    /** 判定する指標（判定器を実装済みのもの）。 */
-    public static final List<String> ALL_METRICS = List.of(M_BRANCH_COVERAGE, M_MUTATION, M_PERFORMANCE_P95,
-            M_ERROR_RATE, M_VULNERABILITIES, M_COMPLEXITY, M_BREAKING_CHANGES, M_ACCESSIBILITY,
-            M_TEST_SUCCESS, M_SKIPPED_TESTS, M_SECRETS, M_LICENSES);
+    /** 判定する指標（{@link MetricCatalog} の全指標）。 */
+    public static final List<String> ALL_METRICS = MetricCatalog.all().stream()
+            .map(MetricDefinition::metricId)
+            .toList();
 
     public static GateThresholds defaults() {
         return from(QualityGateProperties.Gate.defaults());

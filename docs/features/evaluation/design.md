@@ -16,7 +16,7 @@
 4. 比較対象の特定     比較元コミットの Run、無ければ同じブランチの直前の Run
 5. 判定             有効な指標ごとに判定器（MetricEvaluator）を適用する
 6. 差分             比較対象 Run と fingerprint を比べ、違反を新規 / 継続 / 解消に分ける
-7. 集約・保存        verdict（PASS / FAIL）を決め、measurements / findings を置き換える
+7. 集約・保存        verdict（PASS / FAIL）を決め、measurements / findings を保存する（Run の判定は 1 回だけ）
 ```
 
 1〜3 はトランザクションの外で、4〜7 を 1 つのトランザクションで行う（その間は Run の行をロックする）。

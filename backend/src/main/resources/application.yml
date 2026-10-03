@@ -30,10 +30,6 @@ spring:
         order_inserts: true
         order_updates: true
 
-  flyway:
-    enabled: true
-    locations: classpath:db/migration
-
   servlet:
     multipart:
       # 通信としての上限。成果物の大きさの判定は quality-gate.max-artifact-bytes（既定 50MB）で行い、
@@ -88,10 +84,6 @@ quality-gate:
     forbidden-licenses-max: ${QG_FORBIDDEN_LICENSES_MAX:}  # M-12 件（既定 0）
 
 springdoc:
-  api-docs:
-    path: /v3/api-docs
-  swagger-ui:
-    path: /swagger-ui.html
   writer-with-order-by-keys: true   # 生成される openapi.yml の差分を安定させる
 
 management:
@@ -105,8 +97,6 @@ management:
         enabled: true
 
 logging:
-  level:
-    com.qualitygate: INFO
   # JSON 構造化ログ（docs/architecture.md 4.3）。QG_LOG_FORMAT に ecs / logstash / gelf を指定すると
   # 標準出力が 1 行 1 JSON になり、MDC の相関 ID（requestId / runId）が項目として載る。未指定なら従来のテキスト形式
   structured:

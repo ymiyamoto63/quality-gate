@@ -1,10 +1,4 @@
 # 結合テストの接続先は Testcontainers が動的に差し込む。
-spring:
-  jpa:
-    show-sql: false
-  flyway:
-    clean-disabled: false
-
 quality-gate:
   repository: ymiyamoto63/quality-gate
   artifact-root: ${java.io.tmpdir}/quality-gate-test-artifacts

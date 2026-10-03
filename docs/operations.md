@@ -56,7 +56,7 @@ DB は日次でバックアップしてください。
 
 ### 2.3 Ingest Token
 
-収集ランナーが計測結果を送るための鍵で、すべての対象で共通の 1 つです。アプリの `QG_INGEST_TOKEN` と、quality-gate リポジトリの Secret `QG_INGEST_TOKEN`（3.4）に同じ値を入れます。
+収集ランナーが計測結果を送るための鍵です（収集ランナー用の 1 つだけ）。アプリの `QG_INGEST_TOKEN` と、quality-gate リポジトリの Secret `QG_INGEST_TOKEN`（3.4）に同じ値を入れます。
 
 ```bash
 openssl rand -hex 32

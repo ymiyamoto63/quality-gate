@@ -35,7 +35,7 @@ class FlywayMigrationIT {
 
     @Test
     void 判定は合格と不合格の2値しか持たない() {
-        // 注意（WARN）や部分計測（SKIP）は V002 でやめた。制約で入らないようにする
+        // 注意（WARN）や部分計測（SKIP）は持たない。制約で入らないようにする
         List<String> checks = jdbcTemplate.queryForList(
                 "select pg_get_constraintdef(oid) from pg_constraint where conname in "
                         + "('runs_verdict_check', 'measurements_status_check')", String.class);
