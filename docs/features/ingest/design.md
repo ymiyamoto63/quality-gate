@@ -14,7 +14,7 @@
   → POST /api/v1/runs/{id}/finalize       FINALIZED を確定 → その場で判定             → 200 {status, verdict, errorCode, detailUrl}
 ```
 
-確定すると判定まで行って結果を返す（DD-15）。判定の中身は [判定](../evaluation/design.md)。
+確定すると判定まで行って結果を返す（DD-18）。判定の中身は [判定](../evaluation/design.md)。
 
 ## 2. `POST /api/v1/runs`
 

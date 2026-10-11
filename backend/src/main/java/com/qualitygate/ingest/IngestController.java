@@ -30,7 +30,7 @@ import java.util.UUID;
 /**
  * 収集ランナーからの取り込み API。認証は Ingest Token（書き込み専用。収集ランナーの 1 つだけ）。
  *
- * <p>{@code finalize} はその場で判定し、判定結果を返す（DD-15）。
+ * <p>{@code finalize} はその場で判定し、判定結果を返す（DD-18）。
  */
 @RestController
 @RequestMapping("/api/v1/runs")

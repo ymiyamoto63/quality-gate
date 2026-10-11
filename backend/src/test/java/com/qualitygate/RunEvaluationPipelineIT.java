@@ -28,7 +28,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * 取り込みの確定から呼ぶ、その場での判定（DD-15）の失敗の扱いを検証する。
+ * 取り込みの確定から呼ぶ、その場での判定（DD-18）の失敗の扱いを検証する。
  *
  * <p>判定に失敗しても例外は投げず、Run を「処理失敗」として記録する。判定結果 FAIL（品質の問題）と
  * 処理の失敗を混同させないため。

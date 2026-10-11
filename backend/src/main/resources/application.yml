@@ -53,7 +53,7 @@ quality-gate:
   repository: ${QG_REPOSITORY:}
   artifact-root: ${QG_ARTIFACT_ROOT:}
   base-url: ${QG_BASE_URL:}
-  # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-20）
+  # 収集ランナーが取り込み API に送る Ingest Token。交換のときは新旧をカンマ区切りで並べる（DD-23）
   ingest-tokens: ${QG_INGEST_TOKEN:}
   # 画面のログイン（全員で共有する 1 つのアカウント）。パスワードは必須（12 文字以上）
   login:

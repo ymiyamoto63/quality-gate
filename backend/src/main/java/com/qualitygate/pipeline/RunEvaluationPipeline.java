@@ -19,7 +19,7 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * 正規化 → 判定を、呼び出したスレッドでその場で行う（取り込みの確定から呼ぶ。DD-15）。
+ * 正規化 → 判定を、呼び出したスレッドでその場で行う（取り込みの確定から呼ぶ。DD-18）。
  *
  * <p>合格ラインは環境変数（{@link QualityGateProperties.Gate}）から、判定のたびに作る。
  *
