@@ -8,7 +8,7 @@
 | --- | --- |
 | AUTH-1 | 画面と参照 API は、全員で共有する 1 つのアカウント（`QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD`）でログインした人だけが使える。GitHub のアカウントは要らない |
 | AUTH-2 | ロールは持たない。ログインした人は全員、同じリリース判定を見る（画面から変えられるものは無い） |
-| AUTH-3 | 取り込み API は Ingest Token で認証し、参照 API は呼べない |
+| AUTH-3 | 取り込み API は Ingest Token で認証する。Ingest Token では参照 API を呼べない |
 | AUTH-4 | パスワードが無いか 12 文字未満なら起動しない |
 
 ## 受け入れ基準

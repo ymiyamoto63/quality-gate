@@ -188,7 +188,7 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` とアプリの `QG_REPOSITORY` がずれていると、送信が取り込みで拒否されます。
 
 計測できるのは Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけです。使わない側は計測プロファイルで空にしてください。
-設定したら、合格ラインを確定する前に一度計測してベースラインを確かめ、対象自身のビルドと結果が一致するかを確かめます（4.5）。
+設定したら、合格ラインを確定する前に一度計測してベースラインを把握し、対象自身のビルドと結果が一致するかを確かめます（4.5）。
 
 ### 4.2 計測プロファイル
 
@@ -224,7 +224,7 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | `PERF_WARMUP_SECONDS` / `PERF_DURATION_SECONDS` | `60` / `300` | ウォームアップと計測の秒数。**手元で試すときだけ**短くします（その結果は送らない） |
 | `PERF_PROGRESS_INTERVAL` | `30` | 負荷試験の経過をログに出す間隔（秒） |
 
-`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`OPENAPI_PATH` を空にしても（M-08 は `A11Y_PAGES` とアプリの `QG_ACCESSIBILITY_PAGES` の両方が空でも）計測は止まりますが、アプリで判定する指標のままだと結果が無いため ERROR になります。止めるときは 4.3 のとおりアプリの `QG_DISABLED_METRICS` に書いてください。
+`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`OPENAPI_PATH` を空にすると、その指標の計測は止まります（M-08 は `A11Y_PAGES` とアプリの `QG_ACCESSIBILITY_PAGES` の両方が空のとき）。ただし、アプリで判定する指標のままだと、結果が無いため ERROR になります。指標を止めるときは、4.3 のとおりアプリの `QG_DISABLED_METRICS` に書いてください。
 
 ### 4.3 計測する指標の切り替え
 
@@ -260,8 +260,8 @@ QG_DISABLED_METRICS=M-03,M-04
 - 計測区間の到達率の合計をアプリの `QG_ARRIVAL_RATE_RPS` と一致させる
 - `handleSummary` で `http_reqs{phase:measure}` の rate を「件数 ÷ 計測秒数」に直して `PERF_SUMMARY` に書く。k6 の rate はウォームアップを含む全体の時間で割るため、そのままでは到達率が 5/6 に見え、M-03 が計測エラーになります
 
-k6 とアプリは同じコンテナで動きます。値は前回との比較（劣化の検出）に使ってください。
-データベースなど外部のサービスが要る対象は起動できず、外部の有料 API を呼ぶ対象はスタブに差し替える手段ができるまで性能を計測しないでください。
+k6 とアプリは同じコンテナで動くため、値は本番の性能を表しません。前回との比較（劣化の検出）に使ってください。
+データベースなど外部のサービスが要る対象は、計測用のコンテナの中で起動できません。外部の有料 API を呼ぶ対象は、スタブに差し替える手段ができるまで性能を計測しないでください。
 
 ### 4.5 対象自身のビルドと結果が一致するか確かめる
 
@@ -297,7 +297,7 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 
    比較元は自動で決まります（[アーキテクチャ](architecture.md#34-比較元とタグ)）。
 
-3. 実行画面に `collect qg-test-target v1.2.0`（計測対象と、`commit`・`branch` のうち指定したもの。どちらも空なら `default`）のような名前の実行ができる。`submit` ジョブのログに `Run を作成しました: <runId>`・送信したファイル・判定結果（`判定: PASS` など）とリリース判定の URL が出る。処理失敗なら `submit` ジョブが失敗する
+3. 実行画面に `collect qg-test-target v1.2.0` のような名前の実行ができる（計測対象と、`commit`・`branch` のうち指定したもの。どちらも空なら `default`）。`submit` ジョブのログには、`Run を作成しました: <runId>`、送信したファイル、判定結果（`判定: PASS` など）、リリース判定の URL が出る。処理に失敗すると `submit` ジョブが失敗する
 4. quality-gate の画面（リリース判定）で結果を見る
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
@@ -344,7 +344,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 ```
 
 - `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。`QG_TARGET` はどのスクリプトにも必要です
-- `fetch.sh` に `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いとアプリの設定を読まず、計測しない指標は計測プロファイルの `DISABLED_METRICS`、M-08 で検査する画面は `A11Y_PAGES` だけになります
+- `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いと、`fetch.sh` はアプリの設定を読みません。その場合、計測しない指標は計測プロファイルの `DISABLED_METRICS` だけ、M-08 で検査する画面は `A11Y_PAGES` だけになります
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - 負荷試験が有効なら約 18 分かかります。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 

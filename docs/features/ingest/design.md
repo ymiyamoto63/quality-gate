@@ -22,7 +22,7 @@
 | --- | --- | --- |
 | `repository` | ○ | `owner/name`。`QG_REPOSITORY` と違えば `400 VALIDATION_FAILED`。初めて送られたときに登録する |
 | `commitSha` | ○ | 40 桁の 16 進 |
-| `branch` / `measuredAt` | ○ | 計測したブランチと日時。比較対象 Run（同じブランチの直前の計測）を探すのと、並べる順に使う |
+| `branch` / `measuredAt` | ○ | 計測したブランチと日時。比較対象 Run（同じブランチの直前の計測）を探すときと、計測を並べるときに使う |
 | `baseCommitSha` | | 比較元（[指標](../../metrics.md#24-比較元と比較対象-run)） |
 | `ciRunUrl` | | 計測したワークフローの実行 URL。リリース判定の「計測日時」のリンクになる |
 | `tags` | | 計測したコミットを指すタグ（`git tag --points-at`）。リリース判定でタグを解決するのに使う |
@@ -44,7 +44,7 @@
 | `oasdiff-json` | 比較元に定義が無かったことを `baseSpecMissing: true` で申告できる | — |
 | `sarif` | 走査した対象を `scanners`（`vuln` / `misconfig` / `secret` / `license`）で申告する | すべて M-05 として読む |
 
-- **この時点ではパースしない**（受領・検証・保存だけ）。必須のメタデータは取り込み時に検証して拒否する。判定時に気づいても収集ランナーのログに残らないため
+- **この時点ではパースしない**（受領・検証・保存だけ）。ただし必須のメタデータが無ければ、取り込みの時点で拒否する。判定のときに気づいても、収集ランナーのログには残らないため
 - 確定前に同じ種別・同じファイル名を再送すると置き換える。古いファイルはコミット後に消す
 - 1 ファイル 50MB（`ARTIFACT_TOO_LARGE`）、1 Run 合計 200MB を超えたら拒否する。通信としての上限（`spring.servlet.multipart`）はそれより少し大きい 60MB にし、理由のわかるエラーを返せるようにしている
 
@@ -63,7 +63,7 @@
 | `disabledMetrics` | `QG_DISABLED_METRICS`。`fetch.sh` が `meta.env` の `QG_DISABLED_METRICS` に書き、`measure.sh` と `submit.sh` はその指標を計測・送信しない |
 | `accessibilityPages` | `QG_ACCESSIBILITY_PAGES`。`fetch.sh` が `meta.env` の `QG_ACCESSIBILITY_PAGES` に書き、`measure.sh` は計測プロファイルの `A11Y_PAGES` と合わせて M-08 で検査する。`:` で始まる区切りを含むパターンは開けないため検査しない（具体的なパスを `A11Y_PAGES` に書く） |
 
-判定しない指標と M-08 で検査する画面をアプリの設定だけで持つためのもの。計測プロファイルにも書かせると、片方だけ変えたときに計測エラーになるか、判定しない指標を測って時間を使う。
+この API は、判定しない指標と M-08 で検査する画面を、アプリの設定だけで決めるためにある。計測プロファイルにも書かせると、片方だけ変えたときに計測エラーになるか、判定しない指標を測って時間を無駄にする。
 
 ## 5. `POST /api/v1/runs/{runId}/finalize`
 
