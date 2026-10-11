@@ -1,23 +1,23 @@
 #!/usr/bin/env bash
 # 計測対象のリポジトリを取得し、計測するコミットと比較元（base）を決める。
 #
-# 使い方: fetch.sh <作業ディレクトリ>（計測対象は計測プロファイルの QG_REPOSITORY）
+# 使い方: fetch.sh <作業ディレクトリ>（計測対象は quality-gate の QG_REPOSITORY）
 #
 # 環境変数:
+#   QG_BASE_URL / QG_INGEST_TOKEN
+#                 quality-gate の URL と Ingest Token。アプリの設定を読み、計測対象のリポジトリ（QG_REPOSITORY）・
+#                 判定しない指標（QG_DISABLED_METRICS）・M-08 で検査する画面（QG_ACCESSIBILITY_PAGES）を決める。
+#                 計測プロファイルは QG_REPOSITORY が一致するもの（collector/targets/*/profile.env）を使う
+#   QG_TARGET     計測プロファイルのディレクトリ名。QG_BASE_URL / QG_INGEST_TOKEN が無いとき（アプリなしで手元で試すとき）に使う。
+#                 そのときは QG_DISABLED_METRICS / QG_ACCESSIBILITY_PAGES もこの環境変数から読む（カンマか空白区切り）
 #   GH_TOKEN      clone に使うトークン（private リポジトリでは必須）。
 #                 .git/config には書き込まない（後続の計測ジョブへ渡さないため）
 #   QG_BRANCH     計測するブランチ（既定: 計測プロファイルの DEFAULT_BRANCH）
 #   QG_COMMIT     計測するコミット（40 桁の SHA）またはタグ（既定: ブランチの先頭）
-#   QG_BASE_URL / QG_INGEST_TOKEN
-#                 quality-gate の URL と Ingest Token。指定するとアプリの設定を読み、
-#                 計測対象のリポジトリが一致するかを確かめ、判定しない指標（QG_DISABLED_METRICS）と
-#                 M-08 で検査する画面（QG_ACCESSIBILITY_PAGES）を meta.env に書く。
-#                 未指定なら読まない（計測しない指標は計測プロファイルの DISABLED_METRICS、
-#                 検査する画面は A11Y_PAGES だけになる）
 #
 # 出力:
 #   <作業ディレクトリ>/src       対象リポジトリ（全履歴。比較元・タグを求めるのと、比較元の OpenAPI 定義を読むのに使う）
-#   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / TAGS（コミットを指すタグ。空白区切り）/
+#   <作業ディレクトリ>/meta.env  QG_TARGET（計測プロファイル）/ COMMIT_SHA / BRANCH / BASE_SHA / TAGS（コミットを指すタグ。空白区切り）/
 #                                QG_DISABLED_METRICS（アプリの判定しない指標。空白区切り）/
 #                                QG_ACCESSIBILITY_PAGES（アプリの M-08 で検査されているべき画面。空白区切り）
 set -euo pipefail
@@ -25,34 +25,42 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
 [ $# -eq 1 ] || die "使い方: fetch.sh <作業ディレクトリ>"
 WORK=$1
-load_profile
-REPOSITORY=$QG_REPOSITORY
 
-BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
-
-# アプリの設定。判定しない指標は計測もしない（計測プロファイルに書かなくても、アプリの QG_DISABLED_METRICS だけで止まる）。
-# M-08 はアプリの QG_ACCESSIBILITY_PAGES の画面も検査する（計測プロファイルの A11Y_PAGES に書かなくてよい）。
-# 計測対象の食い違いは送信のときに拒否されるため、計測に時間をかける前にここで止める
-APP_DISABLED_METRICS=""
-APP_ACCESSIBILITY_PAGES=""
+# アプリの設定。計測対象・判定しない指標・M-08 の画面はアプリの設定だけで決まる（計測プロファイルやワークフローには書かない）。
+# 計測に時間をかける前に、設定の誤りはここで止める
 if [ -n "${QG_BASE_URL:-}" ] && [ -n "${QG_INGEST_TOKEN:-}" ]; then
-  SETTINGS=$(curl -sS --retry 3 --fail-with-body "${QG_BASE_URL%/}/api/v1/collector/settings" \
-    -H "Authorization: Bearer ${QG_INGEST_TOKEN}") || die "quality-gate の設定を読めませんでした: ${QG_BASE_URL}"
-  APP_REPOSITORY=$(jq -r '.repository' <<< "$SETTINGS")
-  [ "$APP_REPOSITORY" = "$REPOSITORY" ] \
-    || die "計測プロファイルの QG_REPOSITORY（$REPOSITORY）が quality-gate の QG_REPOSITORY（$APP_REPOSITORY）と違います"
+  read_app_settings
+  if [ -z "${QG_TARGET:-}" ]; then
+    QG_TARGET=$(find_target "$APP_REPOSITORY") || exit 1
+    export QG_TARGET
+  fi
   APP_DISABLED_METRICS=$(jq -r '.disabledMetrics | join(" ")' <<< "$SETTINGS")
-  [[ "$APP_DISABLED_METRICS" =~ ^(M-[0-9]{2}( M-[0-9]{2})*)?$ ]] \
-    || die "quality-gate の判定しない指標を解釈できません: $APP_DISABLED_METRICS"
-  log "quality-gate の判定しない指標（QG_DISABLED_METRICS）: ${APP_DISABLED_METRICS:-なし}"
   # 空白区切りで meta.env に書くため、空白と引用符を含む画面は受け付けない
   jq -e '.accessibilityPages | all(test("^[^\\s\"]+$"))' <<< "$SETTINGS" >/dev/null \
     || die "quality-gate の QG_ACCESSIBILITY_PAGES に空白か引用符を含む画面があります"
   APP_ACCESSIBILITY_PAGES=$(jq -r '.accessibilityPages | join(" ")' <<< "$SETTINGS")
-  log "quality-gate の M-08 で検査されているべき画面（QG_ACCESSIBILITY_PAGES）: ${APP_ACCESSIBILITY_PAGES:-なし}"
 else
-  log "QG_BASE_URL / QG_INGEST_TOKEN が無いため、quality-gate の設定は読みません（計測しない指標は計測プロファイルの DISABLED_METRICS だけ）"
+  [ -n "${QG_TARGET:-}" ] || die "QG_BASE_URL と QG_INGEST_TOKEN（アプリの設定を読む）か、QG_TARGET（計測プロファイル）を指定してください"
+  log "QG_BASE_URL / QG_INGEST_TOKEN が無いため、quality-gate の設定は読みません（計測しない指標と M-08 の画面は環境変数から読む）"
+  APP_REPOSITORY=""
+  # カンマか空白区切りの値を、空白 1 つ区切りにする
+  words() { local list; read -ra list <<< "${1//,/ }"; echo "${list[*]}"; }
+  APP_DISABLED_METRICS=$(words "${QG_DISABLED_METRICS:-}")
+  APP_ACCESSIBILITY_PAGES=$(words "${QG_ACCESSIBILITY_PAGES:-}")
 fi
+[[ "$APP_DISABLED_METRICS" =~ ^(M-[0-9]{2}( M-[0-9]{2})*)?$ ]] \
+  || die "判定しない指標（QG_DISABLED_METRICS）を解釈できません: $APP_DISABLED_METRICS"
+[[ "$APP_ACCESSIBILITY_PAGES" != *[\"\']* ]] || die "QG_ACCESSIBILITY_PAGES に引用符を含む画面があります"
+
+load_profile
+REPOSITORY=$QG_REPOSITORY
+[ -z "$APP_REPOSITORY" ] || [ "$APP_REPOSITORY" = "$REPOSITORY" ] \
+  || die "計測プロファイル（$QG_TARGET）の QG_REPOSITORY（$REPOSITORY）が quality-gate の QG_REPOSITORY（$APP_REPOSITORY）と違います"
+log "計測プロファイル: collector/targets/$QG_TARGET（$REPOSITORY）"
+log "判定しない指標（QG_DISABLED_METRICS）: ${APP_DISABLED_METRICS:-なし}"
+log "M-08 で検査されているべき画面（QG_ACCESSIBILITY_PAGES）: ${APP_ACCESSIBILITY_PAGES:-なし}"
+
+BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
 
 # 40 桁の SHA か、タグ名として正しい文字列だけを受け付ける（git のコマンドにそのまま渡すため）
 valid_ref() { [[ "$1" =~ ^[0-9a-f]{40}$ ]] || git check-ref-format "refs/tags/$1"; }
@@ -114,6 +122,7 @@ fi
 TAGS=$(git tag --points-at "$COMMIT" | tr '\n' ' ' | sed 's/ *$//')
 
 cat > "$WORK/meta.env" <<EOF
+QG_TARGET=$QG_TARGET
 QG_REPOSITORY=$REPOSITORY
 COMMIT_SHA=$COMMIT
 BRANCH=$BRANCH

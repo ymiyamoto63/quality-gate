@@ -1,15 +1,15 @@
 # 収集ランナー: 計測対象のリポジトリを quality-gate 側で取得・計測し、Ingest API に送る。
 # 対象リポジトリには何も置かない（docs/architecture.md 3 章、手順は docs/operations.md）。
 #
-# 起動は手動実行だけ（DD-8）。計測対象は collector/targets/<QG_TARGET>/ の 1 つで、ブランチ（またはコミット・タグ）を指定して計測する。
-# QG_TARGET は入力 target、空なら Actions の Variable QG_TARGET。対象を切り替えるときは Variable とアプリの QG_REPOSITORY を一緒に変える。
+# 起動は手動実行だけ（DD-8）。ブランチ（またはコミット・タグ）を指定して計測する。
+# 計測対象は quality-gate アプリの QG_REPOSITORY で決まる。fetch がアプリの設定を読み、QG_REPOSITORY が一致する
+# 計測プロファイル（collector/targets/*/profile.env）を使う。対象を切り替えるときはアプリの QG_REPOSITORY だけを変える。
 # リリース判定に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
-# 計測する指標は M-01〜M-12。quality-gate の QG_DISABLED_METRICS（fetch で読む）と計測プロファイルの DISABLED_METRICS に書いたものは除く。
+# 計測する指標は M-01〜M-12。quality-gate の QG_DISABLED_METRICS（fetch で読む）に書いたものは除く。
 #
 # 必要な設定（Settings → Secrets and variables → Actions）:
-#   Variables: QG_TARGET                     計測対象（collector/targets/ のディレクトリ名。例: qg-test-target）
-#              QG_BASE_URL                   取り込み先の quality-gate の URL
+#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
 #              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
 #   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
 #              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
@@ -18,15 +18,12 @@
 # Ingest Token は fetch（quality-gate の設定を読む）と submit（送信）だけが使う。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect
-# 画面に出す名前（例: collect qg-test-target main / collect qg-test-target v1.2.0）
-run-name: collect ${{ inputs.target || vars.QG_TARGET }} ${{ inputs.commit || inputs.branch || 'default' }}
+# 画面に出す名前（例: collect main / collect v1.2.0）。計測対象は fetch のログと submit の結果に出る
+run-name: collect ${{ inputs.commit || inputs.branch || 'default' }}
 
 on:
   workflow_dispatch:
     inputs:
-      target:
-        description: 計測対象（collector/targets/ のディレクトリ名。空なら Variable の QG_TARGET）
-        required: false
       branch:
         description: 計測するブランチ（空なら計測プロファイルの DEFAULT_BRANCH）
         required: false
@@ -37,10 +34,6 @@ on:
 permissions:
   contents: read
 
-# 計測対象。すべてのジョブのスクリプトが collector/targets/$QG_TARGET/ を読む（値の検査は lib.sh の load_profile）
-env:
-  QG_TARGET: ${{ inputs.target || vars.QG_TARGET }}
-
 jobs:
   fetch:
     runs-on: self-hosted
@@ -50,14 +43,24 @@ jobs:
         with:
           persist-credentials: false
 
-      - name: 計測プロファイルの読み込み
+      # 計測対象はアプリの QG_REPOSITORY で決まる。計測プロファイルがあるかもここで確かめる
+      - name: 計測対象の決定
         id: profile
+        env:
+          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
         run: |
+          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
+            echo "::error::QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です"
+            exit 1
+          fi
           source collector/bin/lib.sh
-          load_profile
+          read_app_settings
+          TARGET=$(find_target "$APP_REPOSITORY") || exit 1
+          echo "計測対象: $APP_REPOSITORY（collector/targets/$TARGET）"
           {
-            echo "owner=${QG_REPOSITORY%%/*}"
-            echo "name=${QG_REPOSITORY#*/}"
+            echo "owner=${APP_REPOSITORY%%/*}"
+            echo "name=${APP_REPOSITORY#*/}"
           } >> "$GITHUB_OUTPUT"
 
       # 対象リポジトリだけを読める、1 時間で失効するトークン。
@@ -72,7 +75,7 @@ jobs:
           owner: ${{ steps.profile.outputs.owner }}
           repositories: ${{ steps.profile.outputs.name }}
 
-      # quality-gate の設定（計測対象のリポジトリと判定しない指標）も読む。計測に時間をかける前に設定の誤りで止める
+      # quality-gate の設定（計測対象のリポジトリ・判定しない指標・M-08 の画面）も読み、計測プロファイルを meta.env に書く。計測に時間をかける前に設定の誤りで止める
       - name: 対象リポジトリの取得
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
@@ -80,12 +83,7 @@ jobs:
           QG_COMMIT: ${{ inputs.commit }}
           QG_BASE_URL: ${{ vars.QG_BASE_URL }}
           QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
-        run: |
-          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
-            echo "::error::QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です"
-            exit 1
-          fi
-          ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
+        run: ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
 
       - name: 受け渡し用にまとめる
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector

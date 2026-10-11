@@ -23,6 +23,8 @@ WORK=$(cd "$1" && pwd)
 mkdir -p "$2"
 REPORTS=$(cd "$2" && pwd)
 
+# 計測プロファイル（QG_TARGET）は fetch.sh が meta.env に書いたものを使う
+load_env "$WORK/meta.env"
 load_profile
 command -v docker >/dev/null || die "docker がありません"
 

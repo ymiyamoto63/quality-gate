@@ -27,8 +27,34 @@ load_env() {
 }
 
 # 計測対象ごとの設定（計測プロファイルと k6 のシナリオ）は collector/targets/<名前>/ に置く。
-# どれを使うかは環境変数 QG_TARGET で選ぶ（収集ワークフローは入力 target か Actions の Variable QG_TARGET を渡す）。
+# どれを使うかは環境変数 QG_TARGET で選ぶ。収集ワークフローでは fetch.sh が quality-gate の QG_REPOSITORY から
+# 計測プロファイルを探して meta.env に書き、measure / submit はそれを読む（Variable などで指定しなくてよい）。
 # 一度に計測する対象は 1 つだけ（quality-gate アプリの QG_REPOSITORY と一致させる）
+
+# quality-gate の設定（GET /api/v1/collector/settings）を読み、SETTINGS（JSON）と APP_REPOSITORY（QG_REPOSITORY）を決める。
+# QG_BASE_URL と QG_INGEST_TOKEN が要る
+read_app_settings() {
+  SETTINGS=$(curl -sS --retry 3 --fail-with-body "${QG_BASE_URL%/}/api/v1/collector/settings" \
+    -H "Authorization: Bearer ${QG_INGEST_TOKEN}") || die "quality-gate の設定を読めませんでした: ${QG_BASE_URL}"
+  APP_REPOSITORY=$(jq -r '.repository' <<< "$SETTINGS")
+  [[ "$APP_REPOSITORY" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
+    || die "quality-gate の QG_REPOSITORY を解釈できません: $APP_REPOSITORY"
+}
+
+# QG_REPOSITORY が <リポジトリ> の計測プロファイルのディレクトリ名を出す。0 件か 2 件以上なら止める
+# find_target <owner/name>
+find_target() {
+  local repository=$1 profile found=()
+  for profile in "$COLLECTOR_DIR"/targets/*/profile.env; do
+    [ -f "$profile" ] || continue
+    if [ "$( (load_env "$profile"; echo "${QG_REPOSITORY:-}") )" = "$repository" ]; then
+      found+=("$(basename "$(dirname "$profile")")")
+    fi
+  done
+  [ ${#found[@]} -gt 0 ] || die "QG_REPOSITORY=$repository の計測プロファイルがありません（collector/targets/<名前>/profile.env を作る）"
+  [ ${#found[@]} -eq 1 ] || die "QG_REPOSITORY=$repository の計測プロファイルが複数あります: ${found[*]}"
+  echo "${found[0]}"
+}
 
 # 計測プロファイルと版の定義を読む。TARGET_DIR（対象の設定のディレクトリ）と PROFILE を決める
 load_profile() {
@@ -42,11 +68,14 @@ load_profile() {
   load_env "$PROFILE"
   [[ "${QG_REPOSITORY:-}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ ]] \
     || die "計測プロファイルの QG_REPOSITORY は owner/name の形式で指定してください: ${QG_REPOSITORY:-}"
+  # 計測しない指標はアプリの QG_DISABLED_METRICS だけで決める（2 か所に書くと食い違って計測エラーになるため廃止した）
+  [ -z "${DISABLED_METRICS:-}" ] \
+    || die "計測プロファイルの DISABLED_METRICS は廃止しました。止める指標は quality-gate の QG_DISABLED_METRICS に書いてください（$PROFILE）"
 }
 
-# 計測しない指標。quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く）と、計測プロファイルの DISABLED_METRICS の和
+# 計測しない指標。quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く。空白区切り）
 # metric_enabled <指標 ID>（M-03 など）
-metric_enabled() { ! grep -qw -- "$1" <<< "${QG_DISABLED_METRICS:-} ${DISABLED_METRICS:-}"; }
+metric_enabled() { ! grep -qw -- "$1" <<< "${QG_DISABLED_METRICS:-}"; }
 
 # M-08 で検査する画面（空白区切り）。quality-gate の QG_ACCESSIBILITY_PAGES（fetch.sh が meta.env に書く）と、
 # 計測プロファイルの A11Y_PAGES の和（重複は除く）。
