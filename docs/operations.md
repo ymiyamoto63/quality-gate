@@ -155,7 +155,7 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 | 種別 | 名前 | 値 |
 | --- | --- | --- |
 | Variables | `QG_TARGET` | 計測対象（`collector/targets/` のディレクトリ名。例: `qg-test-target`）。4.1 |
-| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` も計測の前にアプリの設定を読む |
+| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` も計測の前にアプリの設定を読むため、`QG_INGEST_TOKEN` とあわせて必須（無いと `fetch` で止まる） |
 | Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体） |
 | Secrets | `QG_INGEST_TOKEN` | アプリの `QG_INGEST_TOKEN` と同じ値（2.3） |
@@ -208,7 +208,7 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | `MUTATION_THREADS` | `2` | PIT のスレッド数 |
 | `OPENAPI_PATH` | 空 | M-07 で比べる OpenAPI 定義（リポジトリ相対）。空なら M-07 を計測しない |
 | `FRONTEND_DIR` | 空 | フロントエンド（npm + Vitest）のディレクトリ。空ならフロントエンドを計測しない |
-| `NODE_VERSION_FILE` | 空（Node.js 22） | Node.js の版を書いたファイル（`.nvmrc` など。`22` / `v22.21.1` の形に対応） |
+| `NODE_VERSION_FILE` | 空（Node.js 22） | Node.js の版を書いたファイル（**リポジトリ相対**。`FRONTEND_DIR` 相対ではない。例: `frontend/.nvmrc`）。`22` / `v22.21.1` の形に対応。ファイルが無いと黙って 22 になる |
 | `FRONTEND_COVERAGE_INCLUDE` / `FRONTEND_COVERAGE_EXCLUDE` | 空 | M-01 のカバレッジの分母に含める / 除くファイル（`FRONTEND_DIR` 相対、空白区切り）。含めるファイルを指定しないと、テストが触れたファイルだけの数字になり実態より良く見えます |
 | `FRONTEND_COMPLEXITY_SOURCES` / `FRONTEND_COMPLEXITY_EXCLUDE` | `src` / `**/*.spec.ts **/*.test.ts **/*.d.ts` | M-06 で解析するディレクトリ / 除くファイル |
 | `A11Y_PAGES` | 空 | アプリの `QG_ACCESSIBILITY_PAGES` に加えて M-08 で検査する画面のパス（空白区切り）。`QG_ACCESSIBILITY_PAGES` の `/tasks/:id` のようなパターンは開けないため、その画面は具体的なパス（`/tasks/1` など）をここに書く。両方とも空なら M-08 を計測しない |
@@ -291,12 +291,13 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 
    | 入力 | 例 | 説明 |
    | --- | --- | --- |
-   | branch | （空） | 空なら既定ブランチ |
+   | target | （空） | 計測対象（`collector/targets/` のディレクトリ名）。空なら Variable `QG_TARGET`。ここで変えるときは、アプリの `QG_REPOSITORY` も同じ対象にしておく（4.1） |
+   | branch | （空） | 空なら計測プロファイルの `DEFAULT_BRANCH` |
    | commit | （空）/ `v1.2.0` | 特定のコミット（40 桁）かタグを測るときに指定する。リリース判定にはタグを指定する |
 
    比較元は自動で決まります（[アーキテクチャ](architecture.md#34-比較元とタグ)）。
 
-3. 実行画面に `collect main` のような名前の実行ができる。`submit` ジョブのログに `Run を作成しました: <runId>`・送信したファイル・判定結果（`判定: PASS` など）とリリース判定の URL が出る。処理失敗なら `submit` ジョブが失敗する
+3. 実行画面に `collect qg-test-target v1.2.0`（計測対象と、`commit`・`branch` のうち指定したもの。どちらも空なら `default`）のような名前の実行ができる。`submit` ジョブのログに `Run を作成しました: <runId>`・送信したファイル・判定結果（`判定: PASS` など）とリリース判定の URL が出る。処理失敗なら `submit` ジョブが失敗する
 4. quality-gate の画面（リリース判定）で結果を見る
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
@@ -383,7 +384,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | `measure` で `M-08: 検査ツール（Playwright と Chromium）を用意できませんでした` | 計測用のコンテナのビルドが不完全。イメージを消して作り直す |
 | `measure` で `M-03 / M-04: バックエンドが起動しませんでした` | ポート（`PERF_BACKEND_PORT`）が使われている、または起動に外部のサービスが要る |
 | `measure` で `M-03 / M-04: k6 を取得できませんでした` | github.com に届かない |
-| `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 3.4 の設定漏れ |
+| `fetch` / `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 3.4 の設定漏れ |
 | `submit` の Run の作成が 401 | リポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない |
 | `submit` の Run の作成が 400（`計測対象のリポジトリは … です`） | 計測プロファイルとアプリの `QG_REPOSITORY` が一致していない |
 | 計測していない指標が計測エラーになる | 計測プロファイルの `DISABLED_METRICS` にだけ書き、アプリの `QG_DISABLED_METRICS` に書いていない（4.3） |
