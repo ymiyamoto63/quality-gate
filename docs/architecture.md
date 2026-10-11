@@ -298,7 +298,7 @@ CREATED ─(成果物)→ UPLOADING ─(finalize)→ FINALIZED → PROCESSING �
 
 ## 5. データベース
 
-DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql`）で、ここでは繰り返さない。
+DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/db/migration/`**（`V001__init.sql` 以降を番号順に適用する）で、ここでは繰り返さない。
 
 ### 5.1 方針
 
