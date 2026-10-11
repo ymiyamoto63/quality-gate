@@ -21,8 +21,8 @@ quality-gate/
 
 ## 2. セットアップと起動
 
-**アプリを動かすだけなら次の 3 つで足ります。** `http://localhost:8080` を開いてください。
-`spring-boot:run` がフロントエンドのビルドと同梱まで行うため（Node.js も Maven が `backend/target/` に取得します）、`npm run dev` は要りません。
+**アプリを動かすだけなら次の 3 つで足ります。** 起動したら `http://localhost:8080` を開いてください。
+`npm run dev` は要りません。`spring-boot:run` がフロントエンドのビルドと同梱まで行うためです（Node.js も Maven が `backend/target/` に取得します）。
 
 ```bash
 cp .env.example .env                    # QG_LOGIN_PASSWORD（12 文字以上）を書き入れる（3 章）
@@ -43,7 +43,7 @@ cd frontend && npm ci && npm run dev                        # /api などは 808
 | --- | --- | --- | --- |
 | A. 分離起動 | `db` コンテナ / `spring-boot:run -DskipFrontend=true` / `npm run dev` | `:5173` | 画面を触りながら開発する。フロントの変更は即時、バックエンドの変更は再起動で反映 |
 | B. 同梱起動 | `db` コンテナ / `spring-boot:run` | `:8080` | 本番に近い形での確認。SPA はビルド時点のものが出るため、フロントを直したら再ビルドが要る |
-| C. すべてコンテナ | `docker compose --profile full up --build` | `:8080` | JDK / Node.js を入れずに動かす、デモ（[運用](operations.md#21-起動)） |
+| C. すべてコンテナ | `docker compose --profile full up --build` | `:8080` | JDK / Node.js を入れずに動かすとき、デモ（[運用](operations.md#21-起動)） |
 
 - `-DskipFrontend=true` で起動しても、以前にビルドした画面が `backend/target/classes/static/` に残っていると 8080 で表示されます。8080 を API だけにしたいときは `./mvnw clean spring-boot:run -DskipFrontend=true`
 - 成果物ストア（`QG_ARTIFACT_ROOT`、既定 `./data/artifacts`）の相対パスは起動したディレクトリから解決されます。`backend/` から起動すると `backend/data/artifacts/` です
@@ -80,7 +80,7 @@ QG_LOGIN_PASSWORD=<12 文字以上>
 | コマンド | 実行場所 | 何をするか |
 | --- | --- | --- |
 | `docker compose up -d db` | リポジトリ直下 | PostgreSQL 17 だけを起動する（DB 名・ユーザー・パスワードはいずれも `qualitygate`、ポート 5432、データは名前付きボリューム `pgdata`） |
-| `./mvnw verify` | `backend/` | コンパイル → 単体テスト（Surefire）→ jar → 結合テスト（Failsafe、`*IT`）。結合テストは **Testcontainers が専用の PostgreSQL を起動する**ため、`db` コンテナは使いません（Docker が動いていればよい）。あわせて `api/openapi.yml` と `frontend/e2e/fixtures/*.json` を生成する。`-DskipFrontend=true` を付けないとフロントエンドもビルドして同梱する |
+| `./mvnw verify` | `backend/` | コンパイル → 単体テスト（Surefire）→ jar → 結合テスト（Failsafe、`*IT`）。結合テストは **Testcontainers が専用の PostgreSQL を起動する**ため、`db` コンテナは使わない（Docker が動いていればよい）。あわせて `api/openapi.yml` と `frontend/e2e/fixtures/*.json` を生成する。`-DskipFrontend=true` を付けないとフロントエンドもビルドして同梱する |
 | `./mvnw test` | `backend/` | 単体テストだけ（Docker 不要） |
 | `./mvnw spring-boot:run` | `backend/` | アプリを 8080 で起動する。起動時に Flyway がマイグレーションを適用する |
 | `./mvnw package -DskipTests` | `backend/` | フロントエンドを同梱した実行可能 jar（`target/quality-gate.jar`）を作る |
@@ -115,7 +115,7 @@ git diff --exit-code api/ frontend/src/api/schema.d.ts
 cd frontend && npm run test:a11y     # ライト / ダークの両モードで検査
 ```
 
-- dev server は起動していなければ Playwright が立ち上げます（起動済みならそれを使います）
+- dev server が起動していなければ、Playwright が立ち上げます（起動済みならそれを使います）
 - 検査先を変えるときは `QG_E2E_BASE_URL`、同梱のブラウザを取得できない環境では `QG_E2E_CHROMIUM` に Chromium の実行ファイルのパスを渡します
 - ログインが要る画面は、**結合テストが実物の API から書き出した応答例**（`e2e/fixtures/`）を `page.route` で返して描きます。手で書いた応答例だと、API が変わっても検査が通り続けてしまうためです
 - 検査の前に画面に内容が描かれたことを確かめます（空のページは必ず違反 0 件になる）
@@ -156,7 +156,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | --- | --- |
 | Gradle | この規模では Maven で足り、Spring Boot と周辺プラグインの連携も枯れている |
 | nginx での分離配信 / 別オリジン | コンテナが増える、または CORS とクロスサイト Cookie の設計が要る。独立デプロイの必要が無い |
-| Orval + TanStack Query / openapi-generator | ライブラリが増える、生成物が大きい。必要になれば openapi-fetch の上に載せられる |
+| Orval + TanStack Query / openapi-generator | ライブラリが増え、生成物も大きい。必要になれば openapi-fetch の上に載せられる |
 | MinIO（S3 互換） | この規模ではローカルファイルシステムで足りる。保存先を触るコードは `ArtifactStore` 1 つに閉じてある |
 | Spring WebFlux | 仮想スレッドで足りる |
 | GitHub でのログイン | GitHub のアカウントを持っていない方が見られない。画面は見るだけでロールも要らないため、共有のアカウントで足りる |

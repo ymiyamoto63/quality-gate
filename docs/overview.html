@@ -168,7 +168,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
   <div class="card"><h3>合格ラインは環境変数</h3><p><code>QG_*</code> で決める。判定に使った値は計測ごとに保存され、後から変えても過去の結論は変わらない。</p></div>
   <div class="card"><h3>共有アカウントでログイン</h3><p>全員で 1 つのアカウントを共有。GitHub アカウントは不要。ロールも持たない。</p></div>
   <div class="card"><h3>対象リポジトリには何も置かない</h3><p>計測は quality-gate 側の収集ランナーが対象を clone して行う。対象チームに保守を求めない。</p></div>
-  <div class="card"><h3>マージはブロックしない</h3><p>可視化に徹する。しきい値の妥当性を実績で確かめる前のブロックはゲートを形骸化させるため。</p></div>
+  <div class="card"><h3>マージはブロックしない</h3><p>可視化に徹する。しきい値の妥当性を実績で確かめる前にブロックすると、ゲートが形骸化するため。</p></div>
 </div>
 </section>
 
@@ -453,7 +453,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>domain</code> / <code>platform</code> / <code>config</code></td><td>エンティティ等 / 設定・ArtifactStore・例外・可観測性 / Security と SPA 配信</td></tr>
   </tbody>
 </table></div>
-<p><code>adapter</code> と <code>evaluate</code> は互いを知らない、などの依存規則を ArchUnit で検証します。指標やツール形式の追加は、アダプタと判定器の追加で完結します。</p>
+<p>「<code>adapter</code> と <code>evaluate</code> は互いを知らない」などの依存規則を ArchUnit で検証します。指標やツール形式の追加は、アダプタと判定器の追加で完結します。</p>
 </section>
 
 <section id="database">
@@ -651,7 +651,7 @@ cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
     <tr><td>規模</td><td>対象 1 リポジトリ、Run は 1 日数件、利用者は数名〜20。PostgreSQL 1 台 + quality-gate アプリ 1 プロセス（Docker Compose）</td></tr>
     <tr><td>性能の目安</td><td>リリース判定の表示 p95 1.0 秒、確定から判定結果の応答まで p95 60 秒</td></tr>
     <tr><td>可用性</td><td>quality-gate の障害が対象の開発を止めない。DB は日次バックアップ</td></tr>
-    <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数でログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>
+    <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数で渡してログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>
     <tr><td>運用</td><td><code>/actuator/health</code>、Prometheus メトリクス、相関 ID（<code>requestId</code> / <code>runId</code>）付きログ</td></tr>
     <tr><td>自身の品質</td><td>quality-gate 自身は計測対象にせず、PR の CI（<code>ci.yml</code>）で単体・結合テスト、静的検査、生成物の同期、アクセシビリティ、脆弱性を確認</td></tr>
   </tbody>
