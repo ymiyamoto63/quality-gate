@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -23,59 +24,74 @@ class SkippedTestEvaluatorTest {
     private final SkippedTestEvaluator evaluator = new SkippedTestEvaluator();
 
     @Test
-    void 比較対象が無ければ件数だけを記録して合格() {
-        MetricResult result = evaluate(Map.of(), List.of(report("backend", 10, 0, 0, 3, 0)),
+    void スキップが無ければ合格() {
+        MetricResult result = evaluate(Map.of(), List.of(report("backend", 10, 0, 0, 0, 0)),
                 Map.of()).getFirst();
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
-        assertThat(result.value()).isEqualByComparingTo("3");
+        assertThat(result.value()).isEqualByComparingTo("0");
         assertThat(result.unit()).isEqualTo("count");
-        assertThat(result.reason()).contains("3 件").contains("増加は判定していません");
+        assertThat(result.reason()).isEqualTo("スキップされたテストはありません");
     }
 
     @Test
-    void 前回より増えれば不合格() {
+    void 比較対象が無くても件数が上限を超えれば不合格() {
+        // 初回の計測でも、同じコミットなら同じ判定になる（前回の有無で合否を変えない）
         MetricResult result = evaluate(Map.of(), List.of(report("backend", 10, 0, 0, 3, 0)),
-                Map.of(EvaluationContext.key("M-10", "backend"), BigDecimal.ONE)).getFirst();
+                Map.of()).getFirst();
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
-        assertThat(result.reason()).contains("前回から 2 件増えました（1 件 → 3 件");
-        assertThat(result.detail()).containsEntry("increase", 2L);
+        assertThat(result.value()).isEqualByComparingTo("3");
+        assertThat(result.reason()).startsWith("スキップされたテストが 3 件あります（上限 0 件）");
+        assertThat(result.detail()).doesNotContainKey("increase");
     }
 
     @Test
-    void 増加の上限までは合格() {
-        MetricResult result = evaluate(Map.of("skipped-tests-increase-max", 2),
+    void 上限までは合格() {
+        MetricResult result = evaluate(Map.of("skipped-tests-max", 3),
+                List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
+
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).isEqualTo("スキップされたテストは 3 件です（上限 3 件）");
+    }
+
+    @Test
+    void 前回からの増加は書き添えるだけで合否に使わない() {
+        MetricResult result = evaluate(Map.of("skipped-tests-max", 3),
                 List.of(report("backend", 10, 0, 0, 3, 0)),
                 Map.of(EvaluationContext.key("M-10", "backend"), BigDecimal.ONE)).getFirst();
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).isEqualTo(
+                "スキップされたテストは 3 件です（上限 3 件）。前回より 2 件増えています（1 件 → 3 件）");
+        assertThat(result.detail()).containsEntry("increase", 2L);
     }
 
     @Test
-    void 既存のスキップが減らなくても増えなければ合格() {
+    void 前回から増えていなくても上限を超えれば不合格() {
         MetricResult result = evaluate(Map.of(), List.of(report("backend", 10, 0, 0, 3, 0)),
                 Map.of(EvaluationContext.key("M-10", "backend"), new BigDecimal("3"))).getFirst();
 
-        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
-        assertThat(result.reason()).isEqualTo("スキップされたテストは 3 件です（前回 3 件）");
+        assertThat(result.status()).isEqualTo(MeasurementStatus.FAIL);
+        assertThat(result.reason()).doesNotContain("前回");
+        assertThat(result.detail()).containsEntry("increase", 0L);
     }
 
     @Test
-    void 合格ラインは前回からの増加で示す() {
-        MetricResult result = evaluate(Map.of("skipped-tests-increase-max", 2),
+    void 合格ラインは件数の上限で示す() {
+        MetricResult result = evaluate(Map.of("skipped-tests-max", 2),
                 List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
 
-        assertThat(result.threshold()).containsEntry("value", 2).containsEntry("basis", "increase");
+        assertThat(result.threshold()).isEqualTo(Threshold.atMost(2));
+        assertThat(result.threshold().isIncrease()).isFalse();
     }
 
     @Test
-    void コンポーネントごとに前回と比べる() {
-        List<MetricResult> results = evaluate(Map.of(), List.of(
+    void コンポーネントごとに件数を数える() {
+        List<MetricResult> results = evaluate(Map.of("skipped-tests-max", 1), List.of(
                         report("backend", 10, 0, 0, 1, 0),
-                        report("frontend", 10, 0, 0, 1, 0)),
-                Map.of(EvaluationContext.key("M-10", "backend"), BigDecimal.ONE,
-                        EvaluationContext.key("M-10", "frontend"), BigDecimal.ZERO));
+                        report("frontend", 10, 0, 0, 2, 0)),
+                Map.of());
 
         assertThat(results).extracting(MetricResult::componentName, MetricResult::status)
                 .containsExactly(

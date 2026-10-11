@@ -157,7 +157,8 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 <header class="hero">
   <p class="kicker">QUALITY-GATE ／ 仕様概要</p>
   <h1>1 つの対象アプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
-  <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定する社内向け Web アプリケーションです。結論は<strong>リリース可 / リリース不可</strong>の形で示し、開発に携わっていない人にもひと目で分かるようにします。</p>
+  <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定する社内向け Web アプリケーションです。結論は<strong>リリース可 / リリース不可</strong>の形で示し、開発に携わっていない人にもひと目で分かるようにします。そのコミットの計測が無ければ<strong>未計測</strong>と示し、リリース可とはしません。</p>
+  <div class="callout">このページは、初めて quality-gate に触れる方向けの 1 枚の概要です。仕様の正本は <a href="../README.md"><code>README.md</code></a> と <code>docs/*.md</code>（<a href="architecture.md">アーキテクチャ</a>・<a href="metrics.md">指標</a>・<a href="operations.md">運用</a>・<a href="development.md">開発環境</a>）です。記述が食い違うときは .md の側が正しいものとします。</div>
 </header>
 
 <section id="features">
@@ -201,7 +202,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 
 <section id="quickstart">
 <h2>3. 最初の計測結果まで</h2>
-<p>quality-gate アプリを起動してから、リリース判定の画面で最初の結論を見るまでの流れです。大きく<strong>事前設定 → 計測 → 結果確認</strong>の 3 段階で、初回の準備は 1 回だけ行います。詳しい手順は <code>docs/operations.md</code> を参照してください。</p>
+<p>quality-gate アプリを起動してから、リリース判定の画面で最初の結論を見るまでの流れです。大きく<strong>事前設定 → 計測 → 結果確認</strong>の 3 段階で、初回の準備は 1 回だけ行います。詳しい手順は <a href="operations.md"><code>docs/operations.md</code></a> を参照してください。</p>
 <div class="flow" role="list">
   <div class="step" role="listitem"><b>① 事前設定</b><span>quality-gate アプリ・ランナー・GitHub・計測プロファイルを準備（初回のみ）</span></div>
   <div class="arrow" aria-hidden="true">→</div>
@@ -232,27 +233,27 @@ docker compose --profile full up -d --build       # DB と quality-gate アプ�
   <li>入力を指定して実行する。最初は <code>branch</code>・<code>commit</code> とも空（既定ブランチの最新コミット）でよい。リリース判定に使うときは <code>commit</code> にタグ（例: <code>v1.2.0</code>）を入れる</li>
   <li><code>fetch</code> → <code>measure</code> → <code>submit</code> の 3 ジョブが順に動く。所要時間は数分で、負荷試験を有効にすると約 18 分延びる。初回は計測用コンテナのビルドにさらに数分かかる</li>
 </ol>
-<p>手元で試すときは、ワークフローと同じスクリプトを直接実行できます（その場合も結果は quality-gate アプリに取り込まれます）。</p>
+<p>手元で試すときは、ワークフローと同じスクリプトを直接実行できます（その場合も結果は quality-gate アプリに取り込まれます）。<code>fetch.sh</code> もアプリの設定を読むため、<code>QG_BASE_URL</code> と <code>QG_INGEST_TOKEN</code> は最初に設定します。</p>
 <pre>WORK=/tmp/qg-collector
-./collector/bin/fetch.sh "$WORK"
+export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの QG_INGEST_TOKEN&gt;
+./collector/bin/fetch.sh "$WORK"                  # アプリの設定を読み、QG_REPOSITORY が同じ計測プロファイルを選ぶ
 ./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
-QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの QG_INGEST_TOKEN&gt; \
-  ./collector/bin/submit.sh "$WORK/reports"</pre>
+./collector/bin/submit.sh "$WORK/reports"</pre>
 
 <h3>3.3 結果確認</h3>
 <ol>
   <li><code>submit</code> ジョブのログで、<code>Run を作成しました: &lt;runId&gt;</code>・送信したファイル・<code>判定: PASS</code>（または <code>FAIL</code>）とリリース判定の URL を確かめる。処理失敗のときだけ <code>submit</code> ジョブが失敗する（判定が不合格でもジョブは成功）</li>
   <li>quality-gate の画面（<code>/</code>）を開き、<code>QG_LOGIN_USERNAME</code>（既定 <code>quality</code>）と <code>QG_LOGIN_PASSWORD</code> でログインする</li>
-  <li>最上部の結論（リリース可 / リリース不可）と、品質基準ごとの合否を見る。不合格・計測エラーの指標は理由と主な違反から原因を確かめる</li>
+  <li>最上部の結論（リリース可 / リリース不可 / 未計測）と、品質基準ごとの合否を見る。不合格・計測エラーの指標は理由と主な違反から原因を確かめる</li>
   <li>必要なら「PDF として保存（印刷）」で証跡を残す。<code>measure</code> ジョブの成果物 <code>collector-reports</code>（7 日保持）で送った内容も確認できる</li>
 </ol>
 <div class="table-wrap"><table>
   <thead><tr><th>最初の結果でよくあること</th><th>原因と対処</th></tr></thead>
   <tbody>
     <tr><td>ジョブが始まらない</td><td>セルフホストランナーが止まっている（<code>Idle</code> になっているか確かめる）</td></tr>
-    <tr><td><code>fetch</code> が「quality-gate の設定を読めませんでした」で失敗する</td><td>GitHub の Secret と quality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
-    <tr><td><code>fetch</code> が「QG_REPOSITORY が…と違います」で失敗する</td><td>計測プロファイルと quality-gate アプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
+    <tr><td><code>fetch</code> が「quality-gate の設定を読めませんでした」で失敗する</td><td><code>QG_BASE_URL</code> にランナーから届かない、または GitHub の Secret と quality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
     <tr><td><code>fetch</code> が「計測プロファイルがありません」で失敗する</td><td>quality-gate アプリの <code>QG_REPOSITORY</code> と同じ <code>QG_REPOSITORY</code> を書いた計測プロファイルが main に無い</td></tr>
+    <tr><td><code>fetch</code> が「計測プロファイルの DISABLED_METRICS は廃止しました」で失敗する</td><td>計測プロファイルから <code>DISABLED_METRICS</code> を消し、止める指標は quality-gate アプリの <code>QG_DISABLED_METRICS</code> に書く</td></tr>
     <tr><td>M-07 が対象外</td><td>初回は比較元に OpenAPI 定義が無いため。異常ではない</td></tr>
   </tbody>
 </table></div>
@@ -285,19 +286,21 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
     <tr><td class="id">M-03</td><td>性能</td><td>応答時間 p95</td><td>50 req/s の負荷下で 500ms 以内</td><td>k6</td><td><code>QG_RESPONSE_TIME_P95_MAX_MS</code> / <code>QG_ARRIVAL_RATE_RPS</code></td></tr>
     <tr><td class="id">M-04</td><td>性能</td><td>エラー率</td><td>0.1% 以下</td><td>k6</td><td><code>QG_ERROR_RATE_MAX_PCT</code></td></tr>
     <tr><td class="id">M-05</td><td>セキュリティ</td><td>重大・高 脆弱性件数</td><td>Critical 0・High 0</td><td>Trivy (SARIF)</td><td><code>QG_CRITICAL_/HIGH_VULNERABILITIES_MAX</code></td></tr>
-    <tr><td class="id">M-06</td><td>コード構造</td><td>循環的複雑度 15 超の関数数</td><td>0 件</td><td>PMD / ESLint</td><td><code>QG_COMPLEXITY_MAX</code></td></tr>
+    <tr><td class="id">M-06</td><td>コード構造</td><td>循環的複雑度が上限を超える関数の数</td><td>0 件</td><td>PMD / ESLint</td><td><code>QG_COMPLEXITY_MAX</code></td></tr>
     <tr><td class="id">M-07</td><td>契約・互換性</td><td>OpenAPI の破壊的変更件数</td><td>0 件</td><td>oasdiff</td><td><code>QG_BREAKING_CHANGES_MAX</code></td></tr>
     <tr><td class="id">M-08</td><td>使いやすさ</td><td>アクセシビリティ重大違反件数</td><td>critical / serious 0 件</td><td>Playwright + axe-core</td><td><code>QG_ACCESSIBILITY_VIOLATIONS_MAX</code></td></tr>
     <tr><td class="id">M-09</td><td>機能テスト</td><td>テスト成功率</td><td>100%</td><td>JUnit XML</td><td><code>QG_TEST_SUCCESS_RATE_MIN</code></td></tr>
-    <tr><td class="id">M-10</td><td>機能テスト</td><td>スキップされたテスト数</td><td>比較対象 Run から増やさない</td><td>JUnit XML</td><td><code>QG_SKIPPED_TESTS_INCREASE_MAX</code></td></tr>
+    <tr><td class="id">M-10</td><td>機能テスト</td><td>スキップされたテスト数</td><td>0 件（backend / frontend それぞれ）</td><td>JUnit XML</td><td><code>QG_SKIPPED_TESTS_MAX</code></td></tr>
     <tr><td class="id">M-11</td><td>セキュリティ</td><td>シークレット検出件数</td><td>0 件</td><td>Trivy (SARIF)</td><td><code>QG_SECRETS_MAX</code></td></tr>
     <tr><td class="id">M-12</td><td>セキュリティ</td><td>ライセンス違反件数</td><td>forbidden 0 パッケージ</td><td>Trivy (SARIF)</td><td><code>QG_FORBIDDEN_LICENSES_MAX</code></td></tr>
   </tbody>
 </table></div>
 <ul>
-  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）</li>
+  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）。外した指標は判定時に Run に残り、リリース判定の結論の下に「判定の対象外」として出る</li>
+  <li>合格ラインを既定値より緩めると、リリース判定の行に「既定より緩い（既定 ≥ 75%）」と出る</li>
   <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
-  <li>性能計測は <code>QG_ARRIVAL_RATE_RPS</code>（既定 50、到達率）と <code>QG_PERF_SCENARIOS</code>（必須のシナリオ）でも調整できる。ミューテーションの対象コンポーネントは <code>QG_MUTATION_COMPONENTS</code>（既定 backend）</li>
+  <li>性能計測は <code>QG_ARRIVAL_RATE_RPS</code>（既定 50、到達率）と <code>QG_PERF_SCENARIOS</code>（必須のシナリオ）でも調整できる。ミューテーションの対象コンポーネントは <code>QG_MUTATION_COMPONENTS</code>（既定 backend）、M-08 で検査されているべき画面は <code>QG_ACCESSIBILITY_PAGES</code></li>
+  <li>M-03 の値は本番の性能を表さない（k6 とアプリが同じコンテナで動く）。それでも負荷条件と専有のランナーを固定したうえで合格ラインの絶対値で判定し、結果はリリース判定に効く。合格ラインは本番の SLO を写さず、この計測環境に合わせて決める。前回比は補足として示す</li>
 </ul>
 </section>
 
@@ -310,7 +313,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
     <tr><td><span class="status pass"><span class="dot" aria-hidden="true">●</span>合格 <code>PASS</code></span></td><td>合格ラインを満たす</td><td>—</td></tr>
     <tr><td><span class="status fail"><span class="dot" aria-hidden="true">■</span>不合格 <code>FAIL</code></span></td><td>合格ラインを満たさない</td><td>リリース不可</td></tr>
     <tr><td><span class="status err"><span class="dot" aria-hidden="true">◆</span>計測エラー <code>ERROR</code></span></td><td>成果物の未提出・形式不正・メタデータ不足・計測条件を満たさない</td><td>リリース不可（不合格として扱う）</td></tr>
-    <tr><td><span class="status neu"><span class="dot" aria-hidden="true">—</span>対象外 <code>NOT_APPLICABLE</code></span></td><td>ツールの制約で測れない（M-02 の frontend など）</td><td>影響しない（表に出さない）</td></tr>
+    <tr><td><span class="status neu"><span class="dot" aria-hidden="true">—</span>対象外 <code>NOT_APPLICABLE</code></span></td><td>ツールの制約で測れない（M-02 の frontend など）</td><td>影響しない（合否の表に出さず、結論の下の「判定の対象外」に理由と出す）</td></tr>
   </tbody>
 </table></div>
 <pre>FAIL または ERROR が 1 つ以上  → FAIL（リリース不可）
@@ -320,7 +323,7 @@ NOT_APPLICABLE は影響しない</pre>
 <h3>比較元・比較対象 Run</h3>
 <ul>
   <li><strong>比較元</strong>（M-07 の起点）: 既定ブランチは直前のコミット、他のブランチは merge-base、タグは前のタグ</li>
-  <li><strong>比較対象 Run</strong>（前回比・違反の新規/継続/解消・M-10 の起点）: 比較元コミットの判定済み Run、無ければ同じブランチの直前の判定済み Run</li>
+  <li><strong>比較対象 Run</strong>（前回比・違反の新規/継続/解消の起点。前回比は理由に書き添えるだけで合否には使わない）: 比較元コミットの判定済み Run、無ければ同じブランチの直前の判定済み Run</li>
   <li>違反は <code>sha256(指標ID + 同定子)</code> の fingerprint で Run をまたいで追跡する（行番号は含めない）</li>
 </ul>
 <h3>Run のライフサイクル</h3>
@@ -340,6 +343,7 @@ NOT_APPLICABLE は影響しない</pre>
   <li><strong>各指標の説明と基準の根拠</strong> — 根拠の種類（外部基準 / 業界の目安 / チーム判断）と、満たさないと何が起きるか</li>
   <li><strong>判定の履歴</strong> — 新しい順、最大 50 件。各判定を開ける</li>
 </ol>
+<p>リリース判断者向けの読み方の手引きは、この画面そのものです。各指標の意味・根拠・合格ラインの説明を画面に出し、別の手引き書は持ちません（DD-24）。</p>
 <h3>7.2 指標の推移</h3>
 <p>パスは <code>/trends</code>。判定まで終わった計測（同じコミットは最後の判定だけ）を新しい順に最大 50 件取り、古い順に指標ごとの折れ線グラフで示します。点線は各計測の判定に使った合格ライン、点を選ぶとその計測のリリース判定の画面を開きます。結論は示さず、合格ライン内での悪化や、基準を守れてきたことの説明に使う補助の画面です。</p>
 <h3>7.3 共通のルール</h3>
@@ -445,11 +449,11 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>モジュール</th><th>役割</th></tr></thead>
   <tbody>
-    <tr><td><code>ingest</code></td><td>取り込み API、Ingest Token 認証、成果物の受領と保管、リポジトリ登録</td></tr>
+    <tr><td><code>ingest</code></td><td>取り込み API と収集ランナー向けの設定、Ingest Token 認証、成果物の受領と保管、リポジトリ登録</td></tr>
     <tr><td><code>pipeline</code></td><td>正規化 → 判定の流れ（確定から呼ぶ）</td></tr>
     <tr><td><code>adapter</code></td><td>ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, eslint, junit, oasdiff, axe）</td></tr>
     <tr><td><code>normalize</code> / <code>evaluate</code></td><td>正規化と fingerprint 生成 / 合格ラインの適用・指標判定・Run の集約</td></tr>
-    <tr><td><code>release</code> / <code>query</code></td><td>リリース判定と履歴 / ログイン状態</td></tr>
+    <tr><td><code>release</code> / <code>query</code></td><td>リリース判定・判定の履歴・指標の推移 / ログイン状態</td></tr>
     <tr><td><code>domain</code> / <code>platform</code> / <code>config</code></td><td>エンティティ等 / 設定・ArtifactStore・例外・可観測性 / Security と SPA 配信</td></tr>
   </tbody>
 </table></div>
@@ -483,7 +487,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td>Run → 成果物</td><td>1 : 0..N</td><td>収集ランナーが送った JaCoCo・SARIF などのファイル</td></tr>
     <tr><td>Run → 指標の判定結果</td><td>1 : 0..N</td><td>指標 × コンポーネント × シナリオ × 計測条件ごとに 1 行</td></tr>
     <tr><td>Run → 違反</td><td>1 : 0..N</td><td>不合格の根拠になった関数・CVE・画面の要素など</td></tr>
-    <tr><td>Run → 比較対象 Run</td><td>N : 0..1</td><td>前回比・違反の新規 / 継続 / 解消・スキップの増加を数える起点。比較対象が消えても判定済みの値は残る（前回値を焼き付けているため）</td></tr>
+    <tr><td>Run → 比較対象 Run</td><td>N : 0..1</td><td>前回比・違反の新規 / 継続 / 解消を数える起点。比較対象が消えても判定済みの値は残る（前回値を焼き付けているため）</td></tr>
   </tbody>
 </table></div>
 
@@ -514,7 +518,9 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>ci_run_url</code></td><td><code>varchar(512)</code></td><td class="c"></td><td></td><td></td><td>計測したワークフローの実行 URL</td></tr>
     <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>計測日時</td></tr>
     <tr><td><code>tags</code></td><td><code>text[]</code></td><td class="c">○</td><td><code>&#x27;{}&#x27;</code></td><td></td><td>計測したコミットを指すタグ。リリース判定でタグを解決するのに使う</td></tr>
-    <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分・M-10 の起点）</td></tr>
+    <tr><td><code>components</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>収集ランナーが申告した、成果物を送るコンポーネント。結果の無いコンポーネントを計測エラーにするのに使う（V003 より前の Run は NULL）</td></tr>
+    <tr><td><code>disabled_metrics</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときに <code>QG_DISABLED_METRICS</code> で外していた指標（V003 より前の Run は NULL）</td></tr>
+    <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分の起点）</td></tr>
     <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>処理の状態</td></tr>
     <tr><td><code>verdict</code></td><td><code>varchar(24)</code></td><td class="c"></td><td></td><td>CHECK ③</td><td>判定結果。判定前は NULL</td></tr>
     <tr><td><code>error_code</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>処理失敗（FAILED）の理由</td></tr>
@@ -600,7 +606,7 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>メソッド</th><th>パス</th><th>用途</th><th>認可</th></tr></thead>
   <tbody>
-    <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）</td><td>Ingest Token</td></tr>
+    <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）。成果物を送るコンポーネント（<code>components</code>）の申告が必須で、届かなかったコンポーネントは計測エラーになる</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/artifacts</code></td><td>成果物のアップロード（1 ファイル 50MB / Run 合計 200MB まで）</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/finalize</code></td><td>確定し、その場で判定して結果を返す</td><td>Ingest Token</td></tr>
     <tr><td>GET</td><td><code>/collector/settings</code></td><td>収集ランナーが計測前に読む設定（対象リポジトリ・判定しない指標・M-08 の検査対象画面）</td><td>Ingest Token</td></tr>
@@ -661,7 +667,7 @@ cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
 </section>
 
 <footer>
-  出典: <code>README.md</code>、<code>docs/architecture.md</code>、<code>docs/metrics.md</code>、<code>docs/operations.md</code>、<code>docs/features/*/requirements.md</code>。詳細な定義はそれぞれの文書を参照してください。
+  出典: <code>README.md</code>、<code>docs/architecture.md</code>、<code>docs/metrics.md</code>、<code>docs/operations.md</code>、<code>docs/features/*/requirements.md</code>。詳細な定義はそれぞれの文書を参照してください。このページと食い違うときは、それらの文書が正本です。
 </footer>
 
 </main>

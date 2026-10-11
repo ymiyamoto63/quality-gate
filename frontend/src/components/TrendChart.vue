@@ -3,7 +3,7 @@ import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 import StatusChip from '@/components/StatusChip.vue'
 import type { components } from '@/api/schema'
-import { formatDateTime, formatValue, shortSha } from '@/api/format'
+import { formatDateTime, formatValue, relaxedLabel, shortSha } from '@/api/format'
 import { presentationOf } from '@/api/status'
 import { axisOf, segmentsOf, stepPathOf, xOf } from '@/api/trend'
 
@@ -160,9 +160,15 @@ function describe(series: Series, point: Point): string {
     run ? `${refLabel(run)}（${formatDateTime(run.measuredAt)}）` : null,
     point.value === null ? status : `${valueText(point)}、${status}`,
     point.threshold ? `合格ライン ${point.threshold}` : null,
+    point.thresholdRelaxed ? relaxedLabel(point.defaultThreshold) : null,
   ]
     .filter(Boolean)
     .join('、')
+}
+
+/** 表の「合格ライン」列に出す点（その計測で合格ラインを持つ最初の系列）。 */
+function thresholdCell(cells: readonly (Point | null | undefined)[]): Point | undefined {
+  return cells.find((cell): cell is Point => Boolean(cell?.threshold))
 }
 
 function hrefOf(point: Point): string {
@@ -341,6 +347,9 @@ function tickText(value: number): string {
         <span v-if="metric.series.length > 1">{{ seriesLabel(active.series) }}</span>
         <strong v-if="active.point.value !== null">{{ valueText(active.point) }}</strong>
         <span v-if="active.point.threshold">合格ライン {{ active.point.threshold }}</span>
+        <span v-if="active.point.thresholdRelaxed">{{
+          relaxedLabel(active.point.defaultThreshold)
+        }}</span>
         <span v-if="runs[active.point.runIndex]">
           {{ refLabel(runs[active.point.runIndex]!) }}・{{
             formatDateTime(runs[active.point.runIndex]!.measuredAt)
@@ -382,7 +391,12 @@ function tickText(value: number): string {
               </template>
               <template v-else>—</template>
             </td>
-            <td>{{ row.cells.find((cell) => cell?.threshold)?.threshold ?? '—' }}</td>
+            <td>
+              {{ thresholdCell(row.cells)?.threshold ?? '—' }}
+              <template v-if="thresholdCell(row.cells)?.thresholdRelaxed">
+                <br />{{ relaxedLabel(thresholdCell(row.cells)?.defaultThreshold) }}
+              </template>
+            </td>
           </tr>
         </tbody>
       </table>

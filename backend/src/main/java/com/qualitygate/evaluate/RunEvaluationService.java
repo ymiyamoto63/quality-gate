@@ -3,6 +3,8 @@ package com.qualitygate.evaluate;
 import com.qualitygate.domain.entity.Finding;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
@@ -76,7 +78,9 @@ public class RunEvaluationService {
 
         EvaluationContext context = new EvaluationContext(run, thresholds,
                 input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
-        List<MetricResult> results = evaluateAll(context);
+        List<MetricResult> results = markRelaxed(evaluateAll(context), context);
+        // 何を判定しなかったかも、合格ラインと同じく判定時に焼き付ける（DD-27）
+        run.applyDisabledMetrics(thresholds.disabledMetrics());
 
         persistMeasurements(run, results, context);
         persistFindings(run, results, baseline);
@@ -122,7 +126,61 @@ public class RunEvaluationService {
         List<MetricResult> results = evaluator.evaluate(context);
         return results.isEmpty()
                 ? List.of(MetricResult.error(metricId, "成果物から値を取り出せませんでした"))
-                : results;
+                : withMissingComponents(metricId, results, context);
+    }
+
+    /**
+     * コンポーネントごとに判定する指標で、Run の作成時に申告されたのに結果の無いコンポーネントを ERROR にする（DD-26）。
+     *
+     * <p>判定器は届いた成果物のコンポーネントしか知らない。frontend の計測が失敗して backend の成果物だけが届くと、
+     * frontend の行が黙って消え、残りが合格ならリリース可になってしまう。測っていないものを合格にしない（fail-closed）。
+     *
+     * <p>判定器が対象外（NOT_APPLICABLE）などの行を出したコンポーネントはそのままにする。
+     * コンポーネント宣言の無い結果が 1 つでもあれば確かめない。どのコンポーネントの値かを知る手がかりが無く、
+     * それを全体の値とみなすしかないためである（M-02 と同じ）。申告の無い Run（V003 より前に作られたもの）も確かめない。
+     */
+    private static List<MetricResult> withMissingComponents(String metricId, List<MetricResult> results,
+                                                            EvaluationContext context) {
+        if (!MetricCatalog.of(metricId).perComponent()) {
+            return results;
+        }
+        Set<String> present = new HashSet<>();
+        results.forEach(result -> present.add(result.componentName()));
+        if (present.contains(null)) {
+            return results;
+        }
+        List<MetricResult> all = new ArrayList<>(results);
+        context.run().getComponents().orElse(List.of()).stream()
+                .filter(component -> !present.contains(component))
+                .sorted()
+                .forEach(component -> all.add(MetricResult.error(metricId, component,
+                        "%s の成果物が届いていません。収集ランナーのログで計測の失敗を確認してください"
+                                .formatted(component))));
+        return all;
+    }
+
+    /**
+     * 合格ラインが既定より緩い結果に印を付ける（DD-27）。
+     *
+     * <p>同じ入力を、合格ラインの値だけを既定にした設定（{@link GateThresholds#withDefaultLimits()}）でも判定し、
+     * 指標・コンポーネント・計測条件の同じ結果どうしで合格ラインを比べる。指標ごとの知識を持たずに済み、
+     * 判定の規則を変えた指標にもそのまま効く。合否と保存する値は、設定の合格ラインで判定したものから変えない。
+     */
+    private List<MetricResult> markRelaxed(List<MetricResult> results, EvaluationContext context) {
+        GateThresholds standard = context.thresholds().withDefaultLimits();
+        if (standard.equals(context.thresholds())) {
+            return results;
+        }
+        Map<String, Threshold> defaults = new HashMap<>();
+        for (MetricResult result : evaluateAll(context.withThresholds(standard))) {
+            defaults.put(EvaluationContext.key(result.metricId(), result.componentName(), result.variant()),
+                    result.threshold());
+        }
+        return results.stream().map(result -> {
+            Threshold reference = defaults.get(
+                    EvaluationContext.key(result.metricId(), result.componentName(), result.variant()));
+            return reference == null ? result : result.withThreshold(result.threshold().relaxedFrom(reference));
+        }).toList();
     }
 
     /**
@@ -140,7 +198,7 @@ public class RunEvaluationService {
         measurements.saveAll(results.stream().map(result -> new Measurement(Uuid7.generate(), run.getId(),
                 result.metricId(), result.componentName(),
                 result.variant(), result.status(), result.value(), result.unit(),
-                toJson(result.threshold()),
+                toJson(result.threshold().toMap()),
                 context.previousValue(result.metricId(), result.componentName(), result.variant()).orElse(null),
                 result.reason(), toJson(result.detail()))).toList());
     }

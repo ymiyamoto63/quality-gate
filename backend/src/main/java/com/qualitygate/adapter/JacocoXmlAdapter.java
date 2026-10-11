@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
@@ -127,7 +128,7 @@ public class JacocoXmlAdapter implements ArtifactAdapter {
                 : BigDecimal.valueOf(counter.covered * 100L)
                         .divide(BigDecimal.valueOf(totalBranches), 4, RoundingMode.HALF_UP);
 
-        return RawMeasurement.of("M-01", componentName, value, "percent", Map.of(
+        return RawMeasurement.of(MetricCatalog.M_BRANCH_COVERAGE, componentName, value, "percent", Map.of(
                 "coveredBranches", counter.covered,
                 "totalBranches", totalBranches,
                 "excludedFiles", counter.excludedFiles));

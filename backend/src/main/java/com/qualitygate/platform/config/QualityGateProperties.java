@@ -102,7 +102,7 @@ public record QualityGateProperties(
      * @param accessibilityPages      M-08 で検査されているべき画面。空なら限定しない
      * @param testSuccessRateMin      M-09 テスト成功率の下限（%）
      * @param testCountMin            M-09 実行されたテストの最小件数
-     * @param skippedTestsIncreaseMax M-10 スキップされたテストの、比較元からの増加の上限（件）
+     * @param skippedTestsMax         M-10 スキップされたテストの件数の上限（コンポーネントごと）
      * @param secretsMax              M-11 シークレットの上限（件）
      * @param forbiddenLicensesMax    M-12 使用禁止ライセンスの上限（件）
      */
@@ -125,7 +125,7 @@ public record QualityGateProperties(
             List<String> accessibilityPages,
             BigDecimal testSuccessRateMin,
             Integer testCountMin,
-            Integer skippedTestsIncreaseMax,
+            Integer skippedTestsMax,
             Integer secretsMax,
             Integer forbiddenLicensesMax) {
 
@@ -156,7 +156,7 @@ public record QualityGateProperties(
             testSuccessRateMin = orDefault(testSuccessRateMin, "100");
             // 0 を書かれても 1 件は求める。0 件の合格は「検証していない」の言い換えにすぎない
             testCountMin = Math.max(1, orDefault(testCountMin, 1));
-            skippedTestsIncreaseMax = orDefault(skippedTestsIncreaseMax, 0);
+            skippedTestsMax = orDefault(skippedTestsMax, 0);
             secretsMax = orDefault(secretsMax, 0);
             forbiddenLicensesMax = orDefault(forbiddenLicensesMax, 0);
         }

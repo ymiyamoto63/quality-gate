@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
@@ -77,11 +78,12 @@ public class LcovAdapter implements ArtifactAdapter {
                         .divide(BigDecimal.valueOf(found), 4, RoundingMode.HALF_UP);
 
         return NormalizedReport.of(ArtifactType.LCOV,
-                List.of(RawMeasurement.of("M-01", context.componentName(), value, "percent", Map.of(
-                        "coveredBranches", hit,
-                        "totalBranches", found,
-                        "files", files,
-                        "excludedFiles", excludedFiles))),
+                List.of(RawMeasurement.of(MetricCatalog.M_BRANCH_COVERAGE, context.componentName(), value,
+                        "percent", Map.of(
+                                "coveredBranches", hit,
+                                "totalBranches", found,
+                                "files", files,
+                                "excludedFiles", excludedFiles))),
                 List.of());
     }
 

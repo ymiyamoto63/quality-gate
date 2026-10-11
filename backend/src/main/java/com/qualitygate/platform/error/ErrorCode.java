@@ -20,6 +20,7 @@ public enum ErrorCode {
     UNSUPPORTED_MEDIA_TYPE(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "本文の形式（Content-Type）に対応していません"),
     ARTIFACT_TYPE_UNKNOWN(HttpStatus.UNPROCESSABLE_CONTENT, "未知の成果物種別です"),
     PERFORMANCE_METADATA_MISSING(HttpStatus.UNPROCESSABLE_CONTENT, "性能計測のメタデータが不足しています"),
+    COMPONENT_NOT_DECLARED(HttpStatus.UNPROCESSABLE_CONTENT, "Run の作成時に申告されていないコンポーネントです"),
     INTERNAL_ERROR(HttpStatus.INTERNAL_SERVER_ERROR, "サーバ内部でエラーが発生しました");
 
     private final HttpStatus status;

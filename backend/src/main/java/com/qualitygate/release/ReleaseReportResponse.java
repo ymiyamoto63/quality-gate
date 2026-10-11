@@ -24,8 +24,11 @@ public record ReleaseReportResponse(
         String decisionReason,
         @NotNull @Schema(nullable = true, description = "判定に使った計測。未計測なら null") ReleaseRun run,
         @NotNull ReleaseCounts counts,
-        @NotNull @Schema(description = "指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない")
+        @NotNull @Schema(description = "指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない（notJudged に出す）")
         List<ReleaseMetric> metrics,
+        @NotNull @Schema(description = "判定の対象外にした指標（設定で判定から外した指標と、対象外の結果）。"
+                + "合否の件数にも結論にも数えない。指標の一覧の並び")
+        List<ReleaseNotJudgedMetric> notJudged,
         @NotNull @Schema(description = "結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）")
         List<ReleaseGuide> guides) {
 
@@ -52,9 +55,25 @@ public record ReleaseReportResponse(
             @NotNull @Schema(nullable = true, description = "実測値。計測エラーは null") BigDecimal value,
             @NotNull @Schema(nullable = true) String unit,
             @NotNull @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）") String threshold,
+            @NotNull @Schema(description = "合格ラインを既定値より緩めて判定したか（判定時に記録したもの）")
+            boolean thresholdRelaxed,
+            @NotNull @Schema(nullable = true,
+                    description = "緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null")
+            String defaultThreshold,
+            @NotNull @Schema(description = "QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02。無ければ 0）")
+            int excludedFileCount,
             @NotNull @Schema(nullable = true) String reason,
             @NotNull @Schema(description = "不合格のときの主な違反（深刻な順に最大 10 件）。合格なら空") List<ReleaseFinding> findings,
             @NotNull @Schema(description = "不合格のときの違反の総数。合格なら 0") int findingCount) {
+    }
+
+    @Schema(description = "判定の対象外にした指標。合否に使っていない")
+    public record ReleaseNotJudgedMetric(
+            @NotNull String metricId,
+            @NotNull String name,
+            @NotNull @Schema(nullable = true, description = "対象外にしたコンポーネント。指標全体なら null") String componentName,
+            @NotNull @Schema(description = "対象外にした理由（設定で判定から外した、ツールの制約で測りようがない など）")
+            String reason) {
     }
 
     public record ReleaseFinding(

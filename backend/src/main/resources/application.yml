@@ -79,7 +79,7 @@ quality-gate:
     accessibility-pages: ${QG_ACCESSIBILITY_PAGES:}        # M-08 で検査されているべき画面（例: /,/settings）
     test-success-rate-min: ${QG_TEST_SUCCESS_RATE_MIN:}    # M-09 %（既定 100）
     test-count-min: ${QG_TEST_COUNT_MIN:}                  # M-09 件（既定 1）
-    skipped-tests-increase-max: ${QG_SKIPPED_TESTS_INCREASE_MAX:}  # M-10 前回からの増加 件（既定 0）
+    skipped-tests-max: ${QG_SKIPPED_TESTS_MAX:}            # M-10 件（既定 0）
     secrets-max: ${QG_SECRETS_MAX:}                        # M-11 件（既定 0）
     forbidden-licenses-max: ${QG_FORBIDDEN_LICENSES_MAX:}  # M-12 件（既定 0）
 

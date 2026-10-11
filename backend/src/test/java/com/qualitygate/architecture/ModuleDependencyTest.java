@@ -32,7 +32,7 @@ class ModuleDependencyTest {
 
     @ArchTest
     static final ArchRule 参照系は書き込み系を呼ばない = noClasses()
-            .that().resideInAPackage("..query..")
+            .that().resideInAnyPackage("..query..", "..release..")
             .should().dependOnClassesThat()
             .resideInAnyPackage("..ingest..", "..normalize..", "..evaluate..")
             .because("参照系は保存済みの判定結果を読むだけで、書き込み側の都合に引きずられない")

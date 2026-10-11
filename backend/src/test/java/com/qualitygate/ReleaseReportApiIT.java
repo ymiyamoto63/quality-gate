@@ -39,11 +39,27 @@ import static org.springframework.security.test.web.servlet.setup.SecurityMockMv
 @AbstractIntegrationTest
 class ReleaseReportApiIT {
 
-    /** M-01（合格ライン 80%）と M-06 だけを判定する。 */
+    /** M-01（合格ライン 80%。既定より厳しい）と M-06（関数ごとの上限 18。既定 15 より緩い）だけを判定する。 */
     private static final QualityGateProperties.Gate GATE = new QualityGateProperties.Gate(
             GateThresholds.ALL_METRICS.stream().filter(id -> !List.of("M-01", "M-06").contains(id)).toList(),
             List.of("**/generated/**"), new BigDecimal("80"), null, null, null, null, null, null, null, null,
-            null, null, null, null, null, null, null, null, null);
+            18, null, null, null, null, null, null, null, null);
+
+    /** 判定の対象外にした指標（M-01 / M-06 以外）を並べた、結論の理由の後半。 */
+    private static final String NOT_JUDGED = "ミューテーションスコア、応答時間 p95、エラー率、重大・高 脆弱性件数、破壊的変更件数、"
+            + "アクセシビリティ違反、テスト成功率、スキップされたテスト数、シークレット検出件数、ライセンス違反件数";
+
+    /** 分岐 20 のうち 17 を通った JaCoCo の結果（85%）。 */
+    private static final String JACOCO_85 = """
+            <?xml version="1.0" encoding="UTF-8"?>
+            <report name="quality-gate">
+              <package name="com/qualitygate">
+                <class name="com/qualitygate/Good" sourcefilename="Good.java">
+                  <counter type="BRANCH" missed="3" covered="17"/>
+                </class>
+              </package>
+            </report>
+            """;
 
     private static final String PASSING = "1".repeat(40);
     private static final String FAILING = "2".repeat(40);
@@ -88,12 +104,27 @@ class ReleaseReportApiIT {
                     json.extractingPath("$.commitUrl")
                             .isEqualTo("https://github.com/ymiyamoto63/quality-gate/commit/" + PASSING);
                     json.extractingPath("$.decision").isEqualTo("RELEASABLE");
+                    // 判定から外した指標を結論の理由に必ず添える（「すべて合格」だけでは判定の範囲が分からない）
                     json.extractingPath("$.decisionReason")
-                            .isEqualTo("判定した 2 件の指標が、すべて合格ラインを満たしています。");
+                            .isEqualTo("判定した 2 件の指標が、すべて合格ラインを満たしています（10 件は判定の対象外です: "
+                                    + NOT_JUDGED + "）。");
+                    json.extractingPath("$.notJudged").asArray().hasSize(10);
+                    json.extractingPath("$.notJudged[0].metricId").isEqualTo("M-02");
+                    json.extractingPath("$.notJudged[0].componentName").isNull();
+                    json.extractingPath("$.notJudged[0].reason").isEqualTo("設定（QG_DISABLED_METRICS）で判定から外しています");
                     json.extractingPath("$.counts.judged").asNumber().isEqualTo(2);
                     json.extractingPath("$.metrics[0].metricId").isEqualTo("M-01");
                     json.extractingPath("$.metrics[0].threshold").isEqualTo("≥ 80%");
+                    // 既定（75%）より厳しい合格ラインは「緩い」と示さない
+                    json.extractingPath("$.metrics[0].thresholdRelaxed").isEqualTo(false);
+                    json.extractingPath("$.metrics[0].defaultThreshold").isNull();
+                    // QG_EXCLUSIONS で外したファイル（generated の 1 クラス）
+                    json.extractingPath("$.metrics[0].excludedFileCount").asNumber().isEqualTo(1);
                     json.extractingPath("$.metrics[0].findings").asArray().isEmpty();
+                    // 関数ごとの上限を既定の 15 から 18 に緩めて判定した
+                    json.extractingPath("$.metrics[1].metricId").isEqualTo("M-06");
+                    json.extractingPath("$.metrics[1].thresholdRelaxed").isEqualTo(true);
+                    json.extractingPath("$.metrics[1].defaultThreshold").isEqualTo("関数ごとの循環的複雑度の上限 15");
                     json.extractingPath("$.guides[0].basisLabel").isEqualTo("業界の目安");
                     json.extractingPath("$.guides[0].summary").asString().contains("分かれ道");
                 });
@@ -106,8 +137,9 @@ class ReleaseReportApiIT {
         assertThat(response).hasStatusOk().bodyJson().satisfies(content -> {
             var json = content.assertThat();
             json.extractingPath("$.decision").isEqualTo("NOT_RELEASABLE");
-            json.extractingPath("$.decisionReason").asString()
-                    .startsWith("2 件の指標が合格ラインを満たしていません（ブランチカバレッジ、循環的複雑度 15 超の関数数）");
+            json.extractingPath("$.decisionReason").isEqualTo(
+                    "2 件の指標が合格ラインを満たしていません（ブランチカバレッジ、循環的複雑度が上限を超える関数の数）。"
+                            + "ほかに 10 件は判定の対象外です（" + NOT_JUDGED + "）。");
             json.extractingPath("$.counts.failed").asNumber().isEqualTo(2);
             json.extractingPath("$.run.baseCommitSha").isEqualTo(PASSING);
             json.extractingPath("$.run.tags[0]").isEqualTo("v1.2.0");
@@ -121,6 +153,39 @@ class ReleaseReportApiIT {
         });
 
         FixtureWriter.write("release-report.json", response.getResponse().getContentAsString());
+    }
+
+    @Test
+    void 対象外の結果は合否に数えず判定の対象外として理由と並べる() {
+        String commitSha = "5".repeat(40);
+        Run run = new Run(Uuid7.generate(), repositoryId, commitSha, "main", Instant.parse("2026-09-25T03:00:00Z"), 1);
+        run.setComponents(List.of("backend", "frontend"));
+        run.finalizeIngest();
+        runs.save(run);
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO_85);
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend", "SF:src/a.ts\nBRF:10\nBRH:9\nend_of_record\n");
+        attach(run, ArtifactType.PIT_XML, "mutations.xml", "backend",
+                "<mutations>" + "<mutation status='KILLED'><sourceFile>Good.java</sourceFile>"
+                        + "<mutatedClass>com.qualitygate.Good</mutatedClass></mutation>" + "</mutations>");
+        QualityGateProperties.Gate gate = new QualityGateProperties.Gate(
+                GateThresholds.ALL_METRICS.stream().filter(id -> !List.of("M-01", "M-02").contains(id)).toList(),
+                null, null, null, List.of("backend"), null, null, null, null, null, null,
+                null, null, null, null, null, null, null, null, null);
+        evaluate(run, gate);
+
+        assertThat(mvc.get().uri("/api/v1/release?ref={ref}", commitSha))
+                .hasStatusOk().bodyJson().satisfies(content -> {
+                    var json = content.assertThat();
+                    json.extractingPath("$.decision").isEqualTo("RELEASABLE");
+                    // M-01 の backend / frontend と M-02 の backend。frontend の M-02 は数えない
+                    json.extractingPath("$.counts.judged").asNumber().isEqualTo(3);
+                    json.extractingPath("$.notJudged").asArray().hasSize(11);
+                    json.extractingPath("$.notJudged[0].metricId").isEqualTo("M-02");
+                    json.extractingPath("$.notJudged[0].componentName").isEqualTo("frontend");
+                    json.extractingPath("$.notJudged[0].reason").asString().contains("JVM");
+                    json.extractingPath("$.decisionReason").asString()
+                            .contains("（11 件は判定の対象外です: ミューテーションスコア（frontend）、応答時間 p95、");
+                });
     }
 
     @Test
@@ -227,6 +292,10 @@ class ReleaseReportApiIT {
             json.extractingPath("$.metrics[0].series[0].points[1].value").asNumber().isEqualTo(75.0);
             json.extractingPath("$.metrics[0].series[0].points[1].thresholdValue").asNumber().isEqualTo(80);
             json.extractingPath("$.metrics[0].series[0].points[1].threshold").isEqualTo("≥ 80%");
+            json.extractingPath("$.metrics[0].series[0].points[1].thresholdRelaxed").isEqualTo(false);
+            json.extractingPath("$.metrics[1].series[0].points[1].thresholdRelaxed").isEqualTo(true);
+            json.extractingPath("$.metrics[1].series[0].points[1].defaultThreshold")
+                    .isEqualTo("関数ごとの循環的複雑度の上限 15");
             json.extractingPath("$.metrics[1].metricId").isEqualTo("M-06");
             json.extractingPath("$.metrics[1].axisMax").isNull();
         });
@@ -265,6 +334,11 @@ class ReleaseReportApiIT {
                       <counter type="BRANCH" missed="%d" covered="%d"/>
                     </class>
                   </package>
+                  <package name="com/qualitygate/generated">
+                    <class name="com/qualitygate/generated/Api" sourcefilename="Api.java">
+                      <counter type="BRANCH" missed="10" covered="0"/>
+                    </class>
+                  </package>
                 </report>
                 """.formatted(20 - covered, covered));
         attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", """
@@ -277,8 +351,13 @@ class ReleaseReportApiIT {
                   </file>
                 </pmd>
                 """.formatted(complexity));
+        evaluate(run, GATE);
+    }
+
+    /** 取り込みの確定と同じ手順（正規化 → 判定）。 */
+    private void evaluate(Run run, QualityGateProperties.Gate gate) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
-        GateThresholds thresholds = GateThresholds.from(GATE);
+        GateThresholds thresholds = GateThresholds.from(gate);
         NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
         evaluationService.evaluate(run.getId(), input, thresholds);
     }

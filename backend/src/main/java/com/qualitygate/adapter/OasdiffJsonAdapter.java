@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -39,7 +40,7 @@ import java.util.Map;
 @Component
 public class OasdiffJsonAdapter implements ArtifactAdapter {
 
-    static final String METRIC_ID = "M-07";
+    static final String METRIC_ID = MetricCatalog.M_BREAKING_CHANGES;
 
     private final ObjectMapper objectMapper;
 

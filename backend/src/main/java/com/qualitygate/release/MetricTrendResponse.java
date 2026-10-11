@@ -51,6 +51,10 @@ public record MetricTrendResponse(
             @NotNull @Schema(nullable = true,
                     description = "その計測の判定に使った合格ライン（縦軸の値）。前回からの増加で判定する指標は null")
             BigDecimal thresholdValue,
-            @NotNull @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）") String threshold) {
+            @NotNull @Schema(nullable = true, description = "合格ラインを表示用にした文字列（≥ 75% など）") String threshold,
+            @NotNull @Schema(description = "合格ラインを既定値より緩めて判定したか") boolean thresholdRelaxed,
+            @NotNull @Schema(nullable = true,
+                    description = "緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null")
+            String defaultThreshold) {
     }
 }

@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import org.springframework.stereotype.Component;
@@ -21,7 +23,7 @@ public class ComplexityEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_COMPLEXITY;
+        return MetricCatalog.M_COMPLEXITY;
     }
 
     @Override
@@ -33,9 +35,7 @@ public class ComplexityEvaluator implements MetricEvaluator {
                 .filter(finding -> complexityOf(finding) > thresholds.maxComplexity())
                 .toList();
 
-        Map<String, Object> threshold = Map.of(
-                "operator", "<=", "value", 0,
-                "maxComplexity", thresholds.maxComplexity());
+        Threshold threshold = Threshold.atMost(0).with("maxComplexity", thresholds.maxComplexity());
         Map<String, Object> detail = new HashMap<>();
         detail.put("analyzedFunctions", analyzed.size());
 

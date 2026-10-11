@@ -1,6 +1,7 @@
 package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.PerformanceSample;
 import com.qualitygate.domain.report.RawMeasurement;
@@ -43,7 +44,7 @@ class PerformanceEvaluatorTest {
 
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(result.value()).isEqualByComparingTo("305");
-        assertThat(result.threshold()).containsEntry("operator", "<=");
+        assertThat(result.threshold().operator()).isEqualTo(Threshold.AT_MOST);
     }
 
     @Test
@@ -117,7 +118,7 @@ class PerformanceEvaluatorTest {
         assertThat(ok.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(slow.status()).isEqualTo(MeasurementStatus.ERROR);
         assertThat(slow.reason()).contains("到達率");
-        assertThat(slow.threshold()).containsEntry("arrivalRateRps", new BigDecimal("50"));
+        assertThat(slow.threshold().extras()).containsEntry("arrivalRateRps", new BigDecimal("50"));
     }
 
     private static MetricResult p95(PerformanceSample... samples) {

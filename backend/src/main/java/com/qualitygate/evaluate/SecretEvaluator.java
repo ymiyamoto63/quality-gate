@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import org.springframework.stereotype.Component;
@@ -23,15 +25,15 @@ public class SecretEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_SECRETS;
+        return MetricCatalog.M_SECRETS;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int max = context.thresholds().maxSecrets();
+        int max = context.thresholds().security().maxSecrets();
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
-        Map<String, Object> threshold = Map.of("operator", "<=", "value", max);
+        Threshold threshold = Threshold.atMost(max);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("secrets", findings.size());
         // どの種類の鍵か（aws-access-key-id など）。値そのものは持たない（ツールが伏せ字にした一致だけ）

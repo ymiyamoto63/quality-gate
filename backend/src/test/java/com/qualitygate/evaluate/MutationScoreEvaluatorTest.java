@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -29,7 +31,7 @@ class MutationScoreEvaluatorTest {
         assertThat(result.value()).isEqualByComparingTo("70.00");
         assertThat(result.variant()).isNull();
         assertThat(result.reason()).contains("60% を満たしています").contains("検出 70 / 対象 100");
-        assertThat(result.threshold()).containsEntry("operator", ">=");
+        assertThat(result.threshold().operator()).isEqualTo(Threshold.AT_LEAST);
     }
 
     @Test
@@ -122,6 +124,33 @@ class MutationScoreEvaluatorTest {
     }
 
     @Test
+    void 申告されたコンポーネントは他の指標の成果物が無くても対象外として並べる() {
+        // frontend の計測そのものが失敗し、frontend の成果物が 1 つも届かなかった Run
+        Run run = run();
+        run.setComponents(List.of("backend", "frontend"));
+        List<MetricResult> results = evaluator.evaluate(context(run, Set.of("backend"),
+                List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
+
+        assertThat(results).extracting(MetricResult::componentName).containsExactly("backend", "frontend");
+        assertThat(results.get(1).status()).isEqualTo(MeasurementStatus.NOT_APPLICABLE);
+        assertThat(results.get(1).reason()).contains("JVM");
+    }
+
+    @Test
+    void 対象を限定していなければ申告されたのに届かなかったコンポーネントを対象外にする() {
+        // 収集ランナーは PIT を BACKEND_DIR でしか動かさない。限定していない設定でも frontend を測り忘れ扱いにしない
+        Run run = run();
+        run.setComponents(List.of("backend", "frontend"));
+        List<MetricResult> results = evaluator.evaluate(context(run, Set.of(),
+                List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
+
+        assertThat(results).extracting(MetricResult::componentName).containsExactly("backend", "frontend");
+        assertThat(results.get(0).status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(results.get(1).status()).isEqualTo(MeasurementStatus.NOT_APPLICABLE);
+        assertThat(results.get(1).reason()).contains("QG_MUTATION_COMPONENTS が空");
+    }
+
+    @Test
     void 対象コンポーネントの成果物が無ければ計測エラー() {
         List<MetricResult> results = evaluator.evaluate(context(Set.of("backend", "batch"),
                 Map.of(), List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
@@ -158,7 +187,7 @@ class MutationScoreEvaluatorTest {
     void 対象外は不合格の理由にならない() {
         List<MetricResult> results = List.of(
                 MetricResult.of("M-01", "backend", MeasurementStatus.PASS, BigDecimal.TEN,
-                        "percent", Map.of(), "", Map.of(), List.of()),
+                        "percent", Threshold.none(), "", Map.of(), List.of()),
                 MetricResult.notApplicable("M-02", "frontend", "対象外"));
 
         assertThat(RunEvaluationService.aggregate(results))
@@ -181,6 +210,14 @@ class MutationScoreEvaluatorTest {
                 Map.of("mutation-score-min", 60, "mutation-components", List.copyOf(components)));
         NormalizedInput input = input(measurements, List.of(), Set.of("M-02"));
         return new EvaluationContext(run(), thresholds, input, previous, !previous.isEmpty());
+    }
+
+    /** Run の作成時にコンポーネントを申告した Run での判定。 */
+    private static EvaluationContext context(Run run, Set<String> components, List<RawMeasurement> measurements) {
+        GateThresholds thresholds = thresholdsWith(
+                Map.of("mutation-score-min", 60, "mutation-components", List.copyOf(components)));
+        return new EvaluationContext(run, thresholds, input(measurements, List.of(), Set.of("M-02")),
+                Map.of(), false);
     }
 
     private static MetricResult single(List<MetricResult> results) {

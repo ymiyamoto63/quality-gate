@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.TestTally;
@@ -35,8 +36,8 @@ import java.util.Map;
 @Component
 public class JUnitXmlAdapter implements ArtifactAdapter {
 
-    static final String TEST_METRIC_ID = "M-09";
-    static final String SKIPPED_METRIC_ID = "M-10";
+    static final String TEST_METRIC_ID = MetricCatalog.M_TEST_SUCCESS;
+    static final String SKIPPED_METRIC_ID = MetricCatalog.M_SKIPPED_TESTS;
 
     private static final int MAX_MESSAGE = 512;
 

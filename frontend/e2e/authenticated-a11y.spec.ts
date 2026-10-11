@@ -31,6 +31,9 @@ for (const scheme of COLOR_SCHEMES) {
     // 検査前に中身が描かれていることを確かめる。空のページは必ず「違反 0 件」になる
     await expect(page.getByRole('heading', { name: 'リリース不可' })).toBeVisible()
     await expect(page.getByText('判定の履歴')).toBeVisible()
+    // 判定の対象外の指標と、既定より緩めた合格ラインの印も検査に含める
+    await expect(page.getByRole('heading', { name: /判定の対象外/ })).toBeVisible()
+    await expect(page.getByText(/既定より緩い/).first()).toBeVisible()
 
     // 折りたたまれた中身（主な違反・技術的な定義）も開いて検査する
     for (const summary of await page.locator('details > summary').all()) await summary.click()

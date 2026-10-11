@@ -33,6 +33,14 @@ export function formatValue(
   return `${trimZeros(numeric)}${unitSuffix(unit)}`
 }
 
+/**
+ * 合格ラインを既定値より緩めて判定したことの表示（「既定より緩い（既定 ≥ 75%）」）。
+ * 緩めたかどうかと既定の合格ラインはサーバが判定時に記録したものを使い、ここでは文言にするだけ。
+ */
+export function relaxedLabel(defaultThreshold: string | null | undefined): string {
+  return defaultThreshold ? `既定より緩い（既定 ${defaultThreshold}）` : '既定より緩い'
+}
+
 export function shortSha(commitSha: string | null | undefined): string {
   return commitSha ? commitSha.slice(0, 7) : NOT_MEASURED
 }

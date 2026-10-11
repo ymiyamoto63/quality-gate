@@ -77,6 +77,7 @@ public class IngestService {
         run.setBaseCommitSha(request.baseCommitSha());
         run.setCiRunUrl(request.ciRunUrl());
         run.setTags(request.tagsOrEmpty());
+        run.setComponents(request.distinctComponents());
         runs.save(run);
         log.info("Run を作成しました runId={} repository={} commit={} attempt={}",
                 run.getId(), request.repository(), request.commitSha(), attempt);
@@ -106,6 +107,7 @@ public class IngestService {
                             .formatted(properties.maxArtifactBytes() / 1024 / 1024,
                                     declaredSize / 1024 / 1024));
         }
+        validateComponent(run, componentName);
         validateMetadata(type, metadata);
 
         // 同じ種別・同じファイル名の再送は置き換える（CI のリトライや、作り直した成果物の送り直し）。
@@ -176,6 +178,27 @@ public class IngestService {
 
     public String detailUrl(Run run) {
         return "%s/?ref=%s".formatted(properties.baseUrl(), run.getCommitSha());
+    }
+
+    /**
+     * 成果物のコンポーネントが、Run の作成時に申告したものかを確かめる（DD-26）。
+     *
+     * <p>申告に無いコンポーネントの成果物を受け取ると、その結果は判定されるのに、申告したコンポーネントの
+     * 成果物が届いていないことに気づけない（名前の綴り違いなど）。判定のときに気づいても収集ランナーのログには
+     * 残らないため、取り込みの時点で拒否する。コンポーネントを付けない成果物（SARIF など）はそのまま受け取る。
+     */
+    private static void validateComponent(Run run, String componentName) {
+        if (componentName == null || componentName.isBlank()) {
+            return;
+        }
+        run.getComponents()
+                .filter(declared -> !declared.contains(componentName))
+                .ifPresent(declared -> {
+                    throw new ApiException(ErrorCode.COMPONENT_NOT_DECLARED,
+                            "コンポーネント %s は Run の作成時に申告されていません（申告: %s）。"
+                                    .formatted(componentName, String.join(", ", declared))
+                                    + "POST /api/v1/runs の components に含めてください");
+                });
     }
 
     /**

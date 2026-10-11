@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.IdentifiedFinding;
 
@@ -21,7 +22,7 @@ public record MetricResult(
         MeasurementStatus status,
         BigDecimal value,
         String unit,
-        Map<String, Object> threshold,
+        Threshold threshold,
         String reason,
         Map<String, Object> detail,
         List<IdentifiedFinding> findingsToPersist,
@@ -29,7 +30,7 @@ public record MetricResult(
 
     public static MetricResult of(String metricId, String componentName,
                                   MeasurementStatus status, BigDecimal value, String unit,
-                                  Map<String, Object> threshold, String reason,
+                                  Threshold threshold, String reason,
                                   Map<String, Object> detail,
                                   List<IdentifiedFinding> findingsToPersist) {
         return new MetricResult(metricId, componentName, status, value, unit,
@@ -48,12 +49,23 @@ public record MetricResult(
     public static MetricResult notApplicable(String metricId, String componentName,
                                              String reason) {
         return new MetricResult(metricId, componentName, MeasurementStatus.NOT_APPLICABLE,
-                null, null, Map.of(), reason, Map.of(), List.of(), null);
+                null, null, Threshold.none(), reason, Map.of(), List.of(), null);
+    }
+
+    /** 合格ラインを差し替えたもの（既定より緩い印を付けるときに使う）。 */
+    public MetricResult withThreshold(Threshold newThreshold) {
+        return new MetricResult(metricId, componentName, status, value, unit,
+                newThreshold, reason, detail, findingsToPersist, variant);
     }
 
     /** 成果物が無い・読めないなど、値を確定できない場合。 */
     public static MetricResult error(String metricId, String reason) {
-        return new MetricResult(metricId, null, MeasurementStatus.ERROR, null, null,
-                Map.of(), reason, Map.of(), List.of(), null);
+        return error(metricId, null, reason);
+    }
+
+    /** あるコンポーネントの値を確定できない場合（申告されたコンポーネントの成果物が届いていないなど）。 */
+    public static MetricResult error(String metricId, String componentName, String reason) {
+        return new MetricResult(metricId, componentName, MeasurementStatus.ERROR, null, null,
+                Threshold.none(), reason, Map.of(), List.of(), null);
     }
 }

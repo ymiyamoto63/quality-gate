@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -32,7 +34,7 @@ public class BreakingChangeEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_BREAKING_CHANGES;
+        return MetricCatalog.M_BREAKING_CHANGES;
     }
 
     @Override
@@ -52,7 +54,7 @@ public class BreakingChangeEvaluator implements MetricEvaluator {
                     "比較元のコミットに OpenAPI 定義が無いため、破壊的変更は数えられません（新規 API）"));
         }
 
-        Map<String, Object> threshold = Map.of("operator", "<=", "value", maximum);
+        Threshold threshold = Threshold.atMost(maximum);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("breaking", breaking);
         detail.put("warnings", warnings);

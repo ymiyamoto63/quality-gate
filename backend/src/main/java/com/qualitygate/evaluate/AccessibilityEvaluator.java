@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -44,12 +46,12 @@ public class AccessibilityEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_ACCESSIBILITY;
+        return MetricCatalog.M_ACCESSIBILITY;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        GateThresholds thresholds = context.thresholds();
+        GateThresholds.Accessibility thresholds = context.thresholds().accessibility();
         Coverage coverage = Coverage.of(context.input().measurementsOf(metricId()));
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
@@ -73,10 +75,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         }
         long blocking = critical + serious;
 
-        Map<String, Object> threshold = Map.of(
-                "operator", "<=",
-                "value", thresholds.maxAccessibilityViolations(),
-                "standard", STANDARD);
+        Threshold threshold = Threshold.atMost(thresholds.maxViolations()).with("standard", STANDARD);
         Map<String, Object> detail = new LinkedHashMap<>();
         detail.put("critical", critical);
         detail.put("serious", serious);
@@ -90,7 +89,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         detail.put("engines", List.copyOf(coverage.engines()));
 
         // 違反はすべて残す。基準外や軽微なものも、一覧で見られなければ直しようがない
-        String error = errorOf(coverage, thresholds.accessibilityPages());
+        String error = errorOf(coverage, thresholds.pages());
         if (error != null) {
             return List.of(MetricResult.of(metricId(), null, MeasurementStatus.ERROR, null,
                     UNIT, threshold, error, detail, findings));
@@ -136,9 +135,9 @@ public class AccessibilityEvaluator implements MetricEvaluator {
 
     private Judgement judge(long blocking, long critical, long serious, long moderate,
                             long outOfStandard, Coverage coverage,
-                            EvaluationContext context, GateThresholds thresholds) {
+                            EvaluationContext context, GateThresholds.Accessibility thresholds) {
         int pageCount = coverage.pages().size();
-        if (blocking > thresholds.maxAccessibilityViolations()) {
+        if (blocking > thresholds.maxViolations()) {
             return new Judgement(MeasurementStatus.FAIL,
                     "重大な違反が %d 件あります（critical %d / serious %d、%d ページを検査）"
                             .formatted(blocking, critical, serious, pageCount));
