@@ -4,6 +4,7 @@ import com.qualitygate.domain.entity.ArtifactRecord;
 import com.qualitygate.domain.entity.Measurement;
 import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.FindingState;
 import com.qualitygate.domain.model.MeasurementStatus;
@@ -27,6 +28,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import tools.jackson.databind.ObjectMapper;
 
 import java.io.ByteArrayInputStream;
 import java.math.BigDecimal;
@@ -131,6 +133,7 @@ class EvaluationPipelineIT {
     @Autowired ArtifactStore artifactStore;
     @Autowired ReportNormalizer normalizer;
     @Autowired RunEvaluationService evaluationService;
+    @Autowired ObjectMapper objectMapper;
 
     private UUID repositoryId;
 
@@ -220,6 +223,79 @@ class EvaluationPipelineIT {
                 .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
                 .extracting(Measurement::getMetricId)
                 .containsExactlyInAnyOrder("M-02", "M-05", "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12");
+    }
+
+    @Test
+    void 申告されたコンポーネントの成果物が届かなければそのコンポーネントを計測エラーにする() {
+        // frontend の計測が失敗し、backend の成果物だけが届いた Run
+        Run run = declare(createRun(Instant.parse("2026-09-22T00:00:00Z")), "backend", "frontend");
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.TEST_JUNIT_XML, "TEST-RunQueryApiIT.xml", "backend", JUNIT_CLEAN);
+        attachPit(run);
+
+        Run evaluated = evaluate(run, gate(only("M-01", "M-02", "M-09", "M-10"), null, List.of("backend"), null));
+
+        // frontend の行が黙って消えると、backend だけでリリース可になってしまう（fail-closed）
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .extracting(Measurement::getMetricId, Measurement::getComponentName, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-01", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-01", "frontend", MeasurementStatus.ERROR),
+                        // M-02 は QG_MUTATION_COMPONENTS の対象外のまま（測りようがない）
+                        org.assertj.core.groups.Tuple.tuple("M-02", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-02", "frontend", MeasurementStatus.NOT_APPLICABLE),
+                        org.assertj.core.groups.Tuple.tuple("M-09", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-09", "frontend", MeasurementStatus.ERROR),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("M-10", "frontend", MeasurementStatus.ERROR));
+        assertThat(measurements.findByRunId(run.getId()))
+                .filteredOn(m -> m.getStatus() == MeasurementStatus.ERROR)
+                .allSatisfy(m -> assertThat(m.getReason())
+                        .isEqualTo("frontend の成果物が届いていません。収集ランナーのログで計測の失敗を確認してください"));
+    }
+
+    @Test
+    void 申告どおりのコンポーネントが揃えば合格にできる() {
+        Run run = declare(createRun(Instant.parse("2026-09-22T00:00:00Z")), "backend", "frontend");
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        attach(run, ArtifactType.LCOV, "lcov.info", "frontend",
+                "SF:src/api/format.ts\nBRF:10\nBRH:9\nend_of_record\n");
+
+        Run evaluated = evaluate(run, gate(only("M-01"), null, null, null));
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        assertThat(measurements.findByRunId(run.getId())).extracting(Measurement::getComponentName)
+                .containsExactlyInAnyOrder("backend", "frontend");
+    }
+
+    @Test
+    void 判定しなかった指標を判定時の設定のままRunに残す() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+
+        Run evaluated = evaluate(run, gate(only("M-01"), null, null, null));
+
+        assertThat(evaluated.getDisabledMetrics()).contains(List.of(
+                "M-02", "M-03", "M-04", "M-05", "M-06", "M-07", "M-08", "M-09", "M-10", "M-11", "M-12"));
+    }
+
+    @Test
+    void 既定より緩めた合格ラインは判定時に印を付けて残す() {
+        Run relaxedRun = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(relaxedRun, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        evaluate(relaxedRun, gate(only("M-01"), new BigDecimal("70"), null, null));
+
+        Threshold relaxed = thresholdOf(relaxedRun, "M-01");
+        assertThat(relaxed.isRelaxed()).isTrue();
+        assertThat(relaxed.defaults()).contains(Threshold.atLeast(new BigDecimal("75")));
+
+        // 既定より厳しい合格ラインには印を付けない
+        Run stricterRun = createRun(Instant.parse("2026-09-23T00:00:00Z"));
+        attach(stricterRun, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+        evaluate(stricterRun, gate(only("M-01"), new BigDecimal("80"), null, null));
+
+        assertThat(thresholdOf(stricterRun, "M-01").isRelaxed()).isFalse();
     }
 
     @Test
@@ -635,6 +711,17 @@ class EvaluationPipelineIT {
             attach(run, ArtifactType.K6_SUMMARY, "k6-summary-%d.json".formatted(i), null,
                     PerformanceFixtures.summary(i), PerformanceFixtures.METADATA);
         }
+    }
+
+    /** 収集ランナーが Run の作成時に申告するコンポーネント。 */
+    private Run declare(Run run, String... components) {
+        run.setComponents(List.of(components));
+        return runs.save(run);
+    }
+
+    private Threshold thresholdOf(Run run, String metricId) {
+        return Threshold.parse(objectMapper, measurements.findByRunId(run.getId()).stream()
+                .filter(m -> m.getMetricId().equals(metricId)).findFirst().orElseThrow().getThreshold());
     }
 
     private static String commitOf(Instant measuredAt) {

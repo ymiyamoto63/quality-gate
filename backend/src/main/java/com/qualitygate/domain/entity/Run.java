@@ -13,7 +13,9 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 /**
@@ -65,6 +67,24 @@ public class Run {
     @JdbcTypeCode(SqlTypes.ARRAY)
     @Column(name = "tags", columnDefinition = "text[]", nullable = false)
     private List<String> tags = new ArrayList<>();
+
+    /**
+     * 成果物を送るはずのコンポーネント（収集ランナーが Run の作成時に申告する。DD-25）。
+     * コンポーネントごとに判定する指標で、成果物の届かなかったコンポーネントを ERROR にするのに使う。
+     * この列を足す前（V003）に作られた Run では null（分からない）。
+     */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "components", columnDefinition = "text[]")
+    private List<String> components;
+
+    /**
+     * 判定したときに {@code QG_DISABLED_METRICS} で判定から外していた指標（DD-26）。
+     * 合格ラインと同じく判定時に焼き付け、後から設定を変えても「何を判定しなかったか」が変わらないようにする。
+     * V003 より前に判定した Run では null（分からない）。
+     */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "disabled_metrics", columnDefinition = "text[]")
+    private List<String> disabledMetrics;
 
     @Column(name = "error_code")
     private String errorCode;
@@ -126,6 +146,11 @@ public class Run {
         this.evaluatedAt = Instant.now();
     }
 
+    /** 判定から外した指標を記録する（判定のたびに、そのときの {@code QG_DISABLED_METRICS} で上書きする）。 */
+    public void applyDisabledMetrics(Collection<String> metricIds) {
+        this.disabledMetrics = new ArrayList<>(metricIds);
+    }
+
     public void markEvaluated(Verdict verdict, Instant at) {
         this.status = RunStatus.EVALUATED;
         this.verdict = verdict;
@@ -160,6 +185,20 @@ public class Run {
 
     public void setTags(List<String> tags) {
         this.tags = new ArrayList<>(tags);
+    }
+
+    /** 申告されたコンポーネント。V003 より前に作られた Run では空（分からない）。 */
+    public Optional<List<String>> getComponents() {
+        return Optional.ofNullable(components).map(List::copyOf);
+    }
+
+    public void setComponents(List<String> components) {
+        this.components = components == null ? null : new ArrayList<>(components);
+    }
+
+    /** 判定から外した指標。V003 より前に判定した Run では空（分からない）。 */
+    public Optional<List<String>> getDisabledMetrics() {
+        return Optional.ofNullable(disabledMetrics).map(List::copyOf);
     }
 
     public String getBranch() {

@@ -101,6 +101,34 @@ public record GateThresholds(
         return from(QualityGateProperties.Gate.defaults());
     }
 
+    /**
+     * 合格ラインの値だけを既定値にしたもの。判定する指標・除外・対象（M-02 のコンポーネント、M-03 のシナリオ、
+     * M-08 の画面）はこの設定のまま。
+     *
+     * <p>同じ入力をこれでも判定し、結果ごとの合格ラインを比べて「既定より緩い」かを決める（DD-26）。
+     * 対象まで既定にすると結果の行の組み合わせが変わり、同じ行どうしを比べられなくなる。
+     */
+    public GateThresholds withDefaultLimits() {
+        GateThresholds standard = defaults();
+        return new GateThresholds(
+                enabledMetrics,
+                exclusions,
+                new Coverage(standard.coverage().branchMin(), standard.coverage().mutationScoreMin(),
+                        coverage.mutationComponents()),
+                new Performance(standard.performance().p95Ms(), standard.performance().arrivalRateRps(),
+                        standard.performance().errorRatePct(), performance.scenarios()),
+                standard.security(),
+                standard.maxComplexity(),
+                standard.maxBreakingChanges(),
+                new Accessibility(standard.accessibility().maxViolations(), accessibility.pages()),
+                standard.testResults());
+    }
+
+    /** 判定しない指標（{@code QG_DISABLED_METRICS}）。指標の一覧の並び。 */
+    public List<String> disabledMetrics() {
+        return ALL_METRICS.stream().filter(metricId -> !enabledMetrics.contains(metricId)).toList();
+    }
+
     /** 環境変数から判定に使う値を取り出す。判定対象は、すべての指標から無効にしたものを除いたもの。 */
     public static GateThresholds from(QualityGateProperties.Gate gate) {
         Set<String> enabled = new LinkedHashSet<>(ALL_METRICS);

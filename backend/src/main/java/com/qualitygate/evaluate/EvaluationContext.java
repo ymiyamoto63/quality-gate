@@ -28,6 +28,11 @@ public record EvaluationContext(
         this(run, thresholds, input, previousValues, Map.of(), hasBaseline);
     }
 
+    /** 合格ラインだけを差し替えたもの（既定の合格ラインと比べるための判定に使う）。 */
+    public EvaluationContext withThresholds(GateThresholds newThresholds) {
+        return new EvaluationContext(run, newThresholds, input, previousValues, previousDetails, hasBaseline);
+    }
+
     public static String key(String metricId, String componentName) {
         return key(metricId, componentName, null);
     }

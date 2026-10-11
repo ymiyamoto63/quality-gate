@@ -296,7 +296,8 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプ
   </tbody>
 </table></div>
 <ul>
-  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）</li>
+  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）。外した指標は判定時に Run に残り、リリース判定の結論の下に「判定の対象外」として出る</li>
+  <li>合格ラインを既定値より緩めると、リリース判定の行に「既定より緩い（既定 ≥ 75%）」と出る</li>
   <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
   <li>性能計測は <code>QG_ARRIVAL_RATE_RPS</code>（既定 50、到達率）と <code>QG_PERF_SCENARIOS</code>（必須のシナリオ）でも調整できる。ミューテーションの対象コンポーネントは <code>QG_MUTATION_COMPONENTS</code>（既定 backend）、M-08 で検査されているべき画面は <code>QG_ACCESSIBILITY_PAGES</code></li>
   <li>M-03 の値は本番の性能を表さない（k6 とアプリが同じコンテナで動く）。それでも負荷条件と専有のランナーを固定したうえで合格ラインの絶対値で判定し、結果はリリース判定に効く。合格ラインは本番の SLO を写さず、この計測環境に合わせて決める。前回比は補足として示す</li>
@@ -312,7 +313,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプ
     <tr><td><span class="status pass"><span class="dot" aria-hidden="true">●</span>合格 <code>PASS</code></span></td><td>合格ラインを満たす</td><td>—</td></tr>
     <tr><td><span class="status fail"><span class="dot" aria-hidden="true">■</span>不合格 <code>FAIL</code></span></td><td>合格ラインを満たさない</td><td>リリース不可</td></tr>
     <tr><td><span class="status err"><span class="dot" aria-hidden="true">◆</span>計測エラー <code>ERROR</code></span></td><td>成果物の未提出・形式不正・メタデータ不足・計測条件を満たさない</td><td>リリース不可（不合格として扱う）</td></tr>
-    <tr><td><span class="status neu"><span class="dot" aria-hidden="true">—</span>対象外 <code>NOT_APPLICABLE</code></span></td><td>ツールの制約で測れない（M-02 の frontend など）</td><td>影響しない（表に出さない）</td></tr>
+    <tr><td><span class="status neu"><span class="dot" aria-hidden="true">—</span>対象外 <code>NOT_APPLICABLE</code></span></td><td>ツールの制約で測れない（M-02 の frontend など）</td><td>影響しない（合否の表に出さず、結論の下の「判定の対象外」に理由と出す）</td></tr>
   </tbody>
 </table></div>
 <pre>FAIL または ERROR が 1 つ以上  → FAIL（リリース不可）
@@ -517,6 +518,8 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>ci_run_url</code></td><td><code>varchar(512)</code></td><td class="c"></td><td></td><td></td><td>計測したワークフローの実行 URL</td></tr>
     <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>計測日時</td></tr>
     <tr><td><code>tags</code></td><td><code>text[]</code></td><td class="c">○</td><td><code>&#x27;{}&#x27;</code></td><td></td><td>計測したコミットを指すタグ。リリース判定でタグを解決するのに使う</td></tr>
+    <tr><td><code>components</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>収集ランナーが申告した、成果物を送るコンポーネント。結果の無いコンポーネントを計測エラーにするのに使う（V003 より前の Run は NULL）</td></tr>
+    <tr><td><code>disabled_metrics</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときに <code>QG_DISABLED_METRICS</code> で外していた指標（V003 より前の Run は NULL）</td></tr>
     <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分・M-10 の起点）</td></tr>
     <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>処理の状態</td></tr>
     <tr><td><code>verdict</code></td><td><code>varchar(24)</code></td><td class="c"></td><td></td><td>CHECK ③</td><td>判定結果。判定前は NULL</td></tr>
@@ -603,7 +606,7 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>メソッド</th><th>パス</th><th>用途</th><th>認可</th></tr></thead>
   <tbody>
-    <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）</td><td>Ingest Token</td></tr>
+    <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）。成果物を送るコンポーネント（<code>components</code>）の申告が必須で、届かなかったコンポーネントは計測エラーになる</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/artifacts</code></td><td>成果物のアップロード（1 ファイル 50MB / Run 合計 200MB まで）</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/finalize</code></td><td>確定し、その場で判定して結果を返す</td><td>Ingest Token</td></tr>
     <tr><td>GET</td><td><code>/collector/settings</code></td><td>収集ランナーが計測前に読む設定（対象リポジトリ・判定しない指標・M-08 の検査対象画面）</td><td>Ingest Token</td></tr>

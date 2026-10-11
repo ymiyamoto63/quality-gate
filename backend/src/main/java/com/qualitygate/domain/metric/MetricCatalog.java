@@ -27,18 +27,18 @@ public final class MetricCatalog {
     public static final String M_LICENSES = "M-12";
 
     private static final List<MetricDefinition> ALL = List.of(
-            new MetricDefinition(M_BRANCH_COVERAGE, "ブランチカバレッジ"),
-            new MetricDefinition(M_MUTATION, "ミューテーションスコア"),
-            new MetricDefinition(M_PERFORMANCE_P95, "応答時間 p95"),
-            new MetricDefinition(M_ERROR_RATE, "エラー率"),
-            new MetricDefinition(M_VULNERABILITIES, "重大・高 脆弱性件数"),
-            new MetricDefinition(M_COMPLEXITY, "循環的複雑度が上限を超える関数の数"),
-            new MetricDefinition(M_BREAKING_CHANGES, "破壊的変更件数"),
-            new MetricDefinition(M_ACCESSIBILITY, "アクセシビリティ違反"),
-            new MetricDefinition(M_TEST_SUCCESS, "テスト成功率"),
-            new MetricDefinition(M_SKIPPED_TESTS, "スキップされたテスト数"),
-            new MetricDefinition(M_SECRETS, "シークレット検出件数"),
-            new MetricDefinition(M_LICENSES, "ライセンス違反件数"));
+            new MetricDefinition(M_BRANCH_COVERAGE, "ブランチカバレッジ", true),
+            new MetricDefinition(M_MUTATION, "ミューテーションスコア", true),
+            new MetricDefinition(M_PERFORMANCE_P95, "応答時間 p95", false),
+            new MetricDefinition(M_ERROR_RATE, "エラー率", false),
+            new MetricDefinition(M_VULNERABILITIES, "重大・高 脆弱性件数", false),
+            new MetricDefinition(M_COMPLEXITY, "循環的複雑度が上限を超える関数の数", false),
+            new MetricDefinition(M_BREAKING_CHANGES, "破壊的変更件数", false),
+            new MetricDefinition(M_ACCESSIBILITY, "アクセシビリティ違反", false),
+            new MetricDefinition(M_TEST_SUCCESS, "テスト成功率", true),
+            new MetricDefinition(M_SKIPPED_TESTS, "スキップされたテスト数", true),
+            new MetricDefinition(M_SECRETS, "シークレット検出件数", false),
+            new MetricDefinition(M_LICENSES, "ライセンス違反件数", false));
 
     private static final Map<String, MetricDefinition> BY_ID = index();
 
@@ -61,7 +61,7 @@ public final class MetricCatalog {
      */
     public static MetricDefinition of(String metricId) {
         return BY_ID.getOrDefault(metricId,
-                new MetricDefinition(metricId, metricId));
+                new MetricDefinition(metricId, metricId, false));
     }
 
     /** 指標 ID をこの一覧の並び（M-01, M-02, …）で比較する。 */

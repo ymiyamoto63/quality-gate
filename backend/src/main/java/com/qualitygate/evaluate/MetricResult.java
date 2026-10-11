@@ -52,9 +52,20 @@ public record MetricResult(
                 null, null, Threshold.none(), reason, Map.of(), List.of(), null);
     }
 
+    /** 合格ラインを差し替えたもの（既定より緩い印を付けるときに使う）。 */
+    public MetricResult withThreshold(Threshold newThreshold) {
+        return new MetricResult(metricId, componentName, status, value, unit,
+                newThreshold, reason, detail, findingsToPersist, variant);
+    }
+
     /** 成果物が無い・読めないなど、値を確定できない場合。 */
     public static MetricResult error(String metricId, String reason) {
-        return new MetricResult(metricId, null, MeasurementStatus.ERROR, null, null,
+        return error(metricId, null, reason);
+    }
+
+    /** あるコンポーネントの値を確定できない場合（申告されたコンポーネントの成果物が届いていないなど）。 */
+    public static MetricResult error(String metricId, String componentName, String reason) {
+        return new MetricResult(metricId, componentName, MeasurementStatus.ERROR, null, null,
                 Threshold.none(), reason, Map.of(), List.of(), null);
     }
 }

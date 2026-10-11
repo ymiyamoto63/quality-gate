@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.MutationTally;
@@ -123,6 +124,33 @@ class MutationScoreEvaluatorTest {
     }
 
     @Test
+    void 申告されたコンポーネントは他の指標の成果物が無くても対象外として並べる() {
+        // frontend の計測そのものが失敗し、frontend の成果物が 1 つも届かなかった Run
+        Run run = run();
+        run.setComponents(List.of("backend", "frontend"));
+        List<MetricResult> results = evaluator.evaluate(context(run, Set.of("backend"),
+                List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
+
+        assertThat(results).extracting(MetricResult::componentName).containsExactly("backend", "frontend");
+        assertThat(results.get(1).status()).isEqualTo(MeasurementStatus.NOT_APPLICABLE);
+        assertThat(results.get(1).reason()).contains("JVM");
+    }
+
+    @Test
+    void 対象を限定していなければ申告されたのに届かなかったコンポーネントを対象外にする() {
+        // 収集ランナーは PIT を BACKEND_DIR でしか動かさない。限定していない設定でも frontend を測り忘れ扱いにしない
+        Run run = run();
+        run.setComponents(List.of("backend", "frontend"));
+        List<MetricResult> results = evaluator.evaluate(context(run, Set.of(),
+                List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
+
+        assertThat(results).extracting(MetricResult::componentName).containsExactly("backend", "frontend");
+        assertThat(results.get(0).status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(results.get(1).status()).isEqualTo(MeasurementStatus.NOT_APPLICABLE);
+        assertThat(results.get(1).reason()).contains("QG_MUTATION_COMPONENTS が空");
+    }
+
+    @Test
     void 対象コンポーネントの成果物が無ければ計測エラー() {
         List<MetricResult> results = evaluator.evaluate(context(Set.of("backend", "batch"),
                 Map.of(), List.of(mutation("backend", tally(70, 0, 30, 0, 0)))));
@@ -182,6 +210,14 @@ class MutationScoreEvaluatorTest {
                 Map.of("mutation-score-min", 60, "mutation-components", List.copyOf(components)));
         NormalizedInput input = input(measurements, List.of(), Set.of("M-02"));
         return new EvaluationContext(run(), thresholds, input, previous, !previous.isEmpty());
+    }
+
+    /** Run の作成時にコンポーネントを申告した Run での判定。 */
+    private static EvaluationContext context(Run run, Set<String> components, List<RawMeasurement> measurements) {
+        GateThresholds thresholds = thresholdsWith(
+                Map.of("mutation-score-min", 60, "mutation-components", List.copyOf(components)));
+        return new EvaluationContext(run, thresholds, input(measurements, List.of(), Set.of("M-02")),
+                Map.of(), false);
     }
 
     private static MetricResult single(List<MetricResult> results) {

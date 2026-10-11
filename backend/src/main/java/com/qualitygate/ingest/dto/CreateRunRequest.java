@@ -2,6 +2,7 @@ package com.qualitygate.ingest.dto;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
@@ -39,13 +40,29 @@ public record CreateRunRequest(
         @Schema(description = "計測したコミットを指すタグ（収集ランナーが対象リポジトリの履歴から求める）。"
                 + "リリース判定でタグをコミットに解決するのに使う")
         @Size(max = 100)
-        List<@Size(max = 255) @Pattern(regexp = TAG, message = "タグ名として使えない文字を含んでいます") String> tags) {
+        List<@Size(max = 255) @Pattern(regexp = TAG, message = "タグ名として使えない文字を含んでいます") String> tags,
+
+        @Schema(description = "成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。"
+                + "コンポーネントごとに判定する指標（M-01 / M-02 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかった"
+                + "コンポーネントを計測エラーにする。成果物の component はこの中から選ぶ",
+                example = "[\"backend\", \"frontend\"]")
+        @NotEmpty(message = "成果物を送るコンポーネントを 1 つ以上指定してください")
+        @Size(max = 10)
+        List<@NotBlank @Size(max = 64) @Pattern(regexp = COMPONENT, message = "コンポーネント名に使えない文字を含んでいます") String> components) {
 
     /** git のタグ名に使えない文字（空白・制御文字・{@code ~^:?*[\}）と {@code ..}、先頭と末尾の {@code /} を拒否する。 */
+    /** コンポーネント名（ディレクトリ名）。artifacts.component_name の幅に収まる、英数字と {@code ._-} だけ。 */
+    static final String COMPONENT = "^[A-Za-z0-9._-]+$";
+
     static final String TAG = "^(?!/)(?!.*\\.\\.)(?!.*/$)[^\\s\\p{Cntrl}~^:?*\\[\\\\]+$";
 
     public List<String> tagsOrEmpty() {
         return tags == null ? List.of() : List.copyOf(tags);
+    }
+
+    /** 重複を除いた、申告されたコンポーネント（送られた順）。 */
+    public List<String> distinctComponents() {
+        return components.stream().map(String::strip).distinct().toList();
     }
 
     public String owner() {

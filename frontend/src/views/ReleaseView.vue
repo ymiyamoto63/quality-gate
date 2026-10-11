@@ -4,11 +4,12 @@ import { useRoute, useRouter } from 'vue-router'
 import StatusChip from '@/components/StatusChip.vue'
 import { api, messageOf } from '@/api/client'
 import type { components } from '@/api/schema'
-import { formatDateTime, formatValue, shortSha } from '@/api/format'
+import { formatDateTime, formatValue, relaxedLabel, shortSha } from '@/api/format'
 import { verdictToStatus, type DisplayStatus } from '@/api/status'
 
 type Report = components['schemas']['ReleaseReportResponse']
 type Row = Report['metrics'][number]
+type NotJudged = Report['notJudged'][number]
 type Decision = Report['decision']
 type HistoryItem = components['schemas']['ReleaseHistoryItem']
 
@@ -36,6 +37,10 @@ const DECISIONS: Record<Decision, { label: string; status: DisplayStatus }> = {
 }
 
 const decision = computed(() => (report.value ? DECISIONS[report.value.decision] : null))
+/** 合格ラインを既定より緩めて判定した行の数。結論の近くで知らせ、表で該当の行を探せるようにする。 */
+const relaxedCount = computed(
+  () => report.value?.metrics.filter((row) => row.thresholdRelaxed).length ?? 0,
+)
 const summaries = computed(
   () => new Map((report.value?.guides ?? []).map((g) => [g.metricId, g.summary])),
 )
@@ -83,6 +88,10 @@ void loadHistory()
 function qualifier(row: Row): string {
   const parts = [row.componentName, row.variantLabel].filter(Boolean)
   return parts.length > 0 ? `（${parts.join('・')}）` : ''
+}
+
+function notJudgedKey(item: NotJudged): string {
+  return `${item.metricId}|${item.componentName ?? ''}`
 }
 
 function rowKey(row: Row): string {
@@ -146,6 +155,40 @@ function print(): void {
           <template v-if="report.counts.failed > 0"
             >、{{ report.counts.failed }} 項目が不合格</template
           >
+        </p>
+
+        <!--
+          判定の範囲を結論のすぐ下に示す。「すべて合格」は判定した指標についての結論であり、
+          判定から外した指標があることを、開発に携わっていない方にも見落とされないようにする（DD-26）
+        -->
+        <div
+          v-if="report.notJudged.length > 0"
+          class="qg-release__scope"
+          role="group"
+          aria-labelledby="scope-heading"
+        >
+          <h3 id="scope-heading">
+            <i class="pi pi-ban" aria-hidden="true"></i>
+            判定の対象外（{{ report.notJudged.length }} 件）
+          </h3>
+          <p>
+            次の指標は合否を確かめていません。上の結論は、これらを除いた指標だけで出したものです。
+          </p>
+          <ul>
+            <li v-for="item in report.notJudged" :key="notJudgedKey(item)">
+              <strong
+                >{{ item.name
+                }}<template v-if="item.componentName"
+                  >（{{ item.componentName }}）</template
+                ></strong
+              >: {{ item.reason }}
+            </li>
+          </ul>
+        </div>
+        <p v-if="relaxedCount > 0" class="qg-release__scope-note">
+          <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+          合格ラインを既定より緩めて判定した指標が
+          {{ relaxedCount }} 件あります（表の「既定より緩い」）。
         </p>
 
         <dl class="qg-release__facts">
@@ -212,7 +255,17 @@ function print(): void {
                 {{ row.name }}<span class="qg-muted">{{ qualifier(row) }}</span>
               </th>
               <td data-label="何を見るか">{{ summaries.get(row.metricId) }}</td>
-              <td data-label="合格ライン">{{ row.threshold ?? '—' }}</td>
+              <td data-label="合格ライン">
+                {{ row.threshold ?? '—' }}
+                <p v-if="row.thresholdRelaxed" class="qg-release__loosened">
+                  <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
+                  {{ relaxedLabel(row.defaultThreshold) }}
+                </p>
+                <p v-if="row.excludedFileCount > 0" class="qg-release__loosened">
+                  <i class="pi pi-filter" aria-hidden="true"></i>
+                  {{ row.excludedFileCount }} ファイルを計測から除外（QG_EXCLUSIONS）
+                </p>
+              </td>
               <td data-label="結果">
                 {{ formatValue(row.value, row.unit) }}
                 <p v-if="row.status !== 'PASS' && row.reason" class="qg-release__why">
@@ -389,6 +442,45 @@ h1 {
 }
 .qg-release__facts dd {
   margin: 0;
+}
+.qg-release__scope {
+  border: 1px dashed var(--text-secondary);
+  border-radius: var(--radius);
+  padding: 0.75rem 1rem;
+  margin: 0 0 1rem;
+  break-inside: avoid;
+}
+.qg-release__scope h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  margin: 0 0 0.25rem;
+}
+.qg-release__scope p {
+  margin: 0 0 0.5rem;
+}
+.qg-release__scope ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+.qg-release__scope li + li {
+  margin-top: 0.25rem;
+}
+.qg-release__scope-note {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+}
+/* 緩めた合格ライン・除外の印。色ではなく記号と文言で示す（文字色は本文のまま） */
+.qg-release__loosened {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 .qg-release__actions {
   display: flex;
