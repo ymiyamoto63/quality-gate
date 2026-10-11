@@ -30,6 +30,34 @@ api.use({
   },
 })
 
+/** ログイン状態を確かめる口。ここの 401 は「未ログイン」の意味で、ストアが自分で扱う。 */
+const ME_PATH = '/api/v1/me'
+
+let unauthorizedHandler: (() => void) | null = null
+
+/**
+ * API が 401 を返したとき（ログインの期限切れ・サーバの再起動）に呼ぶ処理を登録する。
+ *
+ * ログイン状態は画面を開いたときに 1 度だけ確かめるため、開いたままの画面ではセッションが切れても気づけない。
+ * 401 を受けた時点でログイン画面へ戻し、ログインの後に元の画面へ戻れるようにする。
+ * 遷移は router が持つため、ここでは呼び出し先だけを受け取る（client から router を読み込むと循環する）。
+ */
+export function onUnauthorized(handler: () => void): void {
+  unauthorizedHandler = handler
+}
+
+api.use({
+  onResponse({ request, response }) {
+    if (
+      response.status === 401 &&
+      !new URL(request.url, window.location.origin).pathname.startsWith(ME_PATH)
+    ) {
+      unauthorizedHandler?.()
+    }
+    return response
+  },
+})
+
 export function readCookie(name: string): string | null {
   for (const part of document.cookie.split(';')) {
     const [key, ...rest] = part.trim().split('=')

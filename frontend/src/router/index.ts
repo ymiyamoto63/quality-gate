@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory, type RouteRecordRaw } from 'vue-router'
+import { onUnauthorized } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import ReleaseView from '@/views/ReleaseView.vue'
 import LoginView from '@/views/LoginView.vue'
@@ -29,6 +30,11 @@ export const router = createRouter({
   routes,
 })
 
+/** ログイン画面へ。ログインの後に、開こうとしていた判定へ戻す */
+function toLogin(fullPath: string) {
+  return { name: 'login', query: fullPath === '/' ? {} : { next: fullPath } }
+}
+
 router.beforeEach(async (to) => {
   const auth = useAuthStore()
   if (!auth.loaded) {
@@ -39,11 +45,25 @@ router.beforeEach(async (to) => {
     return true
   }
   if (!auth.isAuthenticated) {
-    // ログインの後に、開こうとしていた判定へ戻す
-    return { name: 'login', query: to.fullPath === '/' ? {} : { next: to.fullPath } }
+    return toLogin(to.fullPath)
   }
   return true
 })
+
+/**
+ * 開いたままの画面でセッションが切れたとき（API の 401）。ログイン画面へ移し、ログインの後に元の画面へ戻す。
+ * 画面を開き直さないとログイン画面に移らず、判定が「取得できませんでした」のまま見えなくなるのを防ぐ。
+ */
+export async function handleSessionExpired(): Promise<void> {
+  useAuthStore().expire()
+  const current = router.currentRoute.value
+  if (current.meta.public) {
+    return
+  }
+  await router.replace(toLogin(current.fullPath))
+}
+
+onUnauthorized(() => void handleSessionExpired())
 
 // 画面遷移でタイトルを更新する（docs/architecture.md 7.7 A-12）
 router.afterEach((to) => {
