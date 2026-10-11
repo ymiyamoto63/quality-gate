@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -23,7 +24,7 @@ import java.util.regex.Pattern;
  *
  * <p>PMD と同じく、しきい値超過の検出ではなく<strong>全関数の CC 値</strong>を得る必要がある。
  * {@code complexity} ルールを {@code ["error", 0]}（上限 0）で動かし、すべての関数を報告させる。
- * 判定（15 超か）は quality-gate 側で行う。{@code complexity} 以外のルールは読み飛ばす。
+ * 判定（上限 QG_COMPLEXITY_MAX を超えるか）は quality-gate 側で行う。{@code complexity} 以外のルールは読み飛ばす。
  *
  * <p>関数の同定子はメッセージの関数名（{@code Function 'load'} / {@code Method 'save'} など）。
  * 名前の無い関数（無名のアロー関数など）はファイル内の出現順で番号を振る。行番号は使わない
@@ -88,7 +89,7 @@ public class EslintJsonAdapter implements ArtifactAdapter {
         String member = memberOf(matcher.group(1).strip(), anonymous);
         Integer line = message.path("line").isNumber() ? message.path("line").asInt() : null;
 
-        return new RawFinding("M-06", "CyclomaticComplexity", Severity.INFO,
+        return new RawFinding(MetricCatalog.M_COMPLEXITY, "CyclomaticComplexity", Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(member, complexity),
                 repoPath, line, context.componentName(), modulePath + "#" + member,
                 Map.of("complexity", complexity,

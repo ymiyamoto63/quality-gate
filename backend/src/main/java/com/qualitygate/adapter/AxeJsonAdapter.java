@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -39,7 +40,7 @@ import java.util.regex.Pattern;
 @Component
 public class AxeJsonAdapter implements ArtifactAdapter {
 
-    static final String METRIC_ID = "M-08";
+    static final String METRIC_ID = MetricCatalog.M_ACCESSIBILITY;
 
     /** 検査できたページと読み込みに失敗したページを区別するための、許容するスキーム。 */
     private static final Set<String> LOADED_SCHEMES = Set.of("http", "https", "file");

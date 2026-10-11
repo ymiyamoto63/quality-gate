@@ -1,13 +1,14 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Decimals;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 
 /**
  * M-04 エラー率（docs/metrics.md M-03）。
@@ -19,7 +20,7 @@ public class ErrorRateEvaluator extends PerformanceEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_ERROR_RATE;
+        return MetricCatalog.M_ERROR_RATE;
     }
 
     @Override
@@ -28,11 +29,8 @@ public class ErrorRateEvaluator extends PerformanceEvaluator {
     }
 
     @Override
-    Map<String, Object> threshold(GateThresholds.Performance limits) {
-        Map<String, Object> threshold = new LinkedHashMap<>();
-        threshold.put("operator", "<=");
-        threshold.put("value", limits.errorRatePct());
-        return threshold;
+    Threshold threshold(GateThresholds.Performance limits) {
+        return Threshold.atMost(limits.errorRatePct());
     }
 
     @Override
@@ -40,9 +38,9 @@ public class ErrorRateEvaluator extends PerformanceEvaluator {
                     GateThresholds.Performance limits) {
         if (median.compareTo(limits.errorRatePct()) > 0) {
             return new Judgement(MeasurementStatus.FAIL, "エラー率 %s%% が合格ライン %s%% を超えています"
-                    .formatted(plain(median), plain(limits.errorRatePct())));
+                    .formatted(Decimals.plain(median), Decimals.plain(limits.errorRatePct())));
         }
         return new Judgement(MeasurementStatus.PASS, "エラー率 %s%% は合格ライン %s%% 以内です"
-                .formatted(plain(median), plain(limits.errorRatePct())));
+                .formatted(Decimals.plain(median), Decimals.plain(limits.errorRatePct())));
     }
 }

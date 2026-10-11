@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.RawMeasurement;
@@ -46,13 +48,13 @@ public class MutationScoreEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_MUTATION;
+        return MetricCatalog.M_MUTATION;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds thresholds = context.thresholds();
-        Set<String> targets = thresholds.mutationComponents();
+        Set<String> targets = thresholds.coverage().mutationComponents();
 
         // null（コンポーネント宣言なし）は "" に寄せて並べる。TreeMap は null キーを持てない
         Map<String, List<RawMeasurement>> byComponent = new TreeMap<>();
@@ -95,7 +97,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
         for (String target : new TreeSet<>(targets)) {
             if (!submitted.contains(target)) {
                 missing.add(new MetricResult(metricId(), target, MeasurementStatus.ERROR, null,
-                        null, Map.of(), "%s の成果物（mutations.xml）が提出されていません"
+                        null, Threshold.none(), "%s の成果物（mutations.xml）が提出されていません"
                                 .formatted(target), Map.of(), List.of(), null));
             }
         }
@@ -146,8 +148,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
             }
         }
 
-        Map<String, Object> threshold = Map.of(
-                "operator", ">=", "value", thresholds.mutationThreshold());
+        Threshold threshold = Threshold.atLeast(thresholds.coverage().mutationScoreMin());
         Map<String, Object> detail = new LinkedHashMap<>(tally.toDetail());
         detail.put("excludedFiles", excludedFiles);
         detail.put("reports", measurements.size());
@@ -179,8 +180,9 @@ public class MutationScoreEvaluator implements MetricEvaluator {
         }
 
         BigDecimal value = scaled(tally.score());
-        String limit = thresholds.mutationThreshold().toPlainString();
-        if (value.compareTo(thresholds.mutationThreshold()) < 0) {
+        BigDecimal minimum = thresholds.coverage().mutationScoreMin();
+        String limit = minimum.toPlainString();
+        if (value.compareTo(minimum) < 0) {
             return new Judgement(MeasurementStatus.FAIL,
                     "しきい値 %s%% を下回っています（実測 %s%%、検出 %d / 対象 %d）".formatted(
                             limit, value.toPlainString(),

@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -66,7 +67,7 @@ class SkippedTestEvaluatorTest {
         MetricResult result = evaluate(Map.of("skipped-tests-increase-max", 2),
                 List.of(report("backend", 10, 0, 0, 3, 0)), Map.of()).getFirst();
 
-        assertThat(result.threshold()).containsEntry("value", 2).containsEntry("basis", "increase");
+        assertThat(result.threshold()).isEqualTo(Threshold.increaseAtMost(2));
     }
 
     @Test

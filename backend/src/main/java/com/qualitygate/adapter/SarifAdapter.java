@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -55,12 +56,12 @@ public class SarifAdapter implements ArtifactAdapter {
     /** シークレット混入は有効な認証情報の流出であり、常に重大として扱う。 */
     private static final Set<String> SECRET_TOOLS = Set.of("gitleaks", "trufflehog");
 
-    static final String VULNERABILITY_METRIC = "M-05";
-    static final String SECRET_METRIC = "M-11";
-    static final String LICENSE_METRIC = "M-12";
+    static final String VULNERABILITY_METRIC = MetricCatalog.M_VULNERABILITIES;
+    static final String SECRET_METRIC = MetricCatalog.M_SECRETS;
+    static final String LICENSE_METRIC = MetricCatalog.M_LICENSES;
 
     /** 宣言が無い SARIF が値を与える指標（従来どおり）。 */
-    private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, "M-06");
+    private static final Set<String> UNDECLARED_METRICS = Set.of(VULNERABILITY_METRIC, MetricCatalog.M_COMPLEXITY);
 
     /** Trivy のライセンスの分類。メッセージの {@code Classification: forbidden} から読む。 */
     private static final Pattern CLASSIFICATION =

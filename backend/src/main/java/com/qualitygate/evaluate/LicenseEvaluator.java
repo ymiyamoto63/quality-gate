@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.IdentifiedFinding;
 import org.springframework.stereotype.Component;
@@ -41,12 +43,12 @@ public class LicenseEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_LICENSES;
+        return MetricCatalog.M_LICENSES;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int maxForbidden = context.thresholds().maxForbiddenLicenses();
+        int maxForbidden = context.thresholds().security().maxForbiddenLicenses();
 
         // パッケージ（とコンポーネント）ごとに、最も緩い分類を採る
         Map<String, List<IdentifiedFinding>> byPackage = new LinkedHashMap<>();
@@ -71,9 +73,7 @@ public class LicenseEvaluator implements MetricEvaluator {
         int forbidden = counts.get("forbidden");
         int restricted = counts.get("restricted");
         int unknown = counts.get("unknown");
-        Map<String, Object> threshold = new LinkedHashMap<>();
-        threshold.put("operator", "<=");
-        threshold.put("value", maxForbidden);
+        Threshold threshold = Threshold.atMost(maxForbidden);
         Map<String, Object> detail = new LinkedHashMap<>(counts);
         detail.put("packages", byPackage.size());
 

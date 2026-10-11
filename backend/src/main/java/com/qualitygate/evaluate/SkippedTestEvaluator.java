@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.TestTally;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -36,17 +38,14 @@ public class SkippedTestEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_SKIPPED_TESTS;
+        return MetricCatalog.M_SKIPPED_TESTS;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds.TestResults thresholds = context.thresholds().testResults();
-        Map<String, Object> threshold = new LinkedHashMap<>();
         // 件数そのものではなく、比較元からの増加で判定する（画面は「前回から +0 件以内」と描く）
-        threshold.put("operator", "<=");
-        threshold.put("value", thresholds.maxSkippedIncrease());
-        threshold.put("basis", "increase");
+        Threshold threshold = Threshold.increaseAtMost(thresholds.maxSkippedIncrease());
 
         List<MetricResult> results = new ArrayList<>();
         TestSuccessEvaluator.tallyByComponent(context).forEach((component, tally) -> {

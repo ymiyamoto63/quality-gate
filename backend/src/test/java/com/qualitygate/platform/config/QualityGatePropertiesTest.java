@@ -58,7 +58,7 @@ class QualityGatePropertiesTest {
 
         GateThresholds thresholds = GateThresholds.from(gate);
         assertThat(thresholds.enabledMetrics()).doesNotContain("M-03", "M-04").hasSize(10);
-        assertThat(thresholds.branchCoverageThreshold()).isEqualByComparingTo("80");
+        assertThat(thresholds.coverage().branchMin()).isEqualByComparingTo("80");
         // 0 件のテストの合格は「検証していない」の言い換えにすぎない
         assertThat(thresholds.testResults().minTestCount()).isEqualTo(1);
     }

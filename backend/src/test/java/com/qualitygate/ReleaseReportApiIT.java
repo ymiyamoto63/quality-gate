@@ -107,7 +107,7 @@ class ReleaseReportApiIT {
             var json = content.assertThat();
             json.extractingPath("$.decision").isEqualTo("NOT_RELEASABLE");
             json.extractingPath("$.decisionReason").asString()
-                    .startsWith("2 件の指標が合格ラインを満たしていません（ブランチカバレッジ、循環的複雑度 15 超の関数数）");
+                    .startsWith("2 件の指標が合格ラインを満たしていません（ブランチカバレッジ、循環的複雑度が上限を超える関数の数）");
             json.extractingPath("$.counts.failed").asNumber().isEqualTo(2);
             json.extractingPath("$.run.baseCommitSha").isEqualTo(PASSING);
             json.extractingPath("$.run.tags[0]").isEqualTo("v1.2.0");

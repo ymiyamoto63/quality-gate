@@ -1,5 +1,7 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Decimals;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.PerformanceSample;
 import com.qualitygate.domain.report.RawMeasurement;
@@ -61,11 +63,11 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
         detail.put("environment", runs.getFirst().detail().get("environment"));
         detail.putAll(extraDetail(runs, limits));
 
-        Map<String, Object> threshold = threshold(limits);
+        Threshold threshold = threshold(limits);
         if (errorRate.compareTo(BROKEN_ERROR_RATE) > 0) {
             return result(key, MeasurementStatus.ERROR, null, threshold,
                     "エラー率 %s%% が 5%% を超えています。負荷試験自体が成立していないため判定しません"
-                            .formatted(plain(errorRate)), detail);
+                            .formatted(Decimals.plain(errorRate)), detail);
         }
         if (runs.size() < EXPECTED_RUNS) {
             return result(key, MeasurementStatus.ERROR, null, threshold,
@@ -82,7 +84,7 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
     }
 
     private MetricResult result(Key key, MeasurementStatus status, BigDecimal value,
-                                Map<String, Object> threshold, String reason,
+                                Threshold threshold, String reason,
                                 Map<String, Object> detail) {
         return MetricResult.of(metricId(), key.component(), status, value, unit(), threshold,
                 reason, detail, List.of()).withVariant(key.variant());
@@ -90,7 +92,7 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
 
     abstract String unit();
 
-    abstract Map<String, Object> threshold(GateThresholds.Performance limits);
+    abstract Threshold threshold(GateThresholds.Performance limits);
 
     /** 指標固有の内訳。 */
     Map<String, Object> extraDetail(List<RawMeasurement> runs,
@@ -118,10 +120,6 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
 
     private static long longOf(Object value) {
         return value instanceof Number number ? number.longValue() : 0;
-    }
-
-    static String plain(BigDecimal value) {
-        return value.stripTrailingZeros().toPlainString();
     }
 
     record Judgement(MeasurementStatus status, String reason) {

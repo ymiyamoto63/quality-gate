@@ -6,6 +6,7 @@ import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricGuide;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
@@ -15,15 +16,12 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.platform.config.QualityGateProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
-import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -191,10 +189,11 @@ public class ReleaseReportService {
                 .map(f -> new ReleaseReportResponse.ReleaseFinding(f.getTitle(), locationOf(f),
                         SourceLinks.blob(fullName, run.getCommitSha(), f.getFilePath(), f.getLine())))
                 .toList();
+        String threshold = ThresholdText.of(Threshold.parse(objectMapper, m.getThreshold()), m.getUnit());
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), MetricCatalog.of(m.getMetricId()).name(),
                 m.getComponentName(),
                 m.getVariant(), m.getStatus(),
-                m.getValue(), m.getUnit(), ThresholdText.of(toMap(m.getThreshold()), m.getUnit()), m.getReason(),
+                m.getValue(), m.getUnit(), threshold, m.getReason(),
                 shown, related.size());
     }
 
@@ -219,86 +218,5 @@ public class ReleaseReportService {
                     guide.basis().name(), guide.basis().label(), guide.rationale(), guide.risk(),
                     guide.definition(), guide.tools());
         }).toList();
-    }
-
-    private Map<String, Object> toMap(String json) {
-        return ThresholdText.parse(objectMapper, json);
-    }
-
-    /** 合格ラインを「≥ 75%」のような文字列にする（画面の formatThreshold と同じ表記）。 */
-    static final class ThresholdText {
-
-        private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
-        };
-
-        private ThresholdText() {
-        }
-
-        /** {@code measurements.threshold}（JSON）を読む。無ければ空。 */
-        static Map<String, Object> parse(ObjectMapper objectMapper, String json) {
-            if (json == null || json.isBlank()) {
-                return Map.of();
-            }
-            return objectMapper.readValue(json, JSON_OBJECT);
-        }
-
-        /**
-         * 合格ラインを縦軸の値にする。前回からの増加で判定する指標（M-10）は、値の軸に引ける線が無いため null。
-         */
-        static BigDecimal lineOf(Map<String, Object> threshold) {
-            Object value = threshold.get("value");
-            if (value == null || "increase".equals(threshold.get("basis"))) {
-                return null;
-            }
-            try {
-                return new BigDecimal(value.toString());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-        }
-
-        static String of(Map<String, Object> threshold, String unit) {
-            Object operator = threshold.get("operator");
-            Object value = threshold.get("value");
-            if (!(operator instanceof String op) || value == null) {
-                return null;
-            }
-            BigDecimal number;
-            try {
-                number = new BigDecimal(value.toString());
-            } catch (NumberFormatException e) {
-                return null;
-            }
-            if ("increase".equals(threshold.get("basis"))) {
-                // M-10 は件数そのものではなく、比較元からの増加で判定する
-                return "前回から +%s%s 以内".formatted(plain(number), suffix(unit));
-            }
-            return "%s %s%s".formatted(symbol(op), plain(number), suffix(unit));
-        }
-
-        static String plain(BigDecimal value) {
-            return value.stripTrailingZeros().toPlainString();
-        }
-
-        private static String symbol(String operator) {
-            return switch (operator) {
-                case ">=" -> "≥";
-                case "<=" -> "≤";
-                default -> operator;
-            };
-        }
-
-        static String suffix(String unit) {
-            if (unit == null || unit.isEmpty()) {
-                return "";
-            }
-            return switch (unit) {
-                case "percent" -> "%";
-                case "count" -> " 件";
-                case "ms" -> "ms";
-                case "score" -> " 点";
-                default -> " " + unit;
-            };
-        }
     }
 }

@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -92,7 +93,7 @@ public class PitXmlAdapter implements ArtifactAdapter {
         Map<String, Object> detail = new LinkedHashMap<>(tally.toDetail());
         detail.put("excludedFiles", (long) excludedFiles.size());
 
-        RawMeasurement measurement = RawMeasurement.of("M-02", context.componentName(),
+        RawMeasurement measurement = RawMeasurement.of(MetricCatalog.M_MUTATION, context.componentName(),
                 tally.score(), "percent", detail);
         return NormalizedReport.of(ArtifactType.PIT_XML, List.of(measurement), List.of());
     }

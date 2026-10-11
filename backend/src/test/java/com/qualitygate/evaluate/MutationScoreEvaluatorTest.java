@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.MutationTally;
 import com.qualitygate.domain.report.NormalizedInput;
@@ -29,7 +30,7 @@ class MutationScoreEvaluatorTest {
         assertThat(result.value()).isEqualByComparingTo("70.00");
         assertThat(result.variant()).isNull();
         assertThat(result.reason()).contains("60% を満たしています").contains("検出 70 / 対象 100");
-        assertThat(result.threshold()).containsEntry("operator", ">=");
+        assertThat(result.threshold().operator()).isEqualTo(Threshold.AT_LEAST);
     }
 
     @Test
@@ -158,7 +159,7 @@ class MutationScoreEvaluatorTest {
     void 対象外は不合格の理由にならない() {
         List<MetricResult> results = List.of(
                 MetricResult.of("M-01", "backend", MeasurementStatus.PASS, BigDecimal.TEN,
-                        "percent", Map.of(), "", Map.of(), List.of()),
+                        "percent", Threshold.none(), "", Map.of(), List.of()),
                 MetricResult.notApplicable("M-02", "frontend", "対象外"));
 
         assertThat(RunEvaluationService.aggregate(results))

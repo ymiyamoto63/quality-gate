@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -35,7 +36,8 @@ class AccessibilityEvaluatorTest {
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(result.value()).isEqualByComparingTo("0");
         assertThat(result.reason()).contains("2 ページを wcag22aa で検査");
-        assertThat(result.threshold()).containsEntry("operator", "<=").containsEntry("value", 0);
+        assertThat(result.threshold())
+                .isEqualTo(Threshold.atMost(0).with("standard", AccessibilityEvaluator.STANDARD));
     }
 
     @Test

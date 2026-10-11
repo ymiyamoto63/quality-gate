@@ -1,5 +1,6 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.IdentifiedFinding;
 
@@ -21,7 +22,7 @@ public record MetricResult(
         MeasurementStatus status,
         BigDecimal value,
         String unit,
-        Map<String, Object> threshold,
+        Threshold threshold,
         String reason,
         Map<String, Object> detail,
         List<IdentifiedFinding> findingsToPersist,
@@ -29,7 +30,7 @@ public record MetricResult(
 
     public static MetricResult of(String metricId, String componentName,
                                   MeasurementStatus status, BigDecimal value, String unit,
-                                  Map<String, Object> threshold, String reason,
+                                  Threshold threshold, String reason,
                                   Map<String, Object> detail,
                                   List<IdentifiedFinding> findingsToPersist) {
         return new MetricResult(metricId, componentName, status, value, unit,
@@ -48,12 +49,12 @@ public record MetricResult(
     public static MetricResult notApplicable(String metricId, String componentName,
                                              String reason) {
         return new MetricResult(metricId, componentName, MeasurementStatus.NOT_APPLICABLE,
-                null, null, Map.of(), reason, Map.of(), List.of(), null);
+                null, null, Threshold.none(), reason, Map.of(), List.of(), null);
     }
 
     /** 成果物が無い・読めないなど、値を確定できない場合。 */
     public static MetricResult error(String metricId, String reason) {
         return new MetricResult(metricId, null, MeasurementStatus.ERROR, null, null,
-                Map.of(), reason, Map.of(), List.of(), null);
+                Threshold.none(), reason, Map.of(), List.of(), null);
     }
 }

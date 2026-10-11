@@ -2,6 +2,7 @@ package com.qualitygate.domain.model;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonValue;
+import com.qualitygate.domain.metric.MetricCatalog;
 
 import java.util.List;
 
@@ -12,17 +13,18 @@ import java.util.List;
  */
 public enum ArtifactType implements WireValued {
 
-    JACOCO_XML("jacoco-xml", "M-01"),
-    LCOV("lcov", "M-01"),
-    PIT_XML("pit-xml", "M-02"),
-    K6_SUMMARY("k6-summary", "M-03", "M-04"),
-    SARIF("sarif", "M-05", "M-06", "M-11", "M-12"),
-    PMD_XML("pmd-xml", "M-06"),
-    ESLINT_JSON("eslint-json", "M-06"),
+    JACOCO_XML("jacoco-xml", MetricCatalog.M_BRANCH_COVERAGE),
+    LCOV("lcov", MetricCatalog.M_BRANCH_COVERAGE),
+    PIT_XML("pit-xml", MetricCatalog.M_MUTATION),
+    K6_SUMMARY("k6-summary", MetricCatalog.M_PERFORMANCE_P95, MetricCatalog.M_ERROR_RATE),
+    SARIF("sarif", MetricCatalog.M_VULNERABILITIES, MetricCatalog.M_COMPLEXITY,
+            MetricCatalog.M_SECRETS, MetricCatalog.M_LICENSES),
+    PMD_XML("pmd-xml", MetricCatalog.M_COMPLEXITY),
+    ESLINT_JSON("eslint-json", MetricCatalog.M_COMPLEXITY),
     /** すべてのテストの結果（JUnit XML）。 */
-    TEST_JUNIT_XML("test-junit-xml", "M-09", "M-10"),
-    OASDIFF_JSON("oasdiff-json", "M-07"),
-    AXE_JSON("axe-json", "M-08");
+    TEST_JUNIT_XML("test-junit-xml", MetricCatalog.M_TEST_SUCCESS, MetricCatalog.M_SKIPPED_TESTS),
+    OASDIFF_JSON("oasdiff-json", MetricCatalog.M_BREAKING_CHANGES),
+    AXE_JSON("axe-json", MetricCatalog.M_ACCESSIBILITY);
 
     private final String wire;
     private final List<String> metricIds;

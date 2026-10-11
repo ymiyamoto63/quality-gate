@@ -140,7 +140,7 @@ public class RunEvaluationService {
         measurements.saveAll(results.stream().map(result -> new Measurement(Uuid7.generate(), run.getId(),
                 result.metricId(), result.componentName(),
                 result.variant(), result.status(), result.value(), result.unit(),
-                toJson(result.threshold()),
+                toJson(result.threshold().toMap()),
                 context.previousValue(result.metricId(), result.componentName(), result.variant()).orElse(null),
                 result.reason(), toJson(result.detail()))).toList());
     }

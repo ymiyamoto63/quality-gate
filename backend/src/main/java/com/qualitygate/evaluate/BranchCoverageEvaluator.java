@@ -1,5 +1,8 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Decimals;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
@@ -8,7 +11,6 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 /**
  * M-01 ブランチカバレッジ。
@@ -21,7 +23,7 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_BRANCH_COVERAGE;
+        return MetricCatalog.M_BRANCH_COVERAGE;
     }
 
     @Override
@@ -37,8 +39,8 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
 
     private MetricResult evaluateOne(RawMeasurement measurement, EvaluationContext context,
                                      GateThresholds thresholds) {
-        Map<String, Object> threshold = Map.of(
-                "operator", ">=", "value", thresholds.branchCoverageThreshold());
+        BigDecimal minimum = thresholds.coverage().branchMin();
+        Threshold threshold = Threshold.atLeast(minimum);
         BigDecimal previous = context
                 .previousValue(metricId(), measurement.componentName()).orElse(null);
 
@@ -51,8 +53,8 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
         }
 
         BigDecimal value = measurement.value().setScale(2, RoundingMode.HALF_UP);
-        String limit = thresholds.branchCoverageThreshold().stripTrailingZeros().toPlainString();
-        boolean passed = value.compareTo(thresholds.branchCoverageThreshold()) >= 0;
+        String limit = Decimals.plain(minimum);
+        boolean passed = value.compareTo(minimum) >= 0;
         String reason = (passed ? "合格ライン %s%% を満たしています（実測 %s%%）" : "合格ライン %s%% を下回っています（実測 %s%%）")
                 .formatted(limit, value.toPlainString())
                 + dropNote(previous, value);

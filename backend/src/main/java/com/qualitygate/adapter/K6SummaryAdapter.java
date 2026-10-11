@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
@@ -43,8 +44,8 @@ import java.util.regex.Pattern;
 @Component
 public class K6SummaryAdapter implements ArtifactAdapter {
 
-    static final String M_P95 = "M-03";
-    static final String M_ERROR_RATE = "M-04";
+    static final String M_P95 = MetricCatalog.M_PERFORMANCE_P95;
+    static final String M_ERROR_RATE = MetricCatalog.M_ERROR_RATE;
 
     /** 計測環境を表すメタデータのキー。 */
     public static final String ENVIRONMENT = "environment";

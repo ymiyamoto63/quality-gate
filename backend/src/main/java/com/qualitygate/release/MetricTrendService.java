@@ -5,6 +5,7 @@ import com.qualitygate.domain.entity.MonitoredRepository;
 import com.qualitygate.domain.entity.Run;
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricGuide;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.repo.MeasurementRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +38,7 @@ public class MetricTrendService {
     static final int RUN_LIMIT = ReleaseReportService.HISTORY_LIMIT;
 
     /** 縦軸を 0〜100 に固定しない % の指標。エラー率の合格ラインは 0.1% で、0〜100 では線が底に張りつく。 */
-    private static final String ERROR_RATE = "M-04";
+    private static final String ERROR_RATE = MetricCatalog.M_ERROR_RATE;
     private static final BigDecimal PERCENT_MAX = BigDecimal.valueOf(100);
 
     private final EvaluatedRuns evaluatedRuns;
@@ -101,9 +102,9 @@ public class MetricTrendService {
     }
 
     private MetricTrendResponse.TrendPoint pointOf(Measurement m, int runIndex) {
-        Map<String, Object> threshold = ReleaseReportService.ThresholdText.parse(objectMapper, m.getThreshold());
+        Threshold threshold = Threshold.parse(objectMapper, m.getThreshold());
         return new MetricTrendResponse.TrendPoint(runIndex, m.getStatus(), m.getValue(),
-                ReleaseReportService.ThresholdText.lineOf(threshold),
-                ReleaseReportService.ThresholdText.of(threshold, m.getUnit()));
+                ThresholdText.lineOf(threshold),
+                ThresholdText.of(threshold, m.getUnit()));
     }
 }

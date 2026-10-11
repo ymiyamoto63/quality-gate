@@ -1,5 +1,6 @@
 package com.qualitygate.adapter;
 
+import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.model.ArtifactType;
 import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
@@ -21,7 +22,7 @@ import java.util.regex.Pattern;
  * PMD XML から M-06（循環的複雑度）を読む。
  *
  * <p>ルールセットは {@code reportLevel: 1} で動かす。しきい値超過の検出ではなく
- * <strong>全メソッドの CC 値</strong>を得るためであり、判定（15 超か）は quality-gate 側で行う。
+ * <strong>全メソッドの CC 値</strong>を得るためであり、判定（上限 QG_COMPLEXITY_MAX を超えるか）は quality-gate 側で行う。
  *
  * <p>ここでは「CC 値を持つ関数の一覧」を返すだけで、判定は evaluate の責務である。
  */
@@ -108,7 +109,7 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         // チェックアウト先が違っても同じ関数が同じ identity になるようにするため。
         String identity = modulePath + "#" + memberName;
 
-        return new RawFinding("M-06", RULE, Severity.INFO,
+        return new RawFinding(MetricCatalog.M_COMPLEXITY, RULE, Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(memberName, complexity),
                 repoPath, beginLine, context.componentName(), identity,
                 Map.of("complexity", complexity,

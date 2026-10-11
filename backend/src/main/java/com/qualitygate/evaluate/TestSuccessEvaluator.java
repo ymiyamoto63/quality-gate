@@ -1,5 +1,8 @@
 package com.qualitygate.evaluate;
 
+import com.qualitygate.domain.metric.Decimals;
+import com.qualitygate.domain.metric.MetricCatalog;
+import com.qualitygate.domain.metric.Threshold;
 import com.qualitygate.domain.model.MeasurementStatus;
 import com.qualitygate.domain.report.TestTally;
 import com.qualitygate.domain.report.IdentifiedFinding;
@@ -8,7 +11,6 @@ import org.springframework.stereotype.Component;
 
 import java.math.BigDecimal;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -36,16 +38,14 @@ public class TestSuccessEvaluator implements MetricEvaluator {
 
     @Override
     public String metricId() {
-        return GateThresholds.M_TEST_SUCCESS;
+        return MetricCatalog.M_TEST_SUCCESS;
     }
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds.TestResults thresholds = context.thresholds().testResults();
-        Map<String, Object> threshold = new LinkedHashMap<>();
-        threshold.put("operator", ">=");
-        threshold.put("value", thresholds.minSuccessRate());
-        threshold.put("minTestCount", thresholds.minTestCount());
+        Threshold threshold = Threshold.atLeast(thresholds.minSuccessRate())
+                .with("minTestCount", thresholds.minTestCount());
 
         List<MetricResult> results = new ArrayList<>();
         tallyByComponent(context).forEach((component, tally) -> {
@@ -73,7 +73,7 @@ public class TestSuccessEvaluator implements MetricEvaluator {
      */
     static Map<String, TestTally> tallyByComponent(EvaluationContext context) {
         Map<String, TestTally> byComponent = new TreeMap<>();
-        for (RawMeasurement measurement : context.input().measurementsOf(GateThresholds.M_TEST_SUCCESS)) {
+        for (RawMeasurement measurement : context.input().measurementsOf(MetricCatalog.M_TEST_SUCCESS)) {
             byComponent.merge(Objects.requireNonNullElse(measurement.componentName(), ""),
                     TestTally.fromDetail(measurement.detail()), TestTally::plus);
         }
@@ -97,8 +97,8 @@ public class TestSuccessEvaluator implements MetricEvaluator {
             return new Judgement(MeasurementStatus.FAIL,
                     "テストの失敗 %d 件・エラー %d 件（実行 %d 件中）。成功率 %s%% は合格ライン %s%% 未満です"
                             .formatted(tally.failed(), tally.errored(), tally.executed(),
-                                    tally.successRate().stripTrailingZeros().toPlainString(),
-                                    minimum.stripTrailingZeros().toPlainString()));
+                                    Decimals.plain(tally.successRate()),
+                                    Decimals.plain(minimum)));
         }
         long broken = tally.failed() + tally.errored();
         String reason = broken > 0
