@@ -216,6 +216,21 @@ components:
           description: 計測対象のコミット SHA（40 桁）
           minLength: 1
           pattern: "^[0-9a-f]{40}$"
+        components:
+          type: array
+          description: 成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。コンポーネントごとに判定する指標（M-01
+            / M-02 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかったコンポーネントを計測エラーにする。成果物の component
+            はこの中から選ぶ
+          example:
+          - backend
+          - frontend
+          items:
+            type: string
+            maxLength: 64
+            minLength: 0
+            pattern: "^[A-Za-z0-9._-]+$"
+          maxItems: 10
+          minItems: 0
         measuredAt:
           type: string
           format: date-time
@@ -238,6 +253,7 @@ components:
       required:
       - branch
       - commitSha
+      - components
       - measuredAt
       - repository
     CreateRunResponse:
@@ -412,6 +428,15 @@ components:
           type:
           - string
           - "null"
+        defaultThreshold:
+          type:
+          - string
+          - "null"
+          description: 緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null
+        excludedFileCount:
+          type: integer
+          format: int32
+          description: QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02。無ければ 0）
         findingCount:
           type: integer
           format: int32
@@ -442,6 +467,9 @@ components:
           - string
           - "null"
           description: 合格ラインを表示用にした文字列（≥ 75% など）
+        thresholdRelaxed:
+          type: boolean
+          description: 合格ラインを既定値より緩めて判定したか（判定時に記録したもの）
         unit:
           type:
           - string
@@ -457,6 +485,8 @@ components:
           - "null"
       required:
       - componentName
+      - defaultThreshold
+      - excludedFileCount
       - findingCount
       - findings
       - metricId
@@ -464,9 +494,31 @@ components:
       - reason
       - status
       - threshold
+      - thresholdRelaxed
       - unit
       - value
       - variantLabel
+    ReleaseNotJudgedMetric:
+      type: object
+      description: 判定の対象外にした指標。合否に使っていない
+      properties:
+        componentName:
+          type:
+          - string
+          - "null"
+          description: 対象外にしたコンポーネント。指標全体なら null
+        metricId:
+          type: string
+        name:
+          type: string
+        reason:
+          type: string
+          description: 対象外にした理由（設定で判定から外した、ツールの制約で測りようがない など）
+      required:
+      - componentName
+      - metricId
+      - name
+      - reason
     ReleaseReportResponse:
       type: object
       description: リリース判定。判定済みの計測（Run）から組み立てる
@@ -498,9 +550,14 @@ components:
             $ref: "#/components/schemas/ReleaseGuide"
         metrics:
           type: array
-          description: 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない
+          description: 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない（notJudged に出す）
           items:
             $ref: "#/components/schemas/ReleaseMetric"
+        notJudged:
+          type: array
+          description: 判定の対象外にした指標（設定で判定から外した指標と、対象外の結果）。合否の件数にも結論にも数えない。指標の一覧の並び
+          items:
+            $ref: "#/components/schemas/ReleaseNotJudgedMetric"
         repositoryFullName:
           type: string
         run:
@@ -515,6 +572,7 @@ components:
       - decisionReason
       - guides
       - metrics
+      - notJudged
       - repositoryFullName
       - run
     ReleaseRun:
@@ -578,6 +636,11 @@ components:
     TrendPoint:
       type: object
       properties:
+        defaultThreshold:
+          type:
+          - string
+          - "null"
+          description: 緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null
         runIndex:
           type: integer
           format: int32
@@ -595,6 +658,9 @@ components:
           - string
           - "null"
           description: 合格ラインを表示用にした文字列（≥ 75% など）
+        thresholdRelaxed:
+          type: boolean
+          description: 合格ラインを既定値より緩めて判定したか
         thresholdValue:
           type:
           - number
@@ -606,9 +672,11 @@ components:
           - "null"
           description: 実測値。計測エラー・対象外は null
       required:
+      - defaultThreshold
       - runIndex
       - status
       - threshold
+      - thresholdRelaxed
       - thresholdValue
       - value
     TrendRun:

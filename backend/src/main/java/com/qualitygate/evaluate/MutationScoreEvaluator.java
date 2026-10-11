@@ -105,32 +105,40 @@ public class MutationScoreEvaluator implements MetricEvaluator {
     }
 
     /**
-     * この Run で他の指標を計測しているのに M-02 の対象でないコンポーネントを
-     * 「対象外」として並べる。
+     * Run の作成時に申告されたコンポーネント（と、この Run で他の指標を計測しているコンポーネント）のうち、
+     * M-02 の対象でないものを「対象外」として並べる。
      *
      * <p>黙って行を出さないと、frontend の M-02 が「測り忘れ」なのか
      * 「測りようがない」のか画面から区別できない（docs/metrics.md M-02）。
-     * リポジトリの構成を別に持たず、この Run に現れたコンポーネントを使うのは、
-     * 実際に計測しているものだけを並べるため。
+     * 申告を使うのは、frontend の計測そのものが失敗して他の指標の成果物も届かなかったときにも行を出すため。
+     *
+     * <p>対象を限定していない（{@code QG_MUTATION_COMPONENTS} が空）ときは、申告されたのに成果物の届かなかった
+     * コンポーネントを対象外とする。収集ランナーは PIT を BACKEND_DIR でしか動かさず、frontend から成果物が届くことは無い。
+     * 成果物が 1 つも届かなければ、この判定器に来る前に指標全体が ERROR になる。
      */
     private List<MetricResult> notApplicableComponents(EvaluationContext context,
                                                        Set<String> submitted,
                                                        Set<String> targets) {
-        if (targets.isEmpty()) {
+        if (targets.isEmpty() && submitted.contains("")) {
             return List.of();
         }
-        Set<String> seen = new TreeSet<>();
-        for (RawMeasurement measurement : context.input().measurements()) {
-            if (measurement.componentName() != null) {
-                seen.add(measurement.componentName());
+        Set<String> known = new TreeSet<>(context.run().getComponents().orElse(List.of()));
+        if (!targets.isEmpty()) {
+            for (RawMeasurement measurement : context.input().measurements()) {
+                if (measurement.componentName() != null) {
+                    known.add(measurement.componentName());
+                }
             }
         }
+        String reason = targets.isEmpty()
+                ? "ミューテーションの成果物が届いていません。対象のコンポーネントを限定していない（QG_MUTATION_COMPONENTS が空）ため、"
+                        + "計測の対象外として扱います（PIT は JVM 言語専用です）"
+                : "PIT は JVM 言語専用のため、このコンポーネントは計測の対象外です"
+                        + "（テストの実効性はブランチカバレッジで担保します）";
         List<MetricResult> results = new ArrayList<>();
-        for (String component : seen) {
+        for (String component : known) {
             if (!targets.contains(component) && !submitted.contains(component)) {
-                results.add(MetricResult.notApplicable(metricId(), component,
-                        "PIT は JVM 言語専用のため、このコンポーネントは計測の対象外です"
-                                + "（テストの実効性はブランチカバレッジで担保します）"));
+                results.add(MetricResult.notApplicable(metricId(), component, reason));
             }
         }
         return results;

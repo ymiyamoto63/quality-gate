@@ -27,6 +27,16 @@ load_profile
 API="${QG_BASE_URL%/}/api/v1/runs"
 AUTH=(-H "Authorization: Bearer ${QG_INGEST_TOKEN}")
 
+# コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
+BACKEND=${BACKEND_DIR:-}
+BACKEND=${BACKEND##*/}
+FRONTEND=${FRONTEND_DIR:-}
+FRONTEND=${FRONTEND##*/}
+# 成果物を送るはずのコンポーネントを Run の作成時に申告する。計測に失敗して成果物の届かなかった
+# コンポーネントは、quality-gate がコンポーネントごとに判定する指標（M-01 / M-02 / M-09 / M-10）で ERROR にする
+COMPONENTS=$(echo "$BACKEND $FRONTEND" | xargs)
+[ -n "$COMPONENTS" ] || die "計測プロファイルに BACKEND_DIR と FRONTEND_DIR のどちらもありません"
+
 REQUEST=$(jq -n \
   --arg repository "$QG_REPOSITORY" \
   --arg commitSha "$COMMIT_SHA" \
@@ -35,15 +45,17 @@ REQUEST=$(jq -n \
   --arg ciRunUrl "${QG_CI_RUN_URL:-}" \
   --arg measuredAt "$(date -u +%FT%TZ)" \
   --arg tags "${TAGS:-}" \
+  --arg components "$COMPONENTS" \
   '{repository: $repository, commitSha: $commitSha, branch: $branch, measuredAt: $measuredAt,
-    tags: ($tags | split(" ") | map(select(. != "")))}
+    tags: ($tags | split(" ") | map(select(. != ""))),
+    components: ($components | split(" ") | map(select(. != "")))}
    + (if $baseCommitSha != "" then {baseCommitSha: $baseCommitSha} else {} end)
    + (if $ciRunUrl != "" then {ciRunUrl: $ciRunUrl} else {} end)')
 
 # --retry は一時的な障害（5xx など）を再試行する
 RUN_ID=$(curl -sS --retry 3 --fail-with-body -X POST "$API" "${AUTH[@]}" \
   -H 'Content-Type: application/json' -d "$REQUEST" | jq -r '.runId')
-echo "Run を作成しました: $RUN_ID"
+echo "Run を作成しました: $RUN_ID（コンポーネント: $COMPONENTS）"
 
 # upload <type> <file> [component] [metadata]
 # ファイルが無ければ送らない。未提出の指標は quality-gate が ERROR（計測エラー）として扱う
@@ -60,10 +72,6 @@ upload() {
   curl -sS --retry 3 --fail-with-body -X POST "${API}/${RUN_ID}/artifacts?${query}" "${AUTH[@]}" "${args[@]}" >/dev/null
   echo "送信しました: type=$type ${component:+component=$component }${file#"$REPORTS"/}"
 }
-
-# コンポーネント名は計測プロファイルのディレクトリ名（backend / frontend）とする
-BACKEND=${BACKEND_DIR##*/}
-FRONTEND=${FRONTEND_DIR##*/}
 
 if [ -n "${BACKEND_DIR:-}" ]; then
   upload jacoco-xml "$REPORTS/backend/jacoco.xml" "$BACKEND"

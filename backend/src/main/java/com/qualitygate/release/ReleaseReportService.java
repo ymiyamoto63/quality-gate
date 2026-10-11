@@ -16,12 +16,14 @@ import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.platform.config.QualityGateProperties;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -41,6 +43,11 @@ public class ReleaseReportService {
     static final int MAX_FINDINGS = 10;
     /** 履歴に出す件数。 */
     static final int HISTORY_LIMIT = 50;
+    /** 設定で判定から外した指標の、対象外の理由。 */
+    static final String DISABLED_REASON = "設定（QG_DISABLED_METRICS）で判定から外しています";
+
+    private static final TypeReference<Map<String, Object>> DETAIL = new TypeReference<>() {
+    };
 
     private final EvaluatedRuns evaluatedRuns;
     private final RunRepository runs;
@@ -106,7 +113,9 @@ public class ReleaseReportService {
                             .formatted(candidates.size()));
         }
 
-        List<ReleaseReportResponse.ReleaseMetric> rows = rowsOf(chosen, fullName);
+        List<Measurement> results = measurements.findByRunId(chosen.getId());
+        List<ReleaseReportResponse.ReleaseMetric> rows = rowsOf(chosen, results, fullName);
+        List<ReleaseReportResponse.ReleaseNotJudgedMetric> notJudged = notJudgedOf(chosen, results);
         ReleaseReportResponse.ReleaseCounts counts = countsOf(rows);
         ReleaseDecision decision = chosen.getVerdict() == Verdict.PASS && counts.failed() == 0
                 ? ReleaseDecision.RELEASABLE
@@ -116,11 +125,12 @@ public class ReleaseReportService {
                 commitSha,
                 SourceLinks.commit(fullName, commitSha),
                 decision,
-                reasonOf(decision, counts, rows),
+                reasonOf(decision, counts, rows, notJudged),
                 new ReleaseReportResponse.ReleaseRun(chosen.getMeasuredAt(), chosen.getTags(),
                         chosen.getCiRunUrl(), chosen.getBaseCommitSha()),
                 counts,
                 rows,
+                notJudged,
                 guidesOf(rows));
     }
 
@@ -148,22 +158,61 @@ public class ReleaseReportService {
         return new ReleaseReportResponse(fullName, commitSha,
                 commitSha == null ? null : SourceLinks.commit(fullName, commitSha),
                 ReleaseDecision.NOT_MEASURED, reason, null, new ReleaseReportResponse.ReleaseCounts(0, 0, 0),
-                List.of(), List.of());
+                List.of(), List.of(), List.of());
     }
 
+    /**
+     * 結論の理由。判定の対象外にした指標があれば、その名前を必ず添える（DD-27）。
+     * 「すべて合格」とだけ書くと、12 の指標のうち 2 つしか判定していなくても、開発に携わっていない方には分からない。
+     */
     private static String reasonOf(ReleaseDecision decision, ReleaseReportResponse.ReleaseCounts counts,
-                                   List<ReleaseReportResponse.ReleaseMetric> rows) {
+                                   List<ReleaseReportResponse.ReleaseMetric> rows,
+                                   List<ReleaseReportResponse.ReleaseNotJudgedMetric> notJudged) {
+        String excluded = String.join("、", notJudged.stream().map(ReleaseReportService::labelOf).toList());
         if (decision == ReleaseDecision.RELEASABLE) {
-            return "判定した %d 件の指標が、すべて合格ラインを満たしています。".formatted(counts.judged());
+            return notJudged.isEmpty()
+                    ? "判定した %d 件の指標が、すべて合格ラインを満たしています。".formatted(counts.judged())
+                    : "判定した %d 件の指標が、すべて合格ラインを満たしています（%d 件は判定の対象外です: %s）。"
+                            .formatted(counts.judged(), notJudged.size(), excluded);
         }
         LinkedHashSet<String> names = new LinkedHashSet<>();
         rows.stream().filter(row -> row.status() != MeasurementStatus.PASS).forEach(row -> names.add(row.name()));
-        return "%d 件の指標が合格ラインを満たしていません（%s）。".formatted(counts.failed(),
+        String reason = "%d 件の指標が合格ラインを満たしていません（%s）。".formatted(counts.failed(),
                 names.isEmpty() ? "—" : String.join("、", names));
+        return notJudged.isEmpty() ? reason
+                : reason + "ほかに %d 件は判定の対象外です（%s）。".formatted(notJudged.size(), excluded);
     }
 
-    private List<ReleaseReportResponse.ReleaseMetric> rowsOf(Run run, String fullName) {
-        List<Measurement> judged = new ArrayList<>(measurements.findByRunId(run.getId()).stream()
+    /** 判定の対象外の指標の呼び名（コンポーネントがあれば「ミューテーションスコア（frontend）」）。 */
+    private static String labelOf(ReleaseReportResponse.ReleaseNotJudgedMetric metric) {
+        return metric.componentName() == null ? metric.name()
+                : "%s（%s）".formatted(metric.name(), metric.componentName());
+    }
+
+    /**
+     * 判定の対象外にした指標。設定（{@code QG_DISABLED_METRICS}）で外した指標と、対象外（{@code NOT_APPLICABLE}）の結果。
+     *
+     * <p>判定から外した指標は、判定したときに Run に焼き付けたものを使う。今の設定を読むと、
+     * 後から設定を変えたときに過去の判定の範囲が変わって見える。焼き付ける前（V003 より前）に判定した Run は、
+     * 外した指標が分からないため「無し」として扱う。
+     */
+    private static List<ReleaseReportResponse.ReleaseNotJudgedMetric> notJudgedOf(Run run, List<Measurement> results) {
+        List<ReleaseReportResponse.ReleaseNotJudgedMetric> notJudged = new ArrayList<>();
+        run.getDisabledMetrics().orElse(List.of()).forEach(metricId -> notJudged.add(
+                new ReleaseReportResponse.ReleaseNotJudgedMetric(metricId, MetricCatalog.of(metricId).name(), null,
+                        DISABLED_REASON)));
+        results.stream().filter(m -> !m.getStatus().affectsVerdict()).forEach(m -> notJudged.add(
+                new ReleaseReportResponse.ReleaseNotJudgedMetric(m.getMetricId(),
+                        MetricCatalog.of(m.getMetricId()).name(), m.getComponentName(),
+                        Objects.requireNonNullElse(m.getReason(), "計測の対象外です"))));
+        notJudged.sort(Comparator
+                .comparing(ReleaseReportResponse.ReleaseNotJudgedMetric::metricId, MetricCatalog::compareByCatalogOrder)
+                .thenComparing(metric -> Objects.toString(metric.componentName(), "")));
+        return notJudged;
+    }
+
+    private List<ReleaseReportResponse.ReleaseMetric> rowsOf(Run run, List<Measurement> results, String fullName) {
+        List<Measurement> judged = new ArrayList<>(results.stream()
                 .filter(m -> m.getStatus().affectsVerdict())
                 .toList());
         judged.sort(Comparator
@@ -189,12 +238,26 @@ public class ReleaseReportService {
                 .map(f -> new ReleaseReportResponse.ReleaseFinding(f.getTitle(), locationOf(f),
                         SourceLinks.blob(fullName, run.getCommitSha(), f.getFilePath(), f.getLine())))
                 .toList();
-        String threshold = ThresholdText.of(Threshold.parse(objectMapper, m.getThreshold()), m.getUnit());
+        Threshold threshold = Threshold.parse(objectMapper, m.getThreshold());
         return new ReleaseReportResponse.ReleaseMetric(m.getMetricId(), MetricCatalog.of(m.getMetricId()).name(),
                 m.getComponentName(),
                 m.getVariant(), m.getStatus(),
-                m.getValue(), m.getUnit(), threshold, m.getReason(),
+                m.getValue(), m.getUnit(), ThresholdText.of(threshold, m.getUnit()),
+                threshold.isRelaxed(), ThresholdText.defaultOf(threshold, m.getUnit()),
+                excludedFilesOf(m), m.getReason(),
                 shown, related.size());
+    }
+
+    /**
+     * {@code QG_EXCLUSIONS} で計測から外したファイルの数。内訳（{@code detail}）の {@code excludedFiles} を読む
+     * （M-01 / M-02 が記録する）。除外も合格ラインの緩和と同じく結果を良く見せうるため、画面に出す。
+     */
+    private int excludedFilesOf(Measurement m) {
+        if (m.getDetail() == null || m.getDetail().isBlank()) {
+            return 0;
+        }
+        return objectMapper.readValue(m.getDetail(), DETAIL).get("excludedFiles") instanceof Number number
+                ? number.intValue() : 0;
     }
 
     private static String locationOf(Finding finding) {

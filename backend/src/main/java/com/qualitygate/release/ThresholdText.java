@@ -4,6 +4,9 @@ import com.qualitygate.domain.metric.Decimals;
 import com.qualitygate.domain.metric.Threshold;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
 
 /** 保存済みの合格ラインを、リリース判定と推移の表示に使う形にする。 */
 final class ThresholdText {
@@ -30,6 +33,33 @@ final class ThresholdText {
             return "前回から +%s%s 以内".formatted(Decimals.plain(threshold.value()), suffix(unit));
         }
         return "%s %s%s".formatted(symbol(threshold.operator()), Decimals.plain(threshold.value()), suffix(unit));
+    }
+
+    /**
+     * 既定より緩いと記録された合格ラインの、既定の合格ライン（「≥ 75%」「関数ごとの循環的複雑度の上限 15」など）。
+     * 緩くない（記録の無い）合格ラインでは null。
+     *
+     * <p>合格ラインの値そのものが緩ければその既定値を、上限・下限の補足（M-06 の関数ごとの上限など）が緩ければ
+     * その名称と既定値を並べる。
+     */
+    static String defaultOf(Threshold threshold, String unit) {
+        if (!threshold.isRelaxed()) {
+            return null;
+        }
+        Threshold standard = threshold.defaults().orElse(null);
+        if (standard == null) {
+            return null;
+        }
+        List<String> parts = new ArrayList<>();
+        if (threshold.isValueLooserThan(standard)) {
+            parts.add(of(standard, unit));
+        }
+        for (String key : threshold.looserLimitsThan(standard)) {
+            Threshold.limitOf(key).ifPresent(limit ->
+                    parts.add("%s %s".formatted(limit.label(), Decimals.plain(standard.extraValue(key)))));
+        }
+        parts.removeIf(Objects::isNull);
+        return parts.isEmpty() ? of(standard, unit) : String.join("、", parts);
     }
 
     private static String symbol(String operator) {

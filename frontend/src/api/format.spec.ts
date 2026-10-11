@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { formatValue, NOT_MEASURED, shortSha } from './format'
+import { formatValue, NOT_MEASURED, relaxedLabel, shortSha } from './format'
 
 describe('formatValue', () => {
   it('未計測と 0 を区別する', () => {
@@ -27,5 +27,12 @@ describe('shortSha', () => {
   it('先頭 7 桁にする', () => {
     expect(shortSha('a1b2c3d4e5f6')).toBe('a1b2c3d')
     expect(shortSha(null)).toBe(NOT_MEASURED)
+  })
+})
+
+describe('relaxedLabel', () => {
+  it('既定の合格ラインを添えて、緩めたことを示す', () => {
+    expect(relaxedLabel('≥ 75%')).toBe('既定より緩い（既定 ≥ 75%）')
+    expect(relaxedLabel(null)).toBe('既定より緩い')
   })
 })

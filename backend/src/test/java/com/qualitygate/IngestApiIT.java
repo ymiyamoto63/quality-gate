@@ -37,6 +37,8 @@ class IngestApiIT {
     private static final String REPOSITORY = "ymiyamoto63/quality-gate";
     private static final String COMMIT = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0";
     private static final String TOKEN = IntegrationCleanup.INGEST_TOKEN;
+    /** 収集ランナーが申告するコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR）。 */
+    private static final java.util.List<String> COMPONENTS = java.util.List.of("backend", "frontend");
     private static final ParameterizedTypeReference<Map<String, Object>> JSON_OBJECT =
             new ParameterizedTypeReference<>() {};
 
@@ -76,12 +78,14 @@ class IngestApiIT {
                         "commitSha", COMMIT,
                         "branch", "main",
                         "measuredAt", "2026-09-21T02:10:00Z",
-                        "tags", java.util.List.of("v1.2.0", "release/2026-09")))
+                        "tags", java.util.List.of("v1.2.0", "release/2026-09"),
+                        "components", COMPONENTS))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         UUID runId = UUID.fromString(String.valueOf(created.getBody().get("runId")));
         assertThat(runs.findById(runId).orElseThrow().getTags()).containsExactly("v1.2.0", "release/2026-09");
+        assertThat(runs.findById(runId).orElseThrow().getComponents()).contains(COMPONENTS);
 
         // 成果物をアップロードする
         MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
@@ -135,7 +139,7 @@ class IngestApiIT {
                 .uri("/api/v1/runs")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z", "components", COMPONENTS))
                 .retrieve().toBodilessEntity();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -172,12 +176,65 @@ class IngestApiIT {
                     .contentType(MediaType.APPLICATION_JSON)
                     .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
                             "measuredAt", "2026-09-21T02:10:00Z",
-                            "tags", java.util.List.of(tag)))
+                            "tags", java.util.List.of(tag), "components", COMPONENTS))
                     .retrieve().toEntity(JSON_OBJECT);
 
             assertThat(response.getStatusCode()).as(tag).isEqualTo(HttpStatus.BAD_REQUEST);
         }
         assertThat(runs.findAll()).isEmpty();
+    }
+
+    /** 申告が無いと、計測に失敗して成果物の届かなかったコンポーネントに気づけない（fail-closed）。 */
+    @Test
+    void 成果物を送るコンポーネントの申告が無ければ拒否される() {
+        for (Object components : java.util.List.of(java.util.List.of(), java.util.List.of("front end"))) {
+            ResponseEntity<Map<String, Object>> response = client.post()
+                    .uri("/api/v1/runs")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
+                            "measuredAt", "2026-09-21T02:10:00Z", "components", components))
+                    .retrieve().toEntity(JSON_OBJECT);
+
+            assertThat(response.getStatusCode()).as(components.toString()).isEqualTo(HttpStatus.BAD_REQUEST);
+        }
+        ResponseEntity<Map<String, Object>> missing = client.post()
+                .uri("/api/v1/runs")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
+                        "measuredAt", "2026-09-21T02:10:00Z"))
+                .retrieve().toEntity(JSON_OBJECT);
+
+        assertThat(missing.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
+        assertThat(String.valueOf(missing.getBody().get("violations"))).contains("components");
+        assertThat(runs.findAll()).isEmpty();
+    }
+
+    @Test
+    void 申告していないコンポーネントの成果物は理由つきで拒否される() {
+        UUID runId = createRun();
+        MultiValueMap<String, Object> form = new LinkedMultiValueMap<>();
+        form.add("file", new ByteArrayResource("<report/>".getBytes(StandardCharsets.UTF_8)) {
+            @Override
+            public String getFilename() {
+                return "jacoco.xml";
+            }
+        });
+        form.add("type", "jacoco-xml");
+        form.add("component", "backnd");
+
+        ResponseEntity<Map<String, Object>> response = client.post()
+                .uri("/api/v1/runs/{runId}/artifacts", runId)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(form)
+                .retrieve().toEntity(JSON_OBJECT);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNPROCESSABLE_CONTENT);
+        assertThat(response.getBody()).containsEntry("errorCode", "COMPONENT_NOT_DECLARED");
+        assertThat(String.valueOf(response.getBody().get("detail"))).contains("backnd").contains("backend, frontend");
+        assertThat(artifacts.findByRunId(runId)).isEmpty();
     }
 
     @Test
@@ -187,7 +244,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN + "x")
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z", "components", COMPONENTS))
                 .retrieve().toBodilessEntity();
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
@@ -201,7 +258,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "feature/x",
-                        "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z", "components", COMPONENTS))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
@@ -216,7 +273,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", "someone/other", "commitSha", COMMIT, "branch", "main",
-                        "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z", "components", COMPONENTS))
                 .retrieve().toEntity(JSON_OBJECT);
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.BAD_REQUEST);
@@ -397,7 +454,7 @@ class IngestApiIT {
                 .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("repository", REPOSITORY, "commitSha", COMMIT, "branch", "main",
-                        "measuredAt", "2026-09-21T02:10:00Z"))
+                        "measuredAt", "2026-09-21T02:10:00Z", "components", COMPONENTS))
                 .retrieve().toEntity(JSON_OBJECT);
         assertThat(created.getStatusCode()).isEqualTo(HttpStatus.CREATED);
         return UUID.fromString(String.valueOf(created.getBody().get("runId")));

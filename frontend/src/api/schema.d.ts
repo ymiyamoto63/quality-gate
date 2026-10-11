@@ -181,6 +181,14 @@ export interface components {
       ciRunUrl?: string
       /** @description 計測対象のコミット SHA（40 桁） */
       commitSha: string
+      /**
+       * @description 成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。コンポーネントごとに判定する指標（M-01 / M-02 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかったコンポーネントを計測エラーにする。成果物の component はこの中から選ぶ
+       * @example [
+       *       "backend",
+       *       "frontend"
+       *     ]
+       */
+      components: string[]
       /** Format: date-time */
       measuredAt: string
       /**
@@ -271,6 +279,13 @@ export interface components {
     }
     ReleaseMetric: {
       componentName: string | null
+      /** @description 緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null */
+      defaultThreshold: string | null
+      /**
+       * Format: int32
+       * @description QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02。無ければ 0）
+       */
+      excludedFileCount: number
       /**
        * Format: int32
        * @description 不合格のときの違反の総数。合格なら 0
@@ -288,10 +303,21 @@ export interface components {
       status: 'PASS' | 'FAIL' | 'ERROR' | 'NOT_APPLICABLE'
       /** @description 合格ラインを表示用にした文字列（≥ 75% など） */
       threshold: string | null
+      /** @description 合格ラインを既定値より緩めて判定したか（判定時に記録したもの） */
+      thresholdRelaxed: boolean
       unit: string | null
       /** @description 実測値。計測エラーは null */
       value: number | null
       variantLabel: string | null
+    }
+    /** @description 判定の対象外にした指標。合否に使っていない */
+    ReleaseNotJudgedMetric: {
+      /** @description 対象外にしたコンポーネント。指標全体なら null */
+      componentName: string | null
+      metricId: string
+      name: string
+      /** @description 対象外にした理由（設定で判定から外した、ツールの制約で測りようがない など） */
+      reason: string
     }
     /** @description リリース判定。判定済みの計測（Run）から組み立てる */
     ReleaseReportResponse: {
@@ -305,8 +331,10 @@ export interface components {
       decisionReason: string
       /** @description 結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び） */
       guides: components['schemas']['ReleaseGuide'][]
-      /** @description 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない */
+      /** @description 指標ごとの結果。不合格を先に並べる。合否に使わない対象外の結果は含めない（notJudged に出す） */
       metrics: components['schemas']['ReleaseMetric'][]
+      /** @description 判定の対象外にした指標（設定で判定から外した指標と、対象外の結果）。合否の件数にも結論にも数えない。指標の一覧の並び */
+      notJudged: components['schemas']['ReleaseNotJudgedMetric'][]
       repositoryFullName: string
       /** @description 判定に使った計測。未計測なら null */
       run: components['schemas']['ReleaseRun']
@@ -334,6 +362,8 @@ export interface components {
       unit: string | null
     }
     TrendPoint: {
+      /** @description 緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null */
+      defaultThreshold: string | null
       /**
        * Format: int32
        * @description runs の位置
@@ -346,6 +376,8 @@ export interface components {
       status: 'PASS' | 'FAIL' | 'ERROR' | 'NOT_APPLICABLE'
       /** @description 合格ラインを表示用にした文字列（≥ 75% など） */
       threshold: string | null
+      /** @description 合格ラインを既定値より緩めて判定したか */
+      thresholdRelaxed: boolean
       /** @description その計測の判定に使った合格ライン（縦軸の値）。前回からの増加で判定する指標は null */
       thresholdValue: number | null
       /** @description 実測値。計測エラー・対象外は null */

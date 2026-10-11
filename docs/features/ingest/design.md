@@ -26,8 +26,11 @@
 | `baseCommitSha` | | 比較元（[指標](../../metrics.md#24-比較元と比較対象-run)） |
 | `ciRunUrl` | | 計測したワークフローの実行 URL。リリース判定の「計測日時」のリンクになる |
 | `tags` | | 計測したコミットを指すタグ（`git tag --points-at`）。リリース判定でタグを解決するのに使う |
+| `components` | ○ | 成果物を送るコンポーネント（1〜10 個、英数字と `._-`）。`submit.sh` が計測プロファイルの `BACKEND_DIR` / `FRONTEND_DIR` の末尾のディレクトリ名から作る。空や欠けは `400 VALIDATION_FAILED`。`runs.components` に残し、コンポーネントごとに判定する指標で、結果の無いコンポーネントを ERROR にする（DD-26、[指標 2.2](../../metrics.md#22-コンポーネント)） |
 
 同じコミットへの再送信は `attempt` を増やした新しい Run になる。応答は以降の呼び出しに使う `runId` だけ。
+
+`components` を必須にしたのは、送り手が収集ランナーだけで（DD-7）、申告が無いと計測に失敗したコンポーネントに気づけないため（fail-closed）。
 
 ## 3. `POST /api/v1/runs/{runId}/artifacts`
 
@@ -35,7 +38,7 @@
 | --- | --- |
 | `file` | 成果物 |
 | `type` | `jacoco-xml` / `lcov` / `pit-xml` / `k6-summary` / `sarif` / `pmd-xml` / `eslint-json` / `oasdiff-json` / `axe-json` / `test-junit-xml`（[指標](../../metrics.md#1-指標の一覧)） |
-| `component` | `backend` / `frontend`（任意） |
+| `component` | `backend` / `frontend`（任意）。付けるなら Run の作成時に申告したもの。申告に無ければ `422 COMPONENT_NOT_DECLARED`（申告の無い V003 より前の Run では確かめない） |
 | `metadata` | JSON オブジェクトの文字列 |
 
 | `type` | メタデータ | 無いとき |
@@ -44,7 +47,7 @@
 | `oasdiff-json` | 比較元に定義が無かったことを `baseSpecMissing: true` で申告できる | — |
 | `sarif` | 走査した対象を `scanners`（`vuln` / `misconfig` / `secret` / `license`）で申告する | すべて M-05 として読む |
 
-- **この時点ではパースしない**（受領・検証・保存だけ）。ただし必須のメタデータが無ければ、取り込みの時点で拒否する。判定のときに気づいても、収集ランナーのログには残らないため
+- **この時点ではパースしない**（受領・検証・保存だけ）。ただし必須のメタデータが無いか、申告していないコンポーネントなら、取り込みの時点で拒否する。判定のときに気づいても、収集ランナーのログには残らないため
 - 確定前に同じ種別・同じファイル名を再送すると置き換える。古いファイルはコミット後に消す
 - 1 ファイル 50MB（`ARTIFACT_TOO_LARGE`）、1 Run 合計 200MB を超えたら拒否する。通信としての上限（`spring.servlet.multipart`）はそれより少し大きい 60MB にし、理由のわかるエラーを返せるようにしている
 
@@ -92,7 +95,8 @@ RUN_ID=$(curl -s -X POST http://localhost:8080/api/v1/runs \
   -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
   -d "{\"repository\":\"example/sample\",\"commitSha\":\"$(git rev-parse HEAD)\",
        \"branch\":\"main\",
-       \"measuredAt\":\"$(date -u +%FT%TZ)\"}" | sed -E 's/.*"runId":"([^"]+)".*/\1/')
+       \"measuredAt\":\"$(date -u +%FT%TZ)\",
+       \"components\":[\"backend\"]}" | sed -E 's/.*"runId":"([^"]+)".*/\1/')
 
 curl -s -X POST "http://localhost:8080/api/v1/runs/$RUN_ID/artifacts?type=jacoco-xml&component=backend" \
   -H "Authorization: Bearer $TOKEN" -F file=@path/to/jacoco.xml

@@ -105,6 +105,8 @@ public class MetricTrendService {
         Threshold threshold = Threshold.parse(objectMapper, m.getThreshold());
         return new MetricTrendResponse.TrendPoint(runIndex, m.getStatus(), m.getValue(),
                 ThresholdText.lineOf(threshold),
-                ThresholdText.of(threshold, m.getUnit()));
+                ThresholdText.of(threshold, m.getUnit()),
+                threshold.isRelaxed(),
+                ThresholdText.defaultOf(threshold, m.getUnit()));
     }
 }
