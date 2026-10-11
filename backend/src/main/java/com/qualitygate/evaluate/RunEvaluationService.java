@@ -138,11 +138,11 @@ public class RunEvaluationService {
     private void persistMeasurements(Run run, List<MetricResult> results,
                                      EvaluationContext context) {
         measurements.saveAll(results.stream().map(result -> new Measurement(Uuid7.generate(), run.getId(),
-                run.getRepositoryId(), result.metricId(), result.componentName(),
+                result.metricId(), result.componentName(),
                 result.variant(), result.status(), result.value(), result.unit(),
                 toJson(result.threshold()),
                 context.previousValue(result.metricId(), result.componentName(), result.variant()).orElse(null),
-                result.reason(), toJson(result.detail()), run.getMeasuredAt())).toList());
+                result.reason(), toJson(result.detail()))).toList());
     }
 
     /**

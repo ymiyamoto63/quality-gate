@@ -11,14 +11,12 @@ import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
 
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.util.UUID;
 
 /**
  * 指標ごとの実測値と判定。
  *
- * <p>{@code repositoryId} と {@code measuredAt} は {@link Run} からの複製である（更新されない値のため不整合の余地がない）。
- * {@code threshold} には判定に使った合格ラインを残す。合格ラインの環境変数を後から変えても、判定の根拠が分かる。
+ * <p>{@code threshold} には判定に使った合格ラインを残す。合格ラインの環境変数を後から変えても、判定の根拠が分かる。
  */
 @Entity
 @Table(name = "measurements")
@@ -29,9 +27,6 @@ public class Measurement {
 
     @Column(name = "run_id", nullable = false)
     private UUID runId;
-
-    @Column(name = "repository_id", nullable = false)
-    private UUID repositoryId;
 
     @Column(name = "metric_id", nullable = false, length = 8)
     private String metricId;
@@ -72,21 +67,16 @@ public class Measurement {
     @Column(columnDefinition = "jsonb")
     private String detail;
 
-    @Column(name = "measured_at", nullable = false)
-    private Instant measuredAt;
-
     protected Measurement() {
     }
 
     @SuppressWarnings("java:S107")
-    public Measurement(UUID id, UUID runId, UUID repositoryId, String metricId,
+    public Measurement(UUID id, UUID runId, String metricId,
                        String componentName, String variant, MeasurementStatus status,
                        BigDecimal value, String unit, String threshold,
-                       BigDecimal previousValue, String reason, String detail,
-                       Instant measuredAt) {
+                       BigDecimal previousValue, String reason, String detail) {
         this.id = id;
         this.runId = runId;
-        this.repositoryId = repositoryId;
         this.metricId = metricId;
         this.componentName = componentName;
         this.variant = variant;
@@ -97,7 +87,6 @@ public class Measurement {
         this.previousValue = previousValue;
         this.reason = reason;
         this.detail = detail;
-        this.measuredAt = measuredAt;
     }
 
     public UUID getId() {
@@ -147,9 +136,5 @@ public class Measurement {
 
     public String getDetail() {
         return detail;
-    }
-
-    public Instant getMeasuredAt() {
-        return measuredAt;
     }
 }
