@@ -23,7 +23,10 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
 
     public static final String AT_LEAST = ">=";
     public static final String AT_MOST = "<=";
-    /** M-10 は件数そのものではなく、比較対象 Run からの増加で判定する。 */
+    /**
+     * 比較対象 Run からの増加で判定したことを示す。今はどの指標も使わないが、M-10 を増加で判定していた
+     * ころ（DD-25 より前）に保存した行を読み戻して表示するために残す。
+     */
     public static final String INCREASE = "increase";
 
     private static final String OPERATOR = "operator";
@@ -59,7 +62,7 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
         return atMost(BigDecimal.valueOf(count));
     }
 
-    /** 比較対象 Run からの増加が {@code count} 以下なら合格。 */
+    /** 比較対象 Run からの増加が {@code count} 以下なら合格（DD-25 より前の M-10。保存済みの行の表示とテストで使う）。 */
     public static Threshold increaseAtMost(long count) {
         return new Threshold(AT_MOST, BigDecimal.valueOf(count), INCREASE, Map.of());
     }

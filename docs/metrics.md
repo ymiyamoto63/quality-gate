@@ -23,7 +23,7 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
 | M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
 | M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `QG_TEST_SUCCESS_RATE_MIN` |
-| M-10 | 機能テスト | スキップされたテスト数 | 比較対象 Run から増やさない | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_INCREASE_MAX` |
+| M-10 | 機能テスト | スキップされたテスト数 | 0 件（backend / frontend それぞれ） | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_MAX` |
 | M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `QG_SECRETS_MAX` |
 | M-12 | セキュリティ | ライセンス違反件数 | forbidden 0 パッケージ | Trivy（SARIF） | `sarif` | `QG_FORBIDDEN_LICENSES_MAX` |
 
@@ -86,7 +86,7 @@ M-01・M-02・M-09・M-10 はコンポーネントごとに判定し（合算す
 | 用語 | 意味 | 決め方 |
 | --- | --- | --- |
 | 比較元（`baseCommitSha`） | M-07 の破壊的変更を数える起点のコミット | 収集ランナーが clone した履歴から求めて送る（[アーキテクチャ](architecture.md#34-比較元とタグ)）。既定ブランチは直前のコミット、それ以外のブランチは既定ブランチとの merge-base、既定ブランチ上のタグは前のタグ |
-| 比較対象 Run | 前回比・違反の新規 / 継続 / 解消・M-10 の増加の起点 | 比較元コミットで判定済みの Run があればそれ。無ければ同じブランチで直前に計測した判定済みの Run |
+| 比較対象 Run | 前回比（理由に書き添えるだけで合否には使わない）・違反の新規 / 継続 / 解消の起点 | 比較元コミットで判定済みの Run があればそれ。無ければ同じブランチで直前に計測した判定済みの Run |
 
 前回値は、コンポーネントと計測条件（`variant`）が一致する値だけから取る。
 
@@ -396,12 +396,16 @@ frontend は、Vitest に junit reporter を足して出した `junit.xml` を�
 
 スキップは M-10 で判定するため、M-09 では扱わない。
 
-**判定（M-10）**: スキップ（`@Disabled` / `it.skip` など）は落ちるテストを黙らせる手段になりうるため、**比較対象 Run からの増加**を見る（既存のスキップを一括で不合格にしない）。
+**判定（M-10）**: スキップ（`@Disabled` / `it.skip` など）は落ちるテストを黙らせる手段になりうるため、コンポーネントごとに**件数そのもの**を上限と比べる。
 
 | 順 | 条件 | 結果 |
 | --- | --- | --- |
-| 1 | 比較対象 Run からの増加が `QG_SKIPPED_TESTS_INCREASE_MAX`（既定 0）を超える | FAIL |
-| 2 | それ以外（比較対象に同じコンポーネントの値が無ければ増加は見ない） | PASS |
+| 1 | 件数が `QG_SKIPPED_TESTS_MAX`（既定 0）を超える | FAIL |
+| 2 | それ以外 | PASS（比較対象 Run より増えていれば理由に書き添える。内訳の `increase` にも残す） |
+
+前回からの増加では判定しない。増加で判定すると、比較対象 Run が無い初回の計測（または比較対象にそのコンポーネントが無いとき）は何件スキップしても合格になり、同じコミットの判定がそれまでに何を計測したかで変わってしまうためである（[DD-25](architecture.md#2-設計判断)）。
+
+既存のスキップをすぐには直せないときは、`QG_SKIPPED_TESTS_MAX` を今の件数に合わせて認める（M-06 の既存の違反を `QG_EXCLUSIONS` で外すのと同じく、認める範囲を運用者が明示的に決める）。スキップを減らしたら上限も下げる。上限はコンポーネント共通の 1 つの値である。
 
 ### M-11 シークレット検出件数
 

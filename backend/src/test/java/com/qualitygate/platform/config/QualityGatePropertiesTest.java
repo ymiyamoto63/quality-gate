@@ -47,6 +47,8 @@ class QualityGatePropertiesTest {
         assertThat(gate.errorRateMaxPct()).isEqualByComparingTo("0.1");
         assertThat(gate.complexityMax()).isEqualTo(15);
         assertThat(gate.testSuccessRateMin()).isEqualByComparingTo("100");
+        // M-10 は件数そのものの上限。既定はスキップを 1 件も認めない
+        assertThat(gate.skippedTestsMax()).isZero();
         assertThat(GateThresholds.from(gate).enabledMetrics()).hasSize(12);
     }
 

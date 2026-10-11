@@ -20,14 +20,17 @@ import java.util.Optional;
  *
  * <p>スキップ（{@code @Disabled} / {@code it.skip} など）は失敗にならないため、成功率（M-09）では
  * 見えない。落ちるテストを黙らせる手段として使われると、成功率 100% のまま検証が減っていく。
- * そこで<strong>比較対象 Run からの増加</strong>を判定する。
- * 既存のスキップを一括で不合格にしないのは M-06 と同じ考え方による。
+ * そこで<strong>件数そのもの</strong>を上限（{@code QG_SKIPPED_TESTS_MAX}、既定 0）で判定する。
+ * 前回からの増加で判定すると、比較対象の Run が無いときは何件でも合格になり、同じコミットの判定が
+ * それまでに何を計測したかで変わってしまう（DD-25）。既存のスキップを認めるときは、上限を今の件数に
+ * 合わせる（M-06 を QG_EXCLUSIONS で除くのと同じく、運用者が明示的に決める）。
  *
  * <p>判定の優先順位は次のとおり。
  * <ol>
- *   <li>比較対象 Run からの増加が上限（{@code QG_SKIPPED_TESTS_INCREASE_MAX}、既定 0）を超えた → FAIL</li>
- *   <li>それ以外 → PASS（比較対象が無ければ増加は判定せず、件数だけを記録する）</li>
+ *   <li>件数が上限を超えた → FAIL</li>
+ *   <li>それ以外 → PASS</li>
  * </ol>
+ * 比較対象 Run からの増加は、理由と内訳（{@code increase}）に書き添えるだけで合否には使わない。
  *
  * <p>件数はコンポーネントごとに数える（M-09 と同じ）。
  */
@@ -43,9 +46,8 @@ public class SkippedTestEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        GateThresholds.TestResults thresholds = context.thresholds().testResults();
-        // 件数そのものではなく、比較元からの増加で判定する（画面は「前回から +0 件以内」と描く）
-        Threshold threshold = Threshold.increaseAtMost(thresholds.maxSkippedIncrease());
+        int max = context.thresholds().testResults().maxSkipped();
+        Threshold threshold = Threshold.atMost(max);
 
         List<MetricResult> results = new ArrayList<>();
         TestSuccessEvaluator.tallyByComponent(context).forEach((component, tally) -> {
@@ -59,7 +61,7 @@ public class SkippedTestEvaluator implements MetricEvaluator {
             detail.put("executed", tally.executed());
             previous.ifPresent(value -> detail.put("increase", tally.skipped() - value.longValue()));
 
-            Judgement judgement = judge(tally, previous, thresholds);
+            Judgement judgement = judge(tally, previous, max);
             results.add(MetricResult.of(metricId(), componentName, judgement.status(),
                     BigDecimal.valueOf(tally.skipped()), UNIT, threshold, judgement.reason(),
                     detail, findings));
@@ -67,28 +69,31 @@ public class SkippedTestEvaluator implements MetricEvaluator {
         return results;
     }
 
-    private static Judgement judge(TestTally tally, Optional<BigDecimal> previous,
-                                   GateThresholds.TestResults thresholds) {
+    private static Judgement judge(TestTally tally, Optional<BigDecimal> previous, int max) {
         long skipped = tally.skipped();
-        if (previous.isEmpty()) {
-            return new Judgement(MeasurementStatus.PASS,
-                    "スキップされたテストは %d 件です（比較対象の Run が無いため、増加は判定していません）"
-                            .formatted(skipped));
-        }
-        long increase = skipped - previous.get().longValue();
-        if (increase > thresholds.maxSkippedIncrease()) {
+        String note = increaseNote(skipped, previous);
+        if (skipped > max) {
             return new Judgement(MeasurementStatus.FAIL,
-                    "スキップされたテストが前回から %d 件増えました（%d 件 → %d 件、増加の上限 %d 件）。"
-                            .formatted(increase, previous.get().longValue(), skipped,
-                                    thresholds.maxSkippedIncrease())
-                            + "スキップしたテストは検証されていません");
+                    "スキップされたテストが %d 件あります（上限 %d 件）。スキップしたテストは検証されていません"
+                            .formatted(skipped, max) + note);
         }
         if (skipped == 0) {
-            return new Judgement(MeasurementStatus.PASS, "スキップされたテストはありません");
+            return new Judgement(MeasurementStatus.PASS, "スキップされたテストはありません" + note);
         }
         return new Judgement(MeasurementStatus.PASS,
-                "スキップされたテストは %d 件です（前回 %d 件）"
-                        .formatted(skipped, previous.get().longValue()));
+                "スキップされたテストは %d 件です（上限 %d 件）".formatted(skipped, max) + note);
+    }
+
+    /** 前回より増えていれば、合否とは別に書き添える（上限の内側で増えていることに気づけるように）。 */
+    private static String increaseNote(long skipped, Optional<BigDecimal> previous) {
+        if (previous.isEmpty()) {
+            return "";
+        }
+        long before = previous.get().longValue();
+        if (skipped <= before) {
+            return "";
+        }
+        return "。前回より %d 件増えています（%d 件 → %d 件）".formatted(skipped - before, before, skipped);
     }
 
     private record Judgement(MeasurementStatus status, String reason) {

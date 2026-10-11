@@ -123,11 +123,13 @@ public record MetricGuide(
                     "テスト成功率 = 成功 / 実行 × 100（スキップは分母に入れない）。コンポーネントごとに判定する。",
                     "JUnit（Maven Surefire / Failsafe で実行）、Vitest の junit reporter。結果は JUnit XML で受け取る"),
             new MetricGuide(MetricCatalog.M_SKIPPED_TESTS,
-                    "実行されずに飛ばされたテストが増えていないか",
+                    "実行されずに飛ばされたテストが残っていないか",
                     Basis.TEAM_DECISION,
-                    "飛ばしたテストは何も確かめていないため、前回より増えることを認めない。",
+                    "飛ばしたテストは何も確かめていないため、既定では 1 件も認めない。"
+                            + "既存のスキップを認めるときは、上限を今の件数に合わせて明示する。"
+                            + "前回と比べずに件数で判定するのは、同じコミットならいつ計測しても同じ判定にするため。",
                     "確かめたつもりの機能が、実は検証されていない状態でリリースされる。",
-                    "スキップされたテストの件数（コンポーネントごと）。前回からの増分で判定する。",
+                    "スキップされたテストの件数（コンポーネントごと）。前回からの増加は参考として書き添えるが、合否には使わない。",
                     "JUnit（Maven Surefire / Failsafe で実行）、Vitest の junit reporter。結果は JUnit XML で受け取る"),
             new MetricGuide(MetricCatalog.M_SECRETS,
                     "パスワードや API キーなどの秘密情報が、コードに書き込まれていないか",

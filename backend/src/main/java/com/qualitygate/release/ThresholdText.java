@@ -12,7 +12,7 @@ final class ThresholdText {
     }
 
     /**
-     * 合格ラインを縦軸の値にする。前回からの増加で判定する指標（M-10）は、値の軸に引ける線が無いため null。
+     * 合格ラインを縦軸の値にする。前回からの増加で判定した行（DD-25 より前の M-10）は、値の軸に引ける線が無いため null。
      */
     static BigDecimal lineOf(Threshold threshold) {
         return threshold.isIncrease() ? null : threshold.value();
@@ -26,7 +26,7 @@ final class ThresholdText {
             return null;
         }
         if (threshold.isIncrease()) {
-            // M-10 は件数そのものではなく、比較元からの増加で判定する
+            // DD-25 より前の M-10 は、件数そのものではなく比較元からの増加で判定していた
             return "前回から +%s%s 以内".formatted(Decimals.plain(threshold.value()), suffix(unit));
         }
         return "%s %s%s".formatted(symbol(threshold.operator()), Decimals.plain(threshold.value()), suffix(unit));

@@ -290,7 +290,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプ
     <tr><td class="id">M-07</td><td>契約・互換性</td><td>OpenAPI の破壊的変更件数</td><td>0 件</td><td>oasdiff</td><td><code>QG_BREAKING_CHANGES_MAX</code></td></tr>
     <tr><td class="id">M-08</td><td>使いやすさ</td><td>アクセシビリティ重大違反件数</td><td>critical / serious 0 件</td><td>Playwright + axe-core</td><td><code>QG_ACCESSIBILITY_VIOLATIONS_MAX</code></td></tr>
     <tr><td class="id">M-09</td><td>機能テスト</td><td>テスト成功率</td><td>100%</td><td>JUnit XML</td><td><code>QG_TEST_SUCCESS_RATE_MIN</code></td></tr>
-    <tr><td class="id">M-10</td><td>機能テスト</td><td>スキップされたテスト数</td><td>比較対象 Run から増やさない</td><td>JUnit XML</td><td><code>QG_SKIPPED_TESTS_INCREASE_MAX</code></td></tr>
+    <tr><td class="id">M-10</td><td>機能テスト</td><td>スキップされたテスト数</td><td>0 件（backend / frontend それぞれ）</td><td>JUnit XML</td><td><code>QG_SKIPPED_TESTS_MAX</code></td></tr>
     <tr><td class="id">M-11</td><td>セキュリティ</td><td>シークレット検出件数</td><td>0 件</td><td>Trivy (SARIF)</td><td><code>QG_SECRETS_MAX</code></td></tr>
     <tr><td class="id">M-12</td><td>セキュリティ</td><td>ライセンス違反件数</td><td>forbidden 0 パッケージ</td><td>Trivy (SARIF)</td><td><code>QG_FORBIDDEN_LICENSES_MAX</code></td></tr>
   </tbody>
@@ -322,7 +322,7 @@ NOT_APPLICABLE は影響しない</pre>
 <h3>比較元・比較対象 Run</h3>
 <ul>
   <li><strong>比較元</strong>（M-07 の起点）: 既定ブランチは直前のコミット、他のブランチは merge-base、タグは前のタグ</li>
-  <li><strong>比較対象 Run</strong>（前回比・違反の新規/継続/解消・M-10 の起点）: 比較元コミットの判定済み Run、無ければ同じブランチの直前の判定済み Run</li>
+  <li><strong>比較対象 Run</strong>（前回比・違反の新規/継続/解消の起点。前回比は理由に書き添えるだけで合否には使わない）: 比較元コミットの判定済み Run、無ければ同じブランチの直前の判定済み Run</li>
   <li>違反は <code>sha256(指標ID + 同定子)</code> の fingerprint で Run をまたいで追跡する（行番号は含めない）</li>
 </ul>
 <h3>Run のライフサイクル</h3>
@@ -486,7 +486,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td>Run → 成果物</td><td>1 : 0..N</td><td>収集ランナーが送った JaCoCo・SARIF などのファイル</td></tr>
     <tr><td>Run → 指標の判定結果</td><td>1 : 0..N</td><td>指標 × コンポーネント × シナリオ × 計測条件ごとに 1 行</td></tr>
     <tr><td>Run → 違反</td><td>1 : 0..N</td><td>不合格の根拠になった関数・CVE・画面の要素など</td></tr>
-    <tr><td>Run → 比較対象 Run</td><td>N : 0..1</td><td>前回比・違反の新規 / 継続 / 解消・スキップの増加を数える起点。比較対象が消えても判定済みの値は残る（前回値を焼き付けているため）</td></tr>
+    <tr><td>Run → 比較対象 Run</td><td>N : 0..1</td><td>前回比・違反の新規 / 継続 / 解消を数える起点。比較対象が消えても判定済みの値は残る（前回値を焼き付けているため）</td></tr>
   </tbody>
 </table></div>
 
@@ -517,7 +517,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>ci_run_url</code></td><td><code>varchar(512)</code></td><td class="c"></td><td></td><td></td><td>計測したワークフローの実行 URL</td></tr>
     <tr><td><code>measured_at</code></td><td><code>timestamptz</code></td><td class="c">○</td><td></td><td></td><td>計測日時</td></tr>
     <tr><td><code>tags</code></td><td><code>text[]</code></td><td class="c">○</td><td><code>&#x27;{}&#x27;</code></td><td></td><td>計測したコミットを指すタグ。リリース判定でタグを解決するのに使う</td></tr>
-    <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分・M-10 の起点）</td></tr>
+    <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分の起点）</td></tr>
     <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>処理の状態</td></tr>
     <tr><td><code>verdict</code></td><td><code>varchar(24)</code></td><td class="c"></td><td></td><td>CHECK ③</td><td>判定結果。判定前は NULL</td></tr>
     <tr><td><code>error_code</code></td><td><code>varchar(64)</code></td><td class="c"></td><td></td><td></td><td>処理失敗（FAILED）の理由</td></tr>

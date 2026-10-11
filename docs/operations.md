@@ -95,13 +95,14 @@ openssl rand -hex 32
 | `QG_BREAKING_CHANGES_MAX` | `0` | M-07 |
 | `QG_ACCESSIBILITY_VIOLATIONS_MAX` / `QG_ACCESSIBILITY_PAGES` | `0` / 空 | M-08 の上限（基準は WCAG 2.2 AA に固定）/ 検査されているべき画面（カンマ区切り）。収集ランナーはこの画面を検査する（`:` で始まる区切りを含むパターンは、具体的なパスを計測プロファイルの `A11Y_PAGES` に書く） |
 | `QG_TEST_SUCCESS_RATE_MIN` / `QG_TEST_COUNT_MIN` | `100` / `1` | M-09 |
-| `QG_SKIPPED_TESTS_INCREASE_MAX` | `0` | M-10 前回からの増加の上限 |
+| `QG_SKIPPED_TESTS_MAX` | `0` | M-10 スキップされたテストの件数の上限（コンポーネントごと）。既存のスキップを認めるなら今の件数にする |
 | `QG_SECRETS_MAX` | `0` | M-11 |
 | `QG_FORBIDDEN_LICENSES_MAX` | `0` | M-12 |
 
 - 変えた値はアプリを再起動した後の判定から効きます。**判定済みの計測の結論は変わりません**（判定に使った合格ラインは計測ごとに残り、画面の「合格ライン」列に出ます）
 - 合格ラインを緩めたときは、理由を記録してください（デプロイの設定の変更履歴や、関係者への報告）
 - 値の形式が不正（数でない、知らない指標 ID など）だと起動に失敗します
+- M-10 は前回からの増加ではなく件数そのもので判定します（[DD-25](architecture.md#2-設計判断)）。廃止した `QG_SKIPPED_TESTS_INCREASE_MAX` が残っていると起動に失敗するため、消して `QG_SKIPPED_TESTS_MAX` に件数の上限を書いてください。すぐには直せないスキップがあるなら、上限を今の件数（リリース判定の M-10 の値）に合わせ、減らしたら上限も下げます
 
 ### 2.5 ログイン
 
@@ -397,4 +398,5 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名とアプリの `QG_PERF_SCENARIOS` が一致していない |
 | M-03 が ERROR（成功スループットが到達率の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `QG_ARRIVAL_RATE_RPS` が一致していない |
 | M-08 が ERROR（検査した画面が足りない） | `QG_ACCESSIBILITY_PAGES` のパターン（`/tasks/:id` など）に当たる具体的なパスを `A11Y_PAGES` に書いていない、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
+| アプリが `QG_SKIPPED_TESTS_INCREASE_MAX は廃止しました` で起動しない | `QG_SKIPPED_TESTS_INCREASE_MAX` を消し、M-10 の件数の上限を `QG_SKIPPED_TESTS_MAX` に書く（2.4） |
 | 画面にログインできない | `QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD` が違う。アプリを再起動するとログインし直しになる |

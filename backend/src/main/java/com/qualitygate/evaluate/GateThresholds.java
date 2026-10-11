@@ -66,9 +66,9 @@ public record GateThresholds(
      *
      * @param minSuccessRate     M-09 の合格ライン（成功率 %）
      * @param minTestCount       M-09 の最小実行件数。下回れば値を確定できない（ERROR）
-     * @param maxSkippedIncrease M-10 の比較対象 Run からの増加の上限（件）
+     * @param maxSkipped         M-10 スキップされたテストの件数の上限（コンポーネントごと）
      */
-    public record TestResults(BigDecimal minSuccessRate, int minTestCount, int maxSkippedIncrease) {
+    public record TestResults(BigDecimal minSuccessRate, int minTestCount, int maxSkipped) {
     }
 
     /**
@@ -118,6 +118,6 @@ public record GateThresholds(
                 gate.complexityMax(),
                 gate.breakingChangesMax(),
                 new Accessibility(gate.accessibilityViolationsMax(), gate.accessibilityPages()),
-                new TestResults(gate.testSuccessRateMin(), gate.testCountMin(), gate.skippedTestsIncreaseMax()));
+                new TestResults(gate.testSuccessRateMin(), gate.testCountMin(), gate.skippedTestsMax()));
     }
 }

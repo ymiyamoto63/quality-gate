@@ -407,8 +407,11 @@ class EvaluationPipelineIT {
     }
 
     @Test
-    void テスト結果はコンポーネントごとに判定しスキップの増加は不合格にする() {
-        QualityGateProperties.Gate gate = gate(only("M-01", "M-09", "M-10"), null, null, null);
+    void テスト結果はコンポーネントごとに判定しスキップは件数の上限で判定する() {
+        // 既存のスキップ 1 件を認める（QG_SKIPPED_TESTS_MAX=1）
+        QualityGateProperties.Gate gate = new QualityGateProperties.Gate(only("M-01", "M-09", "M-10"), null,
+                null, null, null, null, null, null, null, null, null, null, null, null, null, null, null, 1,
+                null, null);
         Run first = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(first, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(first, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", """
@@ -424,7 +427,7 @@ class EvaluationPipelineIT {
                 """);
         assertThat(evaluate(first, gate).getVerdict()).isEqualTo(Verdict.PASS);
 
-        // 2 回目: backend のスキップが 1 件増え、frontend のテストが 1 件失敗した
+        // 2 回目: backend のスキップが 1 件増えて上限を超え、frontend のテストが 1 件失敗した
         Run second = createRun(Instant.parse("2026-09-23T00:00:00Z"));
         attach(second, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
         attach(second, ArtifactType.TEST_JUNIT_XML, "TEST-A.xml", "backend", """

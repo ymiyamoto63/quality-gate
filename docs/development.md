@@ -197,6 +197,7 @@ quality-gate 自身は quality-gate で計測せず（DD-5）、PR の CI で次
 | 起動時に `QG_REPOSITORY に計測対象のリポジトリを…` で失敗する | `.env` に `QG_REPOSITORY=owner/name` が無い |
 | 起動時に `QG_LOGIN_PASSWORD に…` / `12 文字以上にしてください` で失敗する | `.env` の `QG_LOGIN_PASSWORD` が無いか短い |
 | 起動時に `QG_DISABLED_METRICS には…`・数値の変換エラーで失敗する | 合格ライン（`QG_*`）の値の形式が不正 |
+| 起動時に `QG_SKIPPED_TESTS_INCREASE_MAX は廃止しました` で失敗する | `.env` から消し、M-10 の件数の上限を `QG_SKIPPED_TESTS_MAX` に書く（[運用 2.4](operations.md#24-合格ライン)） |
 | ログインしても「ユーザー名かパスワードが違います」と出る | `QG_LOGIN_USERNAME`（既定 `quality`）/ `QG_LOGIN_PASSWORD` と違う。アプリを再起動するとセッションが消え、ログインし直しになる |
 
 疎通は Vite を動かしているのと同じ端末から `curl http://127.0.0.1:8080/actuator/health` で確かめられます。
