@@ -51,6 +51,13 @@ fi
 if [ -n "${DISABLED_METRICS:-}" ]; then
   log "計測しない指標（計測プロファイルの DISABLED_METRICS）: $DISABLED_METRICS"
 fi
+SCAN_PAGES=$(a11y_pages)
+read -ra app_pages <<< "${QG_ACCESSIBILITY_PAGES:-}"
+for page in "${app_pages[@]}"; do
+  [[ "$page" != */:* ]] \
+    || log "M-08: $page はパターンのため開きません。具体的なパスを計測プロファイルの A11Y_PAGES に書いてください"
+done
+[ -z "$SCAN_PAGES" ] || log "M-08 で検査する画面: $SCAN_PAGES"
 
 # M-08。対象アプリを起動して検査する
 measure_app() {
@@ -78,7 +85,7 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   measure_frontend
   if metric_enabled M-06; then measure_frontend_complexity; fi
 fi
-if [ -n "${FRONTEND_DIR:-}" ] && [ -n "${A11Y_PAGES:-}" ] && metric_enabled M-08; then
+if [ -n "${FRONTEND_DIR:-}" ] && [ -n "$SCAN_PAGES" ] && metric_enabled M-08; then
   build_frontend
   measure_app
 fi

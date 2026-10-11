@@ -148,6 +148,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 ### 3.5 何を計測するか
 
 - **アプリの `QG_DISABLED_METRICS` に書いた指標は計測しない**。`fetch.sh` が取り込み API と同じ Ingest Token で `GET /api/v1/collector/settings` を読み、`meta.env` に書く（あわせて計測プロファイルとアプリの `QG_REPOSITORY` の一致も確かめ、食い違えば計測の前に止める）
+- M-08 はアプリの `QG_ACCESSIBILITY_PAGES` の画面を検査する（同じ設定で読む）。`/tasks/:id` のようなパターンは開けないため、具体的なパスを計測プロファイルの `A11Y_PAGES` に書く（アプリの設定に足される）
 - 計測プロファイルの `DISABLED_METRICS` に書いた指標も計測しない（アプリの設定に足される）。アプリで判定する指標をここに書くと、判定に残った指標が計測エラーになる
 - テスト（M-01 / M-09 / M-10）はビルドを兼ね、M-02・M-03 / M-04・M-08 が使う jar も作るため、常に実行する
 - テストが失敗しても計測は止めない（失敗は M-09 の材料）。成果物が出なかった指標は送られず、quality-gate では ERROR になる
@@ -228,7 +229,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | `frontend-coverage/lcov.info` | Vitest（v8）（`frontend-tests.sh`） | `lcov` | frontend | — | M-01 | `FRONTEND_DIR` がある |
 | `tests/frontend/junit.xml` | Vitest（`frontend-tests.sh`） | `test-junit-xml` | frontend | — | M-09 / M-10 | 同上 |
 | `frontend/eslint.json` | ESLint（`complexity.sh`） | `eslint-json` | frontend | — | M-06 | 同上 |
-| `frontend/axe-results.json` | Playwright + axe-core（`accessibility.sh`） | `axe-json` | frontend | — | M-08 | `A11Y_PAGES` がある |
+| `frontend/axe-results.json` | Playwright + axe-core（`accessibility.sh`） | `axe-json` | frontend | — | M-08 | 検査する画面（`QG_ACCESSIBILITY_PAGES` か `A11Y_PAGES`）がある |
 | `oasdiff.json` | oasdiff（`breaking-changes.sh`） | `oasdiff-json` | backend | 比較元に API 定義が無ければ `{"baseSpecMissing":true}` | M-07 | `OPENAPI_PATH` がある |
 | `trivy.sarif` | Trivy（`vulnerabilities.sh`） | `sarif` | なし | `{"scanners":["vuln","secret"]}` | M-05 / M-11 | 常に |
 | `trivy-license.sarif` | Trivy（`licenses.sh`） | `sarif` | なし | `{"scanners":["license"]}` | M-12 | 常に |

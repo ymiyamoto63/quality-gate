@@ -13,7 +13,7 @@ export interface paths {
     }
     /**
      * 収集ランナーの設定を返す
-     * @description 計測対象のリポジトリと判定しない指標。収集ランナーは判定しない指標を計測しない。
+     * @description 計測対象のリポジトリ、判定しない指標、M-08 で検査されているべき画面。収集ランナーは判定しない指標を計測せず、画面を検査する。
      */
     get: operations['collectorSettings']
     put?: never
@@ -169,6 +169,7 @@ export type webhooks = Record<string, never>
 export interface components {
   schemas: {
     CollectorSettingsResponse: {
+      accessibilityPages?: string[]
       disabledMetrics?: string[]
       repository?: string
     }

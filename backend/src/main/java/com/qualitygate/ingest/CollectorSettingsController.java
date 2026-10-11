@@ -10,7 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 /**
  * 収集ランナーが計測の前に読む設定。認証は取り込み API と同じ Ingest Token。
  *
- * <p>判定しない指標（{@code QG_DISABLED_METRICS}）をアプリの設定だけで持てるよう、収集ランナーはここから読んで計測を止める。
+ * <p>判定しない指標（{@code QG_DISABLED_METRICS}）と M-08 で検査する画面（{@code QG_ACCESSIBILITY_PAGES}）を
+ * アプリの設定だけで持てるよう、収集ランナーはここから読んで計測を止める・画面を検査する。
  */
 @RestController
 @Tag(name = "Ingest", description = "収集ランナーからの計測結果の取り込み")
@@ -24,9 +25,11 @@ public class CollectorSettingsController {
 
     @GetMapping("/api/v1/collector/settings")
     @Operation(summary = "収集ランナーの設定を返す",
-            description = "計測対象のリポジトリと判定しない指標。収集ランナーは判定しない指標を計測しない。")
+            description = "計測対象のリポジトリ、判定しない指標、M-08 で検査されているべき画面。"
+                    + "収集ランナーは判定しない指標を計測せず、画面を検査する。")
     public CollectorSettingsResponse collectorSettings() {
         return new CollectorSettingsResponse(properties.repository(),
-                properties.gate().disabledMetrics().stream().sorted().toList());
+                properties.gate().disabledMetrics().stream().sorted().toList(),
+                properties.gate().accessibilityPages());
     }
 }

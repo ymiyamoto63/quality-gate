@@ -23,7 +23,7 @@ tags:
 paths:
   /api/v1/collector/settings:
     get:
-      description: 計測対象のリポジトリと判定しない指標。収集ランナーは判定しない指標を計測しない。
+      description: 計測対象のリポジトリ、判定しない指標、M-08 で検査されているべき画面。収集ランナーは判定しない指標を計測せず、画面を検査する。
       operationId: collectorSettings
       responses:
         "200":
@@ -188,6 +188,10 @@ components:
     CollectorSettingsResponse:
       type: object
       properties:
+        accessibilityPages:
+          type: array
+          items:
+            type: string
         disabledMetrics:
           type: array
           items:

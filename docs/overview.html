@@ -418,7 +418,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>frontend-coverage/lcov.info</code></td><td>Vitest（v8）</td><td><code>lcov</code></td><td>frontend</td><td>—</td><td class="id">M-01</td><td><code>FRONTEND_DIR</code> がある</td></tr>
     <tr><td><code>tests/frontend/junit.xml</code></td><td>Vitest</td><td><code>test-junit-xml</code></td><td>frontend</td><td>—</td><td class="id">M-09 / M-10</td><td>同上</td></tr>
     <tr><td><code>frontend/eslint.json</code></td><td>ESLint</td><td><code>eslint-json</code></td><td>frontend</td><td>—</td><td class="id">M-06</td><td>同上</td></tr>
-    <tr><td><code>frontend/axe-results.json</code></td><td>Playwright + axe-core</td><td><code>axe-json</code></td><td>frontend</td><td>—</td><td class="id">M-08</td><td><code>A11Y_PAGES</code> がある</td></tr>
+    <tr><td><code>frontend/axe-results.json</code></td><td>Playwright + axe-core</td><td><code>axe-json</code></td><td>frontend</td><td>—</td><td class="id">M-08</td><td>検査する画面（<code>QG_ACCESSIBILITY_PAGES</code> か <code>A11Y_PAGES</code>）がある</td></tr>
     <tr><td><code>oasdiff.json</code></td><td>oasdiff</td><td><code>oasdiff-json</code></td><td>backend</td><td>比較元に API 定義が無ければ <code>baseSpecMissing</code></td><td class="id">M-07</td><td><code>OPENAPI_PATH</code> がある</td></tr>
     <tr><td><code>trivy.sarif</code></td><td>Trivy</td><td><code>sarif</code></td><td>—</td><td><code>scanners: vuln, secret</code></td><td class="id">M-05 / M-11</td><td>常に</td></tr>
     <tr><td><code>trivy-license.sarif</code></td><td>Trivy</td><td><code>sarif</code></td><td>—</td><td><code>scanners: license</code></td><td class="id">M-12</td><td>常に</td></tr>

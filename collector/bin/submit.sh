@@ -85,7 +85,7 @@ if [ -n "${FRONTEND_DIR:-}" ]; then
   upload test-junit-xml "$REPORTS/tests/frontend/junit.xml" "$FRONTEND"
   upload eslint-json "$REPORTS/frontend/eslint.json" "$FRONTEND"
 fi
-[ -z "${A11Y_PAGES:-}" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
+[ -z "$(a11y_pages)" ] || upload axe-json "$REPORTS/frontend/axe-results.json" "$FRONTEND"
 if [ -n "${OPENAPI_PATH:-}" ]; then
   if [ -e "$REPORTS/oasdiff-base-spec-missing" ]; then
     upload oasdiff-json "$REPORTS/oasdiff.json" "$BACKEND" '{"baseSpecMissing":true}'

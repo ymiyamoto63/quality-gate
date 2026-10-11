@@ -7,7 +7,7 @@
 
 ```
 収集ランナー（fetch.sh）
-  → GET  /api/v1/collector/settings        計測対象のリポジトリと判定しない指標を読む   → 200 {repository, disabledMetrics}
+  → GET  /api/v1/collector/settings        計測対象のリポジトリと判定しない指標を読む   → 200 {repository, disabledMetrics, accessibilityPages}
 収集ランナー（submit.sh）
   → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId}
   → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202（本文なし）
@@ -61,8 +61,9 @@
 | --- | --- |
 | `repository` | `QG_REPOSITORY`。`fetch.sh` は計測プロファイルの `QG_REPOSITORY` と比べ、違えば計測の前に止める（送信で拒否されるのを、計測に時間をかける前に知るため） |
 | `disabledMetrics` | `QG_DISABLED_METRICS`。`fetch.sh` が `meta.env` の `QG_DISABLED_METRICS` に書き、`measure.sh` と `submit.sh` はその指標を計測・送信しない |
+| `accessibilityPages` | `QG_ACCESSIBILITY_PAGES`。`fetch.sh` が `meta.env` の `QG_ACCESSIBILITY_PAGES` に書き、`measure.sh` は計測プロファイルの `A11Y_PAGES` と合わせて M-08 で検査する。`:` で始まる区切りを含むパターンは開けないため検査しない（具体的なパスを `A11Y_PAGES` に書く） |
 
-判定しない指標をアプリの設定だけで持つためのもの。計測プロファイルにも書かせると、片方だけ変えたときに計測エラーになるか、判定しない指標を測って時間を使う。
+判定しない指標と M-08 で検査する画面をアプリの設定だけで持つためのもの。計測プロファイルにも書かせると、片方だけ変えたときに計測エラーになるか、判定しない指標を測って時間を使う。
 
 ## 5. `POST /api/v1/runs/{runId}/finalize`
 

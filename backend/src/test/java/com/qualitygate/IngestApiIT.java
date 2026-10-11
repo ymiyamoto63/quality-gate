@@ -150,7 +150,8 @@ class IngestApiIT {
 
         assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
         assertThat(response.getBody()).containsEntry("repository", REPOSITORY)
-                .containsEntry("disabledMetrics", java.util.List.of());
+                .containsEntry("disabledMetrics", java.util.List.of())
+                .containsEntry("accessibilityPages", java.util.List.of());
     }
 
     @Test
