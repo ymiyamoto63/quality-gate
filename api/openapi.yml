@@ -21,6 +21,20 @@ tags:
 - description: ログインの状態
   name: Me
 paths:
+  /api/v1/collector/settings:
+    get:
+      description: 計測対象のリポジトリと判定しない指標。収集ランナーは判定しない指標を計測しない。
+      operationId: collectorSettings
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/CollectorSettingsResponse"
+          description: OK
+      summary: 収集ランナーの設定を返す
+      tags:
+      - Ingest
   /api/v1/me:
     get:
       description: 未ログインなら 401
@@ -171,6 +185,15 @@ paths:
       - Ingest
 components:
   schemas:
+    CollectorSettingsResponse:
+      type: object
+      properties:
+        disabledMetrics:
+          type: array
+          items:
+            type: string
+        repository:
+          type: string
     CreateRunRequest:
       type: object
       description: Run の作成要求。収集ランナーが計測結果を送る前に送信する。

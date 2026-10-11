@@ -8,10 +8,15 @@
 #                 .git/config には書き込まない（後続の計測ジョブへ渡さないため）
 #   QG_BRANCH     計測するブランチ（既定: 計測プロファイルの DEFAULT_BRANCH）
 #   QG_COMMIT     計測するコミット（40 桁の SHA）またはタグ（既定: ブランチの先頭）
+#   QG_BASE_URL / QG_INGEST_TOKEN
+#                 quality-gate の URL と Ingest Token。指定するとアプリの設定を読み、
+#                 計測対象のリポジトリが一致するかを確かめ、判定しない指標（QG_DISABLED_METRICS）を meta.env に書く。
+#                 未指定なら読まない（計測しない指標は計測プロファイルの DISABLED_METRICS だけになる）
 #
 # 出力:
 #   <作業ディレクトリ>/src       対象リポジトリ（全履歴。比較元・タグを求めるのと、比較元の OpenAPI 定義を読むのに使う）
-#   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / TAGS（コミットを指すタグ。空白区切り）
+#   <作業ディレクトリ>/meta.env  COMMIT_SHA / BRANCH / BASE_SHA / TAGS（コミットを指すタグ。空白区切り）/
+#                                QG_DISABLED_METRICS（アプリの判定しない指標。空白区切り）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
@@ -21,6 +26,23 @@ load_profile
 REPOSITORY=$QG_REPOSITORY
 
 BRANCH=${QG_BRANCH:-$DEFAULT_BRANCH}
+
+# アプリの設定。判定しない指標は計測もしない（計測プロファイルに書かなくても、アプリの QG_DISABLED_METRICS だけで止まる）。
+# 計測対象の食い違いは送信のときに拒否されるため、計測に時間をかける前にここで止める
+APP_DISABLED_METRICS=""
+if [ -n "${QG_BASE_URL:-}" ] && [ -n "${QG_INGEST_TOKEN:-}" ]; then
+  SETTINGS=$(curl -sS --retry 3 --fail-with-body "${QG_BASE_URL%/}/api/v1/collector/settings" \
+    -H "Authorization: Bearer ${QG_INGEST_TOKEN}") || die "quality-gate の設定を読めませんでした: ${QG_BASE_URL}"
+  APP_REPOSITORY=$(jq -r '.repository' <<< "$SETTINGS")
+  [ "$APP_REPOSITORY" = "$REPOSITORY" ] \
+    || die "計測プロファイルの QG_REPOSITORY（$REPOSITORY）が quality-gate の QG_REPOSITORY（$APP_REPOSITORY）と違います"
+  APP_DISABLED_METRICS=$(jq -r '.disabledMetrics | join(" ")' <<< "$SETTINGS")
+  [[ "$APP_DISABLED_METRICS" =~ ^(M-[0-9]{2}( M-[0-9]{2})*)?$ ]] \
+    || die "quality-gate の判定しない指標を解釈できません: $APP_DISABLED_METRICS"
+  log "quality-gate の判定しない指標（QG_DISABLED_METRICS）: ${APP_DISABLED_METRICS:-なし}"
+else
+  log "QG_BASE_URL / QG_INGEST_TOKEN が無いため、quality-gate の設定は読みません（計測しない指標は計測プロファイルの DISABLED_METRICS だけ）"
+fi
 
 # 40 桁の SHA か、タグ名として正しい文字列だけを受け付ける（git のコマンドにそのまま渡すため）
 valid_ref() { [[ "$1" =~ ^[0-9a-f]{40}$ ]] || git check-ref-format "refs/tags/$1"; }
@@ -87,5 +109,6 @@ COMMIT_SHA=$COMMIT
 BRANCH=$BRANCH
 BASE_SHA=$BASE
 TAGS="$TAGS"
+QG_DISABLED_METRICS="$APP_DISABLED_METRICS"
 EOF
 log "計測するコミット: $COMMIT${TAG:+（$TAG）}（比較元: ${BASE:-なし}${BASE_LABEL:+（$BASE_LABEL）}）"

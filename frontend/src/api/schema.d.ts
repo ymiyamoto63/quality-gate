@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+  '/api/v1/collector/settings': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 収集ランナーの設定を返す
+     * @description 計測対象のリポジトリと判定しない指標。収集ランナーは判定しない指標を計測しない。
+     */
+    get: operations['collectorSettings']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/me': {
     parameters: {
       query?: never
@@ -148,6 +168,10 @@ export interface paths {
 export type webhooks = Record<string, never>
 export interface components {
   schemas: {
+    CollectorSettingsResponse: {
+      disabledMetrics?: string[]
+      repository?: string
+    }
     /** @description Run の作成要求。収集ランナーが計測結果を送る前に送信する。 */
     CreateRunRequest: {
       /** @description 差分計測の比較基準（収集ランナーが求めて送る）。省略すると比較元なしで判定する */
@@ -352,6 +376,26 @@ export interface components {
 }
 export type $defs = Record<string, never>
 export interface operations {
+  collectorSettings: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['CollectorSettingsResponse']
+        }
+      }
+    }
+  }
   me: {
     parameters: {
       query?: never
