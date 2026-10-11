@@ -83,7 +83,7 @@ openssl rand -hex 32
 | `QG_CRITICAL_VULNERABILITIES_MAX` / `QG_HIGH_VULNERABILITIES_MAX` | `0` / `0` | M-05 |
 | `QG_COMPLEXITY_MAX` | `15` | M-06 関数の循環的複雑度の上限 |
 | `QG_BREAKING_CHANGES_MAX` | `0` | M-07 |
-| `QG_ACCESSIBILITY_VIOLATIONS_MAX` / `QG_ACCESSIBILITY_PAGES` | `0` / 空 | M-08 の上限（基準は WCAG 2.2 AA に固定）/ 検査されているべき画面（カンマ区切り。計測プロファイルの `A11Y_PAGES` とそろえる） |
+| `QG_ACCESSIBILITY_VIOLATIONS_MAX` / `QG_ACCESSIBILITY_PAGES` | `0` / 空 | M-08 の上限（基準は WCAG 2.2 AA に固定）/ 検査されているべき画面（カンマ区切り）。収集ランナーはこの画面を検査する（`:` で始まる区切りを含むパターンは、具体的なパスを計測プロファイルの `A11Y_PAGES` に書く） |
 | `QG_TEST_SUCCESS_RATE_MIN` / `QG_TEST_COUNT_MIN` | `100` / `1` | M-09 |
 | `QG_SKIPPED_TESTS_INCREASE_MAX` | `0` | M-10 前回からの増加の上限 |
 | `QG_SECRETS_MAX` | `0` | M-11 |
@@ -211,7 +211,7 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | `NODE_VERSION_FILE` | 空（Node.js 22） | Node.js の版を書いたファイル（`.nvmrc` など。`22` / `v22.21.1` の形に対応） |
 | `FRONTEND_COVERAGE_INCLUDE` / `FRONTEND_COVERAGE_EXCLUDE` | 空 | M-01 のカバレッジの分母に含める / 除くファイル（`FRONTEND_DIR` 相対、空白区切り）。含めるファイルを指定しないと、テストが触れたファイルだけの数字になり実態より良く見えます |
 | `FRONTEND_COMPLEXITY_SOURCES` / `FRONTEND_COMPLEXITY_EXCLUDE` | `src` / `**/*.spec.ts **/*.test.ts **/*.d.ts` | M-06 で解析するディレクトリ / 除くファイル |
-| `A11Y_PAGES` | 空 | M-08 で検査する画面のパス（空白区切り）。アプリの `QG_ACCESSIBILITY_PAGES` と一致させる。空なら M-08 を計測しない |
+| `A11Y_PAGES` | 空 | アプリの `QG_ACCESSIBILITY_PAGES` に加えて M-08 で検査する画面のパス（空白区切り）。`QG_ACCESSIBILITY_PAGES` の `/tasks/:id` のようなパターンは開けないため、その画面は具体的なパス（`/tasks/1` など）をここに書く。両方とも空なら M-08 を計測しない |
 | `A11Y_READY_SELECTOR` | 空 | 描画が済んだと判断できる要素（CSS セレクタ）。空なら通信が落ち着くまで待つだけ |
 | `A11Y_BACKEND_PORT` | 空 | M-08 でバックエンドを起動するポート。対象のフロントエンドの proxy 先に合わせる。空ならバックエンドを起動しない |
 | `A11Y_FRONTEND_PORT` / `A11Y_START_TIMEOUT` | `4173` / `120` | `vite preview` のポート / 起動を待つ秒数 |
@@ -224,7 +224,7 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | `PERF_WARMUP_SECONDS` / `PERF_DURATION_SECONDS` | `60` / `300` | ウォームアップと計測の秒数。**手元で試すときだけ**短くします（その結果は送らない） |
 | `PERF_PROGRESS_INTERVAL` | `30` | 負荷試験の経過をログに出す間隔（秒） |
 
-`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`A11Y_PAGES`・`OPENAPI_PATH` を空にしても計測は止まりますが、アプリで判定する指標のままだと結果が無いため ERROR になります。止めるときは 4.3 のとおりアプリの `QG_DISABLED_METRICS` に書いてください。
+`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`OPENAPI_PATH` を空にしても（M-08 は `A11Y_PAGES` とアプリの `QG_ACCESSIBILITY_PAGES` の両方が空でも）計測は止まりますが、アプリで判定する指標のままだと結果が無いため ERROR になります。止めるときは 4.3 のとおりアプリの `QG_DISABLED_METRICS` に書いてください。
 
 ### 4.3 計測する指標の切り替え
 
@@ -343,7 +343,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 ```
 
 - `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。`QG_TARGET` はどのスクリプトにも必要です
-- `fetch.sh` に `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いとアプリの設定を読まず、計測しない指標は計測プロファイルの `DISABLED_METRICS` だけになります
+- `fetch.sh` に `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いとアプリの設定を読まず、計測しない指標は計測プロファイルの `DISABLED_METRICS`、M-08 で検査する画面は `A11Y_PAGES` だけになります
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - 負荷試験が有効なら約 18 分かかります。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 
@@ -391,5 +391,5 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | `fetch` が `計測プロファイルの QG_REPOSITORY（…）が quality-gate の QG_REPOSITORY（…）と違います` | `QG_TARGET` とアプリの `QG_REPOSITORY` がずれている（4.1） |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名とアプリの `QG_PERF_SCENARIOS` が一致していない |
 | M-03 が ERROR（成功スループットが到達率の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `QG_ARRIVAL_RATE_RPS` が一致していない |
-| M-08 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と `QG_ACCESSIBILITY_PAGES` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
+| M-08 が ERROR（検査した画面が足りない） | `QG_ACCESSIBILITY_PAGES` のパターン（`/tasks/:id` など）に当たる具体的なパスを `A11Y_PAGES` に書いていない、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |
 | 画面にログインできない | `QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD` が違う。アプリを再起動するとログインし直しになる |

@@ -48,5 +48,24 @@ load_profile() {
 # metric_enabled <指標 ID>（M-03 など）
 metric_enabled() { ! grep -qw -- "$1" <<< "${QG_DISABLED_METRICS:-} ${DISABLED_METRICS:-}"; }
 
+# M-08 で検査する画面（空白区切り）。quality-gate の QG_ACCESSIBILITY_PAGES（fetch.sh が meta.env に書く）と、
+# 計測プロファイルの A11Y_PAGES の和（重複は除く）。
+# アプリの値のうち `:` で始まる区切りを含むもの（/tasks/:id など）は照合用のパターンで開けないため除く。
+# その画面は、具体的なパス（/tasks/1 など）を A11Y_PAGES に書いて検査する
+a11y_pages() {
+  local page out=" "
+  local -a app profile
+  read -ra app <<< "${QG_ACCESSIBILITY_PAGES:-}"
+  read -ra profile <<< "${A11Y_PAGES:-}"
+  for page in "${app[@]}"; do
+    [[ "$page" == */:* ]] || [[ "$out" == *" $page "* ]] || out+="$page "
+  done
+  for page in "${profile[@]}"; do
+    [[ "$out" == *" $page "* ]] || out+="$page "
+  done
+  out=${out# }
+  echo "${out% }"
+}
+
 group() { echo "::group::$*"; }
 endgroup() { echo "::endgroup::"; }
