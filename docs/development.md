@@ -47,7 +47,7 @@ cd frontend && npm ci && npm run dev                        # /api などは 808
 
 - `-DskipFrontend=true` で起動しても、以前にビルドした画面が `backend/target/classes/static/` に残っていると 8080 で表示されます。8080 を API だけにしたいときは `./mvnw clean spring-boot:run -DskipFrontend=true`
 - 成果物ストア（`QG_ARTIFACT_ROOT`、既定 `./data/artifacts`）の相対パスは起動したディレクトリから解決されます。`backend/` から起動すると `backend/data/artifacts/` です
-- 取り込み API を手元で試すときは `.env` に `QG_INGEST_TOKEN` を書きます（[取り込み](features/ingest/design.md#6-手元で取り込みを試す)）。設定値の一覧は [運用](operations.md#22-設定値)
+- 取り込み API を手元で試すときは `.env` に `QG_INGEST_TOKEN` を書きます（[取り込み](features/ingest/design.md#7-手元で取り込みを試す)）。設定値の一覧は [運用](operations.md#22-設定値)
 
 ### 同一オリジンの実現方法
 

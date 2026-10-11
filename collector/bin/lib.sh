@@ -44,9 +44,9 @@ load_profile() {
     || die "計測プロファイルの QG_REPOSITORY は owner/name の形式で指定してください: ${QG_REPOSITORY:-}"
 }
 
-# 計測しない指標（計測プロファイルの DISABLED_METRICS。quality-gate の QG_DISABLED_METRICS とそろえる）
+# 計測しない指標。quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く）と、計測プロファイルの DISABLED_METRICS の和
 # metric_enabled <指標 ID>（M-03 など）
-metric_enabled() { ! grep -qw -- "$1" <<< "${DISABLED_METRICS:-}"; }
+metric_enabled() { ! grep -qw -- "$1" <<< "${QG_DISABLED_METRICS:-} ${DISABLED_METRICS:-}"; }
 
 group() { echo "::group::$*"; }
 endgroup() { echo "::endgroup::"; }

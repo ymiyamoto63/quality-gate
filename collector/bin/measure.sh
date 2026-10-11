@@ -6,7 +6,7 @@
 #
 # 対象のテストコードを実行するため、このスクリプトには認証情報を渡さない。
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
-# 計測プロファイルの DISABLED_METRICS に書いた指標は計測しない（quality-gate の QG_DISABLED_METRICS とそろえる）。
+# quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く）と、計測プロファイルの DISABLED_METRICS に書いた指標は計測しない。
 #
 # 指標ごとの計測は collector/bin/measure/ に分けてあり、このスクリプトは準備と実行の順序だけを持つ。
 #
@@ -45,8 +45,11 @@ for metric in backend-tests mutation complexity frontend-tests accessibility \
   source "$MEASURE_DIR/$metric.sh"
 done
 
+if [ -n "${QG_DISABLED_METRICS:-}" ]; then
+  log "計測しない指標（quality-gate の QG_DISABLED_METRICS）: $QG_DISABLED_METRICS"
+fi
 if [ -n "${DISABLED_METRICS:-}" ]; then
-  log "計測しない指標（DISABLED_METRICS）: $DISABLED_METRICS"
+  log "計測しない指標（計測プロファイルの DISABLED_METRICS）: $DISABLED_METRICS"
 fi
 
 # M-08。対象アプリを起動して検査する

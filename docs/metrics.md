@@ -28,7 +28,7 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | M-12 | セキュリティ | ライセンス違反件数 | forbidden 0 パッケージ | Trivy（SARIF） | `sarif` | `QG_FORBIDDEN_LICENSES_MAX` |
 
 - 環境変数を書かなかった合格ラインは既定値で判定する。12 の指標はすべて既定で判定する
-- `QG_DISABLED_METRICS` に書いた指標は判定もせず、Run の指標にも現れない。収集ランナーの計測プロファイルの `DISABLED_METRICS` にも書いて計測を止める（[運用](operations.md#43-計測する指標の切り替え)）
+- `QG_DISABLED_METRICS` に書いた指標は判定もせず、Run の指標にも現れない。収集ランナーも計測の前にこの設定を読み、計測しない（[運用](operations.md#43-計測する指標の切り替え)）
 
 ---
 

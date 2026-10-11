@@ -74,7 +74,7 @@ openssl rand -hex 32
 
 | 変数 | 既定値 | 指標 |
 | --- | --- | --- |
-| `QG_DISABLED_METRICS` | 空 | 判定しない指標 ID（カンマ区切り。例: `M-03,M-04`）。計測プロファイルの `DISABLED_METRICS` とそろえる |
+| `QG_DISABLED_METRICS` | 空 | 判定しない指標 ID（カンマ区切り。例: `M-03,M-04`）。収集ランナーも計測しない（4.3） |
 | `QG_EXCLUSIONS` | 空 | 計測から除くファイル（glob、カンマ区切り。例: `**/Main.java,**/*.d.ts`） |
 | `QG_BRANCH_COVERAGE_MIN` | `75` | M-01 ブランチカバレッジの下限（%） |
 | `QG_MUTATION_SCORE_MIN` / `QG_MUTATION_COMPONENTS` | `60` / 空 | M-02 の下限（%）/ 対象のコンポーネント（例: `backend`。空なら限定しない） |
@@ -155,7 +155,7 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 | 種別 | 名前 | 値 |
 | --- | --- | --- |
 | Variables | `QG_TARGET` | 計測対象（`collector/targets/` のディレクトリ名。例: `qg-test-target`）。4.1 |
-| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`） |
+| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` も計測の前にアプリの設定を読む |
 | Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体） |
 | Secrets | `QG_INGEST_TOKEN` | アプリの `QG_INGEST_TOKEN` と同じ値（2.3） |
@@ -198,7 +198,7 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | --- | --- | --- |
 | `QG_REPOSITORY` | （必須） | `owner/name`。アプリの `QG_REPOSITORY` と一致させる |
 | `DEFAULT_BRANCH` | （必須） | 既定ブランチ。ブランチを指定しない計測はここを測る |
-| `DISABLED_METRICS` | 空 | 計測しない指標 ID（空白区切り。例: `M-03 M-04`）。アプリの `QG_DISABLED_METRICS` とそろえる（4.3） |
+| `DISABLED_METRICS` | 空 | アプリの `QG_DISABLED_METRICS` に加えて計測しない指標 ID（空白区切り。例: `M-03 M-04`）。ふだんは空でよい（4.3） |
 | `BACKEND_DIR` | 空 | バックエンド（Maven）のディレクトリ。空ならバックエンドを計測しない。末尾のディレクトリ名がコンポーネント名になる |
 | `JAVA_VERSION` | `21` | 計測用のコンテナの JDK の版 |
 | `TEST_REPORTS` | `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml` | M-09 / M-10 で送る JUnit XML（`BACKEND_DIR/target` からの相対、空白区切り） |
@@ -224,21 +224,23 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 | `PERF_WARMUP_SECONDS` / `PERF_DURATION_SECONDS` | `60` / `300` | ウォームアップと計測の秒数。**手元で試すときだけ**短くします（その結果は送らない） |
 | `PERF_PROGRESS_INTERVAL` | `30` | 負荷試験の経過をログに出す間隔（秒） |
 
-`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`A11Y_PAGES`・`OPENAPI_PATH` を空にしても計測は止まりますが、アプリで判定する指標のままだと結果が無いため ERROR になります。止めるときは 4.3 のとおり両方で無効にしてください。
+`PERF_SCRIPT`・`MUTATION_TARGET_CLASSES`・`A11Y_PAGES`・`OPENAPI_PATH` を空にしても計測は止まりますが、アプリで判定する指標のままだと結果が無いため ERROR になります。止めるときは 4.3 のとおりアプリの `QG_DISABLED_METRICS` に書いてください。
 
 ### 4.3 計測する指標の切り替え
 
-指標を止めるときは、**計測プロファイルの `DISABLED_METRICS` と、アプリの `QG_DISABLED_METRICS` の両方**に同じ指標 ID を書きます。
-前者で計測を止め、後者で判定から外します。片方だけだと、計測しない指標が判定に残って計測エラー（不合格）になるか、判定しない指標を測って時間を使います。
+指標を止めるときは、**アプリの `QG_DISABLED_METRICS`** に指標 ID を書いてアプリを再起動します。判定から外れ、次の計測から収集ランナーも計測しません。
+収集ワークフローの `fetch` がアプリの設定（`GET /api/v1/collector/settings`。Ingest Token で読む）を読み、`measure` と `submit` に渡すためです。計測プロファイルの変更やマージは要りません。
 
 ```bash
-# 計測プロファイル（collector/targets/<名前>/profile.env）
-DISABLED_METRICS=M-03 M-04
-# アプリの環境変数
+# アプリの環境変数（.env）
 QG_DISABLED_METRICS=M-03,M-04
 ```
 
-| 指標 | `DISABLED_METRICS` に書くと行わない計測 |
+`fetch` のログに `quality-gate の判定しない指標（QG_DISABLED_METRICS）: M-03 M-04` と出れば反映されています。
+
+計測プロファイルの `DISABLED_METRICS` に書いた指標も計測しません（アプリの設定に足されます）。ただし、アプリで判定する指標をここに書くと、結果が無いため計測エラー（不合格）になります。
+
+| 指標 | 計測しない指標に含めると行わない計測 |
 | --- | --- |
 | `M-02` | PIT |
 | `M-03`（と M-04） | k6 の負荷試験 |
@@ -333,14 +335,15 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 ```bash
 WORK=/tmp/qg-collector
 export QG_TARGET=qg-test-target   # 計測する対象（collector/targets/ のディレクトリ名）
+export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 # private リポジトリなら GH_TOKEN に読み取り権限のあるトークンを入れる
-./collector/bin/fetch.sh "$WORK"
+./collector/bin/fetch.sh "$WORK"   # アプリの QG_DISABLED_METRICS もここで読む
 ./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
-QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN> \
-  ./collector/bin/submit.sh "$WORK/reports"
+./collector/bin/submit.sh "$WORK/reports"
 ```
 
 - `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。`QG_TARGET` はどのスクリプトにも必要です
+- `fetch.sh` に `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いとアプリの設定を読まず、計測しない指標は計測プロファイルの `DISABLED_METRICS` だけになります
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - 負荷試験が有効なら約 18 分かかります。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 
@@ -384,6 +387,8 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 | `submit` の Run の作成が 401 | リポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない |
 | `submit` の Run の作成が 400（`計測対象のリポジトリは … です`） | 計測プロファイルとアプリの `QG_REPOSITORY` が一致していない |
 | 計測していない指標が計測エラーになる | 計測プロファイルの `DISABLED_METRICS` にだけ書き、アプリの `QG_DISABLED_METRICS` に書いていない（4.3） |
+| `fetch` が `quality-gate の設定を読めませんでした` | `QG_BASE_URL` にランナーから届かない、またはリポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない（401） |
+| `fetch` が `計測プロファイルの QG_REPOSITORY（…）が quality-gate の QG_REPOSITORY（…）と違います` | `QG_TARGET` とアプリの `QG_REPOSITORY` がずれている（4.1） |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名とアプリの `QG_PERF_SCENARIOS` が一致していない |
 | M-03 が ERROR（成功スループットが到達率の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `QG_ARRIVAL_RATE_RPS` が一致していない |
 | M-08 が ERROR（検査した画面が足りない） | `A11Y_PAGES` と `QG_ACCESSIBILITY_PAGES` がずれている、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |

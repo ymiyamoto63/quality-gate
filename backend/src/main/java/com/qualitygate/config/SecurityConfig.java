@@ -41,9 +41,12 @@ import org.springframework.security.web.util.matcher.RequestMatcher;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    /** Ingest API の対象判定。{@code /api/v1/runs} 配下の POST だけ。 */
+    /** Ingest API の対象判定。{@code /api/v1/runs} 配下の POST と、収集ランナーの設定の GET。 */
     static boolean isIngestRequest(HttpServletRequest request) {
-        return request.getRequestURI().startsWith("/api/v1/runs") && "POST".equals(request.getMethod());
+        String uri = request.getRequestURI();
+        String method = request.getMethod();
+        return uri.startsWith("/api/v1/runs") && "POST".equals(method)
+                || "/api/v1/collector/settings".equals(uri) && "GET".equals(method);
     }
 
     @Bean

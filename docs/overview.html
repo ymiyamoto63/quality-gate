@@ -218,7 +218,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
     <tr><td class="id">2</td><td>セルフホストランナーを 1 台登録する</td><td>ランナーのマシン（Linux x64）</td><td>Docker・git・curl・jq が必要。<strong>Settings → Actions → Runners</strong> で <code>Idle</code> になれば完了</td></tr>
     <tr><td class="id">3</td><td>対象を読む GitHub App を作り、対象にインストールする</td><td>GitHub</td><td>対象が private のときだけ。権限は <strong>Contents: Read-only</strong>。秘密鍵をダウンロードしておく</td></tr>
     <tr><td class="id">4</td><td>quality-gate リポジトリに変数とシークレットを設定する</td><td>GitHub（<strong>Settings → Secrets and variables → Actions</strong>）</td><td>Variables: <code>QG_TARGET</code>・<code>QG_BASE_URL</code>・<code>QG_COLLECTOR_APP_ID</code>／Secrets: <code>QG_COLLECTOR_APP_PRIVATE_KEY</code>・<code>QG_INGEST_TOKEN</code>（quality-gate アプリと同じ値）</td></tr>
-    <tr><td class="id">5</td><td>計測プロファイル <code>collector/targets/&lt;名前&gt;/profile.env</code> を書いて main にマージし、Variable <code>QG_TARGET</code> にその名前を設定する</td><td>quality-gate リポジトリ</td><td><code>QG_REPOSITORY</code> を quality-gate アプリの設定と一致させる。対象の切り替えは <code>QG_TARGET</code> とアプリの <code>QG_REPOSITORY</code> を変えるだけで、マージは不要。止める指標は <code>DISABLED_METRICS</code> と quality-gate アプリの <code>QG_DISABLED_METRICS</code> の<strong>両方</strong>に書く</td></tr>
+    <tr><td class="id">5</td><td>計測プロファイル <code>collector/targets/&lt;名前&gt;/profile.env</code> を書いて main にマージし、Variable <code>QG_TARGET</code> にその名前を設定する</td><td>quality-gate リポジトリ</td><td><code>QG_REPOSITORY</code> を quality-gate アプリの設定と一致させる。対象の切り替えは <code>QG_TARGET</code> とアプリの <code>QG_REPOSITORY</code> を変えるだけで、マージは不要。止める指標は quality-gate アプリの <code>QG_DISABLED_METRICS</code> に書く（収集ランナーが計測の前に読み、計測もしない）</td></tr>
   </tbody>
 </table></div>
 <pre>cp .env.example .env                              # QG_REPOSITORY・QG_LOGIN_PASSWORD・QG_INGEST_TOKEN を書き入れる
@@ -294,7 +294,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
   </tbody>
 </table></div>
 <ul>
-  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（計測プロファイルの <code>DISABLED_METRICS</code> にも同じものを書く）</li>
+  <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）</li>
   <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
 </ul>
 </section>
@@ -426,7 +426,7 @@ NOT_APPLICABLE は影響しない</pre>
   </tbody>
 </table></div>
 <ul>
-  <li>止めた指標（<code>DISABLED_METRICS</code>）の成果物は作らず、送らない</li>
+  <li>止めた指標（アプリの <code>QG_DISABLED_METRICS</code> と計測プロファイルの <code>DISABLED_METRICS</code>）の成果物は作らず、送らない</li>
   <li><code>meta.env</code>（計測したコミット・比較元・タグ）は成果物として送らず、Run を作る要求の中身にする。<code>versions.env</code>（ツールの版）と oasdiff の入力（<code>openapi-*.yml</code>）も送らない</li>
   <li>確定前に同じ種別・同じファイル名を送り直すと置き換わる。確定後は追加も置き換えもできず、判定済みの結論は変わらない</li>
   <li>ファイルは自動では消さない。Run を削除しても、ファイルの実体は <code>QG_ARTIFACT_ROOT</code> に残る</li>

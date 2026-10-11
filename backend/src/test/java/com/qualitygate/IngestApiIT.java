@@ -142,6 +142,27 @@ class IngestApiIT {
     }
 
     @Test
+    void 収集ランナーの設定を返す() {
+        ResponseEntity<Map<String, Object>> response = client.get()
+                .uri("/api/v1/collector/settings")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + TOKEN)
+                .retrieve().toEntity(JSON_OBJECT);
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+        assertThat(response.getBody()).containsEntry("repository", REPOSITORY)
+                .containsEntry("disabledMetrics", java.util.List.of());
+    }
+
+    @Test
+    void 収集ランナーの設定はトークンが無ければ拒否される() {
+        ResponseEntity<Void> response = client.get()
+                .uri("/api/v1/collector/settings")
+                .retrieve().toBodilessEntity();
+
+        assertThat(response.getStatusCode()).isEqualTo(HttpStatus.UNAUTHORIZED);
+    }
+
+    @Test
     void タグ名に使えない文字を含むタグは拒否される() {
         for (String tag : java.util.List.of("a b", "v1..2", "/v1", "v1/", "x:y")) {
             ResponseEntity<Map<String, Object>> response = client.post()

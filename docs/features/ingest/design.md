@@ -6,6 +6,8 @@
 ## 1. 流れ
 
 ```
+収集ランナー（fetch.sh）
+  → GET  /api/v1/collector/settings        計測対象のリポジトリと判定しない指標を読む   → 200 {repository, disabledMetrics}
 収集ランナー（submit.sh）
   → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId}
   → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202（本文なし）
@@ -51,7 +53,18 @@
 **保存の順序**: ファイルを先に保存し、成功してから DB に記録する。逆順だと「参照先の無い記録」という扱いにくい壊れ方をする。
 記録されずに残ったファイル（孤児）は判定に使われないだけで、自動では消さない（日次バッチは持たない）。
 
-## 4. `POST /api/v1/runs/{runId}/finalize`
+## 4. `GET /api/v1/collector/settings`
+
+収集ランナーが計測の前に読む設定。認証は Ingest Token。
+
+| 項目 | 内容 |
+| --- | --- |
+| `repository` | `QG_REPOSITORY`。`fetch.sh` は計測プロファイルの `QG_REPOSITORY` と比べ、違えば計測の前に止める（送信で拒否されるのを、計測に時間をかける前に知るため） |
+| `disabledMetrics` | `QG_DISABLED_METRICS`。`fetch.sh` が `meta.env` の `QG_DISABLED_METRICS` に書き、`measure.sh` と `submit.sh` はその指標を計測・送信しない |
+
+判定しない指標をアプリの設定だけで持つためのもの。計測プロファイルにも書かせると、片方だけ変えたときに計測エラーになるか、判定しない指標を測って時間を使う。
+
+## 5. `POST /api/v1/runs/{runId}/finalize`
 
 取り込みを確定し、その場で合格ラインの解決・正規化・判定を行い、`status` / `verdict` / `errorCode` / `detailUrl` を返す。
 `detailUrl`（`QG_BASE_URL` から組み立てる、そのコミットのリリース判定の URL `/?ref=<commitSha>`）は、収集ランナーのログに直リンクを出すため。
@@ -61,14 +74,14 @@
 - 確定済みの Run への `finalize` は `409 RUN_ALREADY_FINALIZED`（二重に判定しない）
 - 収集ランナーは `FAILED` ならワークフローを失敗にし、判定結果の `FAIL` では失敗にしない
 
-## 5. Ingest Token
+## 6. Ingest Token
 
 - バックエンドの環境変数 `QG_INGEST_TOKEN` に設定した値だけを受け付ける。カンマ区切りで複数並べると、どれでも受け付ける（交換のため）
 - 送られた値と設定値をどちらも SHA-256 にしてから定数時間で比べる。未設定なら取り込み API はすべて 401
-- **書き込み専用**で参照 API は呼べない。漏えいしたときの影響を「偽の計測結果を送れる」に限る
+- **書き込み専用**で参照 API は呼べない（読めるのは 4 の収集ランナーの設定だけ。判定結果は読めない）。漏えいしたときの影響を「偽の計測結果を送れる」に限る
 - 交換の手順は [運用](../../operations.md#23-ingest-token)
 
-## 6. 手元で取り込みを試す
+## 7. 手元で取り込みを試す
 
 `.env` に `QG_INGEST_TOKEN` を設定してバックエンドを起動すれば、curl で試せる。リポジトリは最初の Run 作成で登録される。
 

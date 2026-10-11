@@ -5,7 +5,7 @@
 # QG_TARGET は入力 target、空なら Actions の Variable QG_TARGET。対象を切り替えるときは Variable とアプリの QG_REPOSITORY を一緒に変える。
 # リリース判定に使うときは、commit にリリースのタグを指定する（比較元は前のタグになる）。
 #
-# 計測する指標は M-01〜M-12（計測プロファイルの DISABLED_METRICS に書いたものは除く）。
+# 計測する指標は M-01〜M-12。quality-gate の QG_DISABLED_METRICS（fetch で読む）と計測プロファイルの DISABLED_METRICS に書いたものは除く。
 #
 # 必要な設定（Settings → Secrets and variables → Actions）:
 #   Variables: QG_TARGET                     計測対象（collector/targets/ のディレクトリ名。例: qg-test-target）
@@ -15,6 +15,7 @@
 #              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
 #
 # ジョブを 3 つ（fetch → measure → submit）に分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
+# Ingest Token は fetch（quality-gate の設定を読む）と submit（送信）だけが使う。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
 name: collect
 # 画面に出す名前（例: collect qg-test-target main / collect qg-test-target v1.2.0）
@@ -71,12 +72,20 @@ jobs:
           owner: ${{ steps.profile.outputs.owner }}
           repositories: ${{ steps.profile.outputs.name }}
 
+      # quality-gate の設定（計測対象のリポジトリと判定しない指標）も読む。計測に時間をかける前に設定の誤りで止める
       - name: 対象リポジトリの取得
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           QG_BRANCH: ${{ inputs.branch }}
           QG_COMMIT: ${{ inputs.commit }}
-        run: ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
+          QG_BASE_URL: ${{ vars.QG_BASE_URL }}
+          QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
+        run: |
+          if [ -z "$QG_BASE_URL" ] || [ -z "$QG_INGEST_TOKEN" ]; then
+            echo "::error::QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です"
+            exit 1
+          fi
+          ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
 
       - name: 受け渡し用にまとめる
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
