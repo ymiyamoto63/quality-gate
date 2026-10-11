@@ -23,6 +23,10 @@ async function logout(): Promise<void> {
   <header class="qg-header">
     <a class="qg-skip" href="#main">本文へスキップ</a>
     <RouterLink class="qg-brand" to="/">quality-gate</RouterLink>
+    <nav v-if="auth.isAuthenticated" class="qg-header__nav" aria-label="画面">
+      <RouterLink :to="{ name: 'release' }">リリース判定</RouterLink>
+      <RouterLink :to="{ name: 'trends' }">指標の推移</RouterLink>
+    </nav>
 
     <div class="qg-header__right">
       <button
@@ -62,7 +66,19 @@ async function logout(): Promise<void> {
   text-decoration: none;
 }
 
-/* リリース判定を PDF として印刷するとき、ヘッダは要らない */
+.qg-header__nav {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.9375rem;
+}
+/* 今いる画面は下線を外し、太字で示す（RouterLink が aria-current="page" を付ける） */
+.qg-header__nav a[aria-current='page'] {
+  color: var(--text-primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+/* リリース判定や推移を PDF として印刷するとき、ヘッダは要らない */
 @media print {
   .qg-header {
     display: none;
@@ -89,8 +105,14 @@ button {
 
 @media (max-width: 767px) {
   .qg-header {
-    gap: 0.75rem;
+    flex-wrap: wrap;
+    gap: 0.5rem 0.75rem;
     padding: 0.75rem 1rem;
+  }
+  /* 狭い画面では画面の切り替えを 2 行目に置き、ボタンを押しつぶさない */
+  .qg-header__nav {
+    order: 1;
+    flex-basis: 100%;
   }
 }
 </style>

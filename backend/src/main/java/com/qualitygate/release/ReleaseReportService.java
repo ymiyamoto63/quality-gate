@@ -11,10 +11,8 @@ import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
 import com.qualitygate.domain.repo.FindingRepository;
 import com.qualitygate.domain.repo.MeasurementRepository;
-import com.qualitygate.domain.repo.MonitoredRepositoryRepository;
 import com.qualitygate.domain.repo.RunRepository;
 import com.qualitygate.platform.config.QualityGateProperties;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
@@ -28,7 +26,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.Set;
 
 /**
  * リリース判定。指定したタグ・コミット（指定が無ければ最新の計測）で判定済みの Run から、
@@ -47,10 +44,7 @@ public class ReleaseReportService {
     /** 履歴に出す件数。 */
     static final int HISTORY_LIMIT = 50;
 
-    private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
-    };
-
-    private final MonitoredRepositoryRepository repositories;
+    private final EvaluatedRuns evaluatedRuns;
     private final RunRepository runs;
     private final MeasurementRepository measurements;
     private final FindingRepository findings;
@@ -59,11 +53,11 @@ public class ReleaseReportService {
     private final ObjectMapper objectMapper;
 
     @SuppressWarnings("java:S107")
-    public ReleaseReportService(MonitoredRepositoryRepository repositories, RunRepository runs,
-                                MeasurementRepository measurements, FindingRepository findings,
-                                ReleaseRefResolver resolver, QualityGateProperties properties,
-                                ObjectMapper objectMapper) {
-        this.repositories = repositories;
+    ReleaseReportService(EvaluatedRuns evaluatedRuns, RunRepository runs,
+                         MeasurementRepository measurements, FindingRepository findings,
+                         ReleaseRefResolver resolver, QualityGateProperties properties,
+                         ObjectMapper objectMapper) {
+        this.evaluatedRuns = evaluatedRuns;
         this.runs = runs;
         this.measurements = measurements;
         this.findings = findings;
@@ -76,7 +70,7 @@ public class ReleaseReportService {
     @Transactional(readOnly = true)
     public ReleaseReportResponse report(String ref) {
         String fullName = properties.repository();
-        Optional<MonitoredRepository> repository = findRepository();
+        Optional<MonitoredRepository> repository = evaluatedRuns.repository();
         boolean latest = ref == null || ref.isBlank();
 
         if (repository.isEmpty()) {
@@ -135,27 +129,21 @@ public class ReleaseReportService {
     /** 判定の履歴。同じコミットを何度か計測していれば、最後の判定だけを出す。 */
     @Transactional(readOnly = true)
     public ReleaseHistoryResponse history() {
-        Optional<MonitoredRepository> repository = findRepository();
+        Optional<MonitoredRepository> repository = evaluatedRuns.repository();
         if (repository.isEmpty()) {
             return new ReleaseHistoryResponse(List.of());
         }
-        List<Run> evaluated = runs.findByRepositoryIdAndStatusOrderByMeasuredAtDescAttemptDesc(
-                repository.get().getId(), RunStatus.EVALUATED, PageRequest.of(0, HISTORY_LIMIT * 4));
-        Set<String> seen = new LinkedHashSet<>();
-        List<ReleaseHistoryResponse.ReleaseHistoryItem> items = evaluated.stream()
-                .filter(run -> seen.add(run.getCommitSha()))
-                .limit(HISTORY_LIMIT)
+        List<ReleaseHistoryResponse.ReleaseHistoryItem> items = evaluatedRuns
+                .latestPerCommit(repository.get(), HISTORY_LIMIT).stream()
                 .map(run -> new ReleaseHistoryResponse.ReleaseHistoryItem(run.getMeasuredAt(), run.getCommitSha(),
-                        run.getTags(), run.getVerdict(),
-                        run.getTags().isEmpty() ? run.getCommitSha() : run.getTags().getFirst()))
+                        run.getTags(), run.getVerdict(), refOf(run)))
                 .toList();
         return new ReleaseHistoryResponse(items);
     }
 
-    private Optional<MonitoredRepository> findRepository() {
-        String fullName = properties.repository();
-        int slash = fullName.indexOf('/');
-        return repositories.findByOwnerAndName(fullName.substring(0, slash), fullName.substring(slash + 1));
+    /** リリース判定を開くときの指定。タグがあればタグ、無ければコミット SHA。 */
+    static String refOf(Run run) {
+        return run.getTags().isEmpty() ? run.getCommitSha() : run.getTags().getFirst();
     }
 
     private static ReleaseReportResponse notMeasured(String fullName, String commitSha, String reason) {
@@ -234,16 +222,39 @@ public class ReleaseReportService {
     }
 
     private Map<String, Object> toMap(String json) {
-        if (json == null || json.isBlank()) {
-            return Map.of();
-        }
-        return objectMapper.readValue(json, JSON_OBJECT);
+        return ThresholdText.parse(objectMapper, json);
     }
 
     /** 合格ラインを「≥ 75%」のような文字列にする（画面の formatThreshold と同じ表記）。 */
     static final class ThresholdText {
 
+        private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
+        };
+
         private ThresholdText() {
+        }
+
+        /** {@code measurements.threshold}（JSON）を読む。無ければ空。 */
+        static Map<String, Object> parse(ObjectMapper objectMapper, String json) {
+            if (json == null || json.isBlank()) {
+                return Map.of();
+            }
+            return objectMapper.readValue(json, JSON_OBJECT);
+        }
+
+        /**
+         * 合格ラインを縦軸の値にする。前回からの増加で判定する指標（M-10）は、値の軸に引ける線が無いため null。
+         */
+        static BigDecimal lineOf(Map<String, Object> threshold) {
+            Object value = threshold.get("value");
+            if (value == null || "increase".equals(threshold.get("basis"))) {
+                return null;
+            }
+            try {
+                return new BigDecimal(value.toString());
+            } catch (NumberFormatException e) {
+                return null;
+            }
         }
 
         static String of(Map<String, Object> threshold, String unit) {

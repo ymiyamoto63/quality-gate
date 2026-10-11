@@ -163,7 +163,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
 <section id="features">
 <h2>1. 主な特徴</h2>
 <div class="cards">
-  <div class="card"><h3>画面はリリース判定の 1 枚だけ</h3><p>最上部に結論を大きく表示し、その下に基準ごとの合否・根拠・履歴を並べる。印刷して PDF の証跡にできる。</p></div>
+  <div class="card"><h3>結論はリリース判定の 1 枚で示す</h3><p>最上部に結論を大きく表示し、その下に基準ごとの合否・根拠・履歴を並べる。印刷して PDF の証跡にできる。補助として指標の推移（折れ線グラフ）の画面を持つ。</p></div>
   <div class="card"><h3>合否は 2 値</h3><p>指標は「合格 / 不合格」だけ。測れなかった指標は計測エラーとして不合格に数える（fail-closed）。</p></div>
   <div class="card"><h3>合格ラインは環境変数</h3><p><code>QG_*</code> で決める。判定に使った値は計測ごとに保存され、後から変えても過去の結論は変わらない。</p></div>
   <div class="card"><h3>共有アカウントでログイン</h3><p>全員で 1 つのアカウントを共有。GitHub アカウントは不要。ロールも持たない。</p></div>
@@ -605,6 +605,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td>GET</td><td><code>/me</code></td><td>ログイン中のユーザー名</td><td>ログイン</td></tr>
     <tr><td>GET</td><td><code>/release?ref=</code></td><td>リリース判定（ref 省略で最新）</td><td>ログイン</td></tr>
     <tr><td>GET</td><td><code>/release/history</code></td><td>判定の履歴（最大 50 件）</td><td>ログイン</td></tr>
+    <tr><td>GET</td><td><code>/release/trends</code></td><td>指標の推移（履歴と同じ計測を古い順に）</td><td>ログイン</td></tr>
   </tbody>
 </table></div>
 <ul>

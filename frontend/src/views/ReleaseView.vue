@@ -13,7 +13,7 @@ type Decision = Report['decision']
 type HistoryItem = components['schemas']['ReleaseHistoryItem']
 
 /**
- * リリース判定（アプリの画面はこれ 1 つ）。
+ * リリース判定（アプリの主画面。指標の推移はその補助）。
  *
  * 読み手に開発に携わっていない方も想定し、結論（リリース可 / 不可）を最上部に大きく出してから、
  * 指標ごとの合否、各指標の説明と基準の根拠、判定の履歴の順に並べる。判定・理由・説明の文言はサーバが持つ。
@@ -276,6 +276,10 @@ function print(): void {
 
     <section v-if="history.length > 0" class="qg-no-print" aria-labelledby="history-heading">
       <h2 id="history-heading">判定の履歴</h2>
+      <p class="qg-muted">
+        指標ごとの値の移り変わりは<RouterLink :to="{ name: 'trends' }">指標の推移</RouterLink
+        >で確かめられます。
+      </p>
       <table class="qg-table qg-table--stack">
         <thead>
           <tr>

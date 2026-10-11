@@ -168,6 +168,8 @@ class ReleaseReportApiIT {
                 });
         assertThat(mvc.get().uri("/api/v1/release/history"))
                 .hasStatusOk().bodyJson().extractingPath("$.items").asArray().isEmpty();
+        assertThat(mvc.get().uri("/api/v1/release/trends"))
+                .hasStatusOk().bodyJson().extractingPath("$.runs").asArray().isEmpty();
     }
 
     @Test
@@ -208,11 +210,37 @@ class ReleaseReportApiIT {
     }
 
     @Test
+    void 推移は履歴と同じ計測を古い順に並べ指標ごとの値を返す() throws Exception {
+        var response = mvc.get().uri("/api/v1/release/trends").exchange();
+
+        assertThat(response).hasStatusOk().bodyJson().satisfies(content -> {
+            var json = content.assertThat();
+            // 同じコミットは最後の判定だけ（履歴と同じ数え方）
+            json.extractingPath("$.runs").asArray().hasSize(3);
+            json.extractingPath("$.runs[0].commitSha").isEqualTo(PASSING);
+            json.extractingPath("$.runs[1].ref").isEqualTo("v1.2.0");
+            json.extractingPath("$.runs[2].measuredAt").isEqualTo("2026-09-24T03:00:00Z");
+            json.extractingPath("$.metrics[0].metricId").isEqualTo("M-01");
+            json.extractingPath("$.metrics[0].axisMax").asNumber().isEqualTo(100);
+            json.extractingPath("$.metrics[0].series[0].componentName").isEqualTo("backend");
+            json.extractingPath("$.metrics[0].series[0].points[1].status").isEqualTo("FAIL");
+            json.extractingPath("$.metrics[0].series[0].points[1].value").asNumber().isEqualTo(75.0);
+            json.extractingPath("$.metrics[0].series[0].points[1].thresholdValue").asNumber().isEqualTo(80);
+            json.extractingPath("$.metrics[0].series[0].points[1].threshold").isEqualTo("≥ 80%");
+            json.extractingPath("$.metrics[1].metricId").isEqualTo("M-06");
+            json.extractingPath("$.metrics[1].axisMax").isNull();
+        });
+
+        FixtureWriter.write("metric-trends.json", response.getResponse().getContentAsString());
+    }
+
+    @Test
     void ログインしていなければ取得できない() {
         MockMvcTester anonymous = MockMvcTester.create(MockMvcBuilders.webAppContextSetup(context)
                 .apply(springSecurity()).build());
         assertThat(anonymous.get().uri("/api/v1/release")).hasStatus(401);
         assertThat(anonymous.get().uri("/api/v1/release/history")).hasStatus(401);
+        assertThat(anonymous.get().uri("/api/v1/release/trends")).hasStatus(401);
     }
 
     /** 分岐 20 のうち {@code covered} を通り、循環的複雑度 {@code complexity} の関数が 1 つある計測。 */

@@ -141,7 +141,7 @@ cd frontend && npm run test:a11y     # ライト / ダークの両モードで�
 | 可観測性 | Actuator + Micrometer（Prometheus） | |
 | テスト（バックエンド） | JUnit 5、AssertJ、Mockito、Testcontainers 2.0（PostgreSQL）、ArchUnit | H2 などの代替 DB は使わない（jsonb・部分インデックス・CHECK 制約を検証するため） |
 | フロントエンド | Vue 3.5（Composition API + `<script setup>`）/ TypeScript 5（`strict` + `noUncheckedIndexedAccess`）/ Vite 8 | |
-| UI | 素の HTML 要素 + `tokens.css`（色・余白のトークン）+ PrimeIcons | 画面が 1 枚で部品が少ないため、UI コンポーネントのライブラリは使わない |
+| UI | 素の HTML 要素 + `tokens.css`（色・余白のトークン）+ PrimeIcons | 画面が 2 枚（リリース判定と指標の推移）で部品が少ないため、UI コンポーネントのライブラリは使わない |
 | 状態管理 / ルーティング | Pinia / Vue Router | |
 | API 呼び出し | openapi-typescript + openapi-fetch | |
 | テスト（フロントエンド） | Vitest + @vue/test-utils、Playwright + `@axe-core/playwright` | |

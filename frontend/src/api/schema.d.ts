@@ -64,6 +64,26 @@ export interface paths {
     patch?: never
     trace?: never
   }
+  '/api/v1/release/trends': {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    /**
+     * 指標の推移を取得する
+     * @description 判定の履歴と同じ計測（新しいものから最大 50 件、同じコミットは最後の判定だけ）を古い順に並べ、指標ごとの値・合否・その時点の合格ラインを返す
+     */
+    get: operations['trends']
+    put?: never
+    post?: never
+    delete?: never
+    options?: never
+    head?: never
+    patch?: never
+    trace?: never
+  }
   '/api/v1/runs': {
     parameters: {
       query?: never
@@ -170,6 +190,13 @@ export interface components {
     MeResponse: {
       username: string
     }
+    /** @description 指標の推移。判定の履歴と同じ数え方の計測を、古い順に並べる */
+    MetricTrendResponse: {
+      /** @description 期間内に一度でも判定した指標（指標 ID の順） */
+      metrics: components['schemas']['TrendMetric'][]
+      /** @description 横軸に並べる計測（古い順、最大 50 件） */
+      runs: components['schemas']['TrendRun'][]
+    }
     /** @description 合否に使った指標の件数 */
     ReleaseCounts: {
       /** Format: int32 */
@@ -269,6 +296,53 @@ export interface components {
       /** @description 計測したコミットを指すタグ */
       tags: string[]
     }
+    TrendMetric: {
+      /** @description 縦軸の上端を固定するときの値（% の指標は 100）。null なら値と合格ラインから決める */
+      axisMax: number | null
+      metricId: string
+      name: string
+      /** @description コンポーネント・計測条件ごとの線 */
+      series: components['schemas']['TrendSeries'][]
+      /** @description 何を見る指標か */
+      summary: string
+      /** @description 値の単位（percent / ms / count） */
+      unit: string | null
+    }
+    TrendPoint: {
+      /**
+       * Format: int32
+       * @description runs の位置
+       */
+      runIndex: number
+      /**
+       * @description PASS / FAIL / ERROR / NOT_APPLICABLE
+       * @enum {string}
+       */
+      status: 'PASS' | 'FAIL' | 'ERROR' | 'NOT_APPLICABLE'
+      /** @description 合格ラインを表示用にした文字列（≥ 75% など） */
+      threshold: string | null
+      /** @description その計測の判定に使った合格ライン（縦軸の値）。前回からの増加で判定する指標は null */
+      thresholdValue: number | null
+      /** @description 実測値。計測エラー・対象外は null */
+      value: number | null
+    }
+    TrendRun: {
+      commitSha: string
+      /** Format: date-time */
+      measuredAt: string
+      /** @description リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA） */
+      ref: string
+      /** @description 計測したコミットを指すタグ */
+      tags: string[]
+      /** @enum {string} */
+      verdict: 'PASS' | 'FAIL'
+    }
+    TrendSeries: {
+      componentName: string | null
+      /** @description 計測の古い順 */
+      points: components['schemas']['TrendPoint'][]
+      variantLabel: string | null
+    }
   }
   responses: never
   parameters: never
@@ -337,6 +411,26 @@ export interface operations {
         }
         content: {
           '*/*': components['schemas']['ReleaseHistoryResponse']
+        }
+      }
+    }
+  }
+  trends: {
+    parameters: {
+      query?: never
+      header?: never
+      path?: never
+      cookie?: never
+    }
+    requestBody?: never
+    responses: {
+      /** @description OK */
+      200: {
+        headers: {
+          [name: string]: unknown
+        }
+        content: {
+          '*/*': components['schemas']['MetricTrendResponse']
         }
       }
     }

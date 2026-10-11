@@ -3,9 +3,10 @@ import { useAuthStore } from '@/stores/auth'
 import ReleaseView from '@/views/ReleaseView.vue'
 import LoginView from '@/views/LoginView.vue'
 import NotFoundView from '@/views/NotFoundView.vue'
+import TrendView from '@/views/TrendView.vue'
 
 /**
- * 画面はリリース判定の 1 つだけ（docs/architecture.md 7.1）。
+ * 画面はリリース判定と、その補助の指標の推移（docs/architecture.md 7.1）。
  * 見るタグ・コミットは ?ref= に置き、同じ判定を URL で共有できるようにする。
  */
 const routes: RouteRecordRaw[] = [
@@ -16,6 +17,7 @@ const routes: RouteRecordRaw[] = [
     meta: { public: true, title: 'ログイン' },
   },
   { path: '/', name: 'release', component: ReleaseView, meta: { title: 'リリース判定' } },
+  { path: '/trends', name: 'trends', component: TrendView, meta: { title: '指標の推移' } },
   {
     path: '/:pathMatch(.*)*',
     name: 'not-found',
