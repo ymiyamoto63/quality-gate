@@ -2,6 +2,7 @@
 
 quality-gate の構成、測定の仕組み、バックエンドの構造、データベース、API と画面の共通規則をまとめる。
 機能ごとの要件と設計は [features/](../README.md#機能ごとの要件と設計) に、指標の定義は [指標](metrics.md) にある。
+Ingest API・Ingest Token・Run など、このプロジェクト独自の用語は [README の用語](../README.md#用語) にまとめている。
 
 ---
 

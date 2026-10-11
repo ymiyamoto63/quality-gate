@@ -15,6 +15,21 @@ quality-gate は社内向けの Web アプリケーションです。**1 つの�
 対象リポジトリ ──clone──▶ 収集ランナー（取得 → 計測 → 送信）──Ingest API──▶ quality-gate（判定・保存・画面）◀── ブラウザ
 ```
 
+## 用語
+
+ドキュメントとコードに出てくる、このプロジェクト独自の呼び名です。一般的な製品名や標準規格の名前ではありません。
+
+| 用語 | 意味 | 詳細 |
+| --- | --- | --- |
+| 収集ランナー | 対象リポジトリを取得して計測し、結果を quality-gate に送る仕組み。quality-gate リポジトリの GitHub Actions（`collect.yml`）と専有のセルフホストランナーで動く | [アーキテクチャ 3](docs/architecture.md#3-測定の仕組み収集ランナー) |
+| Ingest API | 収集ランナーが計測の成果物を quality-gate アプリへ送るための API。Run の作成（`POST /api/v1/runs`）、成果物のアップロード（`.../artifacts`）、確定（`.../finalize`）と、計測の前に読む設定（`GET /api/v1/collector/settings`）からなる。「取り込み API」とも書く | [取り込み](docs/features/ingest/design.md) |
+| Ingest Token | Ingest API を呼ぶための認証トークン（`Authorization: Bearer <token>`）。収集ランナー用に 1 つだけ発行し、アプリの環境変数と Actions の Secret に同じ値（`QG_INGEST_TOKEN`）を置く。書き込み専用で、判定結果などの参照 API は呼べない | [運用 2.3](docs/operations.md#23-ingest-token) |
+| 計測プロファイル | 計測対象ごとの測り方を書いた設定（`collector/targets/<名前>/profile.env`）。収集ランナーはアプリの `QG_REPOSITORY` と同じリポジトリを書いたものを選ぶ | [運用 4](docs/operations.md#4-計測対象を設定する) |
+| 成果物 | 計測ツールが出力したレポートのファイル（JaCoCo の XML、k6 のサマリーなど）。Ingest API で送られ、アプリが正規化して判定に使う | [アーキテクチャ 3.9](docs/architecture.md#39-成果物の流れ) |
+| Run | 1 つのコミットに対する 1 回の計測・判定。確定（finalize）した時点で判定され、以後は変わらない | [アーキテクチャ 4.2](docs/architecture.md#42-run-のライフサイクル) |
+| 試行（attempt） | 同じコミットを計測し直したときの回数。再送信は既存の Run を上書きせず、attempt を増やした新しい Run になる | 同上 |
+| 合格ライン | 指標ごとの合否のしきい値。環境変数（`QG_*`）で決める | [運用 2.4](docs/operations.md#24-合格ライン) |
+
 ## 品質基準（指標）
 
 | カテゴリ | 指標（ID） | 既定の合格ライン |
