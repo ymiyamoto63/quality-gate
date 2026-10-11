@@ -316,7 +316,7 @@ DBMS は PostgreSQL 17。**列の定義の正本は `backend/src/main/resources/
 
 ```
 repositories ──▶ runs ──┬──▶ artifacts
-                        ├──▶ measurements（repository_id も持つ）
+                        ├──▶ measurements
                         └──▶ findings
 ```
 
@@ -334,6 +334,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 - `variant` は値どうしを比べられるかを分ける計測条件（性能の計測環境名）。前回値は `variant` の一致する行からだけ引く
 - `component_name` / `variant` は NULL を取りうるため、一意性は `COALESCE` を挟んだ式インデックス（`ux_measurements_key`）で守る
 - 前回値（`previous_value`）は判定時に焼き付ける。比較対象 Run が消えても、判定したときの前回値を辿れる
+- リポジトリと計測日時は持たず、`run_id` から Run を辿って得る（複製すると、使わない列とインデックスを書き込みのたびに保守することになる）
 
 ### 5.3 インデックス
 
@@ -342,7 +343,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 | 最新の判定済み Run と判定の履歴 | `ix_runs_latest`（`status = 'EVALUATED'` の部分インデックス） |
 | 比較対象 Run（同じブランチの直前の Run） | `ix_runs_list` |
 | Run の指標・違反 | `ix_measurements_run` / `ix_findings_run` |
-| 指標の推移（指標ごとの時系列） | `ix_measurements_trend` |
+| 指標の推移（指標ごとの時系列） | `ix_runs_latest` で判定済み Run を決め、`ix_measurements_run` で引く |
 | タグの解決 | `ix_runs_tags`（GIN） |
 
 計測は手動で 1 つのアプリだけのため、件数は少ない。集計用のテーブルは持たない。

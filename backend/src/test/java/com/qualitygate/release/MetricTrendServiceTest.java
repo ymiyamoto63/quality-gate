@@ -144,9 +144,8 @@ class MetricTrendServiceTest {
 
     private Measurement measurement(Run run, String metricId, String component, String variant,
                                     MeasurementStatus status, String value, String unit, String threshold) {
-        return new Measurement(UUID.randomUUID(), run.getId(), repository.getId(), metricId, component, variant,
-                status, value == null ? null : new BigDecimal(value), unit, threshold, null, null, null,
-                run.getMeasuredAt());
+        return new Measurement(UUID.randomUUID(), run.getId(), metricId, component, variant,
+                status, value == null ? null : new BigDecimal(value), unit, threshold, null, null, null);
     }
 
     private static String ge(String value) {
