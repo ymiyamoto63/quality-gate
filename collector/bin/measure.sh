@@ -6,7 +6,7 @@
 #
 # 対象のテストコードを実行するため、このスクリプトには認証情報を渡さない。
 # 指標ごとの失敗は警告にとどめて続行する。未提出の指標は quality-gate が ERROR として扱う。
-# quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く）と、計測プロファイルの DISABLED_METRICS に書いた指標は計測しない。
+# quality-gate の QG_DISABLED_METRICS（fetch.sh が meta.env に書く）に書いた指標は計測しない。
 #
 # 指標ごとの計測は collector/bin/measure/ に分けてあり、このスクリプトは準備と実行の順序だけを持つ。
 #
@@ -27,8 +27,9 @@ REPORTS=$(cd "$2" && pwd)
 SRC="$WORK/src"
 CACHE="$HOME/.cache/quality-gate-collector"
 
-load_profile
+# 計測プロファイル（QG_TARGET）は fetch.sh が meta.env に書いたものを使う
 load_env "$WORK/meta.env"
+load_profile
 [ "$(git -C "$SRC" rev-parse HEAD)" = "$COMMIT_SHA" ] || die "作業ディレクトリのコミットが meta.env と一致しません"
 
 FAILED=()
@@ -47,9 +48,6 @@ done
 
 if [ -n "${QG_DISABLED_METRICS:-}" ]; then
   log "計測しない指標（quality-gate の QG_DISABLED_METRICS）: $QG_DISABLED_METRICS"
-fi
-if [ -n "${DISABLED_METRICS:-}" ]; then
-  log "計測しない指標（計測プロファイルの DISABLED_METRICS）: $DISABLED_METRICS"
 fi
 SCAN_PAGES=$(a11y_pages)
 read -ra app_pages <<< "${QG_ACCESSIBILITY_PAGES:-}"

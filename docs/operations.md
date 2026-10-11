@@ -16,7 +16,17 @@ quality-gate のアプリを動かし、収集ランナーで対象リポジト�
 | 5 | 計測プロファイルを書く | quality-gate リポジトリ | [4](#4-計測対象を設定する) |
 | 6 | collect ワークフローを手動実行する | GitHub Actions | [5](#5-計測を実行する) |
 
-対象リポジトリには何も置きません。quality-gate が見るアプリは 1 つだけで、アプリの `QG_REPOSITORY` と計測プロファイルの `QG_REPOSITORY` に同じリポジトリを書きます。
+対象リポジトリには何も置きません。quality-gate が見るアプリは 1 つだけで、計測対象はアプリの `QG_REPOSITORY` で決まります（収集ランナーは同じ `QG_REPOSITORY` を書いた計測プロファイルを自動で選びます）。
+
+設定する場所と項目は次のとおりです。
+
+| 場所 | 必須の項目 | 任意の項目 |
+| --- | --- | --- |
+| アプリの環境変数（`.env`） | `QG_REPOSITORY`・`QG_LOGIN_PASSWORD`・`QG_INGEST_TOKEN` | 合格ライン（2.4）、その他（2.2） |
+| quality-gate リポジトリの Actions の Variables / Secrets | `QG_BASE_URL`・`QG_INGEST_TOKEN` | `QG_COLLECTOR_APP_ID`・`QG_COLLECTOR_APP_PRIVATE_KEY`（対象が private のとき） |
+| 計測プロファイル（`collector/targets/<名前>/profile.env`） | `QG_REPOSITORY`・`DEFAULT_BRANCH` と測り方（4.2） | — |
+
+`QG_INGEST_TOKEN` だけはアプリと Actions の Secret の両方に同じ値を入れます。それ以外の値は 1 か所にしか書きません。
 
 ## 2. アプリを動かす
 
@@ -44,7 +54,7 @@ DB は日次でバックアップしてください。
 | --- | --- | --- |
 | `QG_REPOSITORY` | （必須） | 計測対象のリポジトリ（`owner/name`）。これと違うリポジトリの計測は取り込みで拒否します |
 | `QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD` | `quality` / （必須） | 画面のログイン。全員で共有する 1 つのアカウントです。パスワードは 12 文字以上（例: `openssl rand -base64 18`）。空のままでは起動しません |
-| `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。`compose.yaml` の `db` と一致しています |
+| `QG_DB_URL` / `QG_DB_USERNAME` / `QG_DB_PASSWORD` | `jdbc:postgresql://localhost:5432/qualitygate` / `qualitygate` / `qualitygate` | 接続先 DB。既定値が `compose.yaml` の `db` と一致しているため、ふだんは書かなくてよい |
 | `QG_ARTIFACT_ROOT` | `./data/artifacts` | 成果物の保存先（相対パスは起動したディレクトリから） |
 | `QG_INGEST_TOKEN` | なし | Ingest Token（2.3）。未設定なら取り込み API はすべて 401 |
 | `QG_BASE_URL` | `http://localhost:8080` | 取り込み API の応答に載せるリリース判定の URL の組み立てに使う |
@@ -154,10 +164,9 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 
 | 種別 | 名前 | 値 |
 | --- | --- | --- |
-| Variables | `QG_TARGET` | 計測対象（`collector/targets/` のディレクトリ名。例: `qg-test-target`）。4.1 |
-| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` も計測の前にアプリの設定を読むため、`QG_INGEST_TOKEN` とあわせて必須（無いと `fetch` で止まる） |
-| Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID |
-| Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体） |
+| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` は計測の前にアプリの設定（計測対象・判定しない指標・M-08 の画面）を読むため、`QG_INGEST_TOKEN` とあわせて必須（無いと `fetch` で止まる） |
+| Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID（対象が public なら不要） |
+| Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体。対象が public なら不要） |
 | Secrets | `QG_INGEST_TOKEN` | アプリの `QG_INGEST_TOKEN` と同じ値（2.3） |
 
 ### 3.5 ランナーを止めるとき
@@ -170,8 +179,8 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 
 ### 4.1 手順
 
-計測対象ごとの設定は `collector/targets/<名前>/` に置きます（計測プロファイル `profile.env` と、負荷試験のシナリオ `k6.js`）。
-どの対象を計測するかは、quality-gate リポジトリの Actions の Variable `QG_TARGET`（ディレクトリ名）で選びます。収集ワークフローの入力 `target` を指定すると、その実行だけ別の対象を計測できます。
+計測対象ごとの設定は `collector/targets/<名前>/` に置きます（計測プロファイル `profile.env` と、負荷試験のシナリオ `k6.js`）。ディレクトリ名は自由です。
+どの対象を計測するかは、アプリの `QG_REPOSITORY` だけで決まります。収集ワークフローの `fetch` がアプリの設定を読み、`QG_REPOSITORY` が同じ計測プロファイルを使います（同じリポジトリのプロファイルを 2 つ置くと止まります）。
 
 対象を追加するとき（最初の 1 回だけ）:
 
@@ -182,10 +191,9 @@ quality-gate のアプリ（画面）はランナーとは別に動きます。
 
 計測対象を切り替えるとき（マージは不要）:
 
-1. Actions の Variable `QG_TARGET` を、切り替え先のディレクトリ名にする（3.4）
-2. アプリの `QG_REPOSITORY` を、その計測プロファイルの `QG_REPOSITORY` と同じにし、合格ライン（2.4。`QG_DISABLED_METRICS`・`QG_PERF_SCENARIOS`・`QG_ACCESSIBILITY_PAGES`・`QG_EXCLUSIONS` など対象に合わせる値を含む）を決めて再起動する
+1. アプリの `QG_REPOSITORY` を切り替え先のリポジトリにし、合格ライン（2.4。`QG_DISABLED_METRICS`・`QG_PERF_SCENARIOS`・`QG_ACCESSIBILITY_PAGES`・`QG_EXCLUSIONS` など対象に合わせる値を含む）を決めて再起動する
 
-quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` とアプリの `QG_REPOSITORY` がずれていると、送信が取り込みで拒否されます。
+quality-gate が一度に判定する対象は 1 つだけです。
 
 計測できるのは Maven（`BACKEND_DIR`）と npm + Vitest（`FRONTEND_DIR`）の構成だけです。使わない側は計測プロファイルで空にしてください。
 設定したら、合格ラインを確定する前に一度計測してベースラインを把握し、対象自身のビルドと結果が一致するかを確かめます（4.5）。
@@ -196,9 +204,8 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 
 | キー | 既定値 | 説明 |
 | --- | --- | --- |
-| `QG_REPOSITORY` | （必須） | `owner/name`。アプリの `QG_REPOSITORY` と一致させる |
+| `QG_REPOSITORY` | （必須） | `owner/name`。アプリの `QG_REPOSITORY` がこの値のとき、このプロファイルが使われる |
 | `DEFAULT_BRANCH` | （必須） | 既定ブランチ。ブランチを指定しない計測はここを測る |
-| `DISABLED_METRICS` | 空 | アプリの `QG_DISABLED_METRICS` に加えて計測しない指標 ID（空白区切り。例: `M-03 M-04`）。ふだんは空でよい（4.3） |
 | `BACKEND_DIR` | 空 | バックエンド（Maven）のディレクトリ。空ならバックエンドを計測しない。末尾のディレクトリ名がコンポーネント名になる |
 | `JAVA_VERSION` | `21` | 計測用のコンテナの JDK の版 |
 | `TEST_REPORTS` | `surefire-reports/TEST-*.xml failsafe-reports/TEST-*.xml` | M-09 / M-10 で送る JUnit XML（`BACKEND_DIR/target` からの相対、空白区切り） |
@@ -236,9 +243,9 @@ quality-gate が一度に判定する対象は 1 つだけです。`QG_TARGET` �
 QG_DISABLED_METRICS=M-03,M-04
 ```
 
-`fetch` のログに `quality-gate の判定しない指標（QG_DISABLED_METRICS）: M-03 M-04` と出れば反映されています。
+`fetch` のログに `判定しない指標（QG_DISABLED_METRICS）: M-03 M-04` と出れば反映されています。
 
-計測プロファイルの `DISABLED_METRICS` に書いた指標も計測しません（アプリの設定に足されます）。ただし、アプリで判定する指標をここに書くと、結果が無いため計測エラー（不合格）になります。
+計測しない指標はアプリの `QG_DISABLED_METRICS` だけで決まります（計測プロファイルの `DISABLED_METRICS` は廃止しました。残っていると `fetch` が止まります）。
 
 | 指標 | 計測しない指標に含めると行わない計測 |
 | --- | --- |
@@ -291,13 +298,12 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 
    | 入力 | 例 | 説明 |
    | --- | --- | --- |
-   | target | （空） | 計測対象（`collector/targets/` のディレクトリ名）。空なら Variable `QG_TARGET`。ここで変えるときは、アプリの `QG_REPOSITORY` も同じ対象にしておく（4.1） |
    | branch | （空） | 空なら計測プロファイルの `DEFAULT_BRANCH` |
    | commit | （空）/ `v1.2.0` | 特定のコミット（40 桁）かタグを測るときに指定する。リリース判定にはタグを指定する |
 
    比較元は自動で決まります（[アーキテクチャ](architecture.md#34-比較元とタグ)）。
 
-3. 実行画面に `collect qg-test-target v1.2.0` のような名前の実行ができる（計測対象と、`commit`・`branch` のうち指定したもの。どちらも空なら `default`）。`submit` ジョブのログには、`Run を作成しました: <runId>`、送信したファイル、判定結果（`判定: PASS` など）、リリース判定の URL が出る。処理に失敗すると `submit` ジョブが失敗する
+3. 実行画面に `collect v1.2.0` のような名前の実行ができる（`commit`・`branch` のうち指定したもの。どちらも空なら `default`）。計測対象は `fetch` のログ（`計測対象: …`）に出る。`submit` ジョブのログには、`Run を作成しました: <runId>`、送信したファイル、判定結果（`判定: PASS` など）、リリース判定の URL が出る。処理に失敗すると `submit` ジョブが失敗する
 4. quality-gate の画面（リリース判定）で結果を見る
 
 `measure` ジョブの成果物 `collector-reports`（7 日保持）で、送った内容をあとから確認できます。
@@ -335,16 +341,15 @@ M-02 はミューテーションの総数（143 件）が一致し、検出数�
 
 ```bash
 WORK=/tmp/qg-collector
-export QG_TARGET=qg-test-target   # 計測する対象（collector/targets/ のディレクトリ名）
 export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST_TOKEN>
 # private リポジトリなら GH_TOKEN に読み取り権限のあるトークンを入れる
-./collector/bin/fetch.sh "$WORK"   # アプリの QG_DISABLED_METRICS もここで読む
+./collector/bin/fetch.sh "$WORK"   # アプリの設定を読み、QG_REPOSITORY が同じ計測プロファイルを選ぶ
 ./collector/bin/measure-isolated.sh "$WORK" "$WORK/reports"
 ./collector/bin/submit.sh "$WORK/reports"
 ```
 
-- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。`QG_TARGET` はどのスクリプトにも必要です
-- `QG_BASE_URL` / `QG_INGEST_TOKEN` が無いと、`fetch.sh` はアプリの設定を読みません。その場合、計測しない指標は計測プロファイルの `DISABLED_METRICS` だけ、M-08 で検査する画面は `A11Y_PAGES` だけになります
+- `fetch.sh` は環境変数 `QG_BRANCH` / `QG_COMMIT` でワークフローの入力と同じ指定ができます。選んだ計測プロファイルは `meta.env` の `QG_TARGET` に書かれ、`measure-isolated.sh` と `submit.sh` はそれを使います
+- アプリを動かさずに計測だけ試すときは、`QG_BASE_URL` / `QG_INGEST_TOKEN` の代わりに `QG_TARGET`（計測プロファイルのディレクトリ名）を指定します。計測しない指標と M-08 の画面は、環境変数 `QG_DISABLED_METRICS` / `QG_ACCESSIBILITY_PAGES`（カンマ区切り）から読みます（`submit.sh` は送れません）
 - `measure.sh` はコンテナの外では動きません。必ず `measure-isolated.sh` を使います
 - 負荷試験が有効なら約 18 分かかります。k6 のシナリオを確かめるだけなら、計測プロファイルを写したものに `PERF_RUNS=1`・`PERF_WARMUP_SECONDS=5`・`PERF_DURATION_SECONDS=20` を足して短く実行できます（その結果は quality-gate に送らないでください）
 
@@ -367,9 +372,9 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | 症状 | 主な原因と対処 |
 | --- | --- |
 | 実行してもジョブが始まらない | ランナーが止まっている（3.5） |
-| `fetch` が `QG_TARGET が未設定です` | Actions の Variable `QG_TARGET` が無い（3.4）。入力 `target` でも指定できる |
-| `fetch` が `計測プロファイルがありません` | `collector/targets/<QG_TARGET>/profile.env` が無い（`QG_TARGET` の綴りを確かめる） |
-| `submit` が 400 で止まる | 計測プロファイルの `QG_REPOSITORY` とアプリの `QG_REPOSITORY` が違う（アプリのログに「計測対象のリポジトリは … です」と出る）。`QG_TARGET` とアプリの設定をそろえる |
+| `fetch` が `QG_REPOSITORY=… の計測プロファイルがありません` | アプリの `QG_REPOSITORY` と同じ `QG_REPOSITORY` を書いた計測プロファイルが main に無い（4.1） |
+| `fetch` が `QG_REPOSITORY=… の計測プロファイルが複数あります` | 同じリポジトリの計測プロファイルが 2 つ以上ある。1 つにする |
+| `fetch` が `計測プロファイルの DISABLED_METRICS は廃止しました` | 計測プロファイルから `DISABLED_METRICS` を消し、止める指標はアプリの `QG_DISABLED_METRICS` に書く（4.3） |
 | `fetch` が `could not read Username` / `Repository not found` | App が対象にインストールされていない、Contents の権限が無い、または `QG_COLLECTOR_APP_ID` が未設定で private を取得しようとした |
 | `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
@@ -387,9 +392,8 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | `fetch` / `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 3.4 の設定漏れ |
 | `submit` の Run の作成が 401 | リポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない |
 | `submit` の Run の作成が 400（`計測対象のリポジトリは … です`） | 計測プロファイルとアプリの `QG_REPOSITORY` が一致していない |
-| 計測していない指標が計測エラーになる | 計測プロファイルの `DISABLED_METRICS` にだけ書き、アプリの `QG_DISABLED_METRICS` に書いていない（4.3） |
 | `fetch` が `quality-gate の設定を読めませんでした` | `QG_BASE_URL` にランナーから届かない、またはリポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない（401） |
-| `fetch` が `計測プロファイルの QG_REPOSITORY（…）が quality-gate の QG_REPOSITORY（…）と違います` | `QG_TARGET` とアプリの `QG_REPOSITORY` がずれている（4.1） |
+| `fetch` が `計測プロファイル（…）の QG_REPOSITORY（…）が quality-gate の QG_REPOSITORY（…）と違います` | 手元で `QG_TARGET` を指定したまま、別の対象のアプリに向けている（6） |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名とアプリの `QG_PERF_SCENARIOS` が一致していない |
 | M-03 が ERROR（成功スループットが到達率の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `QG_ARRIVAL_RATE_RPS` が一致していない |
 | M-08 が ERROR（検査した画面が足りない） | `QG_ACCESSIBILITY_PAGES` のパターン（`/tasks/:id` など）に当たる具体的なパスを `A11Y_PAGES` に書いていない、画面を読み込めなかった、または `A11Y_READY_SELECTOR` の要素が現れない |

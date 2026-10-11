@@ -62,7 +62,7 @@ quality-gate の構成、測定の仕組み、バックエンドの構造、デ�
 | DD-12 | 性能計測の条件 | **到達率 50 req/s を負荷条件として固定し、その下で p95 とエラー率を判定する**。到達率は指標にせず M-03 の前提として確かめる。計測は他のジョブと同居しない専有のセルフホストランナーで行う | スループットを結果として測ると合否が負荷のかけ方で変わる。共有の実行環境ではノイズで値が揺れ、絶対値で判定できない |
 | DD-13 | ミューテーションテスト | **PIT を使い、backend だけを対象にする**。frontend は `NOT_APPLICABLE`（対象外）とし、合否に使わない | PIT は JVM 専用。業務ロジックはバックエンドに寄っている |
 | DD-14 | リリース判定のための計測 | **タグを指定して計測でき、比較元は前のタグにする**。比較対象 Run は比較元コミットの Run を優先する | 前回のリリースからの変更全体で増加（破壊的変更・スキップ）を数える。手動の計測は順不同のため、直前に計測した Run がリリースより新しいことがある |
-| DD-15 | 対象の登録 | **計測プロファイル（`collector/targets/<名前>/profile.env`。使う対象は Variable `QG_TARGET` で選ぶ）とアプリの `QG_REPOSITORY` に同じリポジトリを書く**。バックエンドは初めて計測が届いたときにリポジトリを登録し、`QG_REPOSITORY` と違う送信は拒否する | 取り違えた送信で別のアプリの結果が混ざらないようにする |
+| DD-15 | 対象の登録 | **計測対象はアプリの `QG_REPOSITORY` だけで選ぶ**。収集ランナーは同じ `QG_REPOSITORY` を書いた計測プロファイル（`collector/targets/<名前>/profile.env`）を使う。バックエンドは初めて計測が届いたときにリポジトリを登録し、`QG_REPOSITORY` と違う送信は拒否する | 取り違えた送信で別のアプリの結果が混ざらないようにする |
 
 ### 判定
 
@@ -114,7 +114,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 | ファイル | 役割 |
 | --- | --- |
-| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）で計測対象（`target`。空なら Variable `QG_TARGET`）とブランチ・コミット・タグを受け取り、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
+| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）でブランチ・コミット・タグを受け取り（計測対象はアプリの `QG_REPOSITORY` で決まる）、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
 | `collector/bin/fetch.sh` | 対象を全履歴ごと clone し、計測するコミット・比較元・タグを決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | 計測用のコンテナを用意し（無ければビルド）、その中で `measure.sh` を実行する |
 | `collector/bin/measure.sh` | 計測の準備と順序。指標ごとの計測は `collector/bin/measure/*.sh` |
@@ -123,7 +123,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | `collector/versions.env` | ツールの版（JaCoCo・PMD・PIT・oasdiff・Trivy・Maven・k6） |
 | `collector/runner/Dockerfile` | 計測用のコンテナ（JDK・Node.js・Maven・Trivy・oasdiff・Playwright と Chromium・ESLint） |
 | `collector/a11y/` / `collector/complexity/` / `collector/pit/` / `collector/pmd-ruleset.xml` | M-08 の検査スクリプト、M-06（frontend）の ESLint の設定、PIT の取得用 pom、M-06（backend）のルールセット |
-| `collector/targets/<名前>/profile.env` | 計測対象ごとの計測プロファイル（計測対象と、**どう測るか**・何を測らないか）。使う対象は Actions の Variable `QG_TARGET` で選ぶ |
+| `collector/targets/<名前>/profile.env` | 計測対象ごとの計測プロファイル（計測対象と、**どう測るか**）。アプリの `QG_REPOSITORY` と同じ `QG_REPOSITORY` のものが使われる |
 | `collector/targets/<名前>/k6.js` | 計測対象ごとの負荷試験のシナリオ（性能を測る場合） |
 
 | ジョブ | やること | 認証情報 | 所要時間 |
@@ -147,9 +147,8 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 ### 3.5 何を計測するか
 
-- **アプリの `QG_DISABLED_METRICS` に書いた指標は計測しない**。`fetch.sh` が取り込み API と同じ Ingest Token で `GET /api/v1/collector/settings` を読み、`meta.env` に書く（あわせて計測プロファイルとアプリの `QG_REPOSITORY` の一致も確かめ、食い違えば計測の前に止める）
+- **アプリの `QG_DISABLED_METRICS` に書いた指標は計測しない**。`fetch.sh` が取り込み API と同じ Ingest Token で `GET /api/v1/collector/settings` を読み、`meta.env` に書く（あわせてアプリの `QG_REPOSITORY` と同じ計測プロファイルを選び、`meta.env` の `QG_TARGET` に書く。`measure` と `submit` はそれを使う）
 - M-08 はアプリの `QG_ACCESSIBILITY_PAGES` の画面を検査する（同じ設定で読む）。`/tasks/:id` のようなパターンは開けないため、具体的なパスを計測プロファイルの `A11Y_PAGES` に書く（アプリの設定に足される）
-- 計測プロファイルの `DISABLED_METRICS` に書いた指標も計測しない（アプリの設定に足される）。アプリで判定する指標をここに書くと、判定に残った指標が計測エラーになる
 - テスト（M-01 / M-09 / M-10）はビルドを兼ね、M-02・M-03 / M-04・M-08 が使う jar も作るため、常に実行する
 - テストが失敗しても計測は止めない（失敗は M-09 の材料）。成果物が出なかった指標は送られず、quality-gate では ERROR になる
 
