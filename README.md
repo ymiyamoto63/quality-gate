@@ -2,7 +2,8 @@
 
 **1 つのアプリが品質基準をクリアしているか（リリースしてよいか）を、開発に携わっていない方を含め、誰にでもひと目で分かる形で示す**社内向けの Web アプリケーションです。
 
-- 画面はリリース判定の 1 枚だけです。最上部に結論（**リリース可 / リリース不可**）を大きく出し、その下に品質基準ごとの合否、各基準の意味と根拠、判定の履歴を並べます。印刷して PDF の証跡にできます
+- 結論を示す画面はリリース判定の 1 枚だけです。最上部に結論（**リリース可 / リリース不可**）を大きく出し、その下に品質基準ごとの合否、各基準の意味と根拠、判定の履歴を並べます。印刷して PDF の証跡にできます
+- 補助として、指標ごとの値の移り変わりを折れ線グラフで見る**指標の推移**の画面があります
 - 指標の合否は**合格 / 不合格の 2 値**です（測れなかった指標は計測エラーとして不合格に数えます）
 - 合格ラインは**環境変数**（`QG_*`）で決めます。判定に使った合格ラインは計測ごとに残るため、後から変えても過去の結論は変わりません
 - ログインは全員で共有する 1 つのアカウントです（GitHub のアカウントは要りません）
@@ -36,6 +37,7 @@
 | UC-06 | リリース判断者・開発者 | リリース判定会議で、最新の計測（またはリリースのタグ）の結論と全基準の合否を見て、PDF を証跡として残す |
 | UC-07 | リリース判断者 | 判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる |
 | UC-08 | 開発者 | リリース不可のとき、不合格の基準の理由と主な違反（どの関数・どの CVE・どの画面）から直す場所を確かめる |
+| UC-09 | 開発者・リリース判断者 | 指標の推移で、合格ライン内でも値が悪くなっていないかを確かめ、基準を守れてきたことを説明する |
 
 ## クイックスタート
 
@@ -61,6 +63,7 @@ cd backend && ./mvnw spring-boot:run   # http://localhost:8080（ユーザー名
 | 機能 | 要件 | 設計 |
 | --- | --- | --- |
 | リリース判定（画面） | [requirements](docs/features/release-report/requirements.md) | [design](docs/features/release-report/design.md) |
+| 指標の推移（画面） | [requirements](docs/features/trends/requirements.md) | [design](docs/features/trends/design.md) |
 | 合格ライン（環境変数） | [requirements](docs/features/gate-config/requirements.md) | [design](docs/features/gate-config/design.md) |
 | 判定（正規化・判定） | [requirements](docs/features/evaluation/requirements.md) | [design](docs/features/evaluation/design.md) |
 | 取り込み（Ingest API） | [requirements](docs/features/ingest/requirements.md) | [design](docs/features/ingest/design.md) |

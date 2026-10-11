@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * リリース判定（画面はこれ 1 つ）。PDF はサーバでは作らず、画面をブラウザの印刷で出す。
+ * リリース判定と指標の推移。PDF はサーバでは作らず、画面をブラウザの印刷で出す。
  */
 @RestController
 @RequestMapping("/api/v1/release")
@@ -17,9 +17,11 @@ import org.springframework.web.bind.annotation.RestController;
 public class ReleaseReportController {
 
     private final ReleaseReportService service;
+    private final MetricTrendService trends;
 
-    public ReleaseReportController(ReleaseReportService service) {
+    public ReleaseReportController(ReleaseReportService service, MetricTrendService trends) {
         this.service = service;
+        this.trends = trends;
     }
 
     @GetMapping
@@ -36,5 +38,13 @@ public class ReleaseReportController {
     @Operation(summary = "判定の履歴を取得する", description = "判定済みの計測を新しい順に最大 50 件（同じコミットは最後の判定だけ）")
     public ReleaseHistoryResponse history() {
         return service.history();
+    }
+
+    @GetMapping("/trends")
+    @Operation(summary = "指標の推移を取得する",
+            description = "判定の履歴と同じ計測（新しいものから最大 50 件、同じコミットは最後の判定だけ）を古い順に並べ、"
+                    + "指標ごとの値・合否・その時点の合格ラインを返す")
+    public MetricTrendResponse trends() {
+        return trends.trends();
     }
 }

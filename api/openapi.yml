@@ -70,6 +70,20 @@ paths:
       summary: 判定の履歴を取得する
       tags:
       - Release
+  /api/v1/release/trends:
+    get:
+      description: 判定の履歴と同じ計測（新しいものから最大 50 件、同じコミットは最後の判定だけ）を古い順に並べ、指標ごとの値・合否・その時点の合格ラインを返す
+      operationId: trends
+      responses:
+        "200":
+          content:
+            '*/*':
+              schema:
+                $ref: "#/components/schemas/MetricTrendResponse"
+          description: OK
+      summary: 指標の推移を取得する
+      tags:
+      - Release
   /api/v1/runs:
     post:
       description: 計測開始時に呼ぶ。同一コミットへの再送信は attempt を増やした新しい Run になる。
@@ -238,6 +252,23 @@ components:
           type: string
       required:
       - username
+    MetricTrendResponse:
+      type: object
+      description: 指標の推移。判定の履歴と同じ数え方の計測を、古い順に並べる
+      properties:
+        metrics:
+          type: array
+          description: 期間内に一度でも判定した指標（指標 ID の順）
+          items:
+            $ref: "#/components/schemas/TrendMetric"
+        runs:
+          type: array
+          description: 横軸に並べる計測（古い順、最大 50 件）
+          items:
+            $ref: "#/components/schemas/TrendRun"
+      required:
+      - metrics
+      - runs
     ReleaseCounts:
       type: object
       description: 合否に使った指標の件数
@@ -485,3 +516,118 @@ components:
       - ciRunUrl
       - measuredAt
       - tags
+    TrendMetric:
+      type: object
+      properties:
+        axisMax:
+          type:
+          - number
+          - "null"
+          description: 縦軸の上端を固定するときの値（% の指標は 100）。null なら値と合格ラインから決める
+        metricId:
+          type: string
+        name:
+          type: string
+        series:
+          type: array
+          description: コンポーネント・計測条件ごとの線
+          items:
+            $ref: "#/components/schemas/TrendSeries"
+        summary:
+          type: string
+          description: 何を見る指標か
+        unit:
+          type:
+          - string
+          - "null"
+          description: 値の単位（percent / ms / count）
+      required:
+      - axisMax
+      - metricId
+      - name
+      - series
+      - summary
+      - unit
+    TrendPoint:
+      type: object
+      properties:
+        runIndex:
+          type: integer
+          format: int32
+          description: runs の位置
+        status:
+          type: string
+          description: PASS / FAIL / ERROR / NOT_APPLICABLE
+          enum:
+          - PASS
+          - FAIL
+          - ERROR
+          - NOT_APPLICABLE
+        threshold:
+          type:
+          - string
+          - "null"
+          description: 合格ラインを表示用にした文字列（≥ 75% など）
+        thresholdValue:
+          type:
+          - number
+          - "null"
+          description: その計測の判定に使った合格ライン（縦軸の値）。前回からの増加で判定する指標は null
+        value:
+          type:
+          - number
+          - "null"
+          description: 実測値。計測エラー・対象外は null
+      required:
+      - runIndex
+      - status
+      - threshold
+      - thresholdValue
+      - value
+    TrendRun:
+      type: object
+      properties:
+        commitSha:
+          type: string
+        measuredAt:
+          type: string
+          format: date-time
+        ref:
+          type: string
+          description: リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA）
+        tags:
+          type: array
+          description: 計測したコミットを指すタグ
+          items:
+            type: string
+        verdict:
+          type: string
+          enum:
+          - PASS
+          - FAIL
+      required:
+      - commitSha
+      - measuredAt
+      - ref
+      - tags
+      - verdict
+    TrendSeries:
+      type: object
+      properties:
+        componentName:
+          type:
+          - string
+          - "null"
+        points:
+          type: array
+          description: 計測の古い順
+          items:
+            $ref: "#/components/schemas/TrendPoint"
+        variantLabel:
+          type:
+          - string
+          - "null"
+      required:
+      - componentName
+      - points
+      - variantLabel
