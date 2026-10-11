@@ -376,7 +376,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | `measure` で `Node.js の版を解決できませんでした` | `NODE_VERSION_FILE` の書き方が解釈できない（`22` / `v22.21.1` の形に対応）、または nodejs.org に届かない |
 | `measure` で `バックエンドのビルドに失敗しました` | 対象がコンパイルできない、または `JAVA_VERSION` が対象の要求と合っていない |
 | `measure` で `M-02: PIT の実行に失敗しました` | テストに失敗がある、テストが JUnit 5 でない、または `MUTATION_TARGET_CLASSES` に合うクラスが無い（`No mutations found`） |
-| `measure` で `lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
+| `measure` で `M-01: lcov.info がありません` | `FRONTEND_COVERAGE_INCLUDE` のパターンが一致していない（空白区切りで書く） |
 | `measure` で `M-06: ESLint の実行に失敗しました` | `FRONTEND_COMPLEXITY_SOURCES` のディレクトリが無い、または ESLint が設定を読めなかった |
 | `measure` で `M-06: 構文を読めず、関数を数えられなかったファイルがあります` | quality-gate 側のパーサが読めない構文のファイルがある。`FRONTEND_COMPLEXITY_EXCLUDE` で外すか、`collector/complexity` のパーサを見直す |
 | `measure` で `M-09/M-10: バックエンドのテストの結果がありません` | `TEST_REPORTS` のパターンが一致していない |

@@ -250,8 +250,8 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
   <thead><tr><th>最初の結果でよくあること</th><th>原因と対処</th></tr></thead>
   <tbody>
     <tr><td>ジョブが始まらない</td><td>セルフホストランナーが止まっている（<code>Idle</code> になっているか確かめる）</td></tr>
-    <tr><td><code>submit</code> の Run 作成が 401</td><td>GitHub の Secret と quality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
-    <tr><td><code>submit</code> の Run 作成が 400</td><td>計測プロファイルと quality-gate アプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
+    <tr><td><code>fetch</code> が「quality-gate の設定を読めませんでした」で失敗する</td><td>GitHub の Secret と quality-gate アプリの <code>QG_INGEST_TOKEN</code> が一致していない</td></tr>
+    <tr><td><code>fetch</code> が「QG_REPOSITORY が…と違います」で失敗する</td><td>計測プロファイルと quality-gate アプリの <code>QG_REPOSITORY</code> が一致していない</td></tr>
     <tr><td>計測していない指標が計測エラー</td><td><code>DISABLED_METRICS</code> にだけ書き、quality-gate アプリの <code>QG_DISABLED_METRICS</code> に書いていない</td></tr>
     <tr><td>M-07 が対象外</td><td>初回は比較元に OpenAPI 定義が無いため。異常ではない</td></tr>
   </tbody>
@@ -266,9 +266,10 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
   <tbody>
     <tr><td class="id">UC-01</td><td>開発者</td><td>計測プロファイルと quality-gate アプリの <code>QG_REPOSITORY</code> に対象を書き、合格ラインを環境変数で決める</td></tr>
     <tr><td class="id">UC-02</td><td>開発者</td><td>収集ランナーでブランチ・コミット・タグを指定して計測すると、その場で判定される</td></tr>
-    <tr><td class="id">UC-06</td><td>リリース判断者・開発者</td><td>リリース判定会議で最新の計測（またはタグ）の結論と全基準の合否を見て、PDF を証跡として残す</td></tr>
-    <tr><td class="id">UC-07</td><td>リリース判断者</td><td>判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる</td></tr>
-    <tr><td class="id">UC-08</td><td>開発者</td><td>リリース不可のとき、不合格の基準の理由と主な違反（関数・CVE・画面）から直す場所を確かめる</td></tr>
+    <tr><td class="id">UC-03</td><td>リリース判断者・開発者</td><td>リリース判定会議で最新の計測（またはタグ）の結論と全基準の合否を見て、PDF を証跡として残す</td></tr>
+    <tr><td class="id">UC-04</td><td>リリース判断者</td><td>判定の履歴で、過去のリリースが品質基準をクリアしてきたかを確かめる</td></tr>
+    <tr><td class="id">UC-05</td><td>開発者</td><td>リリース不可のとき、不合格の基準の理由と主な違反（関数・CVE・画面）から直す場所を確かめる</td></tr>
+    <tr><td class="id">UC-06</td><td>開発者・リリース判断者</td><td>指標の推移で、合格ライン内でも値が悪くなっていないかを確かめ、基準を守れてきたことを説明する</td></tr>
   </tbody>
 </table></div>
 </section>
@@ -281,7 +282,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
   <tbody>
     <tr><td class="id">M-01</td><td>機能テスト</td><td>ブランチカバレッジ</td><td>75% 以上（各コンポーネント）</td><td>JaCoCo / Vitest (v8)</td><td><code>QG_BRANCH_COVERAGE_MIN</code></td></tr>
     <tr><td class="id">M-02</td><td>機能テスト</td><td>ミューテーションスコア</td><td>60% 以上（backend のみ）</td><td>PIT</td><td><code>QG_MUTATION_SCORE_MIN</code></td></tr>
-    <tr><td class="id">M-03</td><td>性能</td><td>応答時間 p95</td><td>50 req/s の負荷下で 500ms 以内</td><td>k6</td><td><code>QG_RESPONSE_TIME_P95_MAX_MS</code></td></tr>
+    <tr><td class="id">M-03</td><td>性能</td><td>応答時間 p95</td><td>50 req/s の負荷下で 500ms 以内</td><td>k6</td><td><code>QG_RESPONSE_TIME_P95_MAX_MS</code> / <code>QG_ARRIVAL_RATE_RPS</code></td></tr>
     <tr><td class="id">M-04</td><td>性能</td><td>エラー率</td><td>0.1% 以下</td><td>k6</td><td><code>QG_ERROR_RATE_MAX_PCT</code></td></tr>
     <tr><td class="id">M-05</td><td>セキュリティ</td><td>重大・高 脆弱性件数</td><td>Critical 0・High 0</td><td>Trivy (SARIF)</td><td><code>QG_CRITICAL_/HIGH_VULNERABILITIES_MAX</code></td></tr>
     <tr><td class="id">M-06</td><td>コード構造</td><td>循環的複雑度 15 超の関数数</td><td>0 件</td><td>PMD / ESLint</td><td><code>QG_COMPLEXITY_MAX</code></td></tr>
@@ -296,6 +297,7 @@ QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプリの 
 <ul>
   <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）</li>
   <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
+  <li>性能計測は <code>QG_ARRIVAL_RATE_RPS</code>（既定 50、到達率）と <code>QG_PERF_SCENARIOS</code>（必須のシナリオ）でも調整できる。ミューテーションの対象コンポーネントは <code>QG_MUTATION_COMPONENTS</code>（既定 backend）</li>
 </ul>
 </section>
 
@@ -328,7 +330,9 @@ NOT_APPLICABLE は影響しない</pre>
 </section>
 
 <section id="screen">
-<h2>7. 画面（リリース判定）</h2>
+<h2>7. 画面</h2>
+<p>結論を示す画面は<strong>リリース判定</strong>（<code>/</code>）の 1 つだけ。<strong>指標の推移</strong>（<code>/trends</code>）はその補助で、ヘッダの画面切替と判定の履歴から開きます。他の画面はログイン（<code>/login</code>）と「見つからない」のみです。</p>
+<h3>7.1 リリース判定</h3>
 <p>パスは <code>/</code>（<code>?ref=&lt;タグかコミット&gt;</code> で指定可）。上から次の順に並べます。</p>
 <ol>
   <li><strong>結論</strong> — リリース可 / リリース不可 / 未計測 を大きく表示</li>
@@ -336,6 +340,9 @@ NOT_APPLICABLE は影響しない</pre>
   <li><strong>各指標の説明と基準の根拠</strong> — 根拠の種類（外部基準 / 業界の目安 / チーム判断）と、満たさないと何が起きるか</li>
   <li><strong>判定の履歴</strong> — 新しい順、最大 50 件。各判定を開ける</li>
 </ol>
+<h3>7.2 指標の推移</h3>
+<p>パスは <code>/trends</code>。判定まで終わった計測（同じコミットは最後の判定だけ）を新しい順に最大 50 件取り、古い順に指標ごとの折れ線グラフで示します。点線は各計測の判定に使った合格ライン、点を選ぶとその計測のリリース判定の画面を開きます。結論は示さず、合格ライン内での悪化や、基準を守れてきたことの説明に使う補助の画面です。</p>
+<h3>7.3 共通のルール</h3>
 <div class="table-wrap"><table>
   <thead><tr><th>要件</th><th>内容</th></tr></thead>
   <tbody>
@@ -347,7 +354,6 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td>アクセシビリティ</td><td>quality-gate 自身も WCAG 2.2 AA を満たす。CI で axe-core の critical / serious 0 件を確認</td></tr>
   </tbody>
 </table></div>
-<p>他の画面はログイン（<code>/login</code>）と「見つからない」のみです。</p>
 </section>
 
 <section id="collector">
@@ -356,7 +362,7 @@ NOT_APPLICABLE は影響しない</pre>
 <div class="table-wrap"><table>
   <thead><tr><th>ジョブ</th><th>やること</th><th>認証情報</th><th>所要時間</th></tr></thead>
   <tbody>
-    <tr><td class="id"><code>fetch</code></td><td>GitHub App の読み取り専用トークン（1 時間）で clone し、計測コミット・比較元・タグを決める</td><td>App の秘密鍵</td><td>1 分未満</td></tr>
+    <tr><td class="id"><code>fetch</code></td><td>GitHub App の読み取り専用トークン（1 時間）で clone し、計測コミット・比較元・タグを決める。quality-gate の設定（<code>GET /collector/settings</code>）も読み、対象リポジトリの一致・判定しない指標・M-08 の検査対象画面を確かめる（計測に時間をかける前に設定の誤りで止める）</td><td>App の秘密鍵・Ingest Token</td><td>1 分未満</td></tr>
     <tr><td class="id"><code>measure</code></td><td>コンテナの中でビルド・テスト・解析し、成果物を <code>reports/</code> にまとめる</td><td><strong>なし</strong></td><td>数分〜20 分以上</td></tr>
     <tr><td class="id"><code>submit</code></td><td>Run 作成 → 成果物アップロード → 確定。処理失敗ならジョブ失敗（不合格では失敗にしない）</td><td>Ingest Token</td><td>1 分未満</td></tr>
   </tbody>
@@ -601,6 +607,7 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td>POST</td><td><code>/runs</code></td><td>Run の作成（初回はリポジトリ登録）</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/artifacts</code></td><td>成果物のアップロード（1 ファイル 50MB / Run 合計 200MB まで）</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/runs/{runId}/finalize</code></td><td>確定し、その場で判定して結果を返す</td><td>Ingest Token</td></tr>
+    <tr><td>GET</td><td><code>/collector/settings</code></td><td>収集ランナーが計測前に読む設定（対象リポジトリ・判定しない指標・M-08 の検査対象画面）</td><td>Ingest Token</td></tr>
     <tr><td>POST</td><td><code>/login</code>, <code>/logout</code></td><td>ログイン / ログアウト</td><td>公開 / ログイン</td></tr>
     <tr><td>GET</td><td><code>/me</code></td><td>ログイン中のユーザー名</td><td>ログイン</td></tr>
     <tr><td>GET</td><td><code>/release?ref=</code></td><td>リリース判定（ref 省略で最新）</td><td>ログイン</td></tr>
@@ -609,7 +616,7 @@ NOT_APPLICABLE は影響しない</pre>
   </tbody>
 </table></div>
 <ul>
-  <li>Ingest Token は書き込み専用で参照 API は呼べない。交換時は新旧をカンマ区切りで並べる</li>
+  <li>Ingest Token は計測の取り込みと収集ランナー向け設定の取得にだけ使え、画面向けの参照 API（<code>/me</code>・<code>/release</code> 系）は呼べない。交換時は新旧をカンマ区切りで並べる</li>
   <li>セッションは HttpOnly の <code>JSESSIONID</code> Cookie。状態を変える操作には CSRF トークン（<code>X-XSRF-TOKEN</code>）が必要</li>
   <li><code>/actuator/health</code> は公開、<code>/actuator/prometheus</code> はログインが必要</li>
 </ul>
