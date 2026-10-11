@@ -98,7 +98,8 @@ public record MetricGuide(
                     "米国 NIST の指針（SP 500-235）では 10 以下を推奨し、理由があれば 15 まで許容としている。"
                             + "既定値はその上限の 15。",
                     "修正のたびに不具合が混入しやすくなり、保守の費用が上がる。",
-                    "循環的複雑度（McCabe）が上限（QG_COMPLEXITY_MAX。既定 15）を超える関数の数。QG_EXCLUSIONS で外したファイルは数えない。",
+                    "循環的複雑度（McCabe）が上限（QG_COMPLEXITY_MAX。既定 15）を超える関数の数。"
+                            + "コンポーネント（backend / frontend）ごとに判定し、合算しない。QG_EXCLUSIONS で外したファイルは数えない。",
                     "PMD（Java）、ESLint の complexity ルール（TypeScript / Vue。typescript-eslint・vue-eslint-parser）"),
             new MetricGuide(MetricCatalog.M_BREAKING_CHANGES,
                     "既存の利用者を壊す API の変更（互換性のない変更）が入っていないか",

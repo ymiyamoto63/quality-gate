@@ -6,12 +6,14 @@ import com.qualitygate.domain.model.Severity;
 import com.qualitygate.domain.report.NormalizedReport;
 import com.qualitygate.domain.report.ParseContext;
 import com.qualitygate.domain.report.RawFinding;
+import com.qualitygate.domain.report.RawMeasurement;
 import org.springframework.stereotype.Component;
 
 import javax.xml.stream.XMLStreamConstants;
 import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.InputStream;
+import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -78,7 +80,7 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         } finally {
             close(xml);
         }
-        return NormalizedReport.of(ArtifactType.PMD_XML, List.of(), findings);
+        return NormalizedReport.of(ArtifactType.PMD_XML, List.of(analyzed(findings, context)), findings);
     }
 
     private RawFinding toFinding(XMLStreamReader xml, String filePath, ParseContext context) {
@@ -114,6 +116,15 @@ public class PmdXmlAdapter implements ArtifactAdapter {
                 repoPath, beginLine, context.componentName(), identity,
                 Map.of("complexity", complexity,
                         "member", memberName));
+    }
+
+    /**
+     * 解析した関数の件数を、成果物が届いたことの印としてコンポーネントごとに返す。
+     * 関数が 1 つも無いコンポーネントでも行が残り、成果物の届かなかったコンポーネント（ERROR）と区別できる。
+     */
+    static RawMeasurement analyzed(List<RawFinding> findings, ParseContext context) {
+        return RawMeasurement.of(MetricCatalog.M_COMPLEXITY, context.componentName(),
+                BigDecimal.valueOf(findings.size()), "count", Map.of("analyzedFunctions", findings.size()));
     }
 
     /**
