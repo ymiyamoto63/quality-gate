@@ -12,7 +12,7 @@
 
 ## 2. 取り込み API
 
-`POST /api/v1/runs/**` は `Authorization: Bearer <Ingest Token>` で認証する（ステートレス、CSRF 対象外）。トークンは `QG_INGEST_TOKEN`（交換中は新旧をカンマ区切り）。
+`POST /api/v1/runs/**` と `GET /api/v1/collector/settings`（収集ランナーが計測の前に読む設定）は `Authorization: Bearer <Ingest Token>` で認証する（ステートレス、CSRF 対象外）。トークンは `QG_INGEST_TOKEN`（交換中は新旧をカンマ区切り）。
 
 ## 3. 採らなかった方式
 

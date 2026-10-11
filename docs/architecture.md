@@ -114,7 +114,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 | ファイル | 役割 |
 | --- | --- |
-| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）でブランチ・コミット・タグを受け取り、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
+| `.github/workflows/collect.yml` | 手動実行（`workflow_dispatch`）で計測対象（`target`。空なら Variable `QG_TARGET`）とブランチ・コミット・タグを受け取り、`fetch` → `measure` → `submit` の 3 ジョブで計測する |
 | `collector/bin/fetch.sh` | 対象を全履歴ごと clone し、計測するコミット・比較元・タグを決めて `meta.env` に書く |
 | `collector/bin/measure-isolated.sh` | 計測用のコンテナを用意し（無ければビルド）、その中で `measure.sh` を実行する |
 | `collector/bin/measure.sh` | 計測の準備と順序。指標ごとの計測は `collector/bin/measure/*.sh` |
@@ -128,7 +128,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 | ジョブ | やること | 認証情報 | 所要時間 |
 | --- | --- | --- | --- |
-| `fetch` | GitHub App から対象だけを読める 1 時間有効のトークンを発行し、clone する。トークンは `.git/config` に残さない | App の秘密鍵 → 読み取り用トークン | 1 分未満 |
+| `fetch` | アプリの設定（`GET /api/v1/collector/settings`）を読む（3.5）。GitHub App から対象だけを読める 1 時間有効のトークンを発行し、clone する。トークンは `.git/config` に残さない | App の秘密鍵 → 読み取り用トークン、Ingest Token | 1 分未満 |
 | `measure` | 計測用のコンテナの中でビルド・テスト・解析をし、成果物を `reports/` にまとめる。最後に作業領域を消す | **なし** | 数分（負荷試験を含めると 20 分以上） |
 | `submit` | `reports/` を Ingest API に送り、確定する。処理失敗（`FAILED`）ならジョブを失敗にする。判定結果の不合格ではジョブを失敗にしない | Ingest Token | 1 分未満 |
 
@@ -141,7 +141,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 1. `commit` に**タグ**を指定し、既定ブランチ上の計測なら、その前のタグ（`git describe --tags`）。前のタグが無ければ直前のコミット
 2. 既定ブランチ上の計測なら、直前のコミット
-3. それ以外（別のブランチ）は既定ブランチとの merge-base
+3. それ以外（別のブランチ）は既定ブランチとの merge-base。merge-base が計測するコミットそのもの（既定ブランチに取り込み済み）なら直前のコミット
 
 あわせて、計測するコミットを指すタグ（`git tag --points-at`）を Run の `tags` として送る。リリース判定でタグをコミットに解決するのに使う。
 
@@ -176,7 +176,7 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 | 鍵 | 使う場所 | 置き場所 | できること |
 | --- | --- | --- | --- |
 | GitHub App の秘密鍵 → インストールトークン | `fetch` | quality-gate の Actions Secrets | 対象リポジトリを読む（1 時間。書き込み不可）。Contents の Read-only を付けて対象にインストールする |
-| Ingest Token | `submit` | quality-gate の Actions Secrets と、アプリの環境変数（同じ値） | Run を作って成果物を送る（参照 API は呼べない） |
+| Ingest Token | `fetch` / `submit` | quality-gate の Actions Secrets と、アプリの環境変数（同じ値） | 収集ランナーの設定を読み、Run を作って成果物を送る（参照 API は呼べない） |
 | 画面のログインのパスワード | アプリ | アプリの環境変数（`QG_LOGIN_PASSWORD`） | 画面のログイン（全員で共有） |
 
 | リスク | 対策 |
@@ -251,14 +251,14 @@ GitHub Actions のワークフローを実際に実行するコンピュータ�
 
 ```
 com.qualitygate
-├ ingest/       取り込み API、Ingest Token 認証、成果物の受領と保管、リポジトリの登録
+├ ingest/       取り込み API と収集ランナーの設定、Ingest Token 認証、成果物の受領と保管、リポジトリの登録
 ├ pipeline/     正規化 → 判定の流れ（確定から呼ぶ）
 ├ adapter/      ツール別パーサ（jacoco, lcov, pit, k6, sarif, pmd, eslint, junit, oasdiff, axe）
 ├ normalize/    正規化、fingerprint の生成
 ├ evaluate/     合格ラインの適用、指標の判定、Run の集約、違反の新規 / 継続 / 解消
 ├ config/       複数モジュールを組み立てる設定（SecurityConfig・SPA の配信）
 ├ query/        ログインの状態（/api/v1/me）
-├ release/      リリース判定と判定の履歴
+├ release/      リリース判定、判定の履歴、指標の推移
 ├ domain/       エンティティ・リポジトリ・正規化モデル・列挙値
 └ platform/     設定（合格ラインの環境変数を含む）、ArtifactStore、共通例外、可観測性
 ```
@@ -378,7 +378,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 
 | 経路 | 対象 | 方式 |
 | --- | --- | --- |
-| Ingest Token | `POST /api/v1/runs`・`.../artifacts`・`.../finalize` | `Authorization: Bearer <token>`。書き込み専用で参照 API は呼べない。Cookie を使わないため CSRF の対象外 |
+| Ingest Token | `POST /api/v1/runs`・`.../artifacts`・`.../finalize`、`GET /api/v1/collector/settings` | `Authorization: Bearer <token>`。書き込み専用で、読めるのは収集ランナーの設定だけ（参照 API は呼べない）。Cookie を使わないため CSRF の対象外 |
 | セッション | それ以外の `/api/**` | `POST /api/v1/login`（共有のユーザー名とパスワード）でログインした後の `JSESSIONID` Cookie（HttpOnly）。ログイン・ログアウトなど状態を変える操作には CSRF トークン（`XSRF-TOKEN` Cookie を `X-XSRF-TOKEN` ヘッダで送り返す）を求める |
 | なし | `/actuator/health`・`/actuator/info`、SPA のシェル | 公開。`/actuator/**` のほか（`prometheus` など）はログインが要る |
 
@@ -393,6 +393,7 @@ repositories ──▶ runs ──┬──▶ artifacts
 | POST | `/api/v1/runs` | Run の作成（初めてのリポジトリは登録） | Ingest Token | [取り込み](features/ingest/design.md) |
 | POST | `/api/v1/runs/{runId}/artifacts` | 成果物のアップロード | Ingest Token | 同上 |
 | POST | `/api/v1/runs/{runId}/finalize` | 確定し、その場で判定する | Ingest Token | 同上 |
+| GET | `/api/v1/collector/settings` | 収集ランナーが計測の前に読む設定（計測対象・判定しない指標・M-08 で検査する画面） | Ingest Token | 同上 |
 | POST | `/api/v1/login`、`/api/v1/logout` | ログイン（`username` / `password` のフォーム）とログアウト | 公開 / — | [認証](features/auth/design.md) |
 | GET | `/api/v1/me` | ログイン中のユーザー名 | — | 同上 |
 | GET | `/api/v1/release?ref=` | リリース判定（`ref` を省くと最新の計測） | — | [リリース判定](features/release-report/design.md) |
@@ -446,7 +447,7 @@ springdoc がコントローラと DTO から仕様を作り、結合テスト�
 
 | 要素 | 仕様 |
 | --- | --- |
-| ヘッダ | ロゴ、テーマ切替、ログアウト。印刷では出さない |
+| ヘッダ | スキップリンク、ロゴ、画面の切替（リリース判定 / 指標の推移）、テーマ切替、ログアウト。印刷では出さない |
 | テーマ切替 | ライト / ダーク / OS 追従。選択を `localStorage` に保持し、`<html data-theme>` に反映する |
 | 最大幅 | 1440px。中央寄せ、左右 24px（モバイルは 16px）の余白 |
 

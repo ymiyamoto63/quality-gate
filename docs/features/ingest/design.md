@@ -7,7 +7,7 @@
 
 ```
 収集ランナー（fetch.sh）
-  → GET  /api/v1/collector/settings        計測対象のリポジトリと判定しない指標を読む   → 200 {repository, disabledMetrics, accessibilityPages}
+  → GET  /api/v1/collector/settings        計測対象・判定しない指標・M-08 の画面を読む → 200 {repository, disabledMetrics, accessibilityPages}
 収集ランナー（submit.sh）
   → POST /api/v1/runs                     Run を作成（初めてのリポジトリは登録）      → 201 {runId}
   → POST /api/v1/runs/{id}/artifacts ×N   検証して保存するだけ（パースしない）          → 202（本文なし）
