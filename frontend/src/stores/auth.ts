@@ -32,6 +32,11 @@ export const useAuthStore = defineStore('auth', () => {
     return isAuthenticated.value
   }
 
+  /** セッションが切れたことを API の 401 で知ったときに、ログインしていない状態に戻す。 */
+  function expire(): void {
+    username.value = null
+  }
+
   async function logout(): Promise<void> {
     await fetch('/api/v1/logout', {
       method: 'POST',
@@ -41,7 +46,7 @@ export const useAuthStore = defineStore('auth', () => {
     username.value = null
   }
 
-  return { username, loaded, isAuthenticated, load, login, logout }
+  return { username, loaded, isAuthenticated, load, login, logout, expire }
 })
 
 /** CSRF のトークンは、先に GET した応答で受け取った XSRF-TOKEN Cookie の値を送り返す。 */
