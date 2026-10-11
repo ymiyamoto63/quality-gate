@@ -30,9 +30,16 @@ describe('niceStep', () => {
 })
 
 describe('xOf', () => {
-  it('計測を左端から右端まで等間隔に並べる', () => {
-    expect(xOf(0, 3, 40, 200)).toBe(40)
-    expect(xOf(2, 3, 40, 200)).toBe(240)
+  it('計測を等間隔に並べ、両端の点の外側に余白を空ける', () => {
+    // 間隔の半分（200 / 6）だけ空ける
+    expect(xOf(0, 3, 40, 200)).toBeCloseTo(40 + 200 / 6)
+    expect(xOf(1, 3, 40, 200)).toBeCloseTo(140)
+    expect(xOf(2, 3, 40, 200)).toBeCloseTo(240 - 200 / 6)
+  })
+
+  it('計測が少なく間隔が広くても、余白は上限までにする', () => {
+    expect(xOf(0, 2, 40, 1000)).toBe(80)
+    expect(xOf(1, 2, 40, 1000)).toBe(1000)
   })
 
   it('計測が 1 件なら中央に置く', () => {

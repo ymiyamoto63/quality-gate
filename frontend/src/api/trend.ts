@@ -54,10 +54,19 @@ function ticksOf(max: number, step: number): number[] {
   return ticks
 }
 
-/** 計測の位置（0 始まり）を横の座標にする。計測が 1 件なら中央に置く。 */
+/** 左右の端の点と枠の間に空ける幅の上限（px）。 */
+export const MAX_X_INSET = 40
+
+/**
+ * 計測の位置（0 始まり）を横の座標にする。計測が 1 件なら中央に置く。
+ *
+ * 両端の点を枠に貼りつけない。端の点が軸や枠と重なって見づらくなるため、
+ * 計測 1 件分の間隔の半分（上限 MAX_X_INSET）を左右に空ける。計測が多いと間隔が狭いので余白も小さくなる。
+ */
 export function xOf(index: number, count: number, left: number, width: number): number {
   if (count <= 1) return left + width / 2
-  return left + (index * width) / (count - 1)
+  const inset = Math.min(MAX_X_INSET, width / (2 * count))
+  return left + inset + (index * (width - 2 * inset)) / (count - 1)
 }
 
 export interface Located {

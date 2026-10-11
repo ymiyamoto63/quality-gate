@@ -139,8 +139,6 @@ const xLabels = computed(() => {
       key: run.commitSha,
       x: x(index),
       text: refLabel(run),
-      anchor:
-        count > 1 && index === 0 ? 'start' : count > 1 && index === count - 1 ? 'end' : 'middle',
     }))
 })
 
@@ -269,7 +267,7 @@ function tickText(value: number): string {
             :key="label.key"
             :x="label.x"
             :y="HEIGHT - 8"
-            :text-anchor="label.anchor"
+            text-anchor="middle"
           >
             {{ label.text }}
           </text>
