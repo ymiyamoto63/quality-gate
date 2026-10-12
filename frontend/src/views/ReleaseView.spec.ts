@@ -2,10 +2,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { flushPromises, mount } from '@vue/test-utils'
 import { createMemoryHistory, createRouter } from 'vue-router'
 import type { components } from '@/api/schema'
+import { guide, historyItem, metricRow, releaseReport } from '@/components/release/fixtures'
 import ReleaseView from './ReleaseView.vue'
 
 type Report = components['schemas']['ReleaseReportResponse']
-type Row = Report['metrics'][number]
+type HistoryItem = components['schemas']['ReleaseHistoryItem']
 
 const get = vi.fn()
 vi.mock('@/api/client', () => ({
@@ -13,45 +14,15 @@ vi.mock('@/api/client', () => ({
   messageOf: (_: unknown, fallback: string) => fallback,
 }))
 
-function row(overrides: Partial<Row>): Row {
-  return {
-    metricId: 'M-01',
-    name: 'ブランチカバレッジ',
-    componentName: 'backend',
-    variantLabel: null,
-    status: 'PASS',
-    value: 85,
-    unit: 'percent',
-    threshold: '≥ 70%',
-    thresholdRelaxed: false,
-    defaultThreshold: null,
-    excludedFileCount: 0,
-    reason: null,
-    findings: [],
-    findingCount: 0,
-    ...overrides,
-  }
-}
-
-function report(overrides: Partial<Report>): Report {
-  return {
-    repositoryFullName: 'example/app',
-    commitSha: '1'.repeat(40),
-    commitUrl: null,
-    decision: 'RELEASABLE',
-    decisionReason: '判定した 1 件の指標が、すべて合格ラインを満たしています。',
-    run: { measuredAt: '2026-09-20T03:00:00Z', tags: [], ciRunUrl: null, baseCommitSha: null },
-    counts: { judged: 1, passed: 1, failed: 0 },
-    metrics: [row({})],
-    notJudged: [],
-    guides: [],
-    ...overrides,
-  }
-}
-
-async function render(data: Report) {
+async function render(data: Report | null, history: HistoryItem[] = []) {
   get.mockImplementation((path: string) =>
-    Promise.resolve(path === '/api/v1/release' ? { data } : { data: { items: [] } }),
+    Promise.resolve(
+      path === '/api/v1/release'
+        ? data
+          ? { data }
+          : { error: { message: 'x' } }
+        : { data: { items: history } },
+    ),
   )
   const router = createRouter({
     history: createMemoryHistory(),
@@ -71,7 +42,7 @@ describe('ReleaseView', () => {
 
   it('判定の対象外にした指標を、結論のすぐ下に理由と並べる', async () => {
     const wrapper = await render(
-      report({
+      releaseReport({
         notJudged: [
           {
             metricId: 'M-02',
@@ -99,26 +70,38 @@ describe('ReleaseView', () => {
   })
 
   it('判定の対象外が無ければ何も出さない', async () => {
-    const wrapper = await render(report({}))
+    const wrapper = await render(releaseReport())
 
     expect(wrapper.find('.qg-release__scope').exists()).toBe(false)
     expect(wrapper.find('.qg-release__loosened').exists()).toBe(false)
   })
 
-  it('既定より緩めた合格ラインと除外したファイルを行に示す', async () => {
+  it('結論、指標ごとの合否、指標の説明、判定の履歴の順に並べる', async () => {
     const wrapper = await render(
-      report({
-        metrics: [row({ thresholdRelaxed: true, defaultThreshold: '≥ 75%', excludedFileCount: 3 })],
+      releaseReport({
+        metrics: [metricRow({ thresholdRelaxed: true, defaultThreshold: '≥ 75%' })],
+        guides: [guide({ summary: '分岐のうちテストで通った割合' })],
       }),
+      [historyItem()],
     )
 
-    const cell = wrapper.find('td[data-label="合格ライン"]')
-    expect(cell.text()).toContain('≥ 70%')
-    expect(cell.text()).toContain('既定より緩い（既定 ≥ 75%）')
-    expect(cell.text()).toContain('3 ファイルを計測から除外（QG_EXCLUSIONS）')
-    // 結論の近くでも、緩めた指標があることを知らせる
-    expect(wrapper.find('.qg-release__scope-note').text()).toContain(
-      '既定より緩めて判定した指標が 1 件',
-    )
+    const headings = wrapper.findAll('h2').map((h) => h.attributes('id'))
+    expect(headings).toEqual([
+      'decision-heading',
+      'metrics-heading',
+      'guides-heading',
+      'history-heading',
+    ])
+    expect(wrapper.find('h1').text()).toContain('example/app')
+    // 結論の近くの注記と表の行が、同じ判定結果から出ている
+    expect(wrapper.find('.qg-release__scope-note').text()).toContain('1 件')
+    expect(wrapper.find('td[data-label="何を見るか"]').text()).toBe('分岐のうちテストで通った割合')
+  })
+
+  it('取得に失敗したら理由を知らせ、結論は出さない', async () => {
+    const wrapper = await render(null)
+
+    expect(wrapper.find('[role="alert"]').text()).toBe('リリース判定を取得できませんでした')
+    expect(wrapper.find('.qg-release__decision').exists()).toBe(false)
   })
 })
