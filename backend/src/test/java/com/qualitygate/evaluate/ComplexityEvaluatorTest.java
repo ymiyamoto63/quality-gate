@@ -6,6 +6,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 import java.util.Set;
 
+import static com.qualitygate.evaluate.EvaluatorTestSupport.analyzed;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.context;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.function;
 import static com.qualitygate.evaluate.EvaluatorTestSupport.input;
@@ -54,5 +55,32 @@ class ComplexityEvaluatorTest {
         assertThat(results.getFirst().status()).isEqualTo(MeasurementStatus.PASS);
         assertThat(results.getFirst().findingsToPersist()).isEmpty();
         assertThat(results.getFirst().detail()).containsEntry("analyzedFunctions", 2);
+    }
+
+    @Test
+    void コンポーネントごとに判定し片方の違反がもう片方に隠れない() {
+        List<MetricResult> results = evaluator.evaluate(context(input(
+                List.of(analyzed("backend", 1), analyzed("frontend", 1)),
+                List.of(function("backend", "simple", 3), function("frontend", "legacy", 30)),
+                Set.of("M-06"))));
+
+        assertThat(results).extracting(MetricResult::componentName, MetricResult::status)
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("backend", MeasurementStatus.PASS),
+                        org.assertj.core.groups.Tuple.tuple("frontend", MeasurementStatus.FAIL));
+        assertThat(results.get(1).findingsToPersist()).hasSize(1);
+    }
+
+    @Test
+    void 関数が無くても成果物が届いたコンポーネントは合格の行を出す() {
+        // 行が無いと、成果物の届かなかったコンポーネント（ERROR）と区別できない
+        List<MetricResult> results = evaluator.evaluate(context(input(
+                List.of(analyzed("frontend", 0)), List.of(), Set.of("M-06"))));
+
+        assertThat(results).singleElement().satisfies(result -> {
+            assertThat(result.componentName()).isEqualTo("frontend");
+            assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+            assertThat(result.detail()).containsEntry("analyzedFunctions", 0);
+        });
     }
 }

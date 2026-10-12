@@ -256,6 +256,22 @@ class EvaluationPipelineIT {
     }
 
     @Test
+    void 複雑度もコンポーネントごとに判定し解析の届かないコンポーネントを計測エラーにする() {
+        // frontend の ESLint が失敗し、backend の PMD だけが届いた Run
+        Run run = declare(createRun(Instant.parse("2026-09-22T00:00:00Z")), "backend", "frontend");
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
+
+        Run evaluated = evaluate(run, gate(only("M-06"), null, null, null));
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.FAIL);
+        assertThat(measurements.findByRunId(run.getId()))
+                .extracting(Measurement::getMetricId, Measurement::getComponentName, Measurement::getStatus)
+                .containsExactlyInAnyOrder(
+                        org.assertj.core.groups.Tuple.tuple("M-06", "backend", MeasurementStatus.FAIL),
+                        org.assertj.core.groups.Tuple.tuple("M-06", "frontend", MeasurementStatus.ERROR));
+    }
+
+    @Test
     void 申告どおりのコンポーネントが揃えば合格にできる() {
         Run run = declare(createRun(Instant.parse("2026-09-22T00:00:00Z")), "backend", "frontend");
         attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);

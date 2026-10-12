@@ -43,7 +43,7 @@ public record CreateRunRequest(
         List<@Size(max = 255) @Pattern(regexp = TAG, message = "タグ名として使えない文字を含んでいます") String> tags,
 
         @Schema(description = "成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。"
-                + "コンポーネントごとに判定する指標（M-01 / M-02 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかった"
+                + "コンポーネントごとに判定する指標（M-01 / M-02 / M-06 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかった"
                 + "コンポーネントを計測エラーにする。成果物の component はこの中から選ぶ",
                 example = "[\"backend\", \"frontend\"]")
         @NotEmpty(message = "成果物を送るコンポーネントを 1 つ以上指定してください")

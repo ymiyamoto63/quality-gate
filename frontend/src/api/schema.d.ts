@@ -182,7 +182,7 @@ export interface components {
       /** @description 計測対象のコミット SHA（40 桁） */
       commitSha: string
       /**
-       * @description 成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。コンポーネントごとに判定する指標（M-01 / M-02 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかったコンポーネントを計測エラーにする。成果物の component はこの中から選ぶ
+       * @description 成果物を送るコンポーネント（計測プロファイルの BACKEND_DIR / FRONTEND_DIR の末尾のディレクトリ名）。コンポーネントごとに判定する指標（M-01 / M-02 / M-06 / M-09 / M-10）は、ここに挙げたのに成果物の届かなかったコンポーネントを計測エラーにする。成果物の component はこの中から選ぶ
        * @example [
        *       "backend",
        *       "frontend"

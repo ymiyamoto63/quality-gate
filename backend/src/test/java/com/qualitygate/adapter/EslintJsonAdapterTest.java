@@ -52,6 +52,27 @@ class EslintJsonAdapterTest {
     }
 
     @Test
+    void 解析した関数の件数をコンポーネントの行として返す() {
+        // 成果物が届いたことの印。関数が無いコンポーネントも、届かなかったもの（ERROR）と区別できる
+        NormalizedReport report = adapter.parse(stream(ESLINT), context(List.of()));
+
+        assertThat(report.measurements()).singleElement().satisfies(m -> {
+            assertThat(m.metricId()).isEqualTo("M-06");
+            assertThat(m.componentName()).isEqualTo("frontend");
+            assertThat(m.value()).isEqualByComparingTo("4");
+        });
+    }
+
+    @Test
+    void 関数が無くても件数0の行を返す() {
+        NormalizedReport report = adapter.parse(stream("[]"), context(List.of()));
+
+        assertThat(report.findings()).isEmpty();
+        assertThat(report.measurements()).singleElement()
+                .satisfies(m -> assertThat(m.value()).isEqualByComparingTo("0"));
+    }
+
+    @Test
     void 名前の無い関数はファイル内の出現順で区別する() {
         NormalizedReport report = adapter.parse(stream(ESLINT), context(List.of()));
 

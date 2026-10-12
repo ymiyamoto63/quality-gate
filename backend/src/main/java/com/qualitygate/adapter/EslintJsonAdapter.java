@@ -74,7 +74,7 @@ public class EslintJsonAdapter implements ArtifactAdapter {
                 findings.add(toFinding(message, modulePath, repoPath, anonymous, context));
             }
         }
-        return NormalizedReport.of(ArtifactType.ESLINT_JSON, List.of(), findings);
+        return NormalizedReport.of(ArtifactType.ESLINT_JSON, List.of(PmdXmlAdapter.analyzed(findings, context)), findings);
     }
 
     private static RawFinding toFinding(JsonNode message, String modulePath, String repoPath,

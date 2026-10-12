@@ -78,10 +78,20 @@ final class EvaluatorTestSupport {
     }
 
     static IdentifiedFinding function(String name, int complexity) {
+        return function("backend", name, complexity);
+    }
+
+    static IdentifiedFinding function(String component, String name, int complexity) {
         RawFinding finding = new RawFinding("M-06", "CyclomaticComplexity", Severity.INFO,
                 "%s の循環的複雑度は %d です".formatted(name, complexity),
-                "src/main/java/A.java", 10, "backend", "A.java#" + name,
+                "src/main/java/A.java", 10, component, "A.java#" + name,
                 Map.of("complexity", complexity, "member", name));
-        return new IdentifiedFinding("fp-" + name, finding);
+        return new IdentifiedFinding("fp-" + component + "-" + name, finding);
+    }
+
+    /** M-06 の成果物が届いたことの印（アダプタが解析した関数の件数として返す行）。 */
+    static RawMeasurement analyzed(String component, int functions) {
+        return RawMeasurement.of("M-06", component, BigDecimal.valueOf(functions), "count",
+                Map.of("analyzedFunctions", functions));
     }
 }

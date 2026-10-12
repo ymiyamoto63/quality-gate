@@ -61,7 +61,7 @@ measure_frontend_complexity() {
   group "循環的複雑度（フロントエンド、ESLint の complexity ルール）"
   # ESLint とパーサはコンテナのイメージに入っている
   if ! prepare_tool complexity "$QG_COMPLEXITY_TOOL_DIR" "$COMPLEXITY_TOOL" eslint.config.mjs; then
-    fail "M-06: ESLint を用意できませんでした（フロントエンドの複雑度は送られません）"; endgroup; return
+    fail "M-06: ESLint を用意できませんでした（M-06 の frontend は計測エラーになります）"; endgroup; return
   fi
 
   run_eslint "$SRC" "$REPORTS/frontend/eslint.json" || fail "M-06: ESLint の実行に失敗しました"
