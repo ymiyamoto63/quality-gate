@@ -9,8 +9,8 @@ quality-gate のアプリを動かし、収集ランナーで対象リポジト�
 
 | # | やること | 場所 | 節 |
 | --- | --- | --- | --- |
-| 1 | アプリを起動し、計測対象・ログインのパスワード・Ingest Token・合格ラインを環境変数で設定する | アプリを動かすマシン | [2](#2-アプリを動かす) |
-| 2 | セルフホストランナーを登録する | ランナーのマシン | [3](#3-セルフホストランナーを準備する) |
+| 1 | アプリを起動し、計測対象・ログインのパスワード・Ingest Token・合格ラインを環境変数で設定する。GitHub ホストランナーから届く URL（HTTPS）に置く | アプリを動かすマシン | [2](#2-アプリを動かす) |
+| 2 | 性能（M-03 / M-04）を計測するなら、セルフホストランナーを登録する | ランナーのマシン | [3](#3-収集ランナーを準備する) |
 | 3 | 対象を読む GitHub App を作り、対象にインストールする（private のときだけ） | GitHub | [3.3](#33-対象を読むための-github-app) |
 | 4 | quality-gate リポジトリに変数とシークレットを設定する | GitHub | [3.4](#34-リポジトリの変数とシークレット) |
 | 5 | 計測プロファイルを書く | quality-gate リポジトリ | [4](#4-計測対象を設定する) |
@@ -23,7 +23,7 @@ quality-gate のアプリを動かし、収集ランナーで対象リポジト�
 | 場所 | 必須の項目 | 任意の項目 |
 | --- | --- | --- |
 | アプリの環境変数（`.env`） | `QG_REPOSITORY`・`QG_LOGIN_PASSWORD`・`QG_INGEST_TOKEN` | 合格ライン（2.4）、その他（2.2） |
-| quality-gate リポジトリの Actions の Variables / Secrets | `QG_BASE_URL`・`QG_INGEST_TOKEN` | `QG_COLLECTOR_APP_ID`・`QG_COLLECTOR_APP_PRIVATE_KEY`（対象が private のとき） |
+| quality-gate リポジトリの Actions の Variables / Secrets | `QG_BASE_URL`・`QG_INGEST_TOKEN` | `QG_COLLECTOR_APP_ID`・`QG_COLLECTOR_APP_PRIVATE_KEY`（対象が private のとき）、`QG_COLLECTOR_RUNNER` |
 | 計測プロファイル（`collector/targets/<名前>/profile.env`） | `QG_REPOSITORY`・`DEFAULT_BRANCH` と測り方（4.2） | — |
 
 `QG_INGEST_TOKEN` だけはアプリと Actions の Secret の両方に同じ値を入れます。それ以外の値は 1 か所にしか書きません。
@@ -109,12 +109,23 @@ openssl rand -hex 32
 画面を開くとログインを求められます。`QG_LOGIN_USERNAME` / `QG_LOGIN_PASSWORD` を見る人に伝えてください。ロールは無く、全員が同じリリース判定を見ます。
 パスワードを変えるときは `QG_LOGIN_PASSWORD` を変えて再起動します（ログイン中の人もログインし直しになります）。
 
-## 3. セルフホストランナーを準備する
+## 3. 収集ランナーを準備する
 
-収集ランナー（`collect.yml` の `fetch` / `measure` / `submit` のすべて）はセルフホストランナー（`runs-on: self-hosted`）で動きます。
-PR の CI（`ci.yml`）は GitHub ホストランナーで動くため、ランナーが止まっていても PR の CI は止まりません。
+収集ランナー（`collect.yml`）のジョブは次のランナーで動きます（[DD-28](architecture.md#2-設計判断)）。
 
-### 3.1 マシン
+| ジョブ | ランナー |
+| --- | --- |
+| `fetch` / `submit` | GitHub ホストランナー（`ubuntu-24.04`） |
+| `measure` | 性能（M-03 / M-04）を計測する回はセルフホストランナー（`self-hosted`）、それ以外は GitHub ホストランナー。`fetch` が決め、ログに `measure は … で実行します` と出す |
+
+性能を計測する回とは、アプリの `QG_DISABLED_METRICS` に M-03 が無く、計測プロファイルに `PERF_SCRIPT` がある回です。Actions の Variables の `QG_COLLECTOR_RUNNER`（3.4）にラベルを書くと、`measure` はいつもそのランナーで動きます。
+
+- `fetch` と `submit` は GitHub ホストランナーからアプリに届く必要があります。アプリはインターネットから届く URL（HTTPS）に置き、`QG_BASE_URL` に書きます
+- **性能を計測しないなら、セルフホストランナーは要りません**（3.1 と 3.2 は飛ばします）
+- GitHub ホストランナーで `measure` を動かしたとき（`QG_COLLECTOR_RUNNER` で指定した場合）に性能が有効だと、M-03 / M-04 は計測エラーになります。共有の VM では値が揺れ、合格ラインの絶対値で判定できないためです
+- private リポジトリの GitHub ホストランナーは分数を消費します（PIT を含めて 1 回 30〜60 分が目安）
+
+### 3.1 セルフホストランナーのマシン（性能を計測する場合だけ）
 
 Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium などは計測用のコンテナに入るため、マシンに入れる必要はありません。
 
@@ -123,12 +134,11 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 | Docker（ランナーを動かす利用者を `docker` グループに入れる） | 計測用のコンテナのビルドと実行 |
 | git / curl / jq | 対象の取得、Node.js の版の解決、送信 |
 | 外向きの通信: github.com・Docker Hub・nodejs.org・archive.apache.org・Maven Central・npm レジストリ | ランナーの接続、計測用のコンテナのビルド（ベースイメージ・Node.js・Maven・Trivy・oasdiff・Playwright）、PMD・k6 の取得、対象の依存関係 |
-| quality-gate への到達性 | `submit` ジョブ（`QG_BASE_URL`） |
 | 十分なディスク（目安 20GB 以上） | 計測用のコンテナのイメージ、Maven / npm のキャッシュ、Trivy の DB |
 
 性能計測（M-03 / M-04）の値が乱れないよう、**専有のマシンに 1 台だけ登録し、他のリポジトリのランナーや常駐サービスを同じマシンに置かないでください**。
 
-### 3.2 登録
+### 3.2 セルフホストランナーの登録（性能を計測する場合だけ）
 
 1. GitHub の quality-gate リポジトリで **Settings → Actions → Runners → New self-hosted runner** を開き、Linux / x64 を選ぶ
 2. 画面に表示されるコマンドでランナーをダウンロード・展開し、登録コマンドを実行する（トークンの有効期限は 1 時間）
@@ -165,15 +175,17 @@ Linux x64 を想定します（WSL2 でも可）。JDK・Node.js・Chromium な�
 
 | 種別 | 名前 | 値 |
 | --- | --- | --- |
-| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（ランナーから届くもの。同じマシンなら `http://localhost:8080`）。`fetch` は計測の前にアプリの設定（計測対象・判定しない指標・M-08 の画面）を読むため、`QG_INGEST_TOKEN` とあわせて必須（無いと `fetch` で止まる） |
+| Variables | `QG_BASE_URL` | 取り込み先の quality-gate の URL（GitHub ホストランナーから届く HTTPS の URL）。`fetch` は計測の前にアプリの設定（計測対象・判定しない指標・M-08 の画面）を読むため、`QG_INGEST_TOKEN` とあわせて必須（無いと `fetch` で止まる） |
 | Variables | `QG_COLLECTOR_APP_ID` | 3.3 の App の App ID（対象が public なら不要） |
+| Variables | `QG_COLLECTOR_RUNNER` | 任意。`measure` を実行するランナーのラベル 1 つ（例: `self-hosted` / `ubuntu-24.04`）。空なら `fetch` が自動で選ぶ（3）。性能を測らない回もセルフホストランナーで動かしたいときなどに使う |
 | Secrets | `QG_COLLECTOR_APP_PRIVATE_KEY` | 3.3 でダウンロードした秘密鍵（PEM の中身全体。対象が public なら不要） |
 | Secrets | `QG_INGEST_TOKEN` | アプリの `QG_INGEST_TOKEN` と同じ値（2.3） |
 
-### 3.5 ランナーを止めるとき
+### 3.5 セルフホストランナーを止めるとき
 
-ランナーが止まっていると、計測のジョブは待機したまま進みません（24 時間待つと GitHub が取り消します）。
-収集ランナーは GitHub ホストランナーへ退避できないため、ランナーを戻したあとで必要な計測を手動実行し直してください。
+セルフホストランナーが止まっていても、性能を計測しない回はこれまでどおり GitHub ホストランナーで進みます。
+性能を計測する回は `measure` が待機したまま進みません（24 時間待つと GitHub が取り消します）。ランナーを戻したあとで、必要な計測を手動実行し直してください。
+性能の値は GitHub ホストランナーでは測れないため、ランナーを戻すまで待つか、その間だけアプリの `QG_DISABLED_METRICS` で M-03 / M-04 を外します（外した指標はリリース判定に「判定の対象外」と出ます）。
 quality-gate のアプリ（画面）はランナーとは別に動きます。
 
 ## 4. 計測対象を設定する
@@ -357,28 +369,32 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 
 ## 7. 計測用のコンテナの設定
 
-`measure` ジョブは計測用のコンテナの中で計測します（[アーキテクチャ](architecture.md#36-計測のコンテナ隔離)）。ランナーの環境変数で次を変えられます。
+`measure` ジョブは計測用のコンテナの中で計測します（[アーキテクチャ](architecture.md#36-計測のコンテナ隔離)）。セルフホストランナーと手元では、環境変数で次を変えられます。
 
 | 環境変数 | 既定 | 説明 |
 | --- | --- | --- |
-| `QG_COLLECTOR_MEMORY` | `6g` | コンテナのメモリ上限 |
+| `QG_COLLECTOR_MEMORY` | マシンのメモリ − 1GB（`6g` まで） | コンテナのメモリ上限 |
 | `QG_COLLECTOR_BASE_IMAGE` | `eclipse-temurin:<JAVA_VERSION>-jdk-noble` | ベースのイメージ。社内のミラーや社内の CA を入れたイメージを使うときに指定する |
 | `QG_COLLECTOR_DOCKER_ARGS` | 空 | `docker run` に足す引数（空白区切り。例: `--env HTTPS_PROXY --env JAVA_TOOL_OPTIONS`、CPU の上限なら `--cpus 4`）。**ソケットやホストのディレクトリを見せる引数は足さない**（隔離の意味が無くなる） |
 
 - イメージのタグは `quality-gate-collector:java<版>-node<版>-...`。古いイメージは `docker image prune` で消せます
-- Maven・npm・PMD・k6・Trivy の DB のキャッシュは Docker のボリューム `quality-gate-collector-home` に残ります。消すと（`docker volume rm quality-gate-collector-home`）次の計測で取り直します
+- GitHub ホストランナーでは、計測用のイメージを Actions のキャッシュ（キー `collector-image-<イメージのタグ>`）に置き、次回はビルドせずに読み込みます。Maven・npm・PMD・k6・Trivy の DB は毎回取り直します（[アーキテクチャ 3.6](architecture.md#36-計測のコンテナ隔離)）。キャッシュは **Actions → Caches** で消せます
+- セルフホストランナーでは、Maven・npm・PMD・k6・Trivy の DB のキャッシュは Docker のボリューム `quality-gate-collector-home` に残ります。消すと（`docker volume rm quality-gate-collector-home`）次の計測で取り直します
 - ツールの版は `collector/versions.env` で固定しています。版を上げるときは、前回からの値に段差が出ないか（特に PMD の CC の算出）を確かめてください
 
 ## 8. うまくいかないとき
 
 | 症状 | 主な原因と対処 |
 | --- | --- |
-| 実行してもジョブが始まらない | ランナーが止まっている（3.5） |
+| 実行してもジョブが始まらない / `measure` が `Waiting for a runner` のまま | 性能を計測する回なのにセルフホストランナーが止まっている、または登録されていない（3.5）。`fetch` のログに `measure は … で実行します` と出たランナーを確かめる |
+| `fetch` が `QG_COLLECTOR_RUNNER はランナーのラベル 1 つで指定してください` | Variables の `QG_COLLECTOR_RUNNER` に空白やカンマを含む値を書いている（3.4） |
+| M-03 が ERROR（`GitHub ホストランナーでは性能を計測しません`） | `QG_COLLECTOR_RUNNER` で GitHub ホストランナーを指定したまま、性能が有効になっている。`QG_COLLECTOR_RUNNER` を外す（3） |
+| `measure` が `Killed` / `exit code 137` で止まる | 計測用のコンテナのメモリが足りない。GitHub ホストランナーでは PIT の `MUTATION_THREADS` を 1 にするか、メモリの多いランナー（larger runners）を `QG_COLLECTOR_RUNNER` に書く |
 | `fetch` が `QG_REPOSITORY=… の計測プロファイルがありません` | アプリの `QG_REPOSITORY` と同じ `QG_REPOSITORY` を書いた計測プロファイルが main に無い（4.1） |
 | `fetch` が `QG_REPOSITORY=… の計測プロファイルが複数あります` | 同じリポジトリの計測プロファイルが 2 つ以上ある。1 つにする |
 | `fetch` が `計測プロファイルの DISABLED_METRICS は廃止しました` | 計測プロファイルから `DISABLED_METRICS` を消し、止める指標はアプリの `QG_DISABLED_METRICS` に書く（4.3） |
 | `fetch` が `could not read Username` / `Repository not found` | App が対象にインストールされていない、Contents の権限が無い、または `QG_COLLECTOR_APP_ID` が未設定で private を取得しようとした |
-| `measure` で `docker がありません` / `permission denied ... docker.sock` | ランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない |
+| `measure` で `docker がありません` / `permission denied ... docker.sock` | セルフホストランナーに Docker が無い、またはランナーの利用者が `docker` グループに入っていない |
 | `measure` の `計測用のコンテナの作成` で失敗する | Docker Hub・nodejs.org・github.com・archive.apache.org に届かない。社内のミラーを使うなら `QG_COLLECTOR_BASE_IMAGE` を指定する |
 | `measure` で `Node.js の版を解決できませんでした` | `NODE_VERSION_FILE` の書き方が解釈できない（`22` / `v22.21.1` の形に対応）、または nodejs.org に届かない |
 | `measure` で `バックエンドのビルドに失敗しました` | 対象がコンパイルできない、または `JAVA_VERSION` が対象の要求と合っていない |
@@ -394,7 +410,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=<アプリの QG_INGEST
 | `fetch` / `submit` が `QG_BASE_URL（Variables）または QG_INGEST_TOKEN（Secrets）が未設定です` | 3.4 の設定漏れ |
 | `submit` の Run の作成が 401 | リポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない |
 | `submit` の Run の作成が 400（`計測対象のリポジトリは … です`） | 計測プロファイルとアプリの `QG_REPOSITORY` が一致していない |
-| `fetch` が `quality-gate の設定を読めませんでした` | `QG_BASE_URL` にランナーから届かない、またはリポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない（401） |
+| `fetch` が `quality-gate の設定を読めませんでした` | `QG_BASE_URL` に GitHub ホストランナーから届かない（社内や localhost の URL を書いている）、またはリポジトリの Secret とアプリの `QG_INGEST_TOKEN` が一致していない（401） |
 | `fetch` が `計測プロファイル（…）の QG_REPOSITORY（…）が quality-gate の QG_REPOSITORY（…）と違います` | 手元で `QG_TARGET` を指定したまま、別の対象のアプリに向けている（6） |
 | M-03 が ERROR（シナリオがありません） | k6 のシナリオ名とアプリの `QG_PERF_SCENARIOS` が一致していない |
 | M-03 が ERROR（成功スループットが到達率の 95% 未満） | アプリが負荷を捌けていない、`handleSummary` で rate を直していない、または到達率の合計と `QG_ARRIVAL_RATE_RPS` が一致していない |

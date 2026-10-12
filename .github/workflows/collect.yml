@@ -9,14 +9,19 @@
 # 計測する指標は M-01〜M-12。quality-gate の QG_DISABLED_METRICS（fetch で読む）に書いたものは除く。
 #
 # 必要な設定（Settings → Secrets and variables → Actions）:
-#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL
+#   Variables: QG_BASE_URL                   取り込み先の quality-gate の URL（GitHub ホストランナーから届くもの）
 #              QG_COLLECTOR_APP_ID           対象リポジトリを読む GitHub App の App ID
+#              QG_COLLECTOR_RUNNER           （任意）measure を実行するランナーのラベル。空なら自動で選ぶ（下記）
 #   Secrets:   QG_COLLECTOR_APP_PRIVATE_KEY  同 App の秘密鍵
 #              QG_INGEST_TOKEN               quality-gate の Ingest Token（バックエンドの QG_INGEST_TOKEN と同じ値）
 #
 # ジョブを 3 つ（fetch → measure → submit）に分け、対象のテストコードが動く measure ジョブには認証情報を渡さない。
 # Ingest Token は fetch（quality-gate の設定を読む）と submit（送信）だけが使う。
 # measure ジョブの計測はコンテナの中で動かす（collector/bin/measure-isolated.sh）。
+#
+# ランナー（DD-28）: fetch と submit は GitHub ホストランナーで動く。measure は fetch が選ぶ。
+# 性能（M-03 / M-04）を計測するときだけ専有のセルフホストランナー、それ以外は GitHub ホストランナー
+# （collector/bin/lib.sh の measure_runner。Variables の QG_COLLECTOR_RUNNER があればそれを使う）。
 name: collect
 # 画面に出す名前（例: collect main / collect v1.2.0）。計測対象は fetch のログと submit の結果に出る
 run-name: collect ${{ inputs.commit || inputs.branch || 'default' }}
@@ -36,8 +41,11 @@ permissions:
 
 jobs:
   fetch:
-    runs-on: self-hosted
+    # GitHub ホストランナーのラベル。collector/bin/lib.sh の QG_HOSTED_RUNNER と同じ値にする
+    runs-on: ubuntu-24.04
     timeout-minutes: 15
+    outputs:
+      runner: ${{ steps.runner.outputs.label }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,6 +93,17 @@ jobs:
           QG_INGEST_TOKEN: ${{ secrets.QG_INGEST_TOKEN }}
         run: ./collector/bin/fetch.sh "$RUNNER_TEMP/qg-collector"
 
+      # 性能を計測するかは、アプリの QG_DISABLED_METRICS（meta.env）と計測プロファイルの PERF_SCRIPT で決まる
+      - name: 計測するランナーの決定
+        id: runner
+        env:
+          QG_COLLECTOR_RUNNER: ${{ vars.QG_COLLECTOR_RUNNER }}
+        run: |
+          source collector/bin/lib.sh
+          load_env "$RUNNER_TEMP/qg-collector/meta.env"
+          load_profile
+          echo "label=$(measure_runner)" >> "$GITHUB_OUTPUT"
+
       - name: 受け渡し用にまとめる
         run: tar -C "$RUNNER_TEMP" -czf "$RUNNER_TEMP/qg-collector-source.tgz" qg-collector
 
@@ -96,7 +115,7 @@ jobs:
 
   measure:
     needs: fetch
-    runs-on: self-hosted
+    runs-on: ${{ needs.fetch.outputs.runner }}
     # ビルド・テストに加えて PIT と負荷試験（有効なら約 18 分）を実行する
     timeout-minutes: 90
     steps:
@@ -110,8 +129,38 @@ jobs:
       - name: 展開
         run: tar -C "$RUNNER_TEMP" -xzf "$RUNNER_TEMP/qg-collector-source.tgz"
 
+      # GitHub ホストランナーは毎回まっさらなため、計測用のイメージだけを Actions のキャッシュに置く。
+      # Maven・npm・Trivy の DB はキャッシュしない（対象のコードを動かした後に保存することになり、次回の計測に持ち越されうる）。
+      # イメージは対象のコードを動かす前に作られ、コンテナからは Docker に触れないため、書き換えられない
+      - name: 計測用のイメージの名前
+        id: image
+        if: runner.environment == 'github-hosted'
+        run: echo "name=$(./collector/bin/measure-isolated.sh --image "$RUNNER_TEMP/qg-collector")" >> "$GITHUB_OUTPUT"
+      - name: 計測用のイメージの復元
+        id: image-cache
+        if: runner.environment == 'github-hosted'
+        uses: actions/cache/restore@v4
+        with:
+          path: ${{ runner.temp }}/qg-image.tar
+          key: collector-image-${{ steps.image.outputs.name }}
+      - name: 計測用のイメージの読み込み
+        if: steps.image-cache.outputs.cache-hit == 'true'
+        run: docker load -i "$RUNNER_TEMP/qg-image.tar" && rm -f "$RUNNER_TEMP/qg-image.tar"
+
       - name: 計測
         run: ./collector/bin/measure-isolated.sh "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-reports"
+
+      - name: 計測用のイメージの書き出し
+        if: runner.environment == 'github-hosted' && steps.image-cache.outputs.cache-hit != 'true'
+        env:
+          IMAGE: ${{ steps.image.outputs.name }}
+        run: docker save -o "$RUNNER_TEMP/qg-image.tar" "$IMAGE"
+      - name: 計測用のイメージの保存
+        if: runner.environment == 'github-hosted' && steps.image-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@v4
+        with:
+          path: ${{ runner.temp }}/qg-image.tar
+          key: collector-image-${{ steps.image.outputs.name }}
 
       - uses: actions/upload-artifact@v4
         if: always()
@@ -120,14 +169,14 @@ jobs:
           path: ${{ runner.temp }}/qg-reports/
           retention-days: 7
 
-      # セルフホストランナーに対象のソースを残さない
+      # セルフホストランナーに対象のソースを残さない（GitHub ホストランナーはジョブごとに捨てられる）
       - name: 作業領域の削除
-        if: always()
+        if: always() && runner.environment == 'self-hosted'
         run: rm -rf "$RUNNER_TEMP/qg-collector" "$RUNNER_TEMP/qg-collector-source.tgz" "$RUNNER_TEMP/qg-reports"
 
   submit:
     needs: [fetch, measure]
-    runs-on: self-hosted
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4

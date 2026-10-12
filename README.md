@@ -10,7 +10,7 @@ quality-gate は社内向けの Web アプリケーションです。**1 つの�
 - 計測に失敗したコンポーネント（frontend だけ測れなかったなど）は、黙って抜け落ちずに計測エラーになります（収集ランナーが計測の前にコンポーネントを申告します）
 - ログインは全員で共有する 1 つのアカウントです（GitHub のアカウントは要りません）
 
-計測は quality-gate 側の**収集ランナー**（GitHub Actions + 専有のセルフホストランナー）が対象リポジトリを取得して行います。**対象リポジトリには何も置きません**。
+計測は quality-gate 側の**収集ランナー**（GitHub Actions。既定は GitHub ホストランナーで、性能を測るときだけ専有のセルフホストランナー）が対象リポジトリを取得して行います。**対象リポジトリには何も置きません**。
 アプリは送られた成果物を取り込み、合格ラインで判定して保存します。取り込める形式は JaCoCo / lcov / PIT / k6 / SARIF / PMD / ESLint / oasdiff / axe-core / JUnit XML です。
 
 ```
@@ -23,7 +23,7 @@ quality-gate は社内向けの Web アプリケーションです。**1 つの�
 
 | 用語 | 意味 | 詳細 |
 | --- | --- | --- |
-| 収集ランナー | 対象リポジトリを取得して計測し、結果を quality-gate に送る仕組み。quality-gate リポジトリの GitHub Actions（`collect.yml`）と専有のセルフホストランナーで動く | [アーキテクチャ 3](docs/architecture.md#3-測定の仕組み収集ランナー) |
+| 収集ランナー | 対象リポジトリを取得して計測し、結果を quality-gate に送る仕組み。quality-gate リポジトリの GitHub Actions（`collect.yml`）で動く。既定は GitHub ホストランナーで、性能（M-03 / M-04）を計測するときだけ専有のセルフホストランナーを使う | [アーキテクチャ 3](docs/architecture.md#3-測定の仕組み収集ランナー) |
 | Ingest API | 収集ランナーが計測の成果物を quality-gate アプリへ送るための API。Run の作成（`POST /api/v1/runs`）、成果物のアップロード（`.../artifacts`）、確定（`.../finalize`）と、計測の前に読む設定（`GET /api/v1/collector/settings`）からなる。「取り込み API」とも書く | [取り込み](docs/features/ingest/design.md) |
 | Ingest Token | Ingest API を呼ぶための認証トークン（`Authorization: Bearer <token>`）。収集ランナー用に 1 つだけ発行し、アプリの環境変数と Actions の Secret に同じ値（`QG_INGEST_TOKEN`）を置く。書き込み専用で、判定結果などの参照 API は呼べない | [運用 2.3](docs/operations.md#23-ingest-token) |
 | 計測プロファイル | 計測対象ごとの測り方を書いた設定（`collector/targets/<名前>/profile.env`）。収集ランナーはアプリの `QG_REPOSITORY` と同じリポジトリを書いたものを選ぶ | [運用 4](docs/operations.md#4-計測対象を設定する) |
@@ -72,7 +72,7 @@ cd backend
 | ドキュメント | 内容 |
 | --- | --- |
 | [開発環境](docs/development.md) | セットアップ、コマンド、API の型生成、アクセシビリティ検査、技術スタック、PR の CI、よくある症状 |
-| [運用: 環境設定と計測の実行](docs/operations.md) | アプリの設定値（合格ラインの環境変数を含む）と Ingest Token、セルフホストランナー、計測プロファイル、計測の実行、うまくいかないとき |
+| [運用: 環境設定と計測の実行](docs/operations.md) | アプリの設定値（合格ラインの環境変数を含む）と Ingest Token、収集ランナー（性能を測るときのセルフホストランナー）、計測プロファイル、計測の実行、うまくいかないとき |
 | [アーキテクチャ](docs/architecture.md) | 全体像、設計判断、測定の仕組み（収集ランナー）、バックエンドの構成、DB 設計、API と画面の共通規則、非機能要件、未決事項 |
 | [指標](docs/metrics.md) | 12 の指標の一覧と、それぞれの定義・計測方法・判定の規則 |
 | [仕様概要](docs/overview.html) | 初めての方向けに全体を 1 ページにまとめた概要（HTML）。正本は README と上の各ドキュメントで、食い違うときはそちらが正しい |

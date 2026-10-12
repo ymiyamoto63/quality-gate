@@ -2,6 +2,8 @@
 # measure.sh をコンテナの中で実行する（計測のコンテナ隔離）。
 #
 # 使い方: measure-isolated.sh <作業ディレクトリ> <reports ディレクトリ>（measure.sh と同じ）
+#         measure-isolated.sh --image <作業ディレクトリ>
+#           計測用のイメージの名前だけを出す（ビルドしない）。GitHub ホストランナーでイメージをキャッシュするキーに使う
 #
 # 対象のビルド・テストのコードはコンテナの中だけで動く。コンテナに見せるのは次のものだけ:
 #   - 作業ディレクトリと reports ディレクトリ（読み書き）
@@ -12,16 +14,23 @@
 #
 # 環境変数:
 #   QG_COLLECTOR_BASE_IMAGE  ベースのイメージ（既定: eclipse-temurin:<JAVA_VERSION>-jdk-noble）
-#   QG_COLLECTOR_MEMORY      コンテナのメモリ上限（既定: 6g）
+#   QG_COLLECTOR_MEMORY      コンテナのメモリ上限（既定: マシンのメモリ − 1GB。ただし 6g まで）
 #   QG_COLLECTOR_DOCKER_ARGS docker run に足す引数（空白区切り）。社内のプロキシを通す場合や CPU の上限などに使う
 #                            （例: --env HTTPS_PROXY --env JAVA_TOOL_OPTIONS --cpus 4）
 set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib.sh"
 
-[ $# -eq 2 ] || die "使い方: measure-isolated.sh <作業ディレクトリ> <reports ディレクトリ>"
-WORK=$(cd "$1" && pwd)
-mkdir -p "$2"
-REPORTS=$(cd "$2" && pwd)
+USAGE="使い方: measure-isolated.sh <作業ディレクトリ> <reports ディレクトリ> / measure-isolated.sh --image <作業ディレクトリ>"
+[ $# -eq 2 ] || die "$USAGE"
+PRINT_IMAGE=false
+if [ "$1" = --image ]; then
+  PRINT_IMAGE=true
+  WORK=$(cd "$2" && pwd)
+else
+  WORK=$(cd "$1" && pwd)
+  mkdir -p "$2"
+  REPORTS=$(cd "$2" && pwd)
+fi
 
 # 計測プロファイル（QG_TARGET）は fetch.sh が meta.env に書いたものを使う
 load_env "$WORK/meta.env"
@@ -49,6 +58,10 @@ HASH=$({ echo "$BASE_IMAGE"; cat "$COLLECTOR_DIR/runner/Dockerfile" "$COLLECTOR_
   "$COLLECTOR_DIR/complexity/package-lock.json"; } \
   | sha256sum | cut -c1-12)
 IMAGE="quality-gate-collector:java${JAVA}-node${NODE}-maven${MAVEN_VERSION}-trivy${TRIVY_VERSION}-oasdiff${OASDIFF_VERSION}-${HASH}"
+if $PRINT_IMAGE; then
+  echo "$IMAGE"
+  exit 0
+fi
 
 if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   group "計測用のコンテナの作成（${IMAGE}）"
@@ -60,7 +73,14 @@ if ! docker image inspect "$IMAGE" >/dev/null 2>&1; then
   endgroup
 fi
 
-limits=(--memory "${QG_COLLECTOR_MEMORY:-6g}" --pids-limit 4096)
+# メモリ上限の既定は、マシンのメモリから 1GB を残した値（6GB まで）。GitHub ホストランナーはメモリが 7〜8GB 前後しかない
+default_memory() {
+  local total
+  total=$(awk '/MemTotal/ {print int($2 / 1024)}' /proc/meminfo)
+  total=$((total - 1024))
+  echo "$((total < 6144 ? total : 6144))m"
+}
+limits=(--memory "${QG_COLLECTOR_MEMORY:-$(default_memory)}" --pids-limit 4096)
 read -ra extra <<< "${QG_COLLECTOR_DOCKER_ARGS:-}"
 
 # キャッシュのボリュームは、どの UID でも書けるようにしておく（ボリュームが別の経路で作られていた場合に備える）。
@@ -77,6 +97,6 @@ docker run --rm --init \
   -v "$WORK:$WORK" -v "$REPORTS:$REPORTS" \
   -v "$COLLECTOR_DIR:$COLLECTOR_DIR:ro" \
   -v quality-gate-collector-home:/cache/home \
-  --env QG_TARGET \
+  --env QG_TARGET --env RUNNER_ENVIRONMENT \
   -w "$WORK" \
   "$IMAGE" "$COLLECTOR_DIR/bin/measure.sh" "$WORK" "$REPORTS"

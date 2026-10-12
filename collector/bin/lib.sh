@@ -77,6 +77,27 @@ load_profile() {
 # metric_enabled <指標 ID>（M-03 など）
 metric_enabled() { ! grep -qw -- "$1" <<< "${QG_DISABLED_METRICS:-}"; }
 
+# measure ジョブを実行するランナー（runs-on のラベル）を出す（DD-28）。meta.env と計測プロファイルを読んだ後に呼ぶ。
+#   - Variables の QG_COLLECTOR_RUNNER があれば、それ
+#   - 性能（M-03 / M-04）を計測するなら self-hosted（専有のマシンでないと値を比べられない。DD-12）
+#   - それ以外は GitHub ホストランナー（QG_HOSTED_RUNNER。collect.yml の fetch / submit の runs-on と同じ値）
+QG_HOSTED_RUNNER=ubuntu-24.04
+measure_runner() {
+  if [ -n "${QG_COLLECTOR_RUNNER:-}" ]; then
+    [[ "$QG_COLLECTOR_RUNNER" =~ ^[A-Za-z0-9._-]+$ ]] \
+      || die "QG_COLLECTOR_RUNNER はランナーのラベル 1 つで指定してください（例: self-hosted / ubuntu-24.04）: $QG_COLLECTOR_RUNNER"
+    log "measure は QG_COLLECTOR_RUNNER（Variables）のランナーで実行します: $QG_COLLECTOR_RUNNER"
+    echo "$QG_COLLECTOR_RUNNER"
+  elif [ -n "${PERF_SCRIPT:-}" ] && metric_enabled M-03; then
+    log "性能（M-03 / M-04）を計測するため、measure はセルフホストランナーで実行します"
+    log "セルフホストランナーが登録されていないと、measure は割り当てを待ち続け、24 時間で取り消されます"
+    echo self-hosted
+  else
+    log "measure は GitHub ホストランナー（$QG_HOSTED_RUNNER）で実行します"
+    echo "$QG_HOSTED_RUNNER"
+  fi
+}
+
 # M-08 で検査する画面（空白区切り）。quality-gate の QG_ACCESSIBILITY_PAGES（fetch.sh が meta.env に書く）と、
 # 計測プロファイルの A11Y_PAGES の和（重複は除く）。
 # アプリの値のうち `:` で始まる区切りを含むもの（/tasks/:id など）は照合用のパターンで開けないため除く。

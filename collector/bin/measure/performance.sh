@@ -19,6 +19,11 @@ k6_bin() {
 measure_performance() {
   local script="$TARGET_DIR/$PERF_SCRIPT" port=${PERF_BACKEND_PORT:-8080} runs=${PERF_RUNS:-3}
   local warmup=${PERF_WARMUP_SECONDS:-60} duration=${PERF_DURATION_SECONDS:-300} k6 i summary environment jvm progress eta
+  # 性能は専有のセルフホストランナーでだけ測る（DD-12 / DD-28）。共有の VM の値は揺れて、合格ラインの絶対値で判定できない
+  if [ "${RUNNER_ENVIRONMENT:-}" = github-hosted ]; then
+    fail "M-03 / M-04: GitHub ホストランナーでは性能を計測しません。Variables の QG_COLLECTOR_RUNNER を外すと、セルフホストランナーで計測します"
+    return
+  fi
   [ -f "$script" ] || { fail "M-03 / M-04: k6 のシナリオがありません（collector/targets/$QG_TARGET/$PERF_SCRIPT）"; return; }
   group "負荷試験（k6 ${K6_VERSION}、${runs} 回）"
   k6=$(k6_bin) || { fail "M-03 / M-04: k6 を取得できませんでした"; endgroup; return; }
@@ -33,8 +38,9 @@ measure_performance() {
     --arg memory "$(memory_limit)" \
     --arg dataset "${PERF_DATASET_PROFILE:-}" \
     --arg k6 "$K6_VERSION" \
+    --arg runner "${RUNNER_ENVIRONMENT:-local}" \
     --argjson warmup "$warmup" --argjson duration "$duration" \
-    '{name: $name, runner: "self-hosted", cpu: $cpu, memory: $memory, k6: $k6,
+    '{name: $name, runner: $runner, cpu: $cpu, memory: $memory, k6: $k6,
       warmupSeconds: $warmup, durationSeconds: $duration}
      + (if $dataset != "" then {datasetProfile: $dataset} else {} end)')
   mkdir -p "$REPORTS/perf"
