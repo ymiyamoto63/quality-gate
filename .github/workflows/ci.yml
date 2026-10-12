@@ -115,3 +115,17 @@ jobs:
           severity: CRITICAL,HIGH
           ignore-unfixed: true
           exit-code: '1'
+
+  docs:
+    name: ドキュメントの整合性
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+      # 指標の名前（MetricCatalog）と環境変数（application.yml）を、README・docs/・.env.example と突き合わせる。
+      # 依存パッケージは使わないため npm ci は要らない
+      - name: 指標名と環境変数の突き合わせ
+        run: node scripts/check-docs.mjs

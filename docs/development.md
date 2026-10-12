@@ -91,6 +91,7 @@ QG_LOGIN_PASSWORD=<12 文字以上>
 | `npm test` | `frontend/` | Vitest の単体テスト |
 | `npm run test:a11y` | `frontend/` | Playwright + axe-core のアクセシビリティ検査（6 章） |
 | `npm run generate:api` | `frontend/` | `api/openapi.yml` から `src/api/schema.d.ts` を生成する（5 章） |
+| `node scripts/check-docs.mjs` | リポジトリ直下 | ドキュメントの整合性検査。指標の ID と名前（`MetricCatalog.java`）が README・`docs/metrics.md`・`docs/overview.html` の表と揃っているか、`application.yml` の `QG_*` が `docs/operations.md` に書かれているか、ドキュメントと `.env.example` に出てくる `QG_*` が実在するかを確かめる（依存パッケージ不要）。アプリが読まない `QG_*`（収集ランナー用など）を書くときは、スクリプトの許可リストに足す |
 
 ## 5. API の型と応答例の生成
 
@@ -188,6 +189,7 @@ quality-gate 自身は quality-gate で計測せず（DD-5）、PR の CI で次
 | フロントエンドの検査とユニットテスト | ESLint・Prettier・vue-tsc と Vitest |
 | アクセシビリティ検査 | Playwright + axe-core（ライト / ダーク） |
 | 脆弱性スキャン | Trivy（依存関係。修正版のある重大・高を 0 件に） |
+| ドキュメントの整合性 | `scripts/check-docs.mjs`（4 章）。指標名・環境変数の書き写しがコードとずれていないか |
 
 ## 10. 起動時のよくある症状
 

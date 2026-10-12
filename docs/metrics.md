@@ -21,7 +21,7 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | M-05 | セキュリティ | 重大・高 脆弱性件数 | Critical 0 件・High 0 件 | Trivy（SARIF） | `sarif` | `QG_CRITICAL_VULNERABILITIES_MAX` / `QG_HIGH_VULNERABILITIES_MAX` |
 | M-06 | コード構造 | 循環的複雑度が上限を超える関数の数 | 0 件 | PMD / ESLint | `pmd-xml` / `eslint-json` | `QG_COMPLEXITY_MAX` |
 | M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
-| M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
+| M-08 | 使いやすさ | アクセシビリティ違反 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
 | M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `QG_TEST_SUCCESS_RATE_MIN` |
 | M-10 | 機能テスト | スキップされたテスト数 | 0 件（backend / frontend それぞれ） | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_MAX` |
 | M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `QG_SECRETS_MAX` |
@@ -279,7 +279,7 @@ Medium / Low は判定に使わず、件数を内訳に残す。修正版の無�
 ### M-06 循環的複雑度が上限を超える関数の数
 
 **定義**: McCabe の循環的複雑度（CC）が `QG_COMPLEXITY_MAX`（既定 15）を超える関数の数。**計測したコミットの全関数の件数（絶対値）で判定し、比較元との差分は取らない**。
-既存の関数を当面許容するときは `QG_EXCLUSIONS` で外し、理由を記録する。backend と frontend を合わせて 1 つの値にする。
+既存の関数を当面許容するときは `QG_EXCLUSIONS` で外し、理由を記録する。backend と frontend で別々に数え、コンポーネントごとに判定する（合算しない）。
 
 **計測方法**
 
@@ -331,7 +331,7 @@ backend（PMD）と frontend（ESLint）を合算しない。合算すると、�
 
 意図した破壊的変更は API のバージョニング（`/v1` → `/v2`）で対応する。やむを得なければ合格ラインを変え、理由を記録する。
 
-### M-08 アクセシビリティ重大違反件数
+### M-08 アクセシビリティ違反
 
 **定義**: WCAG 2.2 AA を基準に axe-core が自動検出した違反のうち、重大（critical / serious）なものの件数。
 serious にはキーボードで操作できない・コントラスト不足など、実際に利用を妨げる違反が含まれるため、critical と合わせて判定する。
