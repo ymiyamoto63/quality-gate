@@ -696,7 +696,7 @@ class EvaluationPipelineIT {
     private Run evaluate(Run run, QualityGateProperties.Gate gate) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
         GateThresholds thresholds = GateThresholds.from(gate);
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
+        NormalizedInput input = normalizer.normalize(records, thresholds.scope().exclusions());
         evaluationService.evaluate(run.getId(), input, thresholds);
         return runs.findById(run.getId()).orElseThrow();
     }

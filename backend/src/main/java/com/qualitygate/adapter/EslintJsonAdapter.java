@@ -61,11 +61,11 @@ public class EslintJsonAdapter implements ArtifactAdapter {
                                 + " eslint -f json の出力を送信してください");
             }
             String filePath = file.path("filePath").asString();
-            String modulePath = PmdXmlAdapter.relativize(filePath);
+            String modulePath = ComplexityReports.relativize(filePath);
             if (context.isExcluded(modulePath)) {
                 continue;
             }
-            String repoPath = PmdXmlAdapter.repoRelative(filePath, modulePath, context.componentName());
+            String repoPath = ComplexityReports.repoRelative(filePath, modulePath, context.componentName());
             Map<String, Integer> anonymous = new HashMap<>();
             for (JsonNode message : file.path("messages")) {
                 if (!RULE.equals(message.path("ruleId").asString(""))) {
@@ -74,7 +74,7 @@ public class EslintJsonAdapter implements ArtifactAdapter {
                 findings.add(toFinding(message, modulePath, repoPath, anonymous, context));
             }
         }
-        return NormalizedReport.of(ArtifactType.ESLINT_JSON, List.of(PmdXmlAdapter.analyzed(findings, context)), findings);
+        return NormalizedReport.of(ArtifactType.ESLINT_JSON, List.of(ComplexityReports.analyzed(findings, context)), findings);
     }
 
     private static RawFinding toFinding(JsonNode message, String modulePath, String repoPath,

@@ -40,7 +40,8 @@ final class ThresholdText {
      * 緩くない（記録の無い）合格ラインでは null。
      *
      * <p>合格ラインの値そのものが緩ければその既定値を、上限・下限の補足（M-06 の関数ごとの上限など）が緩ければ
-     * その名称と既定値を並べる。
+     * その名称と既定値を並べる。名称は、判定器が宣言して行に保存した上限・下限の宣言から引く
+     * （宣言を保存する前の行は {@link Threshold} の旧形式の表で補う）。
      */
     static String defaultOf(Threshold threshold, String unit) {
         if (!threshold.isRelaxed()) {
@@ -55,7 +56,7 @@ final class ThresholdText {
             parts.add(of(standard, unit));
         }
         for (String key : threshold.looserLimitsThan(standard)) {
-            Threshold.limitOf(key).ifPresent(limit ->
+            threshold.limit(key).ifPresent(limit ->
                     parts.add("%s %s".formatted(limit.label(), Decimals.plain(standard.extraValue(key)))));
         }
         parts.removeIf(Objects::isNull);

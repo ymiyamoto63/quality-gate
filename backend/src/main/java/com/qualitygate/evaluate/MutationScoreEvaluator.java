@@ -54,7 +54,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
         GateThresholds thresholds = context.thresholds();
-        Set<String> targets = thresholds.coverage().mutationComponents();
+        Set<String> targets = thresholds.scope().mutationComponents();
 
         // null（コンポーネント宣言なし）は "" に寄せて並べる。TreeMap は null キーを持てない
         Map<String, List<RawMeasurement>> byComponent = new TreeMap<>();
@@ -156,7 +156,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
             }
         }
 
-        Threshold threshold = Threshold.atLeast(thresholds.coverage().mutationScoreMin());
+        Threshold threshold = Threshold.atLeast(thresholds.limits().coverage().mutationScoreMin());
         Map<String, Object> detail = new LinkedHashMap<>(tally.toDetail());
         detail.put("excludedFiles", excludedFiles);
         detail.put("reports", measurements.size());
@@ -188,7 +188,7 @@ public class MutationScoreEvaluator implements MetricEvaluator {
         }
 
         BigDecimal value = scaled(tally.score());
-        BigDecimal minimum = thresholds.coverage().mutationScoreMin();
+        BigDecimal minimum = thresholds.limits().coverage().mutationScoreMin();
         String limit = minimum.toPlainString();
         if (value.compareTo(minimum) < 0) {
             return new Judgement(MeasurementStatus.FAIL,

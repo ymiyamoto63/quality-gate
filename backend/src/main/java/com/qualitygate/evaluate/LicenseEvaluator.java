@@ -48,7 +48,7 @@ public class LicenseEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int maxForbidden = context.thresholds().security().maxForbiddenLicenses();
+        int maxForbidden = context.thresholds().limits().security().maxForbiddenLicenses();
 
         // パッケージ（とコンポーネント）ごとに、最も緩い分類を採る
         Map<String, List<IdentifiedFinding>> byPackage = new LinkedHashMap<>();

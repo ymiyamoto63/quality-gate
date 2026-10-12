@@ -49,7 +49,7 @@ class QualityGatePropertiesTest {
         assertThat(gate.testSuccessRateMin()).isEqualByComparingTo("100");
         // M-10 は件数そのものの上限。既定はスキップを 1 件も認めない
         assertThat(gate.skippedTestsMax()).isZero();
-        assertThat(GateThresholds.from(gate).enabledMetrics()).hasSize(12);
+        assertThat(GateThresholds.from(gate).scope().enabledMetrics()).hasSize(12);
     }
 
     @Test
@@ -59,10 +59,10 @@ class QualityGatePropertiesTest {
                 0, null, null, null);
 
         GateThresholds thresholds = GateThresholds.from(gate);
-        assertThat(thresholds.enabledMetrics()).doesNotContain("M-03", "M-04").hasSize(10);
-        assertThat(thresholds.coverage().branchMin()).isEqualByComparingTo("80");
+        assertThat(thresholds.scope().enabledMetrics()).doesNotContain("M-03", "M-04").hasSize(10);
+        assertThat(thresholds.limits().coverage().branchMin()).isEqualByComparingTo("80");
         // 0 件のテストの合格は「検証していない」の言い換えにすぎない
-        assertThat(thresholds.testResults().minTestCount()).isEqualTo(1);
+        assertThat(thresholds.limits().testResults().minTestCount()).isEqualTo(1);
     }
 
     @Test

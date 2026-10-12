@@ -10,55 +10,74 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * 判定に使う合格ラインの集合。環境変数（{@link QualityGateProperties.Gate}）から作る。
+ * 判定に使う設定。環境変数（{@link QualityGateProperties.Gate}）から作る。
+ *
+ * <p>何を計測するかを絞る設定（{@link Scope}）と、合格ラインの値（{@link Limits}）に分けて持つ。
+ * 「既定より緩い」かの比較（DD-27）では、対象はこの設定のまま値だけを既定にする（{@link #withDefaultLimits()}）。
  *
  * <p>合否は 2 値（合格 / 不合格）。「注意」のような中間の段階は持たない。
  *
- * <p>合格ラインは指標のカテゴリ（docs/metrics.md 1 章）ごとにまとめて持つ。
- *
- * @param enabledMetrics     判定対象の指標
- * @param exclusions         計測除外の glob パターン
- * @param coverage           M-01 / M-02 の合格ライン
- * @param performance        M-03 / M-04 の合格ライン
- * @param security           M-05 / M-11 / M-12 の合格ライン
- * @param maxComplexity      M-06 の関数ごとの循環的複雑度の上限
- * @param maxBreakingChanges M-07 の合格ライン（破壊的変更の件数）
- * @param accessibility      M-08 の合格ライン
- * @param testResults        M-09 / M-10 の合格ライン
+ * @param scope  判定・計測の対象（判定する指標・除外・指標ごとの対象）
+ * @param limits 合格ラインの値。指標のカテゴリ（docs/metrics.md 1 章）ごとにまとめて持つ
  */
-// カテゴリの異なる合格ラインを 1 つの型に混ぜないため、7 を超える引数を許す
-@SuppressWarnings("java:S107")
-public record GateThresholds(
-        Set<String> enabledMetrics,
-        List<String> exclusions,
-        Coverage coverage,
-        Performance performance,
-        Security security,
-        int maxComplexity,
-        int maxBreakingChanges,
-        Accessibility accessibility,
-        TestResults testResults) {
+public record GateThresholds(Scope scope, Limits limits) {
+
+    /**
+     * 何を計測・判定するかを絞る設定。合格ラインの値ではないため、既定と比べて「緩い」とは扱わない。
+     *
+     * @param enabledMetrics     判定対象の指標
+     * @param exclusions         計測除外の glob パターン
+     * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
+     * @param perfScenarios      M-03 で判定すべきシナリオ。summary に無ければ ERROR
+     * @param accessibilityPages M-08 で検査されているべきページ。空なら限定しない
+     */
+    public record Scope(Set<String> enabledMetrics, List<String> exclusions, Set<String> mutationComponents,
+                        List<String> perfScenarios, List<String> accessibilityPages) {
+
+        /** 判定しない指標（{@code QG_DISABLED_METRICS}）。指標の一覧の並び。 */
+        public List<String> disabledMetrics() {
+            return ALL_METRICS.stream().filter(metricId -> !enabledMetrics.contains(metricId)).toList();
+        }
+    }
+
+    /**
+     * 合格ラインの値。指標のカテゴリごとにまとめる。
+     *
+     * @param coverage           M-01 / M-02 の合格ライン
+     * @param performance        M-03 / M-04 の合格ライン
+     * @param security           M-05 / M-11 / M-12 の合格ライン
+     * @param maxComplexity      M-06 の関数ごとの循環的複雑度の上限
+     * @param maxBreakingChanges M-07 の合格ライン（破壊的変更の件数）
+     * @param accessibility      M-08 の合格ライン
+     * @param testResults        M-09 / M-10 の合格ライン
+     */
+    public record Limits(
+            Coverage coverage,
+            Performance performance,
+            Security security,
+            int maxComplexity,
+            int maxBreakingChanges,
+            Accessibility accessibility,
+            TestResults testResults) {
+    }
 
     /**
      * テストの網羅と質の合格ライン（docs/metrics.md M-01 / M-02）。
      *
-     * @param branchMin          M-01 の合格ライン（分岐網羅率 %）
-     * @param mutationScoreMin   M-02 の合格ライン（ミューテーションスコア %）
-     * @param mutationComponents M-02 の対象コンポーネント。空なら限定しない
+     * @param branchMin        M-01 の合格ライン（分岐網羅率 %）
+     * @param mutationScoreMin M-02 の合格ライン（ミューテーションスコア %）
      */
-    public record Coverage(BigDecimal branchMin, BigDecimal mutationScoreMin, Set<String> mutationComponents) {
+    public record Coverage(BigDecimal branchMin, BigDecimal mutationScoreMin) {
     }
 
     /**
-     * 性能指標の合格ライン（docs/metrics.md M-03）。
+     * 性能指標の合格ライン（docs/metrics.md M-03 / M-04）。
      *
      * @param p95Ms          M-03 の合格ライン（ms 以内）。全体とシナリオの双方に適用する
      * @param arrivalRateRps 負荷条件（到達率）。実測が 95% を下回ったら計測エラー
      * @param errorRatePct   M-04 の合格ライン（% 以下）
-     * @param scenarios      判定すべきシナリオ。summary に無ければ ERROR
      */
-    public record Performance(BigDecimal p95Ms, BigDecimal arrivalRateRps,
-                              BigDecimal errorRatePct, List<String> scenarios) {
+    public record Performance(BigDecimal p95Ms, BigDecimal arrivalRateRps, BigDecimal errorRatePct) {
     }
 
     /**
@@ -86,9 +105,8 @@ public record GateThresholds(
      * アクセシビリティの合格ライン（docs/metrics.md M-08）。
      *
      * @param maxViolations M-08 の合格ライン（critical + serious の件数）
-     * @param pages         検査されているべきページ。空なら限定しない
      */
-    public record Accessibility(int maxViolations, List<String> pages) {
+    public record Accessibility(int maxViolations) {
     }
 
 
@@ -102,31 +120,13 @@ public record GateThresholds(
     }
 
     /**
-     * 合格ラインの値だけを既定値にしたもの。判定する指標・除外・対象（M-02 のコンポーネント、M-03 のシナリオ、
-     * M-08 の画面）はこの設定のまま。
+     * 既定の合格ラインに、この設定の対象（{@link Scope}）を組み合わせたもの。
      *
      * <p>同じ入力をこれでも判定し、結果ごとの合格ラインを比べて「既定より緩い」かを決める（DD-27）。
      * 対象まで既定にすると結果の行の組み合わせが変わり、同じ行どうしを比べられなくなる。
      */
     public GateThresholds withDefaultLimits() {
-        GateThresholds standard = defaults();
-        return new GateThresholds(
-                enabledMetrics,
-                exclusions,
-                new Coverage(standard.coverage().branchMin(), standard.coverage().mutationScoreMin(),
-                        coverage.mutationComponents()),
-                new Performance(standard.performance().p95Ms(), standard.performance().arrivalRateRps(),
-                        standard.performance().errorRatePct(), performance.scenarios()),
-                standard.security(),
-                standard.maxComplexity(),
-                standard.maxBreakingChanges(),
-                new Accessibility(standard.accessibility().maxViolations(), accessibility.pages()),
-                standard.testResults());
-    }
-
-    /** 判定しない指標（{@code QG_DISABLED_METRICS}）。指標の一覧の並び。 */
-    public List<String> disabledMetrics() {
-        return ALL_METRICS.stream().filter(metricId -> !enabledMetrics.contains(metricId)).toList();
+        return new GateThresholds(scope, defaults().limits());
     }
 
     /** 環境変数から判定に使う値を取り出す。判定対象は、すべての指標から無効にしたものを除いたもの。 */
@@ -134,18 +134,21 @@ public record GateThresholds(
         Set<String> enabled = new LinkedHashSet<>(ALL_METRICS);
         gate.disabledMetrics().forEach(enabled::remove);
 
-        return new GateThresholds(
+        Scope scope = new Scope(
                 Set.copyOf(enabled),
                 gate.exclusions(),
-                new Coverage(gate.branchCoverageMin(), gate.mutationScoreMin(),
-                        Set.copyOf(gate.mutationComponents())),
-                new Performance(gate.responseTimeP95MaxMs(), gate.arrivalRateRps(), gate.errorRateMaxPct(),
-                        gate.perfScenarios()),
+                Set.copyOf(gate.mutationComponents()),
+                gate.perfScenarios(),
+                gate.accessibilityPages());
+        Limits limits = new Limits(
+                new Coverage(gate.branchCoverageMin(), gate.mutationScoreMin()),
+                new Performance(gate.responseTimeP95MaxMs(), gate.arrivalRateRps(), gate.errorRateMaxPct()),
                 new Security(gate.criticalVulnerabilitiesMax(), gate.highVulnerabilitiesMax(), gate.secretsMax(),
                         gate.forbiddenLicensesMax()),
                 gate.complexityMax(),
                 gate.breakingChangesMax(),
-                new Accessibility(gate.accessibilityViolationsMax(), gate.accessibilityPages()),
+                new Accessibility(gate.accessibilityViolationsMax()),
                 new TestResults(gate.testSuccessRateMin(), gate.testCountMin(), gate.skippedTestsMax()));
+        return new GateThresholds(scope, limits);
     }
 }

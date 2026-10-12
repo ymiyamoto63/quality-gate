@@ -39,7 +39,7 @@ public class BranchCoverageEvaluator implements MetricEvaluator {
 
     private MetricResult evaluateOne(RawMeasurement measurement, EvaluationContext context,
                                      GateThresholds thresholds) {
-        BigDecimal minimum = thresholds.coverage().branchMin();
+        BigDecimal minimum = thresholds.limits().coverage().branchMin();
         Threshold threshold = Threshold.atLeast(minimum);
         BigDecimal previous = context
                 .previousValue(metricId(), measurement.componentName()).orElse(null);

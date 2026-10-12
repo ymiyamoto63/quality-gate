@@ -46,7 +46,7 @@ public class SkippedTestEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int max = context.thresholds().testResults().maxSkipped();
+        int max = context.thresholds().limits().testResults().maxSkipped();
         Threshold threshold = Threshold.atMost(max);
 
         List<MetricResult> results = new ArrayList<>();

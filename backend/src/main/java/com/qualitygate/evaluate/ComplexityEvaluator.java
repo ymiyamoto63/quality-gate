@@ -52,12 +52,13 @@ public class ComplexityEvaluator implements MetricEvaluator {
 
     private MetricResult evaluateComponent(String componentName, List<IdentifiedFinding> analyzed,
                                            EvaluationContext context) {
-        int max = context.thresholds().maxComplexity();
+        int max = context.thresholds().limits().maxComplexity();
         List<IdentifiedFinding> exceeding = analyzed.stream()
                 .filter(finding -> complexityOf(finding) > max)
                 .toList();
 
-        Threshold threshold = Threshold.atMost(0).with("maxComplexity", max);
+        Threshold threshold = Threshold.atMost(0)
+                .withLimit("maxComplexity", Threshold.AT_MOST, "関数ごとの循環的複雑度の上限", max);
         Map<String, Object> detail = new HashMap<>();
         detail.put("analyzedFunctions", analyzed.size());
 

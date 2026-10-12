@@ -39,7 +39,7 @@ public class BreakingChangeEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int maximum = context.thresholds().maxBreakingChanges();
+        int maximum = context.thresholds().limits().maxBreakingChanges();
         List<RawMeasurement> measurements = context.input().measurementsOf(metricId());
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
