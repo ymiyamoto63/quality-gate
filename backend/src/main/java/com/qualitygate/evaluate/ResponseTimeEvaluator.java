@@ -46,7 +46,8 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
 
     @Override
     Threshold threshold(GateThresholds.Performance limits) {
-        return Threshold.atMost(limits.p95Ms()).with("arrivalRateRps", limits.arrivalRateRps());
+        return Threshold.atMost(limits.p95Ms())
+                .withLimit("arrivalRateRps", Threshold.AT_LEAST, "負荷条件（到達率 req/s）", limits.arrivalRateRps());
     }
 
     @Override
@@ -62,9 +63,10 @@ public class ResponseTimeEvaluator extends PerformanceEvaluator {
     }
 
     @Override
-    String undeterminableReason(List<RawMeasurement> runs, GateThresholds.Performance limits) {
+    String undeterminableReason(List<RawMeasurement> runs, GateThresholds.Performance limits,
+                                GateThresholds.Scope scope) {
         Map<String, BigDecimal> measured = scenarioMedians(runs);
-        List<String> missing = limits.scenarios().stream()
+        List<String> missing = scope.perfScenarios().stream()
                 .filter(name -> !measured.containsKey(name)).toList();
         if (!missing.isEmpty()) {
             return ("設定のシナリオ %s の p95 が summary にありません。"

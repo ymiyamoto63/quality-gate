@@ -10,7 +10,7 @@
 ## 2. 手順
 
 ```
-1. 合格ライン        環境変数（QualityGateProperties.Gate）から判定用の値（GateThresholds）を作る
+1. 合格ライン        環境変数（QualityGateProperties.Gate）から判定用の値（GateThresholds = 対象の Scope + 合格ラインの Limits）を作る
 2. 正規化            成果物を 1 件ずつアダプタでパースし、正規化モデル（指標の素の値と違反）へ変換する
 3. fingerprint      違反に fingerprint を付ける（定義を 1 か所に集めるため、アダプタではなく normalize が付ける）
 4. 比較対象の特定     比較元コミットの Run、無ければ同じブランチの直前の Run
@@ -66,7 +66,7 @@ XML は外部実体参照と外部 DTD を無効にし（`SafeXml`）、StAX で
 
 判定器は指標ごとに 1 つで、コンポーネントや計測条件ごとに複数の結果を返しうる。前回値は比較対象 Run の同じ指標・コンポーネント・計測条件の値で、判定時に `previous_value` として焼き付ける。
 
-**既定より緩い合格ライン**（DD-27）: 合格ラインの値だけを既定にした設定（`GateThresholds.withDefaultLimits()`。判定する指標・除外・対象のコンポーネントやシナリオや画面は同じ）でも同じ入力を判定し、指標・コンポーネント・計測条件の同じ結果どうしで合格ラインを比べる。向きが `>=` なら値が小さいほど、`<=` なら大きいほど緩い。上限・下限を表す補足（M-06 の `maxComplexity`、M-05 の `maxCritical` / `maxHigh`、M-09 の `minTestCount`、M-03 の `arrivalRateRps`）も同じ向きで比べる（`Threshold` の `LIMIT_EXTRAS`）。緩ければ `measurements.threshold` に `relaxed: true` と既定の合格ライン `default` を添える。合否と保存する値は、設定の合格ラインで判定したものから変えない。指標ごとの知識を持たないため、判定の規則を変えた指標にもそのまま効く。
+**既定より緩い合格ライン**（DD-27）: 合格ラインの値だけを既定にした設定（`GateThresholds.withDefaultLimits()`。既定の `Limits` にこの設定の `Scope`（判定する指標・除外・M-02 のコンポーネント・M-03 のシナリオ・M-08 の画面）を組み合わせたもの）でも同じ入力を判定し、指標・コンポーネント・計測条件の同じ結果どうしで合格ラインを比べる。向きが `>=` なら値が小さいほど、`<=` なら大きいほど緩い。上限・下限を表す補足（M-06 の `maxComplexity`、M-05 の `maxCritical` / `maxHigh`、M-09 の `minTestCount`、M-03 の `arrivalRateRps`）も同じ向きで比べる。補足の向きと名称は判定器が `Threshold.withLimit(キー, 向き, 名称, 値)` で宣言し、ほかへの登録は要らない。緩ければ `measurements.threshold` に `relaxed: true` と既定の合格ライン `default`、上限・下限の宣言 `limits`（`{"maxComplexity": {"operator": "<=", "label": "関数ごとの循環的複雑度の上限"}}`。既定値の表示に使う）を添える。緩くない行の JSON は宣言を足す前と同じ形のまま。`limits` を持たない過去の緩い行は、`Threshold` の旧形式の表（`LEGACY_LIMITS`。読み戻し専用で、新しい上限は足さない）で向きと名称を補う。合否と保存する値は、設定の合格ラインで判定したものから変えない。指標ごとの知識を持たないため、判定の規則を変えた指標にもそのまま効く。
 
 Run 全体の集約の規則は [指標](../../metrics.md#21-判定ステータス)。
 

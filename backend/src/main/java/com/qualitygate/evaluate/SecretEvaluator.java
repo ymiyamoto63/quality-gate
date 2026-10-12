@@ -30,7 +30,7 @@ public class SecretEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int max = context.thresholds().security().maxSecrets();
+        int max = context.thresholds().limits().security().maxSecrets();
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
         Threshold threshold = Threshold.atMost(max);

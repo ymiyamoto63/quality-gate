@@ -51,7 +51,7 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
 
     private MetricResult evaluateGroup(Key key, List<RawMeasurement> runs,
                                        EvaluationContext context) {
-        GateThresholds.Performance limits = context.thresholds().performance();
+        GateThresholds.Performance limits = context.thresholds().limits().performance();
         BigDecimal value = PerformanceSample.median(runs.stream()
                 .map(RawMeasurement::value).filter(Objects::nonNull).toList());
         BigDecimal errorRate = PerformanceSample.median(runs.stream()
@@ -74,7 +74,7 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
                     "実行回数が %d 回で、仕様の %d 回に届きません。負荷試験をやり直してください"
                             .formatted(runs.size(), EXPECTED_RUNS), detail);
         }
-        String undeterminable = undeterminableReason(runs, limits);
+        String undeterminable = undeterminableReason(runs, limits, context.thresholds().scope());
         if (undeterminable != null) {
             return result(key, MeasurementStatus.ERROR, null, threshold, undeterminable, detail);
         }
@@ -101,7 +101,8 @@ abstract class PerformanceEvaluator implements MetricEvaluator {
     }
 
     /** 値を確定できない理由。確定できるなら null。 */
-    String undeterminableReason(List<RawMeasurement> runs, GateThresholds.Performance limits) {
+    String undeterminableReason(List<RawMeasurement> runs, GateThresholds.Performance limits,
+                                GateThresholds.Scope scope) {
         return null;
     }
 

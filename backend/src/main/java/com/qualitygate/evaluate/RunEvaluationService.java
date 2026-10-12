@@ -80,7 +80,7 @@ public class RunEvaluationService {
                 input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
         List<MetricResult> results = markRelaxed(evaluateAll(context), context);
         // 何を判定しなかったかも、合格ラインと同じく判定時に焼き付ける（DD-27）
-        run.applyDisabledMetrics(thresholds.disabledMetrics());
+        run.applyDisabledMetrics(thresholds.scope().disabledMetrics());
 
         persistMeasurements(run, results, context);
         persistFindings(run, results, baseline);
@@ -97,7 +97,7 @@ public class RunEvaluationService {
         evaluators.forEach(e -> byMetric.put(e.metricId(), e));
 
         List<MetricResult> results = new ArrayList<>();
-        for (String metricId : context.thresholds().enabledMetrics().stream().sorted().toList()) {
+        for (String metricId : context.thresholds().scope().enabledMetrics().stream().sorted().toList()) {
             results.addAll(evaluateMetric(metricId, byMetric.get(metricId), context));
         }
         return results;

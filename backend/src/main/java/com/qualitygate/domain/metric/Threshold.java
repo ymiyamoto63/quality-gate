@@ -4,7 +4,6 @@ import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 import java.math.BigDecimal;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -18,13 +17,20 @@ import java.util.Optional;
  * <p>JSON の形（キー {@code operator} / {@code value} / {@code basis} と指標固有の補足）は変えない。
  * 保存済みの Run の行もこの形で読むため、形を変えると過去の判定の合格ラインが表示できなくなる。
  *
+ * <p>上限・下限を表す補足（M-06 の {@code maxComplexity} など）は、判定器が {@link #withLimit} で
+ * 向きと名称を添えて宣言する。宣言はこの型が持ち、既定より緩いかの比較（{@link #relaxedFrom(Threshold)}）に使う。
+ * 補足の値は従来どおり {@code "maxComplexity": 15} の形で保存し、宣言（向きと名称）は表示に要る
+ * 「既定より緩い」行にだけ {@code limits} として添える（{@link #toMap()}）。
+ *
  * @param operator 比較の向き（{@link #AT_LEAST} / {@link #AT_MOST}）。合格ラインを持たない結果では null
  * @param value    合格ラインの値。合格ラインを持たない結果では null
  * @param basis    何と比べるか。{@link #INCREASE} なら比較対象 Run からの増加で判定する。値そのものなら null
  * @param extras   指標固有の補足（M-06 の関数ごとの上限 {@code maxComplexity} など）。判定の根拠として残す。
  *                 既定の合格ラインより緩いときは、その印（{@code relaxed} / {@code default}）もここに入る（{@link #relaxedFrom(Threshold)}）
+ * @param limits   補足のうち上限・下限を表すものの宣言（キーは補足のキー）。値は {@code extras} にある
  */
-public record Threshold(String operator, BigDecimal value, String basis, Map<String, Object> extras) {
+public record Threshold(String operator, BigDecimal value, String basis, Map<String, Object> extras,
+                        Map<String, Limit> limits) {
 
     public static final String AT_LEAST = ">=";
     public static final String AT_MOST = "<=";
@@ -42,34 +48,67 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
     /** 緩いときの、既定の合格ライン（{@link #toMap()} の形）。 */
     private static final String DEFAULT = "default";
 
+    /** 上限・下限の宣言（{@link #limits}）。「既定より緩い」行にだけ保存する。 */
+    private static final String LIMITS = "limits";
+    private static final String LABEL = "label";
+
     /**
-     * 合格ラインの一部をなす補足（上限・下限の値）と、その向き。緩さの比較に使う。
-     * {@link #AT_MOST} は値が大きいほど緩く、{@link #AT_LEAST} は小さいほど緩い。
-     * ここに無い補足（M-08 の {@code standard} など）は比べない。
+     * 補足の上限・下限の宣言。{@link #AT_MOST} は値が大きいほど緩く、{@link #AT_LEAST} は小さいほど緩い。
+     *
+     * @param operator 比較の向き（{@link #AT_LEAST} / {@link #AT_MOST}）
+     * @param label    画面に出す名称（既定値の説明に使う）
      */
-    private static final Map<String, Limit> LIMIT_EXTRAS = Map.of(
+    public record Limit(String operator, String label) {
+
+        public Limit {
+            if (!AT_LEAST.equals(operator) && !AT_MOST.equals(operator)) {
+                throw new IllegalArgumentException("上限・下限の向きは >= か <= です: " + operator);
+            }
+            Objects.requireNonNull(label, "label");
+        }
+
+        private Map<String, Object> toMap() {
+            Map<String, Object> map = new LinkedHashMap<>();
+            map.put(OPERATOR, operator);
+            map.put(LABEL, label);
+            return map;
+        }
+
+        private static Optional<Limit> fromMap(Object raw) {
+            if (raw instanceof Map<?, ?> map && map.get(OPERATOR) instanceof String operator
+                    && (AT_LEAST.equals(operator) || AT_MOST.equals(operator))
+                    && map.get(LABEL) instanceof String label) {
+                return Optional.of(new Limit(operator, label));
+            }
+            return Optional.empty();
+        }
+    }
+
+    /**
+     * <strong>旧形式の行を読むためだけの表。</strong>上限・下限の宣言（{@code limits}）を保存するより前の
+     * 「既定より緩い」行には宣言が無いため、当時の判定器が出していた補足の向きと名称をここで補う。
+     *
+     * <p>新しい上限・下限はここに足さない。判定器が {@link #withLimit} で宣言すれば、比較にも表示にも効く。
+     */
+    private static final Map<String, Limit> LEGACY_LIMITS = Map.of(
             "maxComplexity", new Limit(AT_MOST, "関数ごとの循環的複雑度の上限"),
             "maxCritical", new Limit(AT_MOST, "Critical の上限"),
             "maxHigh", new Limit(AT_MOST, "High の上限"),
             "minTestCount", new Limit(AT_LEAST, "最小実行件数"),
             "arrivalRateRps", new Limit(AT_LEAST, "負荷条件（到達率 req/s）"));
 
-    /**
-     * 補足の上限・下限。
-     *
-     * @param operator 比較の向き
-     * @param label    画面に出す名称（既定値の説明に使う）
-     */
-    public record Limit(String operator, String label) {
-    }
-
     private static final TypeReference<Map<String, Object>> JSON_OBJECT = new TypeReference<>() {
     };
 
-    private static final Threshold NONE = new Threshold(null, null, null, Map.of());
+    private static final Threshold NONE = new Threshold(null, null, null, Map.of(), Map.of());
 
     public Threshold {
         extras = Collections.unmodifiableMap(new LinkedHashMap<>(extras));
+        limits = Collections.unmodifiableMap(new LinkedHashMap<>(limits));
+    }
+
+    private Threshold(String operator, BigDecimal value, String basis) {
+        this(operator, value, basis, Map.of(), Map.of());
     }
 
     /** 合格ラインを持たない結果（計測エラー・対象外）。JSON では空のオブジェクトになる。 */
@@ -79,12 +118,12 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
 
     /** 値が {@code value} 以上なら合格。 */
     public static Threshold atLeast(BigDecimal value) {
-        return new Threshold(AT_LEAST, value, null, Map.of());
+        return new Threshold(AT_LEAST, value, null);
     }
 
     /** 値が {@code value} 以下なら合格。 */
     public static Threshold atMost(BigDecimal value) {
-        return new Threshold(AT_MOST, value, null, Map.of());
+        return new Threshold(AT_MOST, value, null);
     }
 
     /** 件数が {@code count} 以下なら合格。 */
@@ -94,14 +133,37 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
 
     /** 比較対象 Run からの増加が {@code count} 以下なら合格（DD-25 より前の M-10。保存済みの行の表示とテストで使う）。 */
     public static Threshold increaseAtMost(long count) {
-        return new Threshold(AT_MOST, BigDecimal.valueOf(count), INCREASE, Map.of());
+        return new Threshold(AT_MOST, BigDecimal.valueOf(count), INCREASE);
     }
 
-    /** 指標固有の補足を足したものを返す。 */
+    /**
+     * 指標固有の補足を足したものを返す。上限・下限でない補足（M-08 の {@code standard} など）に使い、
+     * 既定より緩いかの比較には加えない。上限・下限は {@link #withLimit} で宣言する。
+     */
     public Threshold with(String key, Object extra) {
         Map<String, Object> next = new LinkedHashMap<>(extras);
         next.put(key, extra);
-        return new Threshold(operator, value, basis, next);
+        return new Threshold(operator, value, basis, next, limits);
+    }
+
+    /**
+     * 上限・下限を表す補足を、向きと名称を添えて足したものを返す。
+     *
+     * <p>値は {@code key} の補足として保存し（{@code "maxComplexity": 15}）、宣言は既定より緩いかの比較
+     * （{@link #relaxedFrom(Threshold)}）と既定値の表示に使う。判定器がここで宣言するだけでよく、ほかへの登録は要らない。
+     *
+     * @param key       補足のキー（{@code maxComplexity} など）
+     * @param direction 向き。{@link #AT_MOST} は大きいほど緩く、{@link #AT_LEAST} は小さいほど緩い
+     * @param label     画面に出す名称（「関数ごとの循環的複雑度の上限」など）
+     * @param limit     上限・下限の値
+     */
+    public Threshold withLimit(String key, String direction, String label, Number limit) {
+        Limit declared = new Limit(direction, label);
+        Map<String, Limit> nextLimits = new LinkedHashMap<>(limits);
+        nextLimits.put(key, declared);
+        Map<String, Object> next = new LinkedHashMap<>(extras);
+        next.put(key, Objects.requireNonNull(limit, key));
+        return new Threshold(operator, value, basis, next, nextLimits);
     }
 
     /** 比較対象 Run からの増加で判定するか。 */
@@ -114,7 +176,7 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
      * 補足に足したものを返す。緩くなければ自身をそのまま返す。
      *
      * <p>指標ごとの知識は持たない。比較の向き（{@link #AT_LEAST} は小さいほど緩い、{@link #AT_MOST} は大きいほど緩い）と、
-     * 上限・下限を表す補足（{@code maxComplexity} など）だけで決める。指標の判定の規則が変わっても、
+     * 判定器が {@link #withLimit} で宣言した上限・下限（{@code maxComplexity} など）だけで決める。指標の判定の規則が変わっても、
      * 合格ラインの形（向きと値）さえ保てばそのまま使える。
      */
     public Threshold relaxedFrom(Threshold defaults) {
@@ -129,23 +191,22 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
         return comparable(other) && looser(operator, value, other.value);
     }
 
-    /** {@code other} より緩い上限・下限の補足のキー（{@link #limitOf(String)} で名称を引ける）。 */
+    /** {@code other} より緩い上限・下限の補足のキー（{@link #limit(String)} で名称を引ける）。キーの順。 */
     public List<String> looserLimitsThan(Threshold other) {
         if (!comparable(other)) {
             return List.of();
         }
-        List<String> keys = new ArrayList<>();
-        LIMIT_EXTRAS.entrySet().stream()
+        return limits.entrySet().stream()
                 .sorted(Map.Entry.comparingByKey())
                 .filter(entry -> looser(entry.getValue().operator(),
                         decimalOf(extras.get(entry.getKey())), decimalOf(other.extras.get(entry.getKey()))))
-                .forEach(entry -> keys.add(entry.getKey()));
-        return keys;
+                .map(Map.Entry::getKey)
+                .toList();
     }
 
-    /** 上限・下限を表す補足の向きと名称。上限・下限でない補足なら空。 */
-    public static Optional<Limit> limitOf(String key) {
-        return Optional.ofNullable(LIMIT_EXTRAS.get(key));
+    /** 上限・下限を表す補足の宣言（向きと名称）。上限・下限として宣言されていなければ空。 */
+    public Optional<Limit> limit(String key) {
+        return Optional.ofNullable(limits.get(key));
     }
 
     /** 補足の値を数として読む。無いか数でなければ null。 */
@@ -184,7 +245,12 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
         };
     }
 
-    /** measurements.threshold に保存する形。null の項目はキーごと出さない。 */
+    /**
+     * measurements.threshold に保存する形。null の項目はキーごと出さない。
+     *
+     * <p>上限・下限の宣言（{@code limits}）は、既定より緩いと記録した行にだけ添える。表示で既定値の名称を
+     * 出すのはその行だけで、ほかの行は宣言を足す前と同じ JSON のまま保存できる。
+     */
     public Map<String, Object> toMap() {
         Map<String, Object> map = new LinkedHashMap<>();
         if (operator != null) {
@@ -197,6 +263,11 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
             map.put(BASIS, basis);
         }
         map.putAll(extras);
+        if (isRelaxed() && !limits.isEmpty()) {
+            Map<String, Object> declared = new LinkedHashMap<>();
+            limits.forEach((key, limit) -> declared.put(key, limit.toMap()));
+            map.put(LIMITS, declared);
+        }
         return map;
     }
 
@@ -218,11 +289,28 @@ public record Threshold(String operator, BigDecimal value, String basis, Map<Str
         Object operator = extras.remove(OPERATOR);
         Object value = extras.remove(VALUE);
         Object basis = extras.remove(BASIS);
+        Object declared = extras.remove(LIMITS);
         return new Threshold(
                 operator instanceof String text ? text : null,
                 decimalOf(value),
                 basis instanceof String text ? text : null,
-                extras);
+                extras,
+                declared instanceof Map<?, ?> limits ? limitsOf(limits) : legacyLimitsOf(extras));
+    }
+
+    private static Map<String, Limit> limitsOf(Map<?, ?> declared) {
+        Map<String, Limit> limits = new LinkedHashMap<>();
+        declared.forEach((key, raw) -> Limit.fromMap(raw).ifPresent(limit -> limits.put(String.valueOf(key), limit)));
+        return limits;
+    }
+
+    /** 宣言（{@code limits}）を持たない行の上限・下限。旧形式の表（{@link #LEGACY_LIMITS}）にある補足だけを補う。 */
+    private static Map<String, Limit> legacyLimitsOf(Map<String, Object> extras) {
+        Map<String, Limit> limits = new LinkedHashMap<>();
+        extras.keySet().stream()
+                .filter(LEGACY_LIMITS::containsKey)
+                .forEach(key -> limits.put(key, LEGACY_LIMITS.get(key)));
+        return limits;
     }
 
     private static BigDecimal decimalOf(Object value) {

@@ -71,7 +71,7 @@ public class RunEvaluationPipeline {
     private void evaluateOrThrow(UUID runId) {
         List<ArtifactRecord> records = artifacts.findByRunId(runId);
         GateThresholds thresholds = GateThresholds.from(properties.gate());
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
+        NormalizedInput input = normalizer.normalize(records, thresholds.scope().exclusions());
 
         log.info("正規化が完了しました runId={} 成果物={}件 指標={} 違反={}件 解析失敗={}",
                 runId, records.size(), input.metricsWithData(),

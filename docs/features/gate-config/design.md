@@ -23,8 +23,8 @@
 
 合格ラインを環境変数で既定値より緩めると、判定時に `measurements.threshold` へ `relaxed: true` と既定の合格ライン `default`（同じ形の JSON）を添える。リリース判定の行と指標の推移の点は、これを `thresholdRelaxed` / `defaultThreshold`（「≥ 75%」など）として返し、画面は「既定より緩い（既定 ≥ 75%）」と出す。
 
-- 緩さは `GateThresholds.withDefaultLimits()`（値だけ既定。判定する指標・除外・M-02 のコンポーネント・M-03 のシナリオ・M-08 の画面は設定のまま）で同じ入力を判定し、同じ指標・コンポーネント・計測条件の結果の合格ラインと比べて決める（[判定 5 章](../evaluation/design.md#5-指標ごとの判定)）
-- 向きが `>=` なら小さいほど、`<=` なら大きいほど緩い。比べ方（`basis`）の違うものは比べない。上限・下限の補足（`maxComplexity`・`maxCritical`・`maxHigh`・`minTestCount`・`arrivalRateRps`）も同じ向きで比べる
+- 緩さは `GateThresholds.withDefaultLimits()`（既定の合格ライン `Limits` に、設定の対象 `Scope` = 判定する指標・除外・M-02 のコンポーネント・M-03 のシナリオ・M-08 の画面を組み合わせたもの）で同じ入力を判定し、同じ指標・コンポーネント・計測条件の結果の合格ラインと比べて決める（[判定 5 章](../evaluation/design.md#5-指標ごとの判定)）
+- 向きが `>=` なら小さいほど、`<=` なら大きいほど緩い。比べ方（`basis`）の違うものは比べない。上限・下限の補足（`maxComplexity`・`maxCritical`・`maxHigh`・`minTestCount`・`arrivalRateRps`）も同じ向きで比べる。向きと名称は判定器が `Threshold.withLimit` で宣言し、緩い行にだけ `limits` として保存する（[判定 5 章](../evaluation/design.md#5-指標ごとの判定)）
 - 既定より厳しい値には印を付けない（品質の主張を弱めないため）
 - 印を足す前に判定した行には印が無く、緩くないものとして表示する
 - `QG_EXCLUSIONS` も結果を良く見せうるため、除外したファイルの数（M-01 / M-02 の内訳 `excludedFiles`）を行に出す。除外パターンそのものは出さない
