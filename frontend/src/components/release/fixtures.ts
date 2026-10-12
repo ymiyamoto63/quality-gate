@@ -54,6 +54,7 @@ export function releaseReport(overrides: Partial<Report> = {}): Report {
     counts: { judged: 1, passed: 1, failed: 0 },
     metrics: [metricRow()],
     notJudged: [],
+    conditions: [],
     guides: [],
     ...overrides,
   }
@@ -66,6 +67,10 @@ export function historyItem(overrides: Partial<HistoryItem> = {}): HistoryItem {
     ref: 'v1.0.0',
     tags: ['v1.0.0'],
     verdict: 'PASS',
+    judgedCount: 12,
+    notJudgedCount: 0,
+    thresholdRelaxed: false,
+    filesExcluded: false,
     ...overrides,
   }
 }

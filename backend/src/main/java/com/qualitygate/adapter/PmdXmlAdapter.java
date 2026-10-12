@@ -15,6 +15,8 @@ import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -48,6 +50,7 @@ public class PmdXmlAdapter implements ArtifactAdapter {
     @Override
     public NormalizedReport parse(InputStream in, ParseContext context) {
         List<RawFinding> findings = new ArrayList<>();
+        Set<String> excluded = new TreeSet<>();
         XMLStreamReader xml = SafeXml.reader(in);
         boolean sawPmd = false;
         try {
@@ -59,7 +62,7 @@ public class PmdXmlAdapter implements ArtifactAdapter {
                         case "pmd" -> sawPmd = true;
                         case "file" -> filePath = attr(xml, "name");
                         case "violation" -> {
-                            RawFinding finding = toFinding(xml, filePath, context);
+                            RawFinding finding = toFinding(xml, filePath, context, excluded);
                             if (finding != null) {
                                 findings.add(finding);
                             }
@@ -78,16 +81,17 @@ public class PmdXmlAdapter implements ArtifactAdapter {
         } finally {
             close(xml);
         }
-        return NormalizedReport.of(ArtifactType.PMD_XML, List.of(ComplexityReports.analyzed(findings, context)), findings);
+        return NormalizedReport.of(ArtifactType.PMD_XML, List.of(ComplexityReports.analyzed(findings, excluded, context)), findings);
     }
 
-    private RawFinding toFinding(XMLStreamReader xml, String filePath, ParseContext context) {
+    private RawFinding toFinding(XMLStreamReader xml, String filePath, ParseContext context, Set<String> excluded) {
         String rule = attr(xml, "rule");
         if (!RULE.equals(rule)) {
             return null;
         }
         String modulePath = ComplexityReports.relativize(filePath);
         if (context.isExcluded(modulePath)) {
+            excluded.add(modulePath);
             return null;
         }
         String repoPath = ComplexityReports.repoRelative(filePath, modulePath, context.componentName());

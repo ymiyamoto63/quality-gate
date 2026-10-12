@@ -29,6 +29,9 @@ public record ReleaseReportResponse(
         @NotNull @Schema(description = "判定の対象外にした指標（設定で判定から外した指標と、対象外の結果）。"
                 + "合否の件数にも結論にも数えない。指標の一覧の並び")
         List<ReleaseNotJudgedMetric> notJudged,
+        @NotNull @Schema(nullable = true, description = "判定の範囲を狭めていた設定（判定したときの値。DD-28）。"
+                + "狭める設定が無ければ空。判定時の設定を記録する前（V004 より前）に判定した計測と、未計測なら null")
+        List<ReleaseCondition> conditions,
         @NotNull @Schema(description = "結果に現れた指標の説明（指標 ID ごとに 1 件、metrics と同じ並び）")
         List<ReleaseGuide> guides) {
 
@@ -60,7 +63,8 @@ public record ReleaseReportResponse(
             @NotNull @Schema(nullable = true,
                     description = "緩めたときの既定の合格ライン（≥ 75% など）。緩めていなければ null")
             String defaultThreshold,
-            @NotNull @Schema(description = "QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02。無ければ 0）")
+            @NotNull @Schema(description = "QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02 / M-05 / M-06 / M-11 / M-12。"
+                    + "M-05 / M-11 / M-12 は除外で検出の消えたファイルの数。無ければ 0）")
             int excludedFileCount,
             @NotNull @Schema(nullable = true) String reason,
             @NotNull @Schema(description = "不合格のときの主な違反（深刻な順に最大 10 件）。合格なら空") List<ReleaseFinding> findings,
@@ -74,6 +78,16 @@ public record ReleaseReportResponse(
             @NotNull @Schema(nullable = true, description = "対象外にしたコンポーネント。指標全体なら null") String componentName,
             @NotNull @Schema(description = "対象外にした理由（設定で判定から外した、ツールの制約で測りようがない など）")
             String reason) {
+    }
+
+    @Schema(description = "判定の範囲を狭めていた設定 1 件。文言はサーバが持ち、画面はそのまま表示する")
+    public record ReleaseCondition(
+            @NotNull @Schema(description = "設定の種類（exclusions / mutationComponents / perfScenarios / accessibilityPages）")
+            String key,
+            @NotNull @Schema(description = "何の条件か（計測から外したファイル など）") String label,
+            @NotNull @Schema(description = "設定した値（パターンの一覧など）。指定が無ければ「指定なし」") String value,
+            @NotNull @Schema(description = "判定にどう効くか（開発に携わっていない方向けの説明）") String note,
+            @NotNull @Schema(description = "設定した環境変数の名前") String setting) {
     }
 
     public record ReleaseFinding(

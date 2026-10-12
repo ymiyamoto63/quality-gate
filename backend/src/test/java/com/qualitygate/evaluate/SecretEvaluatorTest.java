@@ -46,6 +46,29 @@ class SecretEvaluatorTest {
         assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
     }
 
+    @Test
+    void 除外で検出の消えたファイルがあれば理由と内訳に残す() {
+        // 誤検出を外すつもりの除外でも、同じファイルの本物の鍵まで数えなくなる。「検出されませんでした」だけでは誤解を招く
+        EvaluationContext context = new EvaluationContext(run(), thresholdsWith(Map.of()),
+                new com.qualitygate.domain.report.NormalizedInput(List.of(), List.of(), Set.of("M-11"), Map.of(),
+                        Map.of("M-11", Set.of("config.py", "ci.env"))), Map.of(), false);
+
+        MetricResult result = evaluator.evaluate(context).getFirst();
+
+        assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(result.reason()).isEqualTo(
+                "シークレットは検出されませんでした（QG_EXCLUSIONS で検査から外した 2 ファイルに検出があり、件数に含めていません）");
+        assertThat(result.detail()).containsEntry("excludedFiles", 2);
+    }
+
+    @Test
+    void 除外したファイルが無ければ理由に書き添えない() {
+        MetricResult result = evaluate(Map.of(), List.of());
+
+        assertThat(result.reason()).isEqualTo("シークレットは検出されませんでした");
+        assertThat(result.detail()).containsEntry("excludedFiles", 0);
+    }
+
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(), thresholdsWith(config),
                 input(List.of(), findings, Set.of("M-11")), Map.of(), false);

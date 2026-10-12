@@ -2,6 +2,7 @@ package com.qualitygate.evaluate;
 
 import com.qualitygate.domain.metric.MetricCatalog;
 import com.qualitygate.domain.metric.MetricDefinition;
+import com.qualitygate.domain.model.JudgementScope;
 import com.qualitygate.platform.config.QualityGateProperties;
 
 import java.math.BigDecimal;
@@ -37,6 +38,12 @@ public record GateThresholds(Scope scope, Limits limits) {
         /** 判定しない指標（{@code QG_DISABLED_METRICS}）。指標の一覧の並び。 */
         public List<String> disabledMetrics() {
             return ALL_METRICS.stream().filter(metricId -> !enabledMetrics.contains(metricId)).toList();
+        }
+
+        /** Run に焼き付ける形（DD-27 / DD-28）。集合は並びを決めるため名前順にする。 */
+        public JudgementScope toRecorded() {
+            return new JudgementScope(disabledMetrics(), exclusions,
+                    mutationComponents.stream().sorted().toList(), perfScenarios, accessibilityPages);
         }
     }
 

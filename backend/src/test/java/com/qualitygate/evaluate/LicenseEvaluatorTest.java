@@ -83,6 +83,15 @@ class LicenseEvaluatorTest {
         assertThat(result.reason()).startsWith("使用禁止のライセンスのパッケージが 1 件ありますが、合格ライン 1 件以内です");
     }
 
+    @Test
+    void 除外で検出の消えたファイルの数を内訳に残す() {
+        EvaluationContext context = new EvaluationContext(run(), thresholdsWith(Map.of()),
+                new com.qualitygate.domain.report.NormalizedInput(List.of(), List.of(), Set.of("M-12"), Map.of(),
+                        Map.of("M-12", Set.of("frontend/package-lock.json"))), Map.of(), false);
+
+        assertThat(evaluator.evaluate(context).getFirst().detail()).containsEntry("excludedFiles", 1);
+    }
+
     private MetricResult evaluate(Map<String, Object> config, List<IdentifiedFinding> findings) {
         EvaluationContext context = new EvaluationContext(run(), thresholdsWith(config),
                 input(List.of(), findings, Set.of("M-12")), Map.of(), false);

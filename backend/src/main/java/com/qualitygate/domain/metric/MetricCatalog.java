@@ -34,7 +34,7 @@ public final class MetricCatalog {
             new MetricDefinition(M_VULNERABILITIES, "重大・高 脆弱性件数", false),
             new MetricDefinition(M_COMPLEXITY, "循環的複雑度が上限を超える関数の数", true),
             new MetricDefinition(M_BREAKING_CHANGES, "破壊的変更件数", false),
-            new MetricDefinition(M_ACCESSIBILITY, "アクセシビリティ違反", false),
+            new MetricDefinition(M_ACCESSIBILITY, "アクセシビリティ重大違反件数", false),
             new MetricDefinition(M_TEST_SUCCESS, "テスト成功率", true),
             new MetricDefinition(M_SKIPPED_TESTS, "スキップされたテスト数", true),
             new MetricDefinition(M_SECRETS, "シークレット検出件数", false),

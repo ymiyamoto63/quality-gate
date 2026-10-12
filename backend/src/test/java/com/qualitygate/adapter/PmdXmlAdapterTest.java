@@ -80,6 +80,24 @@ class PmdXmlAdapterTest {
     }
 
     @Test
+    void 除外したファイルは読まず件数を内訳に残す() {
+        NormalizedReport report = adapter.parse(stream(PMD), context(List.of("**/Big.java")));
+
+        assertThat(report.findings()).isEmpty();
+        // 除外も結果を良く見せうるため、件数の行の内訳に残して画面に出す（docs/metrics.md 2.3）
+        assertThat(report.measurements()).singleElement().satisfies(m -> assertThat(m.detail())
+                .containsEntry("analyzedFunctions", 0).containsEntry("excludedFiles", 1));
+    }
+
+    @Test
+    void 除外が無ければ除外したファイルは0件() {
+        NormalizedReport report = adapter.parse(stream(PMD), context(List.of()));
+
+        assertThat(report.measurements()).singleElement()
+                .satisfies(m -> assertThat(m.detail()).containsEntry("excludedFiles", 0));
+    }
+
+    @Test
     void PMDのレポートでなければ理由つきで拒否する() {
         assertThatThrownBy(() -> adapter.parse(stream("<other/>"), context(List.of())))
                 .isInstanceOf(ArtifactFormatException.class)

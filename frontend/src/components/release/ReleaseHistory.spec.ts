@@ -35,6 +35,26 @@ describe('ReleaseHistory', () => {
     ])
   })
 
+  it('判定の範囲を示し、外した指標のある合格とすべてでの合格を見分けられる', async () => {
+    const wrapper = await render([
+      historyItem(),
+      historyItem({
+        commitSha: 'b'.repeat(40),
+        judgedCount: 2,
+        notJudgedCount: 10,
+        thresholdRelaxed: true,
+        filesExcluded: true,
+      }),
+    ])
+
+    expect(wrapper.findAll('thead th').map((th) => th.text())).toContain('判定の範囲')
+    const cells = wrapper.findAll('td[data-label="判定の範囲"]')
+    expect(cells.map((td) => td.text().replace(/\s+/g, ' '))).toEqual([
+      '12 項目を判定',
+      '2 項目を判定（10 項目は対象外） 合格ラインを既定より緩和・計測から外したファイルあり',
+    ])
+  })
+
   it('印刷物には出さない', async () => {
     const wrapper = await render([historyItem()])
 

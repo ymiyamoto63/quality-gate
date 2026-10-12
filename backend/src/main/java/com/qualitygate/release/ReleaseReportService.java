@@ -21,11 +21,13 @@ import tools.jackson.databind.ObjectMapper;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * リリース判定。指定したタグ・コミット（指定が無ければ最新の計測）で判定済みの Run から、
@@ -131,6 +133,7 @@ public class ReleaseReportService {
                 counts,
                 rows,
                 notJudged,
+                ReleaseConditions.of(chosen).orElse(null),
                 guidesOf(rows));
     }
 
@@ -141,12 +144,32 @@ public class ReleaseReportService {
         if (repository.isEmpty()) {
             return new ReleaseHistoryResponse(List.of());
         }
-        List<ReleaseHistoryResponse.ReleaseHistoryItem> items = evaluatedRuns
-                .latestPerCommit(repository.get(), HISTORY_LIMIT).stream()
-                .map(run -> new ReleaseHistoryResponse.ReleaseHistoryItem(run.getMeasuredAt(), run.getCommitSha(),
-                        run.getTags(), run.getVerdict(), refOf(run)))
+        List<Run> latest = evaluatedRuns.latestPerCommit(repository.get(), HISTORY_LIMIT);
+        // 判定の範囲は Run をまたいで 1 回の集計で読む（Run ごとに結果を読むと履歴の件数だけ問い合わせが増える）
+        Map<UUID, MeasurementRepository.RunScopeSummary> summaries = new HashMap<>();
+        if (!latest.isEmpty()) {
+            measurements.summarizeScopeByRunIds(latest.stream().map(Run::getId).toList())
+                    .forEach(summary -> summaries.put(summary.getRunId(), summary));
+        }
+        List<ReleaseHistoryResponse.ReleaseHistoryItem> items = latest.stream()
+                .map(run -> historyItemOf(run, summaries.get(run.getId())))
                 .toList();
         return new ReleaseHistoryResponse(items);
+    }
+
+    /**
+     * 履歴の 1 行。判定した件数と対象外の件数は、リリース判定（{@link #report}）の {@code counts.judged} と
+     * {@code notJudged} と同じ数え方にする（設定で外した指標と、対象外の結果）。
+     */
+    private static ReleaseHistoryResponse.ReleaseHistoryItem historyItemOf(
+            Run run, MeasurementRepository.RunScopeSummary summary) {
+        int disabled = run.getDisabledMetrics().map(List::size).orElse(0);
+        return new ReleaseHistoryResponse.ReleaseHistoryItem(run.getMeasuredAt(), run.getCommitSha(),
+                run.getTags(), run.getVerdict(), refOf(run),
+                summary == null ? 0 : (int) summary.getJudged(),
+                disabled + (summary == null ? 0 : (int) summary.getNotApplicable()),
+                summary != null && summary.getRelaxed(),
+                summary != null && summary.getFilesExcluded());
     }
 
     /** リリース判定を開くときの指定。タグがあればタグ、無ければコミット SHA。 */
@@ -158,7 +181,7 @@ public class ReleaseReportService {
         return new ReleaseReportResponse(fullName, commitSha,
                 commitSha == null ? null : SourceLinks.commit(fullName, commitSha),
                 ReleaseDecision.NOT_MEASURED, reason, null, new ReleaseReportResponse.ReleaseCounts(0, 0, 0),
-                List.of(), List.of(), List.of());
+                List.of(), List.of(), null, List.of());
     }
 
     /**
@@ -250,7 +273,7 @@ public class ReleaseReportService {
 
     /**
      * {@code QG_EXCLUSIONS} で計測から外したファイルの数。内訳（{@code detail}）の {@code excludedFiles} を読む
-     * （M-01 / M-02 が記録する）。除外も合格ラインの緩和と同じく結果を良く見せうるため、画面に出す。
+     * （M-01 / M-02 / M-05 / M-06 / M-11 / M-12 が記録する。docs/metrics.md 2.3）。除外も合格ラインの緩和と同じく結果を良く見せうるため、画面に出す。
      */
     private int excludedFilesOf(Measurement m) {
         if (m.getDetail() == null || m.getDetail().isBlank()) {

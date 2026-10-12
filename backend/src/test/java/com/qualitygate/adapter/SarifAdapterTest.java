@@ -155,6 +155,44 @@ class SarifAdapterTest {
     }
 
     @Test
+    void 除外で検出の消えたファイルを重複なく数える() {
+        // 2 件の検出は同じファイル。除外したことを画面に出すため、ファイルの数として返す
+        NormalizedReport report = adapter.parse(stream(TRIVY), context(List.of("backend/pom.xml")));
+
+        assertThat(report.excludedFiles()).containsOnlyKeys("M-05");
+        assertThat(report.excludedFiles().get("M-05")).containsExactly("backend/pom.xml");
+    }
+
+    @Test
+    void 除外が無ければ除外したファイルも無い() {
+        NormalizedReport report = adapter.parse(stream(TRIVY), context(List.of()));
+
+        assertThat(report.excludedFiles()).isEmpty();
+    }
+
+    @Test
+    void 除外したファイルは振り分けた指標ごとに数える() {
+        // シークレットの誤検出をファイルごと外すと、本物の鍵も消える。M-11 の分を別に数えて画面に出す
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null,
+                List.of("config.py", "backend/pom.xml"),
+                java.util.Map.of("scanners", List.of("vuln", "secret", "license"))));
+
+        assertThat(report.findings()).isEmpty();
+        assertThat(report.excludedFiles()).containsOnlyKeys("M-05", "M-11", "M-12");
+        assertThat(report.excludedFiles().get("M-11")).containsExactly("config.py");
+        assertThat(report.excludedFiles().get("M-12")).containsExactly("backend/pom.xml");
+    }
+
+    @Test
+    void 宣言していない対象の検出は除外しても数えない() {
+        // 計測していない指標に「除外した」と出すと、計測したかのように読める
+        NormalizedReport report = adapter.parse(stream(TRIVY_ALL_SCANNERS), new ParseContext(null,
+                List.of("config.py"), java.util.Map.of("scanners", List.of("license"))));
+
+        assertThat(report.excludedFiles()).isEmpty();
+    }
+
+    @Test
     void SARIFでなければ理由つきで拒否する() {
         assertThatThrownBy(() -> adapter.parse(stream("{\"foo\":1}"), context(List.of())))
                 .isInstanceOf(ArtifactFormatException.class)

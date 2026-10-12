@@ -47,7 +47,7 @@ class ReleaseReportApiIT {
 
     /** 判定の対象外にした指標（M-01 / M-06 以外）を並べた、結論の理由の後半。 */
     private static final String NOT_JUDGED = "ミューテーションスコア、応答時間 p95、エラー率、重大・高 脆弱性件数、破壊的変更件数、"
-            + "アクセシビリティ違反、テスト成功率、スキップされたテスト数、シークレット検出件数、ライセンス違反件数";
+            + "アクセシビリティ重大違反件数、テスト成功率、スキップされたテスト数、シークレット検出件数、ライセンス違反件数";
 
     /** 分岐 20 のうち 17 を通った JaCoCo の結果（85%）。 */
     private static final String JACOCO_85 = """
@@ -125,6 +125,14 @@ class ReleaseReportApiIT {
                     json.extractingPath("$.metrics[1].metricId").isEqualTo("M-06");
                     json.extractingPath("$.metrics[1].thresholdRelaxed").isEqualTo(true);
                     json.extractingPath("$.metrics[1].defaultThreshold").isEqualTo("関数ごとの循環的複雑度の上限 15");
+                    // 判定の範囲を狭めていた設定（判定時に Run に焼き付けたもの）。判定した指標に効くものだけを出す
+                    json.extractingPath("$.conditions").asArray().hasSize(1);
+                    json.extractingPath("$.conditions[0].key").isEqualTo("exclusions");
+                    json.extractingPath("$.conditions[0].label").isEqualTo("計測から外したファイル");
+                    json.extractingPath("$.conditions[0].value").isEqualTo("**/generated/**");
+                    json.extractingPath("$.conditions[0].setting").isEqualTo("QG_EXCLUSIONS");
+                    json.extractingPath("$.conditions[0].note").asString()
+                            .contains("ブランチカバレッジ・循環的複雑度が上限を超える関数の数 の計測に含めていません");
                     json.extractingPath("$.guides[0].basisLabel").isEqualTo("業界の目安");
                     json.extractingPath("$.guides[0].summary").asString().contains("分かれ道");
                 });
@@ -185,6 +193,34 @@ class ReleaseReportApiIT {
                     json.extractingPath("$.notJudged[0].reason").asString().contains("JVM");
                     json.extractingPath("$.decisionReason").asString()
                             .contains("（11 件は判定の対象外です: ミューテーションスコア（frontend）、応答時間 p95、");
+                    // M-02 の対象を backend に限定した
+                    json.extractingPath("$.conditions").asArray().hasSize(1);
+                    json.extractingPath("$.conditions[0].key").isEqualTo("mutationComponents");
+                    json.extractingPath("$.conditions[0].value").isEqualTo("backend");
+                });
+        // 履歴でも、判定した件数と対象外の件数で判定の範囲が分かる（リリース判定と同じ数え方）
+        assertThat(mvc.get().uri("/api/v1/release/history"))
+                .hasStatusOk().bodyJson().satisfies(content -> {
+                    var json = content.assertThat();
+                    json.extractingPath("$.items[0].commitSha").isEqualTo(commitSha);
+                    json.extractingPath("$.items[0].judgedCount").asNumber().isEqualTo(3);
+                    json.extractingPath("$.items[0].notJudgedCount").asNumber().isEqualTo(11);
+                    json.extractingPath("$.items[0].thresholdRelaxed").isEqualTo(false);
+                    json.extractingPath("$.items[0].filesExcluded").isEqualTo(false);
+                });
+    }
+
+    @Test
+    void 判定の条件を記録する前に判定した計測は条件を返さない() {
+        // V004 より前に判定した Run（判定の範囲を狭める設定の列が NULL）。今の設定で補うと、過去の判定の条件を偽る
+        jdbc.update("update runs set exclusions = null, mutation_components = null, perf_scenarios = null, "
+                + "accessibility_pages = null where commit_sha = ?", PASSING);
+
+        assertThat(mvc.get().uri("/api/v1/release?ref={ref}", PASSING))
+                .hasStatusOk().bodyJson().satisfies(content -> {
+                    var json = content.assertThat();
+                    json.extractingPath("$.decision").isEqualTo("RELEASABLE");
+                    json.extractingPath("$.conditions").isNull();
                 });
     }
 
@@ -269,6 +305,11 @@ class ReleaseReportApiIT {
             json.extractingPath("$.items[1].ref").isEqualTo("v1.2.0");
             json.extractingPath("$.items[1].verdict").isEqualTo("FAIL");
             json.extractingPath("$.items[2].commitSha").isEqualTo(PASSING);
+            // 判定の範囲。M-01 / M-06 の 2 件だけを判定し、10 件は対象外。M-06 は合格ラインを緩め、M-01 はファイルを除外した
+            json.extractingPath("$.items[0].judgedCount").asNumber().isEqualTo(2);
+            json.extractingPath("$.items[0].notJudgedCount").asNumber().isEqualTo(10);
+            json.extractingPath("$.items[0].thresholdRelaxed").isEqualTo(true);
+            json.extractingPath("$.items[0].filesExcluded").isEqualTo(true);
         });
 
         FixtureWriter.write("release-history.json", response.getResponse().getContentAsString());

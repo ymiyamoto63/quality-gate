@@ -21,7 +21,7 @@ quality-gate が計測・判定する 12 の指標の一覧と、それぞれの
 | M-05 | セキュリティ | 重大・高 脆弱性件数 | Critical 0 件・High 0 件 | Trivy（SARIF） | `sarif` | `QG_CRITICAL_VULNERABILITIES_MAX` / `QG_HIGH_VULNERABILITIES_MAX` |
 | M-06 | コード構造 | 循環的複雑度が上限を超える関数の数 | 0 件 | PMD / ESLint | `pmd-xml` / `eslint-json` | `QG_COMPLEXITY_MAX` |
 | M-07 | 契約・互換性 | OpenAPI の破壊的変更件数 | 0 件 | oasdiff | `oasdiff-json` | `QG_BREAKING_CHANGES_MAX` |
-| M-08 | 使いやすさ | アクセシビリティ違反 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
+| M-08 | 使いやすさ | アクセシビリティ重大違反件数 | critical / serious 0 件 | Playwright + axe-core | `axe-json` | `QG_ACCESSIBILITY_VIOLATIONS_MAX` |
 | M-09 | 機能テスト | テスト成功率 | 100% | JUnit XML（Surefire / Failsafe / Vitest） | `test-junit-xml` | `QG_TEST_SUCCESS_RATE_MIN` |
 | M-10 | 機能テスト | スキップされたテスト数 | 0 件（backend / frontend それぞれ） | JUnit XML | `test-junit-xml` | `QG_SKIPPED_TESTS_MAX` |
 | M-11 | セキュリティ | シークレット検出件数 | 0 件 | Trivy（SARIF） | `sarif` | `QG_SECRETS_MAX` |
@@ -86,7 +86,17 @@ M-01・M-02・M-06・M-09・M-10 はコンポーネントごとに判定し（�
 そのため `backend/**/generated/**` のようなリポジトリ相対のパターンは JaCoCo に一致しない。**`**/` を先頭に付けた接尾一致で書く**（`**/generated/**`）。
 暗黙に `**/` を補うことはしない。書いたより広い範囲が黙って外れるのを防ぐためである。
 
-除外したファイル数は M-01 / M-02 の内訳（`measurements.detail` の `excludedFiles`）に残り、リリース判定の表の行に「N ファイルを計測から除外（QG_EXCLUSIONS）」と出る。除外パターンそのものは画面に出さないため、外した理由はデプロイの設定の変更履歴などに記録する。
+除外は結果を良く見せうるため、**適用する指標のすべてで、除外したファイルの数を残して画面に出す**。数は各指標の内訳（`measurements.detail` の `excludedFiles`）に残り、リリース判定の表の行に「N ファイルを計測から除外（QG_EXCLUSIONS）」と出る。
+
+| 指標 | 数えるもの |
+| --- | --- |
+| M-01 / M-02 | カバレッジ・ミューテーションのレポートで、除外に一致したファイル |
+| M-06 | PMD / ESLint のレポートで、除外に一致したファイル（コンポーネントごと） |
+| M-05 / M-11 / M-12 | SARIF の検出のうち、除外に一致して捨てたもののファイル（重複なし。複数の SARIF をまたいで数える）。SARIF は検出のあったファイルしか並べないため、「除外で検出が消えたファイル」の数になる |
+
+M-11 は、除外で検出の消えたファイルがあれば判定理由にも「（QG_EXCLUSIONS で検査から外した N ファイルに検出があり、件数に含めていません）」と書き添える。誤検出を外すつもりの除外でも、同じファイルの本物の鍵まで数えなくなるためである。
+
+除外パターンそのものも判定時に Run に残し（`runs.exclusions`。DD-28）、リリース判定の「判定の条件」に出す。後から `QG_EXCLUSIONS` を変えても、その判定の条件の表示は変わらない。外した理由はデプロイの設定の変更履歴などに記録する。
 
 ### 2.4 比較元と比較対象 Run
 
@@ -331,7 +341,7 @@ backend（PMD）と frontend（ESLint）を合算しない。合算すると、�
 
 意図した破壊的変更は API のバージョニング（`/v1` → `/v2`）で対応する。やむを得なければ合格ラインを変え、理由を記録する。
 
-### M-08 アクセシビリティ違反
+### M-08 アクセシビリティ重大違反件数
 
 **定義**: WCAG 2.2 AA を基準に axe-core が自動検出した違反のうち、重大（critical / serious）なものの件数。
 serious にはキーボードで操作できない・コントラスト不足など、実際に利用を妨げる違反が含まれるため、critical と合わせて判定する。
@@ -427,7 +437,7 @@ frontend は、Vitest に junit reporter を足して出した `junit.xml` を�
 **計測方法**: M-05 と同じ Trivy の走査（`--scanners vuln,secret`）。ルールの tags に `secret` がある検出（または gitleaks / trufflehog の SARIF）を M-11 に振り分ける。
 深刻度はすべて Critical。値そのものは持たず、ツールが伏せ字にした一致だけを残す。
 
-**判定**: 件数が `QG_SECRETS_MAX`（既定 0）を超えたら FAIL、それ以外は PASS。誤検出は `QG_EXCLUSIONS` でファイルごと外す。
+**判定**: 件数が `QG_SECRETS_MAX`（既定 0）を超えたら FAIL、それ以外は PASS。誤検出は `QG_EXCLUSIONS` でファイルごと外す。ファイルごと外すと同じファイルの本物の鍵も数えなくなるため、除外で検出の消えたファイルの数を判定理由と内訳（`excludedFiles`）に残す（2.3）。
 
 ### M-12 ライセンス違反件数
 
@@ -480,5 +490,5 @@ SARIF の成果物には、走査した対象をメタデータ `scanners` で�
 導入直後の 1〜2 週間は、しきい値には手を付けず、**計測そのものが信頼できるか**を次の点で確かめる。
 
 - 性能の 3 回実行の変動係数が 20% 以内に収まっているか
-- `QG_EXCLUSIONS` で意図せず広い範囲を外していないか（M-01 / M-02 の `excludedFiles`）
+- `QG_EXCLUSIONS` で意図せず広い範囲を外していないか（各指標の `excludedFiles`。リリース判定の行の「N ファイルを計測から除外」と「判定の条件」）
 - ERROR（成果物の未提出・形式不正）が出ていないか

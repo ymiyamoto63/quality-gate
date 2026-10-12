@@ -2,6 +2,7 @@
 import { computed } from 'vue'
 import StatusChip from '@/components/StatusChip.vue'
 import ReleaseNotJudged from '@/components/release/ReleaseNotJudged.vue'
+import ReleaseConditions from '@/components/release/ReleaseConditions.vue'
 import type { components } from '@/api/schema'
 import { formatDateTime, shortSha } from '@/api/format'
 import type { DisplayStatus } from '@/api/status'
@@ -12,7 +13,7 @@ type Decision = Report['decision']
 /**
  * リリース判定の結論（リリース可 / 不可 / 未計測）。画面の最上部に置き、ここを見れば結論がすぐ分かるようにする。
  *
- * 結論の見出し・理由・合否の件数の下に、判定の範囲（判定の対象外にした指標、既定より緩めた合格ライン）、
+ * 結論の見出し・理由・合否の件数の下に、判定の範囲（判定の対象外にした指標、判定の条件、既定より緩めた合格ライン）、
  * 判定に使った計測（タグ・コミット・計測日時・比較元）、印刷の操作を並べる。
  * 判定の範囲に関わる表示を足すときは、対象外の一覧（ReleaseNotJudged）と並べてここに置く。
  */
@@ -60,6 +61,8 @@ function print(): void {
       判定から外した指標があることを、開発に携わっていない方にも見落とされないようにする（DD-27）
     -->
     <ReleaseNotJudged :items="report.notJudged" />
+    <!-- 計測から外したファイルなど、確かめる範囲を狭めた設定（DD-28）。未計測なら判定が無いため出さない -->
+    <ReleaseConditions v-if="report.run" :conditions="report.conditions" />
     <p v-if="relaxedCount > 0" class="qg-release__scope-note">
       <i class="pi pi-exclamation-triangle" aria-hidden="true"></i>
       合格ラインを既定より緩めて判定した指標が

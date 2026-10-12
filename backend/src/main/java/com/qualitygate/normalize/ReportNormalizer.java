@@ -57,6 +57,7 @@ public class ReportNormalizer {
         Map<String, IdentifiedFinding> findings = new LinkedHashMap<>();
         Set<String> metricsWithData = new LinkedHashSet<>();
         Map<String, String> parseErrors = new HashMap<>();
+        Map<String, Set<String>> excludedFiles = new HashMap<>();
 
         for (ArtifactRecord artifact : artifacts) {
             ParseContext context = new ParseContext(artifact.getComponentName(),
@@ -66,6 +67,9 @@ public class ReportNormalizer {
                 measurements.addAll(report.measurements());
                 collect(report.findings(), findings);
                 metricsWithData.addAll(report.metricIdsWithData());
+                // 同じファイルを複数の成果物（Trivy と gitleaks など）が報告しても 1 件に数える
+                report.excludedFiles().forEach((metricId, paths) ->
+                        excludedFiles.computeIfAbsent(metricId, k -> new LinkedHashSet<>()).addAll(paths));
             } catch (ArtifactFormatException e) {
                 // 形式不正は再実行しても直らない。当該指標を ERROR とし、理由を残す。
                 log.warn("成果物の解析に失敗しました artifactId={} type={} reason={}",
@@ -76,7 +80,7 @@ public class ReportNormalizer {
         }
 
         return new NormalizedInput(measurements, List.copyOf(findings.values()),
-                Set.copyOf(metricsWithData), Map.copyOf(parseErrors));
+                Set.copyOf(metricsWithData), Map.copyOf(parseErrors), excludedFiles);
     }
 
     /**

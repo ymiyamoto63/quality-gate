@@ -1,5 +1,6 @@
 package com.qualitygate.domain.entity;
 
+import com.qualitygate.domain.model.JudgementScope;
 import com.qualitygate.domain.model.RunStatus;
 import com.qualitygate.domain.model.Verdict;
 import jakarta.persistence.Column;
@@ -13,7 +14,6 @@ import org.hibernate.type.SqlTypes;
 
 import java.time.Instant;
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -86,6 +86,29 @@ public class Run {
     @Column(name = "disabled_metrics", columnDefinition = "text[]")
     private List<String> disabledMetrics;
 
+    /**
+     * 判定したときの計測除外（{@code QG_EXCLUSIONS}）の glob パターン（DD-28）。除外は結果を良く見せうるため、
+     * 判定の条件としてリリース判定に出す。V004 より前に判定した Run では null（分からない）。
+     */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "exclusions", columnDefinition = "text[]")
+    private List<String> exclusions;
+
+    /** 判定したときの M-02 の対象コンポーネント（{@code QG_MUTATION_COMPONENTS}。DD-28）。V004 より前の Run では null。 */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "mutation_components", columnDefinition = "text[]")
+    private List<String> mutationComponents;
+
+    /** 判定したときの M-03 の判定すべきシナリオ（{@code QG_PERF_SCENARIOS}。DD-28）。V004 より前の Run では null。 */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "perf_scenarios", columnDefinition = "text[]")
+    private List<String> perfScenarios;
+
+    /** 判定したときの M-08 の検査すべきページ（{@code QG_ACCESSIBILITY_PAGES}。DD-28）。V004 より前の Run では null。 */
+    @JdbcTypeCode(SqlTypes.ARRAY)
+    @Column(name = "accessibility_pages", columnDefinition = "text[]")
+    private List<String> accessibilityPages;
+
     @Column(name = "error_code")
     private String errorCode;
 
@@ -146,9 +169,15 @@ public class Run {
         this.evaluatedAt = Instant.now();
     }
 
-    /** 判定から外した指標を記録する（判定のたびに、そのときの {@code QG_DISABLED_METRICS} で上書きする）。 */
-    public void applyDisabledMetrics(Collection<String> metricIds) {
-        this.disabledMetrics = new ArrayList<>(metricIds);
+    /**
+     * 判定の範囲を狭める設定を記録する（判定のたびに、そのときの設定で上書きする。DD-27 / DD-28）。
+     */
+    public void applyScope(JudgementScope scope) {
+        this.disabledMetrics = new ArrayList<>(scope.disabledMetrics());
+        this.exclusions = new ArrayList<>(scope.exclusions());
+        this.mutationComponents = new ArrayList<>(scope.mutationComponents());
+        this.perfScenarios = new ArrayList<>(scope.perfScenarios());
+        this.accessibilityPages = new ArrayList<>(scope.accessibilityPages());
     }
 
     public void markEvaluated(Verdict verdict, Instant at) {
@@ -199,6 +228,19 @@ public class Run {
     /** 判定から外した指標。V003 より前に判定した Run では空（分からない）。 */
     public Optional<List<String>> getDisabledMetrics() {
         return Optional.ofNullable(disabledMetrics).map(List::copyOf);
+    }
+
+    /**
+     * 判定したときの判定の範囲。範囲を狭める設定を焼き付ける前（V004 より前）に判定した Run では空（分からない）。
+     * 判定から外した指標だけは V003 から記録しているため、{@link #getDisabledMetrics()} で別に読める。
+     */
+    public Optional<JudgementScope> getScope() {
+        if (disabledMetrics == null || exclusions == null || mutationComponents == null || perfScenarios == null
+                || accessibilityPages == null) {
+            return Optional.empty();
+        }
+        return Optional.of(new JudgementScope(disabledMetrics, exclusions, mutationComponents, perfScenarios,
+                accessibilityPages));
     }
 
     public String getBranch() {

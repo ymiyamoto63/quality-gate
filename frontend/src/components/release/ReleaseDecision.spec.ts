@@ -61,6 +61,50 @@ describe('ReleaseDecision', () => {
     )
   })
 
+  it('判定の条件を、判定の対象外と並べて結論の下に示す', () => {
+    const wrapper = mount(ReleaseDecision, {
+      props: {
+        report: releaseReport({
+          notJudged: [
+            { metricId: 'M-02', name: 'ミューテーションスコア', componentName: null, reason: 'r' },
+          ],
+          conditions: [
+            {
+              key: 'exclusions',
+              label: '計測から外したファイル',
+              value: '**/generated/**',
+              note: 'n',
+              setting: 'QG_EXCLUSIONS',
+            },
+          ],
+        }),
+      },
+    })
+
+    expect(wrapper.find('#scope-heading').exists()).toBe(true)
+    expect(wrapper.find('#conditions-heading').exists()).toBe(true)
+    expect(wrapper.find('.qg-release__conditions dt').text()).toBe('計測から外したファイル')
+  })
+
+  it('条件を記録する前の計測では記録なしと示し、未計測では出さない', () => {
+    const old = mount(ReleaseDecision, { props: { report: releaseReport({ conditions: null }) } })
+    expect(old.find('.qg-release__conditions').text()).toContain('記録なし')
+
+    const notMeasured = mount(ReleaseDecision, {
+      props: {
+        report: releaseReport({
+          decision: 'NOT_MEASURED',
+          // API は未計測で run を null にする（生成した型は $ref の null を表せない）
+          run: null as never,
+          conditions: null,
+          counts: { judged: 0, passed: 0, failed: 0 },
+          metrics: [],
+        }),
+      },
+    })
+    expect(notMeasured.find('.qg-release__conditions').exists()).toBe(false)
+  })
+
   it('判定に使った計測をリンク付きで示す', () => {
     const wrapper = mount(ReleaseDecision, {
       props: {

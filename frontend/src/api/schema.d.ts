@@ -230,6 +230,19 @@ export interface components {
       /** @description 横軸に並べる計測（古い順、最大 50 件） */
       runs: components['schemas']['TrendRun'][]
     }
+    /** @description 判定の範囲を狭めていた設定 1 件。文言はサーバが持ち、画面はそのまま表示する */
+    ReleaseCondition: {
+      /** @description 設定の種類（exclusions / mutationComponents / perfScenarios / accessibilityPages） */
+      key: string
+      /** @description 何の条件か（計測から外したファイル など） */
+      label: string
+      /** @description 判定にどう効くか（開発に携わっていない方向けの説明） */
+      note: string
+      /** @description 設定した環境変数の名前 */
+      setting: string
+      /** @description 設定した値（パターンの一覧など）。指定が無ければ「指定なし」 */
+      value: string
+    }
     /** @description 合否に使った指標の件数 */
     ReleaseCounts: {
       /** Format: int32 */
@@ -265,12 +278,26 @@ export interface components {
     }
     ReleaseHistoryItem: {
       commitSha: string
+      /** @description QG_EXCLUSIONS で計測から外したファイルのある結果があるか（ファイル数は指標ごとに数えるため、合計せずに有無だけを出す） */
+      filesExcluded: boolean
+      /**
+       * Format: int32
+       * @description 合否に使った結果の件数（リリース判定の counts.judged と同じ数え方）
+       */
+      judgedCount: number
       /** Format: date-time */
       measuredAt: string
+      /**
+       * Format: int32
+       * @description 判定の対象外にした件数（設定で判定から外した指標と、対象外の結果。リリース判定の notJudged の件数）
+       */
+      notJudgedCount: number
       /** @description リリース判定を開くときの指定（タグがあればタグ、無ければコミット SHA） */
       ref: string
       /** @description 計測したコミットを指すタグ */
       tags: string[]
+      /** @description 既定より緩い合格ラインで判定した結果があるか */
+      thresholdRelaxed: boolean
       /** @enum {string} */
       verdict: 'PASS' | 'FAIL'
     }
@@ -283,7 +310,7 @@ export interface components {
       defaultThreshold: string | null
       /**
        * Format: int32
-       * @description QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02。無ければ 0）
+       * @description QG_EXCLUSIONS で計測から外したファイルの数（内訳に記録のある M-01 / M-02 / M-05 / M-06 / M-11 / M-12。M-05 / M-11 / M-12 は除外で検出の消えたファイルの数。無ければ 0）
        */
       excludedFileCount: number
       /**
@@ -324,6 +351,8 @@ export interface components {
       /** @description 判定したコミット。計測が 1 件も無ければ null */
       commitSha: string | null
       commitUrl: string | null
+      /** @description 判定の範囲を狭めていた設定（判定したときの値。DD-28）。狭める設定が無ければ空。判定時の設定を記録する前（V004 より前）に判定した計測と、未計測なら null */
+      conditions: components['schemas']['ReleaseCondition'][] | null
       counts: components['schemas']['ReleaseCounts']
       /** @enum {string} */
       decision: 'RELEASABLE' | 'NOT_RELEASABLE' | 'NOT_MEASURED'

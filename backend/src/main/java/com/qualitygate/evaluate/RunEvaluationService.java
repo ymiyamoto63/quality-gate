@@ -79,8 +79,8 @@ public class RunEvaluationService {
         EvaluationContext context = new EvaluationContext(run, thresholds,
                 input, previousValuesOf(previous), previousDetailsOf(previous), baseline.isPresent());
         List<MetricResult> results = markRelaxed(evaluateAll(context), context);
-        // 何を判定しなかったかも、合格ラインと同じく判定時に焼き付ける（DD-27）
-        run.applyDisabledMetrics(thresholds.scope().disabledMetrics());
+        // 何を判定しなかったか・何を計測から外したかも、合格ラインと同じく判定時に焼き付ける（DD-27 / DD-28）
+        run.applyScope(thresholds.scope().toRecorded());
 
         persistMeasurements(run, results, context);
         persistFindings(run, results, baseline);

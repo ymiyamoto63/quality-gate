@@ -18,6 +18,7 @@
 リリース判定の画面の「合格ライン」列はこの値から作るため、環境変数を後から変えても、判定済みの計測はそのときの合格ラインで表示される。
 
 判定から外した指標（`QG_DISABLED_METRICS`）も同じく判定時に `runs.disabled_metrics` に残し、画面の「判定の対象外」に使う（DD-27）。
+判定の範囲を狭める残りの設定（`GateThresholds.Scope` の判定する指標以外 = `QG_EXCLUSIONS`・`QG_MUTATION_COMPONENTS`・`QG_PERF_SCENARIOS`・`QG_ACCESSIBILITY_PAGES`）も判定時に `runs.exclusions` / `mutation_components` / `perf_scenarios` / `accessibility_pages` に残し、画面の「判定の条件」に使う（DD-28。[リリース判定 3.2](../release-report/design.md#32-判定の条件conditions)）。
 
 ## 3. 既定より緩い合格ラインの印
 
@@ -27,7 +28,7 @@
 - 向きが `>=` なら小さいほど、`<=` なら大きいほど緩い。比べ方（`basis`）の違うものは比べない。上限・下限の補足（`maxComplexity`・`maxCritical`・`maxHigh`・`minTestCount`・`arrivalRateRps`）も同じ向きで比べる。向きと名称は判定器が `Threshold.withLimit` で宣言し、緩い行にだけ `limits` として保存する（[判定 5 章](../evaluation/design.md#5-指標ごとの判定)）
 - 既定より厳しい値には印を付けない（品質の主張を弱めないため）
 - 印を足す前に判定した行には印が無く、緩くないものとして表示する
-- `QG_EXCLUSIONS` も結果を良く見せうるため、除外したファイルの数（M-01 / M-02 の内訳 `excludedFiles`）を行に出す。除外パターンそのものは出さない
+- `QG_EXCLUSIONS` も結果を良く見せうるため、除外したファイルの数（M-01 / M-02 / M-05 / M-06 / M-11 / M-12 の内訳 `excludedFiles`）を行に出し、除外パターンそのものは「判定の条件」に出す（DD-28）。合格ラインの値ではないため「既定より緩い」の印は付けない
 
 ## 4. 採らなかった方式
 

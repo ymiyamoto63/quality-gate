@@ -76,6 +76,8 @@ public class LicenseEvaluator implements MetricEvaluator {
         Threshold threshold = Threshold.atMost(maxForbidden);
         Map<String, Object> detail = new LinkedHashMap<>(counts);
         detail.put("packages", byPackage.size());
+        // QG_EXCLUSIONS で検出の消えたファイル（マニフェスト）の数（docs/metrics.md 2.3）
+        detail.put("excludedFiles", context.input().excludedFileCount(metricId()));
 
         MeasurementStatus status;
         String reason;

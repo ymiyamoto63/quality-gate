@@ -8,6 +8,7 @@ import com.qualitygate.domain.report.RawMeasurement;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * M-06（循環的複雑度）のレポートを読むアダプタ（{@link PmdXmlAdapter} / {@link EslintJsonAdapter}）に共通する処理。
@@ -24,10 +25,16 @@ final class ComplexityReports {
     /**
      * 解析した関数の件数を、成果物が届いたことの印としてコンポーネントごとに返す。
      * 関数が 1 つも無いコンポーネントでも行が残り、成果物の届かなかったコンポーネント（ERROR）と区別できる。
+     *
+     * <p>{@code QG_EXCLUSIONS} に一致して読み捨てたファイルの数（{@code excludedFiles}）も内訳に載せる。
+     * M-01 / M-02 と同じく、除外は結果を良く見せうるため画面に出す（docs/metrics.md 2.3）。
+     *
+     * @param excludedFiles 計測除外に一致したファイル（モジュール相対パス。重複なし）
      */
-    static RawMeasurement analyzed(List<RawFinding> findings, ParseContext context) {
+    static RawMeasurement analyzed(List<RawFinding> findings, Set<String> excludedFiles, ParseContext context) {
         return RawMeasurement.of(MetricCatalog.M_COMPLEXITY, context.componentName(),
-                BigDecimal.valueOf(findings.size()), "count", Map.of("analyzedFunctions", findings.size()));
+                BigDecimal.valueOf(findings.size()), "count",
+                Map.of("analyzedFunctions", findings.size(), "excludedFiles", excludedFiles.size()));
     }
 
     /**
