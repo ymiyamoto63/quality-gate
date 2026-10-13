@@ -17,7 +17,7 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * M-08 アクセシビリティ違反（docs/metrics.md M-08）。
+ * M-08 アクセシビリティ重大違反件数（docs/metrics.md M-08）。
  *
  * <p>判定の優先順位は次のとおり。上で決まったものは下を見ない。
  * <ol>
@@ -51,7 +51,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        GateThresholds.Accessibility thresholds = context.thresholds().accessibility();
+        GateThresholds.Accessibility thresholds = context.thresholds().limits().accessibility();
         Coverage coverage = Coverage.of(context.input().measurementsOf(metricId()));
         List<IdentifiedFinding> findings = context.input().findingsOf(metricId());
 
@@ -89,7 +89,7 @@ public class AccessibilityEvaluator implements MetricEvaluator {
         detail.put("engines", List.copyOf(coverage.engines()));
 
         // 違反はすべて残す。基準外や軽微なものも、一覧で見られなければ直しようがない
-        String error = errorOf(coverage, thresholds.pages());
+        String error = errorOf(coverage, context.thresholds().scope().accessibilityPages());
         if (error != null) {
             return List.of(MetricResult.of(metricId(), null, MeasurementStatus.ERROR, null,
                     UNIT, threshold, error, detail, findings));

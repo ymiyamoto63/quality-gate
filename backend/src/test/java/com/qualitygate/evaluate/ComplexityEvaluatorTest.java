@@ -4,6 +4,7 @@ import com.qualitygate.domain.model.MeasurementStatus;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import static com.qualitygate.evaluate.EvaluatorTestSupport.analyzed;
@@ -82,5 +83,23 @@ class ComplexityEvaluatorTest {
             assertThat(result.status()).isEqualTo(MeasurementStatus.PASS);
             assertThat(result.detail()).containsEntry("analyzedFunctions", 0);
         });
+    }
+
+    @Test
+    void 除外したファイルの数をコンポーネントごとに内訳に残す() {
+        // アダプタが件数の行の内訳に載せた数。同じコンポーネントの成果物が複数あれば足す
+        List<MetricResult> results = evaluator.evaluate(context(input(
+                List.of(excluded("backend", 2), excluded("backend", 1), excluded("frontend", 0)),
+                List.of(), Set.of("M-06"))));
+
+        assertThat(results).extracting(MetricResult::componentName, result -> result.detail().get("excludedFiles"))
+                .containsExactly(
+                        org.assertj.core.groups.Tuple.tuple("backend", 3),
+                        org.assertj.core.groups.Tuple.tuple("frontend", 0));
+    }
+
+    private static com.qualitygate.domain.report.RawMeasurement excluded(String component, int files) {
+        return com.qualitygate.domain.report.RawMeasurement.of("M-06", component, java.math.BigDecimal.ZERO, "count",
+                Map.of("analyzedFunctions", 0, "excludedFiles", files));
     }
 }

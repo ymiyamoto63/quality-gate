@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -42,6 +43,10 @@ import java.util.regex.Pattern;
  *
  * <p>宣言が無い SARIF は従来どおりすべてを M-05 として読む。シークレットの分離を知らない送り手の
  * シークレットが、判定から黙って消えないようにするためである。
+ *
+ * <p>計測除外（{@code QG_EXCLUSIONS}）に一致した検出は捨て、そのファイルのパスを指標ごとに
+ * {@link NormalizedReport#excludedFiles()} として返す（docs/metrics.md 2.3）。SARIF が並べるのは検出のあったファイルだけなので、
+ * 数えるのは「除外で検出が消えたファイル」である。
  */
 @Component
 public class SarifAdapter implements ArtifactAdapter {
@@ -89,7 +94,9 @@ public class SarifAdapter implements ArtifactAdapter {
         }
 
         Set<String> declared = declaredMetrics(context);
+        Set<String> supplied = declared == null ? UNDECLARED_METRICS : declared;
         List<RawFinding> findings = new ArrayList<>();
+        Map<String, Set<String>> excluded = new HashMap<>();
         for (JsonNode run : runs) {
             String toolName = toolNameOf(run);
             if (COMPLEXITY_TOOLS.contains(toolName)) {
@@ -99,15 +106,25 @@ public class SarifAdapter implements ArtifactAdapter {
             }
             Map<String, JsonNode> rules = rulesOf(run);
             for (JsonNode result : run.path("results")) {
-                RawFinding finding = toFinding(result, rules, toolName, context, declared != null);
+                JsonNode rule = rules.getOrDefault(result.path("ruleId").asString(""), objectMapper.nullNode());
+                String metricId = declared != null ? metricOf(rule, toolName) : VULNERABILITY_METRIC;
                 // 宣言していない対象の検出は捨てる（その指標は計測していないことになっている）
-                if (finding != null && (declared == null || declared.contains(finding.metricId()))) {
-                    findings.add(finding);
+                if (!supplied.contains(metricId)) {
+                    continue;
                 }
+                String filePath = filePathOf(result);
+                if (context.isExcluded(filePath)) {
+                    // 除外で消えた検出のファイルを指標ごとに数える。シークレットの誤検出をファイルごと外すと、
+                    // 本物の鍵も黙って消えうる。件数を画面に出し、合格の意味を読み違えないようにする
+                    excluded.computeIfAbsent(metricId, k -> new TreeSet<>()).add(filePath);
+                    continue;
+                }
+                findings.add(toFinding(result, rule, metricId, filePath, toolName, context));
             }
         }
         return NormalizedReport.of(ArtifactType.SARIF, List.of(), findings)
-                .withSuppliedMetrics(declared == null ? UNDECLARED_METRICS : declared);
+                .withSuppliedMetrics(supplied)
+                .withExcludedFiles(excluded);
     }
 
     /** メタデータの {@code scanners} から、値を与える指標を決める。宣言が無ければ null。 */
@@ -130,16 +147,9 @@ public class SarifAdapter implements ArtifactAdapter {
         return metrics;
     }
 
-    private RawFinding toFinding(JsonNode result, Map<String, JsonNode> rules,
-                                 String toolName, ParseContext context, boolean split) {
+    private RawFinding toFinding(JsonNode result, JsonNode rule, String metricId, String filePath,
+                                 String toolName, ParseContext context) {
         String ruleId = result.path("ruleId").asString("");
-        String filePath = filePathOf(result);
-        if (context.isExcluded(filePath)) {
-            return null;
-        }
-
-        JsonNode rule = rules.getOrDefault(ruleId, objectMapper.nullNode());
-        String metricId = split ? metricOf(rule, toolName) : VULNERABILITY_METRIC;
         if (LICENSE_METRIC.equals(metricId)) {
             return toLicenseFinding(result, rule, ruleId, filePath, context);
         }

@@ -297,6 +297,52 @@ class EvaluationPipelineIT {
     }
 
     @Test
+    void 判定の範囲を狭める設定を判定時の設定のままRunに残す() {
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
+
+        Run evaluated = evaluate(run, scopedGate(only("M-01"), List.of("**/Main.java", "**/*.d.ts"),
+                List.of("backend"), List.of("list"), List.of()));
+
+        assertThat(evaluated.getScope()).hasValueSatisfying(scope -> {
+            assertThat(scope.disabledMetrics()).hasSize(11);
+            assertThat(scope.exclusions()).containsExactly("**/Main.java", "**/*.d.ts");
+            assertThat(scope.mutationComponents()).containsExactly("backend");
+            assertThat(scope.perfScenarios()).containsExactly("list");
+            assertThat(scope.accessibilityPages()).isEmpty();
+        });
+    }
+
+    @Test
+    void 除外で検出の消えたシークレットのファイルを数えて理由に書き添える() {
+        // 誤検出を外すつもりの除外でも、同じファイルの本物の鍵は数えなくなる。合格を言葉どおりに読ませない
+        Run run = createRun(Instant.parse("2026-09-22T00:00:00Z"));
+        attach(run, ArtifactType.SARIF, "trivy.sarif", null, """
+                { "version": "2.1.0", "runs": [{
+                  "tool": { "driver": { "name": "Trivy", "rules": [
+                    { "id": "aws-access-key-id", "properties": { "security-severity": "9.5", "tags": ["secret"] } }
+                  ]}},
+                  "results": [
+                    { "ruleId": "aws-access-key-id", "level": "error", "message": { "text": "Secret" },
+                      "locations": [{ "physicalLocation": { "artifactLocation": { "uri": "config.py" } } }] }
+                  ]
+                }]}
+                """, SCANNED_VULN_AND_SECRET);
+        attach(run, ArtifactType.PMD_XML, "pmd.xml", "backend", PMD);
+
+        Run evaluated = evaluate(run, scopedGate(only("M-05", "M-06", "M-11"),
+                List.of("config.py", "**/Good.java"), List.of(), List.of(), List.of()));
+
+        assertThat(evaluated.getVerdict()).isEqualTo(Verdict.PASS);
+        Measurement secrets = measurementOf(run, "M-11");
+        assertThat(secrets.getStatus()).isEqualTo(MeasurementStatus.PASS);
+        assertThat(secrets.getReason()).contains("QG_EXCLUSIONS で検査から外した 1 ファイルに検出があり");
+        assertThat(secrets.getDetail()).contains("\"excludedFiles\": 1");
+        assertThat(measurementOf(run, "M-05").getDetail()).contains("\"excludedFiles\": 0");
+        assertThat(measurementOf(run, "M-06").getDetail()).contains("\"excludedFiles\": 1");
+    }
+
+    @Test
     void 既定より緩めた合格ラインは判定時に印を付けて残す() {
         Run relaxedRun = createRun(Instant.parse("2026-09-22T00:00:00Z"));
         attach(relaxedRun, ArtifactType.JACOCO_XML, "jacoco.xml", "backend", JACOCO);
@@ -696,7 +742,7 @@ class EvaluationPipelineIT {
     private Run evaluate(Run run, QualityGateProperties.Gate gate) {
         List<ArtifactRecord> records = artifacts.findByRunId(run.getId());
         GateThresholds thresholds = GateThresholds.from(gate);
-        NormalizedInput input = normalizer.normalize(records, thresholds.exclusions());
+        NormalizedInput input = normalizer.normalize(records, thresholds.scope().exclusions());
         evaluationService.evaluate(run.getId(), input, thresholds);
         return runs.findById(run.getId()).orElseThrow();
     }
@@ -707,6 +753,20 @@ class EvaluationPipelineIT {
         return new QualityGateProperties.Gate(disabledMetrics, null, branchCoverageMin, null, mutationComponents,
                 null, null, null, null, null, null, null, null, null, accessibilityPages, null, null, null,
                 null, null);
+    }
+
+    /** 判定の範囲を狭める設定（QG_EXCLUSIONS など）。合格ラインは既定値。 */
+    private static QualityGateProperties.Gate scopedGate(List<String> disabledMetrics, List<String> exclusions,
+                                                         List<String> mutationComponents, List<String> perfScenarios,
+                                                         List<String> accessibilityPages) {
+        return new QualityGateProperties.Gate(disabledMetrics, exclusions, null, null, mutationComponents,
+                null, null, null, perfScenarios, null, null, null, null, null, accessibilityPages, null, null, null,
+                null, null);
+    }
+
+    private Measurement measurementOf(Run run, String metricId) {
+        return measurements.findByRunId(run.getId()).stream()
+                .filter(m -> m.getMetricId().equals(metricId)).findFirst().orElseThrow();
     }
 
     /** 指定した指標だけを判定する（それ以外を QG_DISABLED_METRICS に並べる）。 */

@@ -86,6 +86,17 @@ class EslintJsonAdapterTest {
 
         assertThat(report.findings()).extracting(RawFinding::identity)
                 .noneMatch(identity -> identity.startsWith("src/main.ts"));
+        // 除外したファイルの数は件数の行の内訳に残し、画面に出す（docs/metrics.md 2.3）
+        assertThat(report.measurements()).singleElement()
+                .satisfies(m -> assertThat(m.detail()).containsEntry("excludedFiles", 1));
+    }
+
+    @Test
+    void 除外が無ければ除外したファイルは0件() {
+        NormalizedReport report = adapter.parse(stream(ESLINT), context(List.of()));
+
+        assertThat(report.measurements()).singleElement()
+                .satisfies(m -> assertThat(m.detail()).containsEntry("excludedFiles", 0));
     }
 
     @Test

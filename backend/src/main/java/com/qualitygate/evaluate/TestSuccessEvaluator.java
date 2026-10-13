@@ -43,9 +43,9 @@ public class TestSuccessEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        GateThresholds.TestResults thresholds = context.thresholds().testResults();
+        GateThresholds.TestResults thresholds = context.thresholds().limits().testResults();
         Threshold threshold = Threshold.atLeast(thresholds.minSuccessRate())
-                .with("minTestCount", thresholds.minTestCount());
+                .withLimit("minTestCount", Threshold.AT_LEAST, "最小実行件数", thresholds.minTestCount());
 
         List<MetricResult> results = new ArrayList<>();
         tallyByComponent(context).forEach((component, tally) -> {

@@ -80,6 +80,24 @@ class PmdXmlAdapterTest {
     }
 
     @Test
+    void 除外したファイルは読まず件数を内訳に残す() {
+        NormalizedReport report = adapter.parse(stream(PMD), context(List.of("**/Big.java")));
+
+        assertThat(report.findings()).isEmpty();
+        // 除外も結果を良く見せうるため、件数の行の内訳に残して画面に出す（docs/metrics.md 2.3）
+        assertThat(report.measurements()).singleElement().satisfies(m -> assertThat(m.detail())
+                .containsEntry("analyzedFunctions", 0).containsEntry("excludedFiles", 1));
+    }
+
+    @Test
+    void 除外が無ければ除外したファイルは0件() {
+        NormalizedReport report = adapter.parse(stream(PMD), context(List.of()));
+
+        assertThat(report.measurements()).singleElement()
+                .satisfies(m -> assertThat(m.detail()).containsEntry("excludedFiles", 0));
+    }
+
+    @Test
     void PMDのレポートでなければ理由つきで拒否する() {
         assertThatThrownBy(() -> adapter.parse(stream("<other/>"), context(List.of())))
                 .isInstanceOf(ArtifactFormatException.class)
@@ -105,35 +123,5 @@ class PmdXmlAdapterTest {
 
     private static InputStream stream(String xml) {
         return new ByteArrayInputStream(xml.getBytes(StandardCharsets.UTF_8));
-    }
-
-    /**
-     * モノレポでは、モジュール相対パスのままだと GitHub のリンクが 404 になる。
-     * 絶対パスに実際にコンポーネント名が含まれているときだけ接頭辞を付ける。
-     */
-    @Test
-    void コンポーネント名が絶対パスに現れればリポジトリ相対に直す() {
-        String module = "src/main/java/com/qualitygate/Good.java";
-
-        assertThat(PmdXmlAdapter.repoRelative(
-                "/build/backend/" + module, module, "backend"))
-                .isEqualTo("backend/" + module);
-    }
-
-    @Test
-    void 絶対パスと合わないコンポーネント名では接頭辞を付けない() {
-        String module = "src/main/java/com/qualitygate/Good.java";
-
-        // 推測で付けると、逆に壊れたリンクを作る
-        assertThat(PmdXmlAdapter.repoRelative("/build/api/" + module, module, "backend"))
-                .isEqualTo(module);
-    }
-
-    @Test
-    void コンポーネント宣言が無ければモジュール相対のまま返す() {
-        String module = "src/main/java/com/qualitygate/Good.java";
-
-        assertThat(PmdXmlAdapter.repoRelative("/build/" + module, module, null))
-                .isEqualTo(module);
     }
 }

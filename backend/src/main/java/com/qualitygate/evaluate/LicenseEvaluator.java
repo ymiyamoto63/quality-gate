@@ -48,7 +48,7 @@ public class LicenseEvaluator implements MetricEvaluator {
 
     @Override
     public List<MetricResult> evaluate(EvaluationContext context) {
-        int maxForbidden = context.thresholds().security().maxForbiddenLicenses();
+        int maxForbidden = context.thresholds().limits().security().maxForbiddenLicenses();
 
         // パッケージ（とコンポーネント）ごとに、最も緩い分類を採る
         Map<String, List<IdentifiedFinding>> byPackage = new LinkedHashMap<>();
@@ -76,6 +76,8 @@ public class LicenseEvaluator implements MetricEvaluator {
         Threshold threshold = Threshold.atMost(maxForbidden);
         Map<String, Object> detail = new LinkedHashMap<>(counts);
         detail.put("packages", byPackage.size());
+        // QG_EXCLUSIONS で検出の消えたファイル（マニフェスト）の数（docs/metrics.md 2.3）
+        detail.put("excludedFiles", context.input().excludedFileCount(metricId()));
 
         MeasurementStatus status;
         String reason;

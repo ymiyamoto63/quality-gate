@@ -158,7 +158,7 @@ footer { margin-top: 56px; color: var(--muted); font-size: 13px; }
   <p class="kicker">QUALITY-GATE ／ 仕様概要</p>
   <h1>1 つの対象アプリが「リリースしてよいか」を、<br>誰にでも分かる 1 画面で示す</h1>
   <p class="lead">quality-gate は、対象アプリの品質を 12 の指標で計測・判定する社内向け Web アプリケーションです。結論は<strong>リリース可 / リリース不可</strong>の形で示し、開発に携わっていない人にもひと目で分かるようにします。そのコミットの計測が無ければ<strong>未計測</strong>と示し、リリース可とはしません。</p>
-  <div class="callout">このページは、初めて quality-gate に触れる方向けの 1 枚の概要です。仕様の正本は <a href="../README.md"><code>README.md</code></a> と <code>docs/*.md</code>（<a href="architecture.md">アーキテクチャ</a>・<a href="metrics.md">指標</a>・<a href="operations.md">運用</a>・<a href="development.md">開発環境</a>）です。記述が食い違うときは .md の側が正しいものとします。</div>
+  <div class="callout">このページは、初めて quality-gate に触れる方向けの 1 枚の概要です。仕様の正本は <a href="../README.md"><code>README.md</code></a> と <code>docs/*.md</code>（<a href="architecture.md">アーキテクチャ</a>・<a href="metrics.md">指標</a>・<a href="operations.md">運用</a>・<a href="development.md">開発環境</a>）です。記述が食い違うときは .md の側が正しいものとします。指標の ID と名前、環境変数（<code>QG_*</code>）の書き写しは、PR の CI（<code>scripts/check-docs.mjs</code>）がコードと突き合わせています。</div>
 </header>
 
 <section id="features">
@@ -285,7 +285,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプ
     <tr><td class="id">M-02</td><td>機能テスト</td><td>ミューテーションスコア</td><td>60% 以上（backend のみ）</td><td>PIT</td><td><code>QG_MUTATION_SCORE_MIN</code></td></tr>
     <tr><td class="id">M-03</td><td>性能</td><td>応答時間 p95</td><td>50 req/s の負荷下で 500ms 以内</td><td>k6</td><td><code>QG_RESPONSE_TIME_P95_MAX_MS</code> / <code>QG_ARRIVAL_RATE_RPS</code></td></tr>
     <tr><td class="id">M-04</td><td>性能</td><td>エラー率</td><td>0.1% 以下</td><td>k6</td><td><code>QG_ERROR_RATE_MAX_PCT</code></td></tr>
-    <tr><td class="id">M-05</td><td>セキュリティ</td><td>重大・高 脆弱性件数</td><td>Critical 0・High 0</td><td>Trivy (SARIF)</td><td><code>QG_CRITICAL_/HIGH_VULNERABILITIES_MAX</code></td></tr>
+    <tr><td class="id">M-05</td><td>セキュリティ</td><td>重大・高 脆弱性件数</td><td>Critical 0・High 0</td><td>Trivy (SARIF)</td><td><code>QG_CRITICAL_VULNERABILITIES_MAX</code> / <code>QG_HIGH_VULNERABILITIES_MAX</code></td></tr>
     <tr><td class="id">M-06</td><td>コード構造</td><td>循環的複雑度が上限を超える関数の数</td><td>0 件</td><td>PMD / ESLint</td><td><code>QG_COMPLEXITY_MAX</code></td></tr>
     <tr><td class="id">M-07</td><td>契約・互換性</td><td>OpenAPI の破壊的変更件数</td><td>0 件</td><td>oasdiff</td><td><code>QG_BREAKING_CHANGES_MAX</code></td></tr>
     <tr><td class="id">M-08</td><td>使いやすさ</td><td>アクセシビリティ重大違反件数</td><td>critical / serious 0 件</td><td>Playwright + axe-core</td><td><code>QG_ACCESSIBILITY_VIOLATIONS_MAX</code></td></tr>
@@ -298,7 +298,7 @@ export QG_BASE_URL=http://localhost:8080 QG_INGEST_TOKEN=&lt;quality-gate アプ
 <ul>
   <li><code>QG_DISABLED_METRICS</code> に書いた指標は判定しない（収集ランナーも計測しない）。外した指標は判定時に Run に残り、リリース判定の結論の下に「判定の対象外」として出る</li>
   <li>合格ラインを既定値より緩めると、リリース判定の行に「既定より緩い（既定 ≥ 75%）」と出る</li>
-  <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す</li>
+  <li><code>QG_EXCLUSIONS</code>（glob、<code>**/</code> 始まりの接尾一致で書く）に一致するファイルは M-01・M-02・M-05・M-06・M-11・M-12 の計測から外す。外したファイルの数はそれぞれの指標の行に、除外パターンは結論の下の「判定の条件」に出る（判定時に Run に残す。DD-28）</li>
   <li>性能計測は <code>QG_ARRIVAL_RATE_RPS</code>（既定 50、到達率）と <code>QG_PERF_SCENARIOS</code>（必須のシナリオ）でも調整できる。ミューテーションの対象コンポーネントは <code>QG_MUTATION_COMPONENTS</code>（既定 backend）、M-08 で検査されているべき画面は <code>QG_ACCESSIBILITY_PAGES</code></li>
   <li>M-03 の値は本番の性能を表さない（k6 とアプリが同じコンテナで動く）。それでも負荷条件と専有のランナーを固定したうえで合格ラインの絶対値で判定し、結果はリリース判定に効く。合格ラインは本番の SLO を写さず、この計測環境に合わせて決める。前回比は補足として示す</li>
 </ul>
@@ -338,10 +338,10 @@ NOT_APPLICABLE は影響しない</pre>
 <h3>7.1 リリース判定</h3>
 <p>パスは <code>/</code>（<code>?ref=&lt;タグかコミット&gt;</code> で指定可）。上から次の順に並べます。</p>
 <ol>
-  <li><strong>結論</strong> — リリース可 / リリース不可 / 未計測 を大きく表示</li>
+  <li><strong>結論</strong> — リリース可 / リリース不可 / 未計測 を大きく表示。その下に「判定の対象外」（判定から外した指標）と「判定の条件」（計測から外したファイル、対象を限定した設定、シナリオ・画面の指定が無いこと）を並べ、結論が何についてのものかを示す</li>
   <li><strong>品質基準ごとの合否</strong> — 不合格の指標には理由と主な違反（深刻な順に最大 10 件、GitHub の該当箇所へのリンク）</li>
   <li><strong>各指標の説明と基準の根拠</strong> — 根拠の種類（外部基準 / 業界の目安 / チーム判断）と、満たさないと何が起きるか</li>
-  <li><strong>判定の履歴</strong> — 新しい順、最大 50 件。各判定を開ける</li>
+  <li><strong>判定の履歴</strong> — 新しい順、最大 50 件。各判定を開ける。判定した項目と対象外の項目の数、緩めた合格ライン・計測から外したファイルの有無も出し、指標を外した合格とすべての指標での合格を見分けられる</li>
 </ol>
 <p>リリース判断者向けの読み方の手引きは、この画面そのものです。各指標の意味・根拠・合格ラインの説明を画面に出し、別の手引き書は持ちません（DD-24）。</p>
 <h3>7.2 指標の推移</h3>
@@ -520,6 +520,10 @@ NOT_APPLICABLE は影響しない</pre>
     <tr><td><code>tags</code></td><td><code>text[]</code></td><td class="c">○</td><td><code>&#x27;{}&#x27;</code></td><td></td><td>計測したコミットを指すタグ。リリース判定でタグを解決するのに使う</td></tr>
     <tr><td><code>components</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>収集ランナーが申告した、成果物を送るコンポーネント。結果の無いコンポーネントを計測エラーにするのに使う（V003 より前の Run は NULL）</td></tr>
     <tr><td><code>disabled_metrics</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときに <code>QG_DISABLED_METRICS</code> で外していた指標（V003 より前の Run は NULL）</td></tr>
+    <tr><td><code>exclusions</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときの <code>QG_EXCLUSIONS</code>（計測除外のパターン。V004 より前の Run は NULL）</td></tr>
+    <tr><td><code>mutation_components</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときの <code>QG_MUTATION_COMPONENTS</code>（V004 より前の Run は NULL）</td></tr>
+    <tr><td><code>perf_scenarios</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときの <code>QG_PERF_SCENARIOS</code>（V004 より前の Run は NULL）</td></tr>
+    <tr><td><code>accessibility_pages</code></td><td><code>text[]</code></td><td class="c"></td><td></td><td></td><td>判定したときの <code>QG_ACCESSIBILITY_PAGES</code>（V004 より前の Run は NULL）</td></tr>
     <tr><td><code>baseline_run_id</code></td><td><code>uuid</code></td><td class="c"></td><td></td><td>FK → runs.id（SET NULL）</td><td>比較対象 Run（前回比・違反の差分の起点）</td></tr>
     <tr><td><code>status</code></td><td><code>varchar(16)</code></td><td class="c">○</td><td></td><td>CHECK ②</td><td>処理の状態</td></tr>
     <tr><td><code>verdict</code></td><td><code>varchar(24)</code></td><td class="c"></td><td></td><td>CHECK ③</td><td>判定結果。判定前は NULL</td></tr>
@@ -655,7 +659,7 @@ cd backend &amp;&amp; ./mvnw spring-boot:run   # http://localhost:8080</pre>
     <tr><td>可用性</td><td>quality-gate の障害が対象の開発を止めない。DB は日次バックアップ</td></tr>
     <tr><td>セキュリティ</td><td>TLS、秘密情報は環境変数で渡してログに出さない、アップロードのサイズ上限と形式検証、XML 外部実体参照の無効化</td></tr>
     <tr><td>運用</td><td><code>/actuator/health</code>、Prometheus メトリクス、相関 ID（<code>requestId</code> / <code>runId</code>）付きログ</td></tr>
-    <tr><td>自身の品質</td><td>quality-gate 自身は計測対象にせず、PR の CI（<code>ci.yml</code>）で単体・結合テスト、静的検査、生成物の同期、アクセシビリティ、脆弱性を確認</td></tr>
+    <tr><td>自身の品質</td><td>quality-gate 自身は計測対象にせず、PR の CI（<code>ci.yml</code>）で単体・結合テスト、静的検査、生成物の同期、アクセシビリティ、脆弱性、ドキュメントの整合性を確認</td></tr>
   </tbody>
 </table></div>
 <h3>制約</h3>
